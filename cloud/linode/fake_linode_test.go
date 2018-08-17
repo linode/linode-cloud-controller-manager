@@ -1,17 +1,18 @@
 package linode
 
 import (
-	"github.com/chiefy/linodego"
-	"testing"
-	"net/http"
-	"strings"
-	"path/filepath"
 	"encoding/json"
-	"strconv"
-	"time"
 	"math/rand"
 	"net"
+	"net/http"
+	"path/filepath"
 	"regexp"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/linode/linodego"
 )
 
 // fakeAPI implements a fake, cached DO API
@@ -19,21 +20,22 @@ type fakeAPI struct {
 	t        *testing.T
 	volumes  map[string]*linodego.Volume
 	instance *linodego.Instance
-	ips []*linodego.InstanceIP
-	nb map[string]*linodego.NodeBalancer
-	nbc map[string]*linodego.NodeBalancerConfig
-	nbn map[string]*linodego.NodeBalancerNode
+	ips      []*linodego.InstanceIP
+	nb       map[string]*linodego.NodeBalancer
+	nbc      map[string]*linodego.NodeBalancerConfig
+	nbn      map[string]*linodego.NodeBalancerNode
 }
 
 type filterStruct struct {
 	Label string `json:"label,omitempty"`
-	NbId string `json:"nodebalancer_id,omitempty"`
+	NbId  string `json:"nodebalancer_id,omitempty"`
 }
-func newFake(t *testing.T) *fakeAPI  {
+
+func newFake(t *testing.T) *fakeAPI {
 	publicIp := net.ParseIP("45.79.101.25")
 	privateIp := net.ParseIP("192.168.133.65")
 	instanceName := "test-instance"
-	region:= "us-east"
+	region := "us-east"
 	return &fakeAPI{
 		t: t,
 		instance: &linodego.Instance{
@@ -53,29 +55,26 @@ func newFake(t *testing.T) *fakeAPI  {
 			},
 		},
 		ips: []*linodego.InstanceIP{
-				{
-					Address: publicIp.String(),
-					Public:true,
-					LinodeID: 123,
-					Type: "ipv4",
-					Region: region,
-				},
-				{
-					Address: privateIp.String(),
-					Public:false,
-					LinodeID:123,
-					Type: "ipv4",
-					Region:region,
-				},
+			{
+				Address:  publicIp.String(),
+				Public:   true,
+				LinodeID: 123,
+				Type:     "ipv4",
+				Region:   region,
+			},
+			{
+				Address:  privateIp.String(),
+				Public:   false,
+				LinodeID: 123,
+				Type:     "ipv4",
+				Region:   region,
+			},
 		},
-		nb: make(map[string]*linodego.NodeBalancer),
+		nb:  make(map[string]*linodego.NodeBalancer),
 		nbc: make(map[string]*linodego.NodeBalancerConfig),
 		nbn: make(map[string]*linodego.NodeBalancerNode),
 	}
 }
-
-
-
 
 func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -83,15 +82,15 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		whichApi := strings.Split(urlPath[1:], "/")
-		switch whichApi[0]{
+		switch whichApi[0] {
 		case "linode":
 			switch whichApi[1] {
 			case "instances":
 				rx, _ := regexp.Compile("/linode/instances/[0-9]+/ips")
-				if rx.MatchString(urlPath){
+				if rx.MatchString(urlPath) {
 					resp := linodego.InstanceIPAddressResponse{
 						IPv4: &linodego.InstanceIPv4Response{
-							Public: []*linodego.InstanceIP{f.ips[0]},
+							Public:  []*linodego.InstanceIP{f.ips[0]},
 							Private: []*linodego.InstanceIP{f.ips[1]},
 						},
 					}
@@ -115,9 +114,9 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					res := 0
 					data := []*linodego.Instance{}
 					filter := r.Header.Get("X-Filter")
-					if filter == ""{
+					if filter == "" {
 						data = append(data, f.instance)
-					}else {
+					} else {
 						var fs filterStruct
 						err := json.Unmarshal([]byte(filter), &fs)
 						if err != nil {
@@ -142,15 +141,15 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		case "nodebalancers":
 			rx, _ := regexp.Compile("/nodebalancers/[0-9]+/configs")
-			if rx.MatchString(urlPath){
+			if rx.MatchString(urlPath) {
 				res := 0
 				data := []*linodego.NodeBalancerConfig{}
 				filter := r.Header.Get("X-Filter")
-				if filter == ""{
+				if filter == "" {
 					for _, n := range f.nbc {
 						data = append(data, n)
 					}
-				}else {
+				} else {
 					var fs filterStruct
 					err := json.Unmarshal([]byte(filter), &fs)
 					if err != nil {
@@ -175,7 +174,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			rx, _ = regexp.Compile("/nodebalancers/[0-9]+/configs/[0-9]+")
-			if rx.MatchString(urlPath){
+			if rx.MatchString(urlPath) {
 				id := filepath.Base(urlPath)
 				nbc := f.nbc[id]
 				if nbc != nil {
@@ -201,11 +200,11 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				res := 0
 				data := []*linodego.NodeBalancer{}
 				filter := r.Header.Get("X-Filter")
-				if filter == ""{
+				if filter == "" {
 					for _, n := range f.nb {
 						data = append(data, n)
 					}
-				}else {
+				} else {
 					var fs filterStruct
 					err := json.Unmarshal([]byte(filter), &fs)
 					if err != nil {
@@ -230,7 +229,6 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-
 		}
 
 	case "POST":
@@ -240,13 +238,13 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if err := json.NewDecoder(r.Body).Decode(nbco); err != nil {
 				f.t.Fatal(err)
 			}
-			ip := net.IPv4(byte(rand.Intn(100)), byte(rand.Intn(100)), byte(rand.Intn(100)),byte(rand.Intn(100)) ).String()
+			ip := net.IPv4(byte(rand.Intn(100)), byte(rand.Intn(100)), byte(rand.Intn(100)), byte(rand.Intn(100))).String()
 			nb := linodego.NodeBalancer{
-				ID: rand.Intn(9999),
-				Label: nbco.Label,
-				Region: nbco.Region,
+				ID:                 rand.Intn(9999),
+				Label:              nbco.Label,
+				Region:             nbco.Region,
 				ClientConnThrottle: *nbco.ClientConnThrottle,
-				IPv4: &ip,
+				IPv4:               &ip,
 
 				CreatedStr: time.Now().Format("2006-01-02T15:04:05"),
 				UpdatedStr: time.Now().Format("2006-01-02T15:04:05"),
@@ -259,7 +257,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			w.Write(resp)
 			return
 
-		}else if (tp == "configs") {
+		} else if tp == "configs" {
 			parts := strings.Split(r.URL.Path[1:], "/")
 			nbcco := new(linodego.NodeBalancerConfigCreateOptions)
 			if err := json.NewDecoder(r.Body).Decode(nbcco); err != nil {
@@ -270,24 +268,24 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				f.t.Fatal(err)
 			}
 			nbcc := linodego.NodeBalancerConfig{
-				ID             : rand.Intn(9999),
-				Port           : nbcco.Port,
-				Protocol       :nbcco.Protocol,
-				Algorithm      :nbcco.Algorithm,
-				Stickiness     : nbcco.Stickiness,
-				Check          :nbcco.Check,
-				CheckInterval  : nbcco.CheckInterval,
-				CheckAttempts  : nbcco.CheckAttempts,
-				CheckPath      : nbcco.CheckPath,
-				CheckBody      : nbcco.CheckBody,
-				CheckPassive   : *nbcco.CheckPassive,
-				CheckTimeout   : nbcco.CheckTimeout,
-				CipherSuite    : nbcco.CipherSuite,
-				NodeBalancerID : nbid,
-				SSLCommonName  : "",
-				SSLFingerprint : "",
-				SSLCert        : nbcco.SSLCert,
-				SSLKey         : nbcco.SSLKey,
+				ID:             rand.Intn(9999),
+				Port:           nbcco.Port,
+				Protocol:       nbcco.Protocol,
+				Algorithm:      nbcco.Algorithm,
+				Stickiness:     nbcco.Stickiness,
+				Check:          nbcco.Check,
+				CheckInterval:  nbcco.CheckInterval,
+				CheckAttempts:  nbcco.CheckAttempts,
+				CheckPath:      nbcco.CheckPath,
+				CheckBody:      nbcco.CheckBody,
+				CheckPassive:   *nbcco.CheckPassive,
+				CheckTimeout:   nbcco.CheckTimeout,
+				CipherSuite:    nbcco.CipherSuite,
+				NodeBalancerID: nbid,
+				SSLCommonName:  "",
+				SSLFingerprint: "",
+				SSLCert:        nbcco.SSLCert,
+				SSLKey:         nbcco.SSLKey,
 			}
 			f.nbc[strconv.Itoa(nbcc.ID)] = &nbcc
 			resp, err := json.Marshal(nbcc)
@@ -296,7 +294,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			w.Write(resp)
 			return
-		}else if(tp == "nodes") {
+		} else if tp == "nodes" {
 			parts := strings.Split(r.URL.Path[1:], "/")
 			nbnco := new(linodego.NodeBalancerNodeCreateOptions)
 			if err := json.NewDecoder(r.Body).Decode(nbnco); err != nil {
@@ -311,14 +309,14 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				f.t.Fatal(err)
 			}
 			nbn := linodego.NodeBalancerNode{
-				ID          :rand.Intn(99999),
-				Address        :nbnco.Address,
-				Label          : nbnco.Label,
-				Status         : "UP",
-				Weight         : nbnco.Weight,
-				Mode           : nbnco.Mode,
-				ConfigID      : nbcid,
-				NodeBalancerID : nbid,
+				ID:             rand.Intn(99999),
+				Address:        nbnco.Address,
+				Label:          nbnco.Label,
+				Status:         "UP",
+				Weight:         nbnco.Weight,
+				Mode:           nbnco.Mode,
+				ConfigID:       nbcid,
+				NodeBalancerID: nbid,
 			}
 			f.nbn[strconv.Itoa(nbn.ID)] = &nbn
 			resp, err := json.Marshal(nbn)

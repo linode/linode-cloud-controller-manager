@@ -3,7 +3,7 @@ package linode
 import (
 	"context"
 
-	"github.com/chiefy/linodego"
+	"github.com/linode/linodego"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )

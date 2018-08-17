@@ -1,22 +1,21 @@
 package linode
 
-
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"testing"
-	"github.com/chiefy/linodego"
+
+	"github.com/linode/linodego"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"net/http/httptest"
-	"net/http"
-	"context"
 )
 
 var _ cloudprovider.LoadBalancer = new(loadbalancers)
-
 
 func TestCCMLoadBalancers(t *testing.T) {
 	fake := newFake(t)
@@ -29,7 +28,7 @@ func TestCCMLoadBalancers(t *testing.T) {
 	testCases := struct {
 		f []func(t *testing.T, client *linodego.Client)
 	}{
-		[]func(t *testing.T, client *linodego.Client) {
+		[]func(t *testing.T, client *linodego.Client){
 			testGetLoadBalancer,
 			testCreateNoadBalancer,
 			testBuildLoadBalancerRequest,
@@ -37,9 +36,8 @@ func TestCCMLoadBalancers(t *testing.T) {
 			testEnsureLoadBalancer,
 			testGetLoadBalancer,
 		},
-
 	}
-	for _, tf := range testCases.f{
+	for _, tf := range testCases.f {
 		t.Run("Running", func(t *testing.T) {
 			tf(t, &linodeClient)
 		})
@@ -84,7 +82,6 @@ func testCreateNoadBalancer(t *testing.T, client *linodego.Client) {
 	defer lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc)
 
 }
-
 
 func Test_getAlgorithm(t *testing.T) {
 	testcases := []struct {
@@ -238,7 +235,7 @@ b8QPmGZdja1VyGqpAMkPmQOu9N5RbhKw1UOU/XGa31p6v96oayL+u8Q=
 			"certificate not set",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:       randString(10),
+					Name:        randString(10),
 					UID:         "abc123",
 					Annotations: map[string]string{},
 				},
@@ -488,51 +485,49 @@ func Test_getNodeInternalIp(t *testing.T) {
 
 }
 
-
 func testBuildLoadBalancerRequest(t *testing.T, client *linodego.Client) {
 	svc := &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test",
-					UID:  "foobar123",
-					Annotations: map[string]string{
-						annLinodeProtocol: "tcp",
-					},
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{
-						{
-							Name:     "test",
-							Protocol: "TCP",
-							Port:     int32(80),
-							NodePort: int32(30000),
-						},
-					},
-				},
-			}
-			nodes := []*v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test",
+			UID:  "foobar123",
+			Annotations: map[string]string{
+				annLinodeProtocol: "tcp",
+			},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
 				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "node-1",
-					},
+					Name:     "test",
+					Protocol: "TCP",
+					Port:     int32(80),
+					NodePort: int32(30000),
 				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "node-2",
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "node-3",
-					},
-				},
-			}
-
+			},
+		},
+	}
+	nodes := []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node-1",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node-2",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node-3",
+			},
+		},
+	}
 
 	lb := &loadbalancers{client, "us-west"}
 	id, err := lb.buildLoadBalancerRequest(svc, nodes)
 	if id == "" {
 		t.Error("unexpected nodeID")
-		t.Logf("expected: != \"\"", )
+		t.Logf("expected: != \"\"")
 		t.Logf("actual: %v", id)
 	}
 	if !reflect.DeepEqual(err, err) {
@@ -542,7 +537,6 @@ func testBuildLoadBalancerRequest(t *testing.T, client *linodego.Client) {
 	}
 
 }
-
 
 func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client) {
 	svc := &v1.Service{
@@ -601,7 +595,6 @@ func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client) {
 			nil,
 		},
 	}
-
 
 	lb := &loadbalancers{client, "us-west"}
 	_, err := lb.createNoadBalancer(svc)
@@ -666,7 +659,7 @@ func testEnsureLoadBalancer(t *testing.T, client *linodego.Client) {
 	fmt.Println(nb.Ingress, "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
 
 	testcases := []struct {
-		name       string
+		name        string
 		service     *v1.Service
 		nodes       []*v1.Node
 		clusterName string
@@ -723,9 +716,6 @@ func testEnsureLoadBalancer(t *testing.T, client *linodego.Client) {
 		},
 	}
 
-
-
-
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
 			lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), test.clusterName, test.service, test.nodes)
@@ -742,7 +732,6 @@ func testEnsureLoadBalancer(t *testing.T, client *linodego.Client) {
 		})
 	}
 }
-
 
 func testGetLoadBalancer(t *testing.T, client *linodego.Client) {
 	lb := &loadbalancers{client, "us-west"}
@@ -829,4 +818,3 @@ func testGetLoadBalancer(t *testing.T, client *linodego.Client) {
 		})
 	}
 }
-

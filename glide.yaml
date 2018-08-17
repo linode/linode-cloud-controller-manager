@@ -29,5 +29,5 @@ import:
   version: v1.11.0
 - package: github.com/appscode/kutil
   version: release-8.0
-- package: github.com/chiefy/linodego
-  version: master
+- package: github.com/linode/linodego
+  version: v0.3.0

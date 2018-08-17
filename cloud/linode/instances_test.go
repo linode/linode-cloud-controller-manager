@@ -1,19 +1,18 @@
 package linode
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"testing"
-	"github.com/chiefy/linodego"
+
+	"github.com/linode/linodego"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"context"
-	"net/http/httptest"
-	"net/http"
 )
 
 var _ cloudprovider.Instances = new(instances)
-
-
 
 func TestCCMInstances(t *testing.T) {
 	fake := newFake(t)
@@ -59,7 +58,6 @@ func testNodeAddresses(t *testing.T, client *linodego.Client) {
 	}
 
 }
-
 
 func testNodeAddressesByProviderID(t *testing.T, client *linodego.Client) {
 	expectedAddresses := []v1.NodeAddress{

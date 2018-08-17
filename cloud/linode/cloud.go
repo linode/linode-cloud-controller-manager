@@ -6,8 +6,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/chiefy/linodego"
 	"github.com/ghodss/yaml"
+	"github.com/linode/linodego"
 	"golang.org/x/oauth2"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"

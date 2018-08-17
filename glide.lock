@@ -1,5 +1,5 @@
-hash: 89e659960748e8ded40e9294a717852d5fb099205b31aeba3cd8d065b153a285
-updated: 2018-08-13T15:16:57.956900028+06:00
+hash: 862a23ebfd8f2464962728ca81c5b327a2d19004c0fc39fa136800aceb6b6556
+updated: 2018-08-17T12:20:52.792115983+06:00
 imports:
 - name: bitbucket.org/ww/goautoneg
   version: 75cd24fc2f2c2a2088577d12123ddee5f54e0675
@@ -11,21 +11,14 @@ imports:
 - name: github.com/appscode/go
   version: df3c57fca2bef0e5b7fd085507deb20f18c790df
   subpackages:
-  - analytics
   - context
   - hold
-  - homedir
   - log
   - log/golog
   - runtime
   - version
-- name: github.com/appscode/jsonpatch
-  version: 1359b374de83fa14fd58ab10aa8ea4935f84d249
 - name: github.com/appscode/kutil
-  version: b50ebf9375ccfa41b08350da68618fee6bc6de4b
-  subpackages:
-  - meta
-  - tools/analytics
+  version: 753becbb6e10fa9a325cbd7cf5348f61e198c495
 - name: github.com/aws/aws-sdk-go
   version: 760741802ad40f49ae9fc4a69ef6706d2527d62e
   subpackages:
@@ -83,8 +76,6 @@ imports:
   version: 3ac7bf7a47d159a033b107610db8a1b6575507a4
   subpackages:
   - quantile
-- name: github.com/chiefy/linodego
-  version: e7bd44d89fc5db41b43b8bce7278550a589d7ab6
 - name: github.com/coreos/etcd
   version: 95a726a27e09030f9ccbd9982a1508f5a6d25ada
   subpackages:
@@ -255,7 +246,7 @@ imports:
 - name: github.com/go-openapi/swag
   version: f3f9494671f93fcff853e3c6e9e948b3eb71e590
 - name: github.com/go-resty/resty
-  version: d4f74c9318f3c14aeb58f1b52549bf2b268de63c
+  version: ec17de1c59a99e0743dac77aaab6435f364fdc42
 - name: github.com/gogo/protobuf
   version: c0656edd0d9eab7c66d1eb0c568f9039345796f7
   subpackages:
@@ -280,13 +271,6 @@ imports:
   - ptypes/timestamp
 - name: github.com/google/btree
   version: 7d79101e329e5a3adf994758c578dab82b90c017
-- name: github.com/google/go-cmp
-  version: 97aa668b73e764ccdd786bc3ccd2edffe621150e
-  subpackages:
-  - cmp
-  - cmp/internal/diff
-  - cmp/internal/function
-  - cmp/internal/value
 - name: github.com/google/gofuzz
   version: 44d81051d367757e1c7c6a5a86423ece9afcf63c
 - name: github.com/google/uuid
@@ -349,6 +333,8 @@ imports:
   version: ab8a2e0c74be9d3be70b3184d9acc634935ded82
 - name: github.com/kardianos/osext
   version: 8fef92e41e22a70e700a96b29f066cda30ea24ef
+- name: github.com/linode/linodego
+  version: 7edbc87f0140b7561dbc20458877a56bdded5eb8
 - name: github.com/mailru/easyjson
   version: 2f5df55504ebc322e4d52d34df6a1f5b503bf26d
   subpackages:
@@ -419,11 +405,6 @@ imports:
   version: 300106c228d52c8941d4b3de6054a6062a86dda3
 - name: github.com/satori/go.uuid
   version: 879c5887cd475cd7864858769793b2ceb0d44feb
-- name: github.com/sergi/go-diff
-  version: 24e2351369ec4949b2ed0dc5c477afdd4c4034e8
-  repo: https://github.com/sergi/go-diff
-  subpackages:
-  - diffmatchpatch
 - name: github.com/shurcooL/sanitized_anchor_name
   version: 10ef21a441db47d8b13ebcc5fd2310f636973c77
 - name: github.com/spf13/cobra
@@ -477,13 +458,6 @@ imports:
   version: 1e2cbf647e57fa90353612074fdfc42faf5073bf
   subpackages:
   - cloudstack
-- name: github.com/yudai/gojsondiff
-  version: e21612694bdd50975f93cd5eaccb457477128e28
-  subpackages:
-  - formatter
-- name: github.com/yudai/golcs
-  version: d1c525dea8ce39ea9a783d33cf08932305373f2c
-  repo: https://github.com/yudai/golcs
 - name: golang.org/x/crypto
   version: 49796115aa4b964c318aad4f3084fdb41e9aa067
   subpackages:

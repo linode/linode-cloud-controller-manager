@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/chiefy/linodego"
+	"github.com/linode/linodego"
 	"github.com/pharmer/ccm-linode/cloud"
 	"github.com/pkg/errors"
 	"k8s.io/api/core/v1"

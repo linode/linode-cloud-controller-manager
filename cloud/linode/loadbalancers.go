@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/chiefy/linodego"
+	"github.com/linode/linodego"
 	"github.com/pkg/errors"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -49,19 +49,6 @@ const (
 	// should use. Options are round_robin and least_connections. Defaults
 	// to round_robin.
 	annLinodeAlgorithm = "service.beta.kubernetes.io/linode-loadbalancer-algorithm"
-
-	// defaultActiveTimeout is the number of seconds to wait for a load balancer to
-	// reach the active state.
-	defaultActiveTimeout = 90
-
-	// defaultActiveCheckTick is the number of seconds between load balancer
-	// status checks when waiting for activation.
-	defaultActiveCheckTick = 5
-
-	// statuses for Digital Ocean load balancer
-	lbStatusNew     = "new"
-	lbStatusActive  = "active"
-	lbStatusErrored = "errored"
 )
 
 var lbNotFound = errors.New("loadbalancer not found")
@@ -155,7 +142,7 @@ func (l *loadbalancers) UpdateLoadBalancer(_ context.Context, clusterName string
 	}
 	jsonFilter, err := json.Marshal(map[string]string{"nodebalancer_id": strconv.Itoa(nb.ID)})
 	if err != nil {
-		return  err
+		return err
 	}
 	nbConfigs, err := l.client.ListNodeBalancerConfigs(context.TODO(), lb.ID, linodego.NewListOptions(0, string(jsonFilter)))
 	if err != nil {
@@ -212,10 +199,10 @@ func (l *loadbalancers) UpdateLoadBalancer(_ context.Context, clusterName string
 
 				jsonFilter, err := json.Marshal(map[string]string{
 					"nodebalancer_id": strconv.Itoa(nb.ID),
-					"config_id": strconv.Itoa(nbc.ID),
+					"config_id":       strconv.Itoa(nbc.ID),
 				})
 				if err != nil {
-					return  err
+					return err
 				}
 				nodeList, err := l.client.ListNodeBalancerNodes(context.TODO(), lb.ID, nbc.ID, linodego.NewListOptions(0, string(jsonFilter)))
 				for _, n := range nodeList {
@@ -240,14 +227,14 @@ func (l *loadbalancers) UpdateLoadBalancer(_ context.Context, clusterName string
 				return err
 			}
 			createOpt := config.GetCreateOptions()
-			nbConfig, err := l.client.CreateNodeBalancerConfig(context.TODO(), lb.ID, &createOpt)
+			nbConfig, err := l.client.CreateNodeBalancerConfig(context.TODO(), lb.ID, createOpt)
 			if err != nil {
 				return err
 			}
 			for _, n := range nodes {
 				node := l.buildNodeBalancerNode(n, port.Port)
 				createNodeOpt := node.GetCreateOptions()
-				if _, err := l.client.CreateNodeBalancerNode(context.TODO(), lb.ID, nbConfig.ID, &createNodeOpt); err != nil {
+				if _, err := l.client.CreateNodeBalancerNode(context.TODO(), lb.ID, nbConfig.ID, createNodeOpt); err != nil {
 					return err
 				}
 			}
@@ -301,10 +288,10 @@ func (l *loadbalancers) lbByName(client *linodego.Client, name string) (*linodeg
 func (l *loadbalancers) createNoadBalancer(service *v1.Service) (int, error) {
 	lbName := cloudprovider.GetLoadBalancerName(service)
 
-	connThrottle :=20
-	nodeBalancer, err := l.client.CreateNodeBalancer(context.TODO(), &linodego.NodeBalancerCreateOptions{
-		Label:  &lbName,
-		Region: l.zone,
+	connThrottle := 20
+	nodeBalancer, err := l.client.CreateNodeBalancer(context.TODO(), linodego.NodeBalancerCreateOptions{
+		Label:              &lbName,
+		Region:             l.zone,
 		ClientConnThrottle: &connThrottle,
 	})
 	if err != nil {
@@ -424,7 +411,7 @@ func (l *loadbalancers) buildLoadBalancerRequest(service *v1.Service, nodes []*v
 			return "", err
 		}
 		createOpt := config.GetCreateOptions()
-		nbConfig, err := l.client.CreateNodeBalancerConfig(context.TODO(), lb, &createOpt)
+		nbConfig, err := l.client.CreateNodeBalancerConfig(context.TODO(), lb, createOpt)
 		if err != nil {
 			return "", err
 		}
@@ -433,7 +420,7 @@ func (l *loadbalancers) buildLoadBalancerRequest(service *v1.Service, nodes []*v
 			node := l.buildNodeBalancerNode(n, port.Port)
 
 			createOpt := node.GetCreateOptions()
-			if _, err := l.client.CreateNodeBalancerNode(context.TODO(), lb, nbConfig.ID, &createOpt); err != nil {
+			if _, err := l.client.CreateNodeBalancerNode(context.TODO(), lb, nbConfig.ID, createOpt); err != nil {
 				return "", err
 			}
 		}
@@ -441,8 +428,8 @@ func (l *loadbalancers) buildLoadBalancerRequest(service *v1.Service, nodes []*v
 	return *nodeBalancer.IPv4, nil
 }
 
-func (l *loadbalancers) buildNodeBalancerNode(node *v1.Node, port int32) linodego.NodeBalancerNode  {
-	 return  linodego.NodeBalancerNode{
+func (l *loadbalancers) buildNodeBalancerNode(node *v1.Node, port int32) linodego.NodeBalancerNode {
+	return linodego.NodeBalancerNode{
 		Address: fmt.Sprintf("%v:%v", getNodeInternalIp(node), port),
 		Label:   node.Name,
 		Mode:    "accept",
@@ -460,7 +447,6 @@ func getProtocol(service *v1.Service) (linodego.ConfigProtocol, error) {
 	if protocol != "tcp" && protocol != "http" && protocol != "https" {
 		return "", fmt.Errorf("invalid protocol: %q specifed in annotation: %q", protocol, annLinodeProtocol)
 	}
-
 
 	return linodego.ConfigProtocol(protocol), nil
 }

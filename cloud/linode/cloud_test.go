@@ -1,4 +1,5 @@
 package linode
+
 /*
 import (
 	"context"
@@ -6,8 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
-
-	"github.com/chiefy/linodego"
+	"github.com/linode/linodego"
 	"golang.org/x/oauth2"
 )
 
