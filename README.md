@@ -1,7 +1,7 @@
-[![Go Report Card](https://goreportcard.com/badge/github.com/pharmer/ccm-linode)](https://goreportcard.com/report/github.com/pharmer/ccm-linode)
+[![Go Report Card](https://goreportcard.com/badge/github.com/linode/linode-cloud-controller-manager)](https://goreportcard.com/report/github.com/linode/linode-cloud-controller-manager)
 [![Build Status](https://travis-ci.org/pharmer/cloud-controller-manager.svg?branch=master)](https://travis-ci.org/pharmer/cloud-controller-manager)
 [![codecov](https://codecov.io/gh/pharmer/cloud-controller-manager/branch/master/graph/badge.svg)](https://codecov.io/gh/pharmer/cloud-controller-manager)
-[![Docker Pulls](https://img.shields.io/docker/pulls/pharmer/cloud-controller-manager.svg)](https://hub.docker.com/r/pharmer/ccm-linode/)
+[![Docker Pulls](https://img.shields.io/docker/pulls/pharmer/cloud-controller-manager.svg)](https://hub.docker.com/r/linode/linode-cloud-controller-manager/)
 [![Slack](http://slack.kubernetes.io/badge.svg)](http://slack.kubernetes.io/#pharmer)
 [![Twitter](https://img.shields.io/twitter/follow/appscodehq.svg?style=social&logo=twitter&label=Follow)](https://twitter.com/intent/follow?screen_name=AppsCodeHQ)
 

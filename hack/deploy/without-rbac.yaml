@@ -12,7 +12,7 @@ spec:
         app: ccm-linode
     spec:
       containers:
-        - image: appscode/ccm-linode:canary
+        - image: linode/linode-cloud-controller-manager:canary
           name: ccm-linode
           ports:
             - containerPort: 9844

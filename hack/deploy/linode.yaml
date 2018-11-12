@@ -46,7 +46,7 @@ spec:
       - key: "node-role.kubernetes.io/master"
         effect: NoSchedule
       containers:
-        - image: appscode/ccm-linode:linode
+        - image: linode/linode-cloud-controller-manager:linode
           imagePullPolicy: Always
           name: ccm
           args:

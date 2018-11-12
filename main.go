@@ -4,7 +4,7 @@ import (
 	"os"
 
 	logs "github.com/appscode/go/log/golog"
-	"github.com/pharmer/ccm-linode/cmds"
+	"github.com/linode/linode-cloud-controller-manager/cmds"
 )
 
 func main() {

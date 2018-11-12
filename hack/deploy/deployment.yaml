@@ -45,7 +45,7 @@ spec:
         value: "true"
         effect: NoSchedule
       containers:
-        - image: appscode/ccm-linode:external
+        - image: linode/linode-cloud-controller-manager:external
           imagePullPolicy: Always
           name: ccm-linode
           args:

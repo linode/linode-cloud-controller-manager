@@ -6,14 +6,14 @@ import (
 	"os"
 
 	"github.com/appscode/go/runtime"
-	"github.com/pharmer/ccm-linode/cmds"
+	"github.com/linode/linode-cloud-controller-manager/cmds"
 	"github.com/spf13/cobra/doc"
 )
 
 // ref: https://github.com/spf13/cobra/blob/master/doc/md_docs.md
 func main() {
 	rootCmd := cmds.NewRootCmd("")
-	dir := runtime.GOPath() + "/src/github.com/pharmer/ccm-linode/docs/reference"
+	dir := runtime.GOPath() + "/src/github.com/linode/linode-cloud-controller-manager/docs/reference"
 	fmt.Printf("Generating cli markdown tree in: %v\n", dir)
 	err := os.RemoveAll(dir)
 	if err != nil {

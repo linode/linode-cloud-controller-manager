@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/appscode/go/log"
-	_ "github.com/pharmer/ccm-linode/cloud/linode"
+	_ "github.com/linode/linode-cloud-controller-manager/cloud/linode"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"

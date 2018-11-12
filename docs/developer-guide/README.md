@@ -16,8 +16,8 @@ development environment, please follow [these instructions](https://golang.org/d
 #### Download Source
 
 ```console
-$ go get github.com/pharmer/ccm-linode
-$ cd $(go env GOPATH)/src/github.com/pharmer/ccm-linode
+$ go get github.com/linode/linode-cloud-controller-manager
+$ cd $(go env GOPATH)/src/github.com/linode/linode-cloud-controller-manager
 ```
 
 #### Install Dev tools

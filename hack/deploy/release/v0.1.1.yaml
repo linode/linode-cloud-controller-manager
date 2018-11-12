@@ -33,7 +33,7 @@ spec:
           effect: NoSchedule
       serviceAccountName: cloud-controller-manager
       containers:
-      - image: pharmer/ccm-linode:v0.1.1
+      - image: linode/linode-cloud-controller-manager:v0.1.1
         name: ccm
         args:
           - up

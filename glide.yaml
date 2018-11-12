@@ -1,4 +1,4 @@
-package: github.com/pharmer/ccm-linode
+package: github.com/linode/linode-cloud-controller-manager
 import:
 - package: github.com/appscode/go
   version: master

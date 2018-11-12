@@ -8,27 +8,27 @@ GOPATH=$(go env GOPATH)
 SRC=$GOPATH/src
 BIN=$GOPATH/bin
 ROOT=$GOPATH
-REPO_ROOT=$GOPATH/src/github.com/pharmer/ccm-linode
+REPO_ROOT=$GOPATH/src/github.com/linode/linode-cloud-controller-manager
 
 source "$REPO_ROOT/hack/libbuild/common/pharmer_image.sh"
 
 APPSCODE_ENV=${APPSCODE_ENV:-dev}
 IMG=ccm-linode
 
-DIST=$GOPATH/src/github.com/pharmer/ccm-linode/dist
+DIST=$GOPATH/src/github.com/linode/linode-cloud-controller-manager/dist
 mkdir -p $DIST
 if [ -f "$DIST/.tag" ]; then
   export $(cat $DIST/.tag | xargs)
 fi
 
 clean() {
-  pushd $GOPATH/src/github.com/pharmer/ccm-linode/hack/docker
+  pushd $GOPATH/src/github.com/linode/linode-cloud-controller-manager/hack/docker
   rm ccm-linode Dockerfile
   popd
 }
 
 build_binary() {
-  pushd $GOPATH/src/github.com/pharmer/ccm-linode
+  pushd $GOPATH/src/github.com/linode/linode-cloud-controller-manager
   ./hack/builddeps.sh
   ./hack/make.py build
   detect_tag $DIST/.tag
@@ -36,7 +36,7 @@ build_binary() {
 }
 
 build_docker() {
-  pushd $GOPATH/src/github.com/pharmer/ccm-linode/hack/docker
+  pushd $GOPATH/src/github.com/linode/linode-cloud-controller-manager/hack/docker
   cp $DIST/ccm-linode/ccm-linode-alpine-amd64 ccm-linode
   chmod 755 ccm-linode
 

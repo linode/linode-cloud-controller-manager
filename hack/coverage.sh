@@ -2,7 +2,7 @@
 set -eou pipefail
 
 GOPATH=$(go env GOPATH)
-REPO_ROOT="$GOPATH/src/github.com/pharmer/ccm-linode"
+REPO_ROOT="$GOPATH/src/github.com/linode/linode-cloud-controller-manager"
 
 pushd $REPO_ROOT
 
