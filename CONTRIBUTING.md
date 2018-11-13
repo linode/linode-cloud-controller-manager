@@ -1,8 +1,6 @@
 # Contributing Guidelines
 
-:+1::tada: First off, thanks for taking the time to contribute! :tada::+1:
-
-Whether it's a bug report, new feature, correction, or additional documentation, we greatly value feedback and contributions from our community. THANK YOU!
+:+1::tada: First off, thanks for taking the time to contribute! THANK YOU! :tada::+1:
 
 We put together the handy guide below to help you get support for your work. Read on!  
 
