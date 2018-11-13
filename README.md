@@ -16,7 +16,7 @@ This project is currently not supported.  Use at your own risk. Contributions we
 
 Kubernetes 1.9+
 
-## Contribution guidelines
+## Contribution Guidelines
 
 Want to improve the linode-cloud-controller-manager? Please start [here](/CONTRIBUTING.md).
 
