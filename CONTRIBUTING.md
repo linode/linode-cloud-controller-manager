@@ -1,6 +1,6 @@
 # Contributing Guidelines
 
-:+1::tada: First off, thanks for taking the time to contribute! THANK YOU! :tada::+1:
+:+1::tada: First off, we appreciate you taking the time to contribute! THANK YOU! :tada::+1:
 
 We put together the handy guide below to help you get support for your work. Read on!  
 
