@@ -20,6 +20,10 @@ Kubernetes 1.9+
 
 Want to improve the linode-cloud-controller-manager? Please start [here](/CONTRIBUTING.md).
 
+## Join the Kubernetes Community
+
+For general help or discussion, join the [Kubernetes Slack team](https://kubernetes.slack.com/messages/CD4B15LUR/details/) channel `#linode`. To sign up, use the [Kubernetes Slack inviter](http://slack.kubernetes.io/).
+
 
 
 

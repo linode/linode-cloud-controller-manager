@@ -4,9 +4,7 @@
 
 We put together the handy guide below to help you get support for your work. Read on!  
 
-## I Just Want to Ask a Question
-
-For general help or discussion, join us in the [Kubernetes Slack team](https://kubernetes.slack.com/messages/CD4B15LUR/details/) channel `#linode`. To sign up, use the [Kubernetes Slack inviter](http://slack.kubernetes.io/).
+## I Just Want to Ask the Maintainers a Question
 
 The [Linode Community](https://www.linode.com/community/questions/) is a great place to get additional support.
 
