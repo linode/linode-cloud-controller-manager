@@ -26,7 +26,7 @@ Detailed bug reports and requests easier for us to work with. Please include the
 
 ## How to Open a Pull Request
 
-We follow the [fork and pull model](https://opensource.guide/how-to-contribute/) for open source contributions.
+We follow the [fork and pull model](https://opensource.guide/how-to-contribute/#opening-a-pull-request) for open source contributions.
 
 Tips for a faster merge:
  * address one feature or bug per pull request. 
