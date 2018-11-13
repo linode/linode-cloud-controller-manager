@@ -28,18 +28,15 @@ Detailed bug reports and requests easier for us to work with. Please include the
 
 ## How to Open a Pull Request
 
-To send us a pull request, please:
-
-1. [Fork the repository](https://help.github.com/articles/fork-a-repo/).
-2. Modify the source. Tips for a faster merge: 
+We follow the [fork and pull model](https://github.com/firstcontributions/first-contributions) for open source contributions.
+  
+Tips for a faster merge:
  * address one feature or bug per pull request. 
  * large formatting changes make it hard for us to focus on your work.
- * follow language coding conventions
+ * follow language coding conventions.
+ * make sure that tests pass.
  * make sure your commits are atomic, [addressing one change per commit](https://chris.beams.io/posts/git-commit/). 
- * add tests! 
-3. [Send us a pull request](https://help.github.com/articles/creating-a-pull-request/) with a clear, descriptive title.
-4. Make sure that your pull request passes automated testing.
-5. Monitor your pull request for questions and conversation.
+ * add tests!
 
 ## Code of Conduct
 This project follows the [Linode Community Code of Conduct](https://www.linode.com/community/questions/conduct). 
