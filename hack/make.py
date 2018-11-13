@@ -1,5 +1,5 @@
-#!/usr/bin/env python
-
+#!/usr/bin/env python2
+from __future__ import print_function
 
 # http://stackoverflow.com/a/14050282
 def check_antipackage():
@@ -25,9 +25,8 @@ def check_antipackage():
         exit(1)
 check_antipackage()
 
-# ref: https://github.com/ellisonbg/antipackage
 import antipackage
-from github.appscode.libbuild import libbuild, pydotenv
+from github.asauber.libbuild import libbuild, pydotenv
 
 import os
 import os.path
@@ -143,7 +142,7 @@ def test(type, *args):
     elif type == 'e2e':
         die(call('ginkgo -r --v --progress --trace -- --v=3'))
     else:
-        print '{test unit|e2e}'
+        print('{test unit|e2e}')
 
 
 if __name__ == "__main__":
