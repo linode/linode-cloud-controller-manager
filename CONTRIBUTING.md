@@ -29,7 +29,7 @@ Detailed bug reports and requests easier for us to work with. Please include the
 ## How to Open a Pull Request
 
 We follow the [fork and pull model](https://github.com/firstcontributions/first-contributions) for open source contributions.
-  
+
 Tips for a faster merge:
  * address one feature or bug per pull request. 
  * large formatting changes make it hard for us to focus on your work.
@@ -39,12 +39,15 @@ Tips for a faster merge:
  * add tests!
 
 ## Code of Conduct
+
 This project follows the [Linode Community Code of Conduct](https://www.linode.com/community/questions/conduct). 
 
 ## Vulnerability Reporting
+
 If you discover a potential security issue in this project we ask that you notify Linode Security via our [vulnerability reporting process](https://hackerone.com/linode). Please do **not** create a public github issue.
 
 ## Licensing
+
 See the LICENSE file for our project's licensing.
 
 
