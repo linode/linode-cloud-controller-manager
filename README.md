@@ -9,7 +9,8 @@
 
 [Kubernetes Cloud Controller Manager For Linode](https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/).
 
-**Work In Progress** This project is currently not supported.  Use at your own risk.
+## Work In Progress
+This project is currently not supported.  Use at your own risk. Contributions welcome!
 
 ## Kubernetes Supported Versions
 
