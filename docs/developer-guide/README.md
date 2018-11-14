@@ -2,7 +2,7 @@
 This document is intended to be the canonical source of truth for things like
 supported toolchain versions for building the Linode Cloud Controller
 Manager. If you find a requirement that this doc does not capture, please
-submit an issue on github.
+submit an issue on GitHub.
 
 This document is intended to be relative to the branch in which it is found.
 It is guaranteed that requirements will change over time for the development
@@ -18,12 +18,18 @@ should work just fine out-of-the-box.
 The Linode Cloud Controller Manager is written in Google's Go programming
 language. Currently, the Linode Cloud Controller Manager is developed and
 tested on **Go 1.8.3**. If you haven't set up a Go development environment,
-please follow [these instructions](https://golang.org/doc/code.html) to
+please follow [these instructions](https://golang.org/doc/install) to
 install Go.
+
+On macOS, Homebrew has a nice package
+
+```bash
+brew install golang
+```
 
 #### Download Source
 
-```console
+```bash
 $ go get github.com/linode/linode-cloud-controller-manager
 $ cd $(go env GOPATH)/src/github.com/linode/linode-cloud-controller-manager
 ```
@@ -32,22 +38,17 @@ $ cd $(go env GOPATH)/src/github.com/linode/linode-cloud-controller-manager
 To install various dev tools for Pharm Controller Manager, run the following command:
 
 ```console
-# setting up dependencies for compiling cloud-controller-manager...
 $ ./hack/builddeps.sh
 ```
 
 #### Build Binary
-The build script currently supports only Python 2. Refer to your distribution
-docs on how to install Python 2 and Python 2 packages. If you're on macOS:
-
-```bash
-brew install python2
-pip2 install git+https://github.com/ellisonbg/antipackage.git#egg=antipackage
-```
+Use the following Make targets to build and run a local binary
 
 ```
-$ ./hack/make.py
-$ linode-cloud-controller-manager version
+$ make build
+$ make run
+# You can also run the binary that was built to pass additional args
+$ dist/linode-cloud-controller-manager run
 ```
 
 #### Dependency management
@@ -59,23 +60,19 @@ update/add dependencies, run:
 $ glide slow
 ```
 
-#### Build Docker images
-To build and push your custom Docker image, follow the steps below. To
-release a new version of Linode Cloud Controller Manager, please follow the
-[release guide](/docs/developer-guide/release.md).
+#### Building Docker images
+To build and push a Docker image, use the following make targets. 
 
-```console
-# Build Docker image
-$ ./hack/docker/setup.sh; ./hack/docker/setup.sh push
-
-# Add docker tag for your repository
-$ docker tag linode/linode-cloud-controller-manager:<tag> <image>:<tag>
+```bash
+# Set the repo/image:tag with the TAG environment variable
+# Then run the docker-build make target
+$ IMG=linode/linode-cloud-controller-manager:canary make docker-build
 
 # Push Image
-$ docker push <image>:<tag>
+$ IMG=linode/linode-cloud-controller-manager:canary make docker-push
 ```
 
-#### Generate CLI Reference Docs
-```console
-$ ./hack/gendocs/make.sh
+Then, to run the image
+```bash
+$ docker run -ti linode/linode-cloud-controller-manager:canary
 ```
