@@ -10,8 +10,8 @@ run: build
 
 fmt:
 	go vet -composites=false ./...
-	goimports -w *.go cloud cmds
-	gofmt -s -w *.go cloud cmds
+	goimports -w *.go cloud
+	gofmt -s -w *.go cloud
 
 test:
 	ginkgo -r --v --progress --trace -- --v=3

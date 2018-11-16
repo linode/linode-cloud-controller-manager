@@ -266,8 +266,7 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 	return l.client.DeleteNodeBalancer(context.TODO(), lb.ID)
 }
 
-// lbByName gets a DigitalOcean Load Balancer by name. The returned error will
-// be lbNotFound if the load balancer does not exist.
+// The returned error will be lbNotFound if the load balancer does not exist.
 func (l *loadbalancers) lbByName(client *linodego.Client, name string) (*linodego.NodeBalancer, error) {
 	jsonFilter, err := json.Marshal(map[string]string{"label": name})
 	if err != nil {

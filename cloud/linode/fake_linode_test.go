@@ -15,7 +15,6 @@ import (
 	"github.com/linode/linodego"
 )
 
-// fakeAPI implements a fake, cached DO API
 type fakeAPI struct {
 	t        *testing.T
 	volumes  map[string]*linodego.Volume
