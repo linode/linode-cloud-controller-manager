@@ -10,7 +10,7 @@ import (
 
 type zones struct {
 	client *linodego.Client
-	zone   string
+	region string
 }
 
 func newZones(client *linodego.Client, zone string) cloudprovider.Zones {
@@ -18,7 +18,7 @@ func newZones(client *linodego.Client, zone string) cloudprovider.Zones {
 }
 
 func (z zones) GetZone(_ context.Context) (cloudprovider.Zone, error) {
-	return cloudprovider.Zone{Region: z.zone}, nil
+	return cloudprovider.Zone{Region: z.region}, nil
 }
 
 func (z zones) GetZoneByProviderID(_ context.Context, providerID string) (cloudprovider.Zone, error) {

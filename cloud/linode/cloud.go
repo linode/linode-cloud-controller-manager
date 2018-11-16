@@ -3,10 +3,9 @@ package linode
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
+	"os"
 
-	"github.com/ghodss/yaml"
 	"github.com/linode/linodego"
 	"golang.org/x/oauth2"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -14,14 +13,12 @@ import (
 )
 
 const (
-	ProviderName = "linode"
+	ProviderName   = "linode"
+	accessTokenEnv = "LINODE_API_TOKEN"
+	regionEnv      = "LINODE_REGION"
 )
 
-type Credential struct {
-	Token string `json:"token" yaml:"token"`
-	Zone  string `json:"zone" yaml:"zone"`
-}
-type Cloud struct {
+type linodeCloud struct {
 	client        *linodego.Client
 	instances     cloudprovider.Instances
 	zones         cloudprovider.Zones
@@ -31,26 +28,26 @@ type Cloud struct {
 func init() {
 	cloudprovider.RegisterCloudProvider(
 		ProviderName,
-		func(config io.Reader) (cloudprovider.Interface, error) {
-			return newCloud(config)
+		func(io.Reader) (cloudprovider.Interface, error) {
+			return newCloud()
 		})
 }
 
-func newCloud(config io.Reader) (*Cloud, error) {
-	cred := &Credential{}
-	contents, err := ioutil.ReadAll(config)
-	if err != nil {
-		return nil, err
-	}
-	fmt.Println(string(contents))
-
-	err = yaml.Unmarshal(contents, cred)
-	if err != nil {
-		return nil, err
+func newCloud() (cloudprovider.Interface, error) {
+	// Read environment variables (from secrets)
+	apiToken := os.Getenv(accessTokenEnv)
+	if apiToken == "" {
+		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", accessTokenEnv)
 	}
 
+	region := os.Getenv(regionEnv)
+	if region == "" {
+		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", regionEnv)
+	}
+
+	// Initialize Linode API Client
 	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{
-		AccessToken: cred.Token,
+		AccessToken: apiToken,
 	})
 
 	oauth2Client := &http.Client{
@@ -62,45 +59,46 @@ func newCloud(config io.Reader) (*Cloud, error) {
 	linodeClient := linodego.NewClient(oauth2Client)
 	linodeClient.SetDebug(true)
 
-	return &Cloud{
+	// Return struct that satisfies cloudprovider.Interface
+	return &linodeCloud{
 		client:        &linodeClient,
 		instances:     newInstances(&linodeClient),
-		zones:         newZones(&linodeClient, cred.Zone),
-		loadbalancers: newLoadbalancers(&linodeClient, cred.Zone),
+		zones:         newZones(&linodeClient, region),
+		loadbalancers: newLoadbalancers(&linodeClient, region),
 	}, nil
 }
 
-func (c *Cloud) Initialize(clientBuilder controller.ControllerClientBuilder) {
+func (c *linodeCloud) Initialize(clientBuilder controller.ControllerClientBuilder) {
 }
 
-func (c *Cloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
+func (c *linodeCloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return c.loadbalancers, true
 }
 
-func (c *Cloud) Instances() (cloudprovider.Instances, bool) {
+func (c *linodeCloud) Instances() (cloudprovider.Instances, bool) {
 	return c.instances, true
 }
 
-func (c *Cloud) Zones() (cloudprovider.Zones, bool) {
+func (c *linodeCloud) Zones() (cloudprovider.Zones, bool) {
 	return c.zones, true
 }
 
-func (c *Cloud) Clusters() (cloudprovider.Clusters, bool) {
+func (c *linodeCloud) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }
 
-func (c *Cloud) Routes() (cloudprovider.Routes, bool) {
+func (c *linodeCloud) Routes() (cloudprovider.Routes, bool) {
 	return nil, false
 }
 
-func (c *Cloud) ProviderName() string {
+func (c *linodeCloud) ProviderName() string {
 	return ProviderName
 }
 
-func (c *Cloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
+func (c *linodeCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
 	return nil, nil
 }
 
-func (c *Cloud) HasClusterID() bool {
+func (c *linodeCloud) HasClusterID() bool {
 	return true
 }
