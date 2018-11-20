@@ -1,8 +1,8 @@
 #!/bin/bash
+
 set -x
 
-kubectl delete deployment -l app=ccm-linode -n kube-system
-kubectl delete service -l app=ccm-linode -n kube-system
-kubectl delete serviceaccount -l app=ccm-linode -n kube-system
-kubectl delete clusterrolebindings -l app=ccm-linode -n kube-system
-kubectl delete clusterrole -l app=ccm-linode -n kube-system
+kubectl delete secret ccm-linode -n kube-system
+kubectl delete serviceaccount ccm-linode -n kube-system
+kubectl delete clusterrolebinding system:ccm-linode -n kube-system
+kubectl delete daemonset ccm-linode -n kube-system

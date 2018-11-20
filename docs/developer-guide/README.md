@@ -37,27 +37,26 @@ $ cd $(go env GOPATH)/src/github.com/linode/linode-cloud-controller-manager
 #### Install Dev tools
 To install various dev tools for Pharm Controller Manager, run the following command:
 
-```console
+```bash
 $ ./hack/builddeps.sh
 ```
 
 #### Build Binary
 Use the following Make targets to build and run a local binary
 
-```
+```bash
 $ make build
 $ make run
-# You can also run the binary that was built to pass additional args
+# You can also run the binary directly to pass additional args
 $ dist/linode-cloud-controller-manager run
 ```
 
 #### Dependency management
-Linode Cloud Controller Manager uses
-[Glide](https://github.com/Masterminds/glide) to manage dependencies.
-Dependencies are already checked in the `vendor` folder. If you want to
-update/add dependencies, run:
-```console
-$ glide slow
+Linode Cloud Controller Manager uses [Dep](https://github.com/golang/dep) to
+manage dependencies. Dependencies are already checked in the `vendor` folder.
+If you want to update/add dependencies, run:
+```bash
+$ dep ensure
 ```
 
 #### Building Docker images

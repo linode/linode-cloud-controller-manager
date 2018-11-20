@@ -10,5 +10,6 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o linode-cloud-controller
 
 FROM ubuntu:latest
 WORKDIR /root/
+RUN apt-get update -qq && apt-get install -qy ca-certificates
 COPY --from=builder /go/src/github.com/linode/linode-cloud-controller-manager/linode-cloud-controller-manager .
 ENTRYPOINT ["./linode-cloud-controller-manager"]

@@ -999,7 +999,6 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
-    "github.com/ghodss/yaml",
     "github.com/json-iterator/go",
     "github.com/linode/linodego",
     "github.com/pkg/errors",
