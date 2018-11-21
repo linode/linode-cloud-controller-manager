@@ -1,11 +1,36 @@
-### General:
+## General:
 
 * [ ] Have you removed all sensitive information, including but not limited to access keys and passwords?
 * [ ] Have you checked to ensure there aren't other open or closed [Pull Requests](../../pulls) for the same bug/feature/question?
 
-### Bug Reporting:
-1. [ ] Have you noted the version of the code you are using?
-1. [ ] Have you provided a reproducable series of steps for us to follow?
-1. [ ] Have you noted any modifications you've made, relevant to the bug?
-1. [ ] Have you noted anything unusual about the your environment or deployment?
-1. [ ] Have you supplied screenshots, logs, code samples, or anything else that might help us better understand your bug? 
+----
+
+## Bug Reporting
+
+### Issue and Steps to Reproduce
+<!-- Describe your issue and tell us how to reproduce it (include any useful information). -->
+
+#### Versions
+
+#### Screenshots
+
+##### Expected
+
+##### Actual
+
+#### Additional Logs and Code Samples
+
+#### Additional Details
+* Installed packages and details about your environment:
+
+----
+
+## Feature Requests:
+* [ ] Have you explained your rationale for why this feature is needed? 
+* [ ] Have you offered a proposed implementation/solution? 
+
+----
+ 
+For general help or discussion, join the [Kubernetes Slack team](https://kubernetes.slack.com/messages/CD4B15LUR/details/) channel `#linode`. To sign up, use the [Kubernetes Slack inviter](http://slack.kubernetes.io/).
+
+The [Linode Community](https://www.linode.com/community/questions/) is a great place to get additional support.
