@@ -13,21 +13,21 @@
 
 ## Bug Reporting
 
-### Issue and Steps to Reproduce
-<!-- Describe your issue and tell us how to reproduce it (include any useful information). -->
+### Expected Behavior
 
-#### Versions
+### Actual Behavior
 
-#### Screenshots
+### Steps to Reproduce the Problem
 
-##### Expected
+  1.
+  1.
+  1.
 
-##### Actual
+### Environment Specifications
 
-#### Additional Logs and Code Samples
+#### Screenshots, Code Blocks, and Logs
 
-#### Additional Details
-* Installed packages and details about your environment:
+#### Additional Notes
 
 ----
  
