@@ -5,6 +5,12 @@
 
 ----
 
+## Feature Requests:
+* [ ] Have you explained your rationale for why this feature is needed? 
+* [ ] Have you offered a proposed implementation/solution? 
+
+----
+
 ## Bug Reporting
 
 ### Issue and Steps to Reproduce
@@ -22,12 +28,6 @@
 
 #### Additional Details
 * Installed packages and details about your environment:
-
-----
-
-## Feature Requests:
-* [ ] Have you explained your rationale for why this feature is needed? 
-* [ ] Have you offered a proposed implementation/solution? 
 
 ----
  
