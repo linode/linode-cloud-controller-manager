@@ -8,9 +8,16 @@ build: fmt
 run: build
 	dist/linode-cloud-controller-manager --logtostderr=true --stderrthreshold=INFO
 
-fmt:
+$(GOPATH)/bin/goimports:
+	go get golang.org/x/tools/cmd/goimports
+
+vet:
 	go vet -composites=false ./...
+
+imports: $(GOPATH)/bin/goimports
 	goimports -w *.go cloud
+
+fmt: vet imports
 	gofmt -s -w *.go cloud
 
 test:

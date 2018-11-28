@@ -4,6 +4,7 @@
 *.o
 *.a
 *.so
+linode-cloud-controller-manager
 
 # Folders
 _obj
