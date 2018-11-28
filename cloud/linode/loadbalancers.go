@@ -91,7 +91,7 @@ func (l *loadbalancers) GetLoadBalancer(_ context.Context, clusterName string, s
 //
 // EnsureLoadBalancer will not modify service or nodes.
 func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
-	lbStatus, exists, err := l.GetLoadBalancer(ctx, clusterName, service)
+	_, exists, err := l.GetLoadBalancer(ctx, clusterName, service)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 		return nil, err
 	}
 
-	lbStatus, exists, err = l.GetLoadBalancer(ctx, clusterName, service)
+	lbStatus, _, err := l.GetLoadBalancer(ctx, clusterName, service)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +204,12 @@ func (l *loadbalancers) UpdateLoadBalancer(_ context.Context, clusterName string
 				if err != nil {
 					return err
 				}
+
 				nodeList, err := l.client.ListNodeBalancerNodes(context.TODO(), lb.ID, nbc.ID, linodego.NewListOptions(0, string(jsonFilter)))
+				if err != nil {
+					return err
+				}
+
 				for _, n := range nodeList {
 					if _, found := kubeNode[n.Label]; !found {
 						if err = l.client.DeleteNodeBalancerNode(context.TODO(), lb.ID, nbc.ID, n.ID); err != nil {
@@ -278,7 +283,7 @@ func (l *loadbalancers) lbByName(client *linodego.Client, name string) (*linodeg
 	}
 
 	if len(lbs) > 0 {
-		return lbs[0], nil
+		return &lbs[0], nil
 	}
 
 	return nil, lbNotFound

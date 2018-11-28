@@ -17,7 +17,6 @@ import (
 
 type fakeAPI struct {
 	t        *testing.T
-	volumes  map[string]*linodego.Volume
 	instance *linodego.Instance
 	ips      []*linodego.InstanceIP
 	nb       map[string]*linodego.NodeBalancer
@@ -27,12 +26,12 @@ type fakeAPI struct {
 
 type filterStruct struct {
 	Label string `json:"label,omitempty"`
-	NbId  string `json:"nodebalancer_id,omitempty"`
+	NbID  string `json:"nodebalancer_id,omitempty"`
 }
 
 func newFake(t *testing.T) *fakeAPI {
-	publicIp := net.ParseIP("45.79.101.25")
-	privateIp := net.ParseIP("192.168.133.65")
+	publicIP := net.ParseIP("45.79.101.25")
+	privateIP := net.ParseIP("192.168.133.65")
 	instanceName := "test-instance"
 	region := "us-east"
 	return &fakeAPI{
@@ -49,20 +48,20 @@ func newFake(t *testing.T) *fakeAPI {
 			CreatedStr: "2018-01-01T00:01:01",
 			UpdatedStr: "2018-01-01T00:01:01",
 			IPv4: []*net.IP{
-				&publicIp,
-				&privateIp,
+				&publicIP,
+				&privateIP,
 			},
 		},
 		ips: []*linodego.InstanceIP{
 			{
-				Address:  publicIp.String(),
+				Address:  publicIP.String(),
 				Public:   true,
 				LinodeID: 123,
 				Type:     "ipv4",
 				Region:   region,
 			},
 			{
-				Address:  privateIp.String(),
+				Address:  privateIP.String(),
 				Public:   false,
 				LinodeID: 123,
 				Type:     "ipv4",
@@ -94,7 +93,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						},
 					}
 					rr, _ := json.Marshal(resp)
-					w.Write(rr)
+					_, _ = w.Write(rr)
 					return
 				}
 
@@ -103,7 +102,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					id := filepath.Base(urlPath)
 					if id == strconv.Itoa(f.instance.ID) {
 						rr, _ := json.Marshal(&f.instance)
-						w.Write(rr)
+						_, _ = w.Write(rr)
 					}
 					return
 				}
@@ -111,10 +110,10 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				rx, _ = regexp.Compile("/linode/instances")
 				if rx.MatchString(urlPath) {
 					res := 0
-					data := []*linodego.Instance{}
+					data := []linodego.Instance{}
 					filter := r.Header.Get("X-Filter")
 					if filter == "" {
-						data = append(data, f.instance)
+						data = append(data, *f.instance)
 					} else {
 						var fs filterStruct
 						err := json.Unmarshal([]byte(filter), &fs)
@@ -122,7 +121,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							f.t.Fatal(err)
 						}
 						if fs.Label == f.instance.Label {
-							data = append(data, f.instance)
+							data = append(data, *f.instance)
 						}
 					}
 					resp := linodego.InstancesPagedResponse{
@@ -134,7 +133,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						Data: data,
 					}
 					rr, _ := json.Marshal(resp)
-					w.Write(rr)
+					_, _ = w.Write(rr)
 					return
 				}
 			}
@@ -142,11 +141,11 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			rx, _ := regexp.Compile("/nodebalancers/[0-9]+/configs")
 			if rx.MatchString(urlPath) {
 				res := 0
-				data := []*linodego.NodeBalancerConfig{}
+				data := []linodego.NodeBalancerConfig{}
 				filter := r.Header.Get("X-Filter")
 				if filter == "" {
 					for _, n := range f.nbc {
-						data = append(data, n)
+						data = append(data, *n)
 					}
 				} else {
 					var fs filterStruct
@@ -155,8 +154,8 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						f.t.Fatal(err)
 					}
 					for _, n := range f.nbc {
-						if strconv.Itoa(n.NodeBalancerID) == fs.NbId {
-							data = append(data, n)
+						if strconv.Itoa(n.NodeBalancerID) == fs.NbID {
+							data = append(data, *n)
 						}
 					}
 				}
@@ -169,7 +168,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					Data: data,
 				}
 				rr, _ := json.Marshal(resp)
-				w.Write(rr)
+				_, _ = w.Write(rr)
 				return
 			}
 			rx, _ = regexp.Compile("/nodebalancers/[0-9]+/configs/[0-9]+")
@@ -178,7 +177,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				nbc := f.nbc[id]
 				if nbc != nil {
 					rr, _ := json.Marshal(nbc)
-					w.Write(rr)
+					_, _ = w.Write(rr)
 
 				}
 				return
@@ -189,7 +188,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				nb := f.nb[id]
 				if nb != nil {
 					rr, _ := json.Marshal(nb)
-					w.Write(rr)
+					_, _ = w.Write(rr)
 
 				}
 				return
@@ -197,11 +196,11 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			rx, _ = regexp.Compile("/nodebalancers")
 			if rx.MatchString(urlPath) {
 				res := 0
-				data := []*linodego.NodeBalancer{}
+				data := []linodego.NodeBalancer{}
 				filter := r.Header.Get("X-Filter")
 				if filter == "" {
 					for _, n := range f.nb {
-						data = append(data, n)
+						data = append(data, *n)
 					}
 				} else {
 					var fs filterStruct
@@ -211,7 +210,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					}
 					for _, n := range f.nb {
 						if *n.Label == fs.Label {
-							data = append(data, n)
+							data = append(data, *n)
 						}
 					}
 				}
@@ -224,7 +223,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					Data: data,
 				}
 				rr, _ := json.Marshal(resp)
-				w.Write(rr)
+				_, _ = w.Write(rr)
 				return
 			}
 
@@ -253,7 +252,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				f.t.Fatal(err)
 			}
-			w.Write(resp)
+			_, _ = w.Write(resp)
 			return
 
 		} else if tp == "configs" {
@@ -291,7 +290,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				f.t.Fatal(err)
 			}
-			w.Write(resp)
+			_, _ = w.Write(resp)
 			return
 		} else if tp == "nodes" {
 			parts := strings.Split(r.URL.Path[1:], "/")
@@ -322,7 +321,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				f.t.Fatal(err)
 			}
-			w.Write(resp)
+			_, _ = w.Write(resp)
 			return
 		}
 	case "DELETE":

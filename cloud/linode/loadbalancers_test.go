@@ -79,8 +79,7 @@ func testCreateNoadBalancer(t *testing.T, client *linodego.Client) {
 		t.Logf("expected: %v", nil)
 		t.Logf("actual: %v", err)
 	}
-	defer lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc)
-
+	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc) }()
 }
 
 func Test_getAlgorithm(t *testing.T) {
@@ -601,7 +600,7 @@ func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc)
+	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc) }()
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
@@ -648,7 +647,7 @@ func testEnsureLoadBalancer(t *testing.T, client *linodego.Client) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc)
+	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc) }()
 	nb, exists, err := lb.GetLoadBalancer(context.TODO(), "linodelb", svc)
 	if err != nil {
 		t.Fatal(err)
@@ -758,7 +757,7 @@ func testGetLoadBalancer(t *testing.T, client *linodego.Client) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc)
+	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc) }()
 	testcases := []struct {
 		name        string
 		service     *v1.Service

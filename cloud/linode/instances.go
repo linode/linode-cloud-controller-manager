@@ -155,7 +155,7 @@ func linodeByName(client *linodego.Client, nodeName types.NodeName) (*linodego.I
 		return nil, errors.New(fmt.Sprintf("Multiple instances found with name %v", nodeName))
 	}
 
-	return linodes[0], nil
+	return &linodes[0], nil
 }
 
 // serverIDFromProviderID returns a server's ID from providerID.
