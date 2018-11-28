@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/go-resty/resty"
+	"gopkg.in/resty.v1"
 )
 
 const (
@@ -33,7 +33,7 @@ type APIErrorReason struct {
 
 func (r APIErrorReason) Error() string {
 	if len(r.Field) == 0 {
-		return fmt.Sprintf("%s", r.Reason)
+		return r.Reason
 	}
 	return fmt.Sprintf("[%s] %s", r.Field, r.Reason)
 }

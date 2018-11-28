@@ -5,15 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-
-	"github.com/go-resty/resty"
 )
 
+// InstanceConfig represents all of the settings that control the boot and run configuration of a Linode Instance
 type InstanceConfig struct {
 	CreatedStr string `json:"created"`
 	UpdatedStr string `json:"updated"`
 
-	ID          int
+	ID          int                      `json:"id"`
 	Label       string                   `json:"label"`
 	Comments    string                   `json:"comments"`
 	Devices     *InstanceConfigDeviceMap `json:"devices"`
@@ -28,11 +27,13 @@ type InstanceConfig struct {
 	Updated     *time.Time               `json:"-"`
 }
 
+// InstanceConfigDevice contains either the DiskID or VolumeID assigned to a Config Device
 type InstanceConfigDevice struct {
 	DiskID   int `json:"disk_id,omitempty"`
 	VolumeID int `json:"volume_id,omitempty"`
 }
 
+// InstanceConfigDeviceMap contains SDA-SDH InstanceConfigDevice settings
 type InstanceConfigDeviceMap struct {
 	SDA *InstanceConfigDevice `json:"sda,omitempty"`
 	SDB *InstanceConfigDevice `json:"sdb,omitempty"`
@@ -44,6 +45,7 @@ type InstanceConfigDeviceMap struct {
 	SDH *InstanceConfigDevice `json:"sdh,omitempty"`
 }
 
+// InstanceConfigHelpers are Instance Config options that control Linux distribution specific tweaks
 type InstanceConfigHelpers struct {
 	UpdateDBDisabled  bool `json:"updatedb_disabled"`
 	Distro            bool `json:"distro"`
@@ -55,7 +57,7 @@ type InstanceConfigHelpers struct {
 // InstanceConfigsPagedResponse represents a paginated InstanceConfig API response
 type InstanceConfigsPagedResponse struct {
 	*PageOptions
-	Data []*InstanceConfig
+	Data []InstanceConfig `json:"data"`
 }
 
 // InstanceConfigCreateOptions are InstanceConfig settings that can be used at creation
@@ -67,17 +69,17 @@ type InstanceConfigCreateOptions struct {
 	MemoryLimit int                     `json:"memory_limit,omitempty"`
 	Kernel      string                  `json:"kernel,omitempty"`
 	InitRD      int                     `json:"init_rd,omitempty"`
-	RootDevice  string                  `json:"root_device,omitempty"`
+	RootDevice  *string                 `json:"root_device,omitempty"`
 	RunLevel    string                  `json:"run_level,omitempty"`
 	VirtMode    string                  `json:"virt_mode,omitempty"`
 }
 
 // InstanceConfigUpdateOptions are InstanceConfig settings that can be used in updates
 type InstanceConfigUpdateOptions struct {
-	Label    string                  `json:"label,omitempty"`
-	Comments string                  `json:"comments"`
-	Devices  InstanceConfigDeviceMap `json:"devices"`
-	Helpers  *InstanceConfigHelpers  `json:"helpers,omitempty"`
+	Label    string                   `json:"label,omitempty"`
+	Comments string                   `json:"comments"`
+	Devices  *InstanceConfigDeviceMap `json:"devices,omitempty"`
+	Helpers  *InstanceConfigHelpers   `json:"helpers,omitempty"`
 	// MemoryLimit 0 means unlimitted, this is not omitted
 	MemoryLimit int    `json:"memory_limit"`
 	Kernel      string `json:"kernel,omitempty"`
@@ -88,7 +90,12 @@ type InstanceConfigUpdateOptions struct {
 	VirtMode   string `json:"virt_mode,omitempty"`
 }
 
+// GetCreateOptions converts a InstanceConfig to InstanceConfigCreateOptions for use in CreateInstanceConfig
 func (i InstanceConfig) GetCreateOptions() InstanceConfigCreateOptions {
+	initrd := 0
+	if i.InitRD != nil {
+		initrd = *i.InitRD
+	}
 	return InstanceConfigCreateOptions{
 		Label:       i.Label,
 		Comments:    i.Comments,
@@ -96,18 +103,19 @@ func (i InstanceConfig) GetCreateOptions() InstanceConfigCreateOptions {
 		Helpers:     i.Helpers,
 		MemoryLimit: i.MemoryLimit,
 		Kernel:      i.Kernel,
-		InitRD:      *i.InitRD,
-		RootDevice:  i.RootDevice,
+		InitRD:      initrd,
+		RootDevice:  copyString(&i.RootDevice),
 		RunLevel:    i.RunLevel,
 		VirtMode:    i.VirtMode,
 	}
 }
 
+// GetUpdateOptions converts a InstanceConfig to InstanceConfigUpdateOptions for use in UpdateInstanceConfig
 func (i InstanceConfig) GetUpdateOptions() InstanceConfigUpdateOptions {
 	return InstanceConfigUpdateOptions{
 		Label:       i.Label,
 		Comments:    i.Comments,
-		Devices:     *i.Devices,
+		Devices:     i.Devices,
 		Helpers:     i.Helpers,
 		MemoryLimit: i.MemoryLimit,
 		Kernel:      i.Kernel,
@@ -129,20 +137,15 @@ func (InstanceConfigsPagedResponse) endpointWithID(c *Client, id int) string {
 
 // appendData appends InstanceConfigs when processing paginated InstanceConfig responses
 func (resp *InstanceConfigsPagedResponse) appendData(r *InstanceConfigsPagedResponse) {
-	(*resp).Data = append(resp.Data, r.Data...)
-}
-
-// setResult sets the Resty response type of InstanceConfig
-func (InstanceConfigsPagedResponse) setResult(r *resty.Request) {
-	r.SetResult(InstanceConfigsPagedResponse{})
+	resp.Data = append(resp.Data, r.Data...)
 }
 
 // ListInstanceConfigs lists InstanceConfigs
-func (c *Client) ListInstanceConfigs(ctx context.Context, linodeID int, opts *ListOptions) ([]*InstanceConfig, error) {
+func (c *Client) ListInstanceConfigs(ctx context.Context, linodeID int, opts *ListOptions) ([]InstanceConfig, error) {
 	response := InstanceConfigsPagedResponse{}
 	err := c.listHelperWithID(ctx, &response, linodeID, opts)
-	for _, el := range response.Data {
-		el.fixDates()
+	for i := range response.Data {
+		response.Data[i].fixDates()
 	}
 	if err != nil {
 		return nil, err
@@ -238,9 +241,6 @@ func (c *Client) DeleteInstanceConfig(ctx context.Context, linodeID int, configI
 	}
 	e = fmt.Sprintf("%s/%d", e, configID)
 
-	if _, err = coupleAPIErrors(c.R(ctx).Delete(e)); err != nil {
-		return err
-	}
-
-	return nil
+	_, err = coupleAPIErrors(c.R(ctx).Delete(e))
+	return err
 }

@@ -61,7 +61,7 @@
   - [X] `POST`
   - [X] `DELETE`
 - `/linode/instances/$id/disks/$id/password`
-  - [ ] `POST`
+  - [X] `POST`
 - `/linode/instances/$id/disks/$id/resize`
   - [X] `POST`
 
@@ -169,6 +169,8 @@
   - [X] `GET`
   - [X] `PUT`
   - [X] `DELETE`
+- `/nodebalancers/$id/configs/$id/rebuild`
+  - [X] `POST`
 
 ## Networking
 
@@ -213,6 +215,15 @@
 - `/support/tickets/$id/replies`
   - [ ] `GET`
   - [ ] `POST`
+
+## Tags
+
+- `/tags/`
+  - [X] `GET`
+  - [X] `POST`
+- `/tags/$id`
+  - [X] `GET`
+  - [X] `DELETE`
 
 ## Account
 
@@ -277,17 +288,67 @@
 ### Users
 
 - `/account/users`
-  - [ ] `GET`
-  - [ ] `POST`
+  - [X] `GET`
+  - [X] `POST`
 - `/account/users/$username`
-  - [ ] `GET`
-  - [ ] `PUT`
-  - [ ] `DELETE`
+  - [X] `GET`
+  - [X] `PUT`
+  - [X] `DELETE`
 - `/account/users/$username/grants`
   - [ ] `GET`
   - [ ] `PUT`
 - `/account/users/$username/password`
   - [ ] `POST`
+
+## Profile
+
+### Personalized User Settings
+
+- `/profile`
+  - [X] `GET`
+  - [X] `PUT`
+
+### Granted OAuth Apps
+
+- `/profile/apps`
+  - [ ] `GET`
+- `/profile/apps/$id`
+  - [ ] `GET`
+  - [ ] `DELETE`
+
+### Grants to Linode Resources
+
+- `/profile/grants`
+  - [ ] `GET`
+
+### SSH Keys
+
+- `/profile/sshkeys`
+  - [x] `GET`
+  - [x] `POST`
+- `/profile/sshkeys/$id`
+  - [x] `GET`
+  - [x] `PUT`
+  - [x] `DELETE`
+  
+### Two-Factor
+
+- `/profile/tfa-disable`
+  - [ ] `POST`
+- `/profile/tfa-enable`
+  - [ ] `POST`
+- `/profile/tfa-enable-confirm`
+  - [ ] `POST`
+
+### Personal Access API Tokens
+
+- `/profile/tokens`
+  - [X] `GET`
+  - [X] `POST`
+- `/profile/tokens/$id`
+  - [X] `GET`
+  - [X] `PUT`
+  - [X] `DELETE`
 
 ## Images
 

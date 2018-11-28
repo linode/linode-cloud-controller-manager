@@ -4,17 +4,15 @@ import (
 	"context"
 	"fmt"
 	"time"
-
-	"github.com/go-resty/resty"
 )
 
 // Invoice structs reflect an invoice for billable activity on the account.
 type Invoice struct {
 	DateStr string `json:"date"`
 
-	ID    int
-	Label string
-	Total float32
+	ID    int        `json:"id"`
+	Label string     `json:"label"`
+	Total float32    `json:"total"`
 	Date  *time.Time `json:"-"`
 }
 
@@ -23,11 +21,11 @@ type InvoiceItem struct {
 	FromStr string `json:"from"`
 	ToStr   string `json:"to"`
 
-	Label     string
-	Type      string
-	UnitPrice int
-	Quantity  int
-	Amount    float32
+	Label     string     `json:"label"`
+	Type      string     `json:"type"`
+	UnitPrice int        `json:"unitprice"`
+	Quantity  int        `json:"quantity"`
+	Amount    float32    `json:"amount"`
 	From      *time.Time `json:"-"`
 	To        *time.Time `json:"-"`
 }
@@ -35,7 +33,7 @@ type InvoiceItem struct {
 // InvoicesPagedResponse represents a paginated Invoice API response
 type InvoicesPagedResponse struct {
 	*PageOptions
-	Data []*Invoice
+	Data []Invoice `json:"data"`
 }
 
 // endpoint gets the endpoint URL for Invoice
@@ -49,20 +47,15 @@ func (InvoicesPagedResponse) endpoint(c *Client) string {
 
 // appendData appends Invoices when processing paginated Invoice responses
 func (resp *InvoicesPagedResponse) appendData(r *InvoicesPagedResponse) {
-	(*resp).Data = append(resp.Data, r.Data...)
-}
-
-// setResult sets the Resty response type of Invoice
-func (InvoicesPagedResponse) setResult(r *resty.Request) {
-	r.SetResult(InvoicesPagedResponse{})
+	resp.Data = append(resp.Data, r.Data...)
 }
 
 // ListInvoices gets a paginated list of Invoices against the Account
-func (c *Client) ListInvoices(ctx context.Context, opts *ListOptions) ([]*Invoice, error) {
+func (c *Client) ListInvoices(ctx context.Context, opts *ListOptions) ([]Invoice, error) {
 	response := InvoicesPagedResponse{}
 	err := c.listHelper(ctx, &response, opts)
-	for _, el := range response.Data {
-		el.fixDates()
+	for i := range response.Data {
+		response.Data[i].fixDates()
 	}
 	if err != nil {
 		return nil, err
@@ -101,7 +94,7 @@ func (c *Client) GetInvoice(ctx context.Context, id int) (*Invoice, error) {
 // InvoiceItemsPagedResponse represents a paginated Invoice Item API response
 type InvoiceItemsPagedResponse struct {
 	*PageOptions
-	Data []*InvoiceItem
+	Data []InvoiceItem `json:"data"`
 }
 
 // endpointWithID gets the endpoint URL for InvoiceItems associated with a specific Invoice
@@ -115,20 +108,15 @@ func (InvoiceItemsPagedResponse) endpointWithID(c *Client, id int) string {
 
 // appendData appends InvoiceItems when processing paginated Invoice Item responses
 func (resp *InvoiceItemsPagedResponse) appendData(r *InvoiceItemsPagedResponse) {
-	(*resp).Data = append(resp.Data, r.Data...)
-}
-
-// setResult sets the Resty response type of InvoiceItems
-func (InvoiceItemsPagedResponse) setResult(r *resty.Request) {
-	r.SetResult(InvoiceItemsPagedResponse{})
+	resp.Data = append(resp.Data, r.Data...)
 }
 
 // ListInvoiceItems gets the invoice items associated with a specific Invoice
-func (c *Client) ListInvoiceItems(ctx context.Context, id int, opts *ListOptions) ([]*InvoiceItem, error) {
+func (c *Client) ListInvoiceItems(ctx context.Context, id int, opts *ListOptions) ([]InvoiceItem, error) {
 	response := InvoiceItemsPagedResponse{}
 	err := c.listHelperWithID(ctx, &response, id, opts)
-	for _, el := range response.Data {
-		el.fixDates()
+	for i := range response.Data {
+		response.Data[i].fixDates()
 	}
 	if err != nil {
 		return nil, err

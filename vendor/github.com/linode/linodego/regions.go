@@ -3,20 +3,18 @@ package linodego
 import (
 	"context"
 	"fmt"
-
-	"github.com/go-resty/resty"
 )
 
-// LinodeRegion represents a linode region object
+// Region represents a linode region object
 type Region struct {
-	ID      string
-	Country string
+	ID      string `json:"id"`
+	Country string `json:"country"`
 }
 
-// LinodeRegionsPagedResponse represents a linode API response for listing
+// RegionsPagedResponse represents a linode API response for listing
 type RegionsPagedResponse struct {
 	*PageOptions
-	Data []*Region
+	Data []Region `json:"data"`
 }
 
 // endpoint gets the endpoint URL for Region
@@ -30,20 +28,15 @@ func (RegionsPagedResponse) endpoint(c *Client) string {
 
 // appendData appends Regions when processing paginated Region responses
 func (resp *RegionsPagedResponse) appendData(r *RegionsPagedResponse) {
-	(*resp).Data = append(resp.Data, r.Data...)
-}
-
-// setResult sets the Resty response type of Region
-func (RegionsPagedResponse) setResult(r *resty.Request) {
-	r.SetResult(RegionsPagedResponse{})
+	resp.Data = append(resp.Data, r.Data...)
 }
 
 // ListRegions lists Regions
-func (c *Client) ListRegions(ctx context.Context, opts *ListOptions) ([]*Region, error) {
+func (c *Client) ListRegions(ctx context.Context, opts *ListOptions) ([]Region, error) {
 	response := RegionsPagedResponse{}
 	err := c.listHelper(ctx, &response, opts)
-	for _, el := range response.Data {
-		el.fixDates()
+	for i := range response.Data {
+		response.Data[i].fixDates()
 	}
 	if err != nil {
 		return nil, err
@@ -63,7 +56,7 @@ func (c *Client) GetRegion(ctx context.Context, id string) (*Region, error) {
 		return nil, err
 	}
 	e = fmt.Sprintf("%s/%s", e, id)
-	r, err := c.R(ctx).SetResult(&Region{}).Get(e)
+	r, err := coupleAPIErrors(c.R(ctx).SetResult(&Region{}).Get(e))
 	if err != nil {
 		return nil, err
 	}

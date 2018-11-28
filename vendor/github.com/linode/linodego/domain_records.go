@@ -4,25 +4,24 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
-	"github.com/go-resty/resty"
 )
 
 // DomainRecord represents a DomainRecord object
 type DomainRecord struct {
-	ID       int
-	Type     DomainRecordType
-	Name     string
-	Target   string
-	Priority int
-	Weight   int
-	Port     int
-	Service  *string
-	Protocol *string
-	TTLSec   int `json:"ttl_sec"`
-	Tag      *string
+	ID       int              `json:"id"`
+	Type     DomainRecordType `json:"type"`
+	Name     string           `json:"name"`
+	Target   string           `json:"target"`
+	Priority int              `json:"priority"`
+	Weight   int              `json:"weight"`
+	Port     int              `json:"port"`
+	Service  *string          `json:"service"`
+	Protocol *string          `json:"protocol"`
+	TTLSec   int              `json:"ttl_sec"`
+	Tag      *string          `json:"tag"`
 }
 
+// DomainRecordCreateOptions fields are those accepted by CreateDomainRecord
 type DomainRecordCreateOptions struct {
 	Type     DomainRecordType `json:"type"`
 	Name     string           `json:"name"`
@@ -36,6 +35,7 @@ type DomainRecordCreateOptions struct {
 	Tag      *string          `json:"tag,omitempty"`
 }
 
+// DomainRecordUpdateOptions fields are those accepted by UpdateDomainRecord
 type DomainRecordUpdateOptions struct {
 	Type     DomainRecordType `json:"type,omitempty"`
 	Name     string           `json:"name,omitempty"`
@@ -49,8 +49,10 @@ type DomainRecordUpdateOptions struct {
 	Tag      *string          `json:"tag,omitempty"`
 }
 
+// DomainRecordType constants start with RecordType and include Linode API Domain Record Types
 type DomainRecordType string
 
+// DomainRecordType contants are the DNS record types a DomainRecord can assign
 const (
 	RecordTypeA     DomainRecordType = "A"
 	RecordTypeAAAA  DomainRecordType = "AAAA"
@@ -63,6 +65,7 @@ const (
 	RecordTypeCAA   DomainRecordType = "CAA"
 )
 
+// GetUpdateOptions converts a DomainRecord to DomainRecordUpdateOptions for use in UpdateDomainRecord
 func (d DomainRecord) GetUpdateOptions() (du DomainRecordUpdateOptions) {
 	du.Type = d.Type
 	du.Name = d.Name
@@ -77,28 +80,10 @@ func (d DomainRecord) GetUpdateOptions() (du DomainRecordUpdateOptions) {
 	return
 }
 
-func copyInt(iPtr *int) *int {
-	if iPtr == nil {
-		return nil
-	}
-	var t int
-	t = *iPtr
-	return &t
-}
-
-func copyString(sPtr *string) *string {
-	if sPtr == nil {
-		return nil
-	}
-	var t string
-	t = *sPtr
-	return &t
-}
-
 // DomainRecordsPagedResponse represents a paginated DomainRecord API response
 type DomainRecordsPagedResponse struct {
 	*PageOptions
-	Data []*DomainRecord
+	Data []DomainRecord `json:"data"`
 }
 
 // endpoint gets the endpoint URL for InstanceConfig
@@ -112,16 +97,11 @@ func (DomainRecordsPagedResponse) endpointWithID(c *Client, id int) string {
 
 // appendData appends DomainRecords when processing paginated DomainRecord responses
 func (resp *DomainRecordsPagedResponse) appendData(r *DomainRecordsPagedResponse) {
-	(*resp).Data = append(resp.Data, r.Data...)
-}
-
-// setResult sets the Resty response type of DomainRecord
-func (DomainRecordsPagedResponse) setResult(r *resty.Request) {
-	r.SetResult(DomainRecordsPagedResponse{})
+	resp.Data = append(resp.Data, r.Data...)
 }
 
 // ListDomainRecords lists DomainRecords
-func (c *Client) ListDomainRecords(ctx context.Context, domainID int, opts *ListOptions) ([]*DomainRecord, error) {
+func (c *Client) ListDomainRecords(ctx context.Context, domainID int, opts *ListOptions) ([]DomainRecord, error) {
 	response := DomainRecordsPagedResponse{}
 	err := c.listHelperWithID(ctx, &response, domainID, opts)
 	if err != nil {
@@ -131,8 +111,8 @@ func (c *Client) ListDomainRecords(ctx context.Context, domainID int, opts *List
 }
 
 // fixDates converts JSON timestamps to Go time.Time values
-func (v *DomainRecord) fixDates() *DomainRecord {
-	return v
+func (d *DomainRecord) fixDates() *DomainRecord {
+	return d
 }
 
 // GetDomainRecord gets the domainrecord with the provided ID
@@ -159,11 +139,11 @@ func (c *Client) CreateDomainRecord(ctx context.Context, domainID int, domainrec
 
 	req := c.R(ctx).SetResult(&DomainRecord{})
 
-	if bodyData, err := json.Marshal(domainrecord); err == nil {
-		body = string(bodyData)
-	} else {
+	bodyData, err := json.Marshal(domainrecord)
+	if err != nil {
 		return nil, NewError(err)
 	}
+	body = string(bodyData)
 
 	r, err := coupleAPIErrors(req.
 		SetBody(body).
@@ -210,9 +190,6 @@ func (c *Client) DeleteDomainRecord(ctx context.Context, domainID int, id int) e
 	}
 	e = fmt.Sprintf("%s/%d", e, id)
 
-	if _, err := coupleAPIErrors(c.R(ctx).Delete(e)); err != nil {
-		return err
-	}
-
-	return nil
+	_, err = coupleAPIErrors(c.R(ctx).Delete(e))
+	return err
 }

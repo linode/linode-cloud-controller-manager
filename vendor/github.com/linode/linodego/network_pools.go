@@ -3,14 +3,12 @@ package linodego
 import (
 	"context"
 	"fmt"
-
-	"github.com/go-resty/resty"
 )
 
 // IPv6PoolsPagedResponse represents a paginated IPv6Pool API response
 type IPv6PoolsPagedResponse struct {
 	*PageOptions
-	Data []*IPv6Range
+	Data []IPv6Range `json:"data"`
 }
 
 // endpoint gets the endpoint URL for IPv6Pool
@@ -24,16 +22,11 @@ func (IPv6PoolsPagedResponse) endpoint(c *Client) string {
 
 // appendData appends IPv6Pools when processing paginated IPv6Pool responses
 func (resp *IPv6PoolsPagedResponse) appendData(r *IPv6PoolsPagedResponse) {
-	(*resp).Data = append(resp.Data, r.Data...)
-}
-
-// setResult sets the Resty response type of IPv6Pool
-func (IPv6PoolsPagedResponse) setResult(r *resty.Request) {
-	r.SetResult(IPv6PoolsPagedResponse{})
+	resp.Data = append(resp.Data, r.Data...)
 }
 
 // ListIPv6Pools lists IPv6Pools
-func (c *Client) ListIPv6Pools(ctx context.Context, opts *ListOptions) ([]*IPv6Range, error) {
+func (c *Client) ListIPv6Pools(ctx context.Context, opts *ListOptions) ([]IPv6Range, error) {
 	response := IPv6PoolsPagedResponse{}
 	err := c.listHelper(ctx, &response, opts)
 	if err != nil {
@@ -49,7 +42,7 @@ func (c *Client) GetIPv6Pool(ctx context.Context, id string) (*IPv6Range, error)
 		return nil, err
 	}
 	e = fmt.Sprintf("%s/%s", e, id)
-	r, err := c.R(ctx).SetResult(&IPv6Range{}).Get(e)
+	r, err := coupleAPIErrors(c.R(ctx).SetResult(&IPv6Range{}).Get(e))
 	if err != nil {
 		return nil, err
 	}

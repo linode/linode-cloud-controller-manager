@@ -5,55 +5,61 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-
-	"github.com/go-resty/resty"
 )
 
 // Image represents a deployable Image object for use with Linode Instances
 type Image struct {
 	CreatedStr  string `json:"created"`
-	UpdatedStr  string `json:"updated"`
-	ID          string
-	Label       string
-	Description string
-	Type        string
-	IsPublic    bool `json:"is_public"`
-	Size        int
-	Vendor      string
-	Deprecated  bool
+	ExpiryStr   string `json:"expiry"`
+	ID          string `json:"id"`
+	CreatedBy   string `json:"created_by"`
+	Label       string `json:"label"`
+	Description string `json:"description"`
+	Type        string `json:"type"`
+	Vendor      string `json:"vendor"`
+	Size        int    `json:"size"`
+	IsPublic    bool   `json:"is_public"`
+	Deprecated  bool   `json:"deprecated"`
 
-	CreatedBy string     `json:"created_by"`
-	Created   *time.Time `json:"-"`
-	Updated   *time.Time `json:"-"`
+	Created *time.Time `json:"-"`
+	Expiry  *time.Time `json:"-"`
 }
 
+// ImageCreateOptions fields are those accepted by CreateImage
 type ImageCreateOptions struct {
 	DiskID      int    `json:"disk_id"`
 	Label       string `json:"label"`
 	Description string `json:"description,omitempty"`
 }
 
+// ImageUpdateOptions fields are those accepted by UpdateImage
 type ImageUpdateOptions struct {
 	Label       string  `json:"label,omitempty"`
 	Description *string `json:"description,omitempty"`
 }
 
-func (l *Image) fixDates() *Image {
-	l.Created, _ = parseDates(l.CreatedStr)
-	l.Updated, _ = parseDates(l.UpdatedStr)
-	return l
+func (i *Image) fixDates() *Image {
+	i.Created, _ = parseDates(i.CreatedStr)
+
+	if len(i.ExpiryStr) > 0 {
+		i.Expiry, _ = parseDates(i.ExpiryStr)
+	} else {
+		i.Expiry = nil
+	}
+	return i
 }
 
+// GetUpdateOptions converts an Image to ImageUpdateOptions for use in UpdateImage
 func (i Image) GetUpdateOptions() (iu ImageUpdateOptions) {
 	iu.Label = i.Label
-	iu.Description = copyString(iu.Description)
+	iu.Description = copyString(&i.Description)
 	return
 }
 
 // ImagesPagedResponse represents a linode API response for listing of images
 type ImagesPagedResponse struct {
 	*PageOptions
-	Data []*Image
+	Data []Image `json:"data"`
 }
 
 func (ImagesPagedResponse) endpoint(c *Client) string {
@@ -65,19 +71,15 @@ func (ImagesPagedResponse) endpoint(c *Client) string {
 }
 
 func (resp *ImagesPagedResponse) appendData(r *ImagesPagedResponse) {
-	(*resp).Data = append(resp.Data, r.Data...)
-}
-
-func (ImagesPagedResponse) setResult(r *resty.Request) {
-	r.SetResult(ImagesPagedResponse{})
+	resp.Data = append(resp.Data, r.Data...)
 }
 
 // ListImages lists Images
-func (c *Client) ListImages(ctx context.Context, opts *ListOptions) ([]*Image, error) {
+func (c *Client) ListImages(ctx context.Context, opts *ListOptions) ([]Image, error) {
 	response := ImagesPagedResponse{}
 	err := c.listHelper(ctx, &response, opts)
-	for _, el := range response.Data {
-		el.fixDates()
+	for i := range response.Data {
+		response.Data[i].fixDates()
 	}
 	if err != nil {
 		return nil, err
@@ -97,7 +99,7 @@ func (c *Client) GetImage(ctx context.Context, id string) (*Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.Result().(*Image), nil
+	return r.Result().(*Image).fixDates(), nil
 }
 
 // CreateImage creates a Image
@@ -161,9 +163,6 @@ func (c *Client) DeleteImage(ctx context.Context, id string) error {
 	}
 	e = fmt.Sprintf("%s/%s", e, id)
 
-	if _, err := coupleAPIErrors(c.R(ctx).Delete(e)); err != nil {
-		return err
-	}
-
-	return nil
+	_, err = coupleAPIErrors(c.R(ctx).Delete(e))
+	return err
 }

@@ -3,16 +3,14 @@ package linodego
 import (
 	"context"
 	"fmt"
-
-	"github.com/go-resty/resty"
 )
 
 // LongviewSubscription represents a LongviewSubscription object
 type LongviewSubscription struct {
-	ID              string
-	Label           string
-	ClientsIncluded int `json:"clients_included"`
-	Price           *LinodePrice
+	ID              string       `json:"id"`
+	Label           string       `json:"label"`
+	ClientsIncluded int          `json:"clients_included"`
+	Price           *LinodePrice `json:"price"`
 	// UpdatedStr string `json:"updated"`
 	// Updated *time.Time `json:"-"`
 }
@@ -20,7 +18,7 @@ type LongviewSubscription struct {
 // LongviewSubscriptionsPagedResponse represents a paginated LongviewSubscription API response
 type LongviewSubscriptionsPagedResponse struct {
 	*PageOptions
-	Data []*LongviewSubscription
+	Data []LongviewSubscription `json:"data"`
 }
 
 // endpoint gets the endpoint URL for LongviewSubscription
@@ -34,20 +32,15 @@ func (LongviewSubscriptionsPagedResponse) endpoint(c *Client) string {
 
 // appendData appends LongviewSubscriptions when processing paginated LongviewSubscription responses
 func (resp *LongviewSubscriptionsPagedResponse) appendData(r *LongviewSubscriptionsPagedResponse) {
-	(*resp).Data = append(resp.Data, r.Data...)
-}
-
-// setResult sets the Resty response type of LongviewSubscription
-func (LongviewSubscriptionsPagedResponse) setResult(r *resty.Request) {
-	r.SetResult(LongviewSubscriptionsPagedResponse{})
+	resp.Data = append(resp.Data, r.Data...)
 }
 
 // ListLongviewSubscriptions lists LongviewSubscriptions
-func (c *Client) ListLongviewSubscriptions(ctx context.Context, opts *ListOptions) ([]*LongviewSubscription, error) {
+func (c *Client) ListLongviewSubscriptions(ctx context.Context, opts *ListOptions) ([]LongviewSubscription, error) {
 	response := LongviewSubscriptionsPagedResponse{}
 	err := c.listHelper(ctx, &response, opts)
-	for _, el := range response.Data {
-		el.fixDates()
+	for i := range response.Data {
+		response.Data[i].fixDates()
 	}
 	if err != nil {
 		return nil, err

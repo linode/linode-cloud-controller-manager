@@ -15,10 +15,9 @@ go get -u github.com/linode/linodego
 
 ## API Support
 
-** Note: Currently in work-in-progress.  Things will change and break until we release a tagged version. **
-
 Check [API_SUPPORT.md](API_SUPPORT.md) for current support of the Linode `v4` API endpoints.
 
+** Note: This project will change and break until we release a v1.0.0 tagged version. Breaking changes in v0.x.x will be denoted with a minor version bump (v0.2.4 -> v0.3.0) **
 
 ## Documentation
 
@@ -38,13 +37,15 @@ A brief summary of the features offered in this API client are shown here.
 package main
 
 import (
-  "context"
-  "fmt"
-  "log"
-  "os"
+	"context"
+	"fmt"
 
-  "github.com/linode/linodego"
-  "golang.org/x/oauth2"
+	"github.com/linode/linodego"
+	"golang.org/x/oauth2"
+
+	"log"
+	"net/http"
+	"os"
 )
 
 func main() {
@@ -60,11 +61,9 @@ func main() {
     },
   }
 
-  linodeClient, err := linodego.NewClient(oauth2Client)
-  if err != nil {
-    log.Fatal(err)
-  }
+  linodeClient := linodego.NewClient(oauth2Client)
   linodeClient.SetDebug(true)
+  
   res, err := linodeClient.GetInstance(context.Background(), 4090913)
   if err != nil {
     log.Fatal(err)
@@ -157,9 +156,8 @@ When performing a `POST` or `PUT` request, multiple field related errors will be
 Run `make test` to run the unit tests.  This is the same as running `go test` except that `make test` will
 execute the tests while playing back API response fixtures that were recorded during a previous development build.
 
-`go test` can be used without the fixtures, so long as `LINODE_TEST_INSTANCE` and `LINODE_TEST_VOLUME` are set
-to an instance ID and volume ID that exists on your account.  The Linode instance must have a backup and a snapshot to
-match the test expectations. Copy `env.sample` to `.env` and configure your persistent test settings, including an API token.
+`go test` can be used without the fixtures. Copy `env.sample` to `.env` and configure your persistent test
+settings, including an API token.
 
 `go test -short` can be used to run live API tests that do not require an account token.
 

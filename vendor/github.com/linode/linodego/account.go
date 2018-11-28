@@ -4,25 +4,26 @@ import "context"
 
 // Account associated with the token in use
 type Account struct {
-	FirstName  string `json:"first_name"`
-	LastName   string `json:"last_name"`
-	Email      string
-	Company    string
-	Address1   string
-	Address2   string
-	Balance    float32
-	City       string
-	State      string
-	Zip        string
-	Country    string
+	FirstName  string      `json:"first_name"`
+	LastName   string      `json:"last_name"`
+	Email      string      `json:"email"`
+	Company    string      `json:"company"`
+	Address1   string      `json:"address_1"`
+	Address2   string      `json:"address_2"`
+	Balance    float32     `json:"balance"`
+	City       string      `json:"city"`
+	State      string      `json:"state"`
+	Zip        string      `json:"zip"`
+	Country    string      `json:"country"`
 	TaxID      string      `json:"tax_id"`
+	Phone      string      `json:"phone"`
 	CreditCard *CreditCard `json:"credit_card"`
 }
 
 // CreditCard information associated with the Account.
 type CreditCard struct {
 	LastFour string `json:"last_four"`
-	Expiry   string
+	Expiry   string `json:"expiry"`
 }
 
 // fixDates converts JSON timestamps to Go time.Time values

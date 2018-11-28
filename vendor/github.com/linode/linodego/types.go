@@ -3,44 +3,52 @@ package linodego
 import (
 	"context"
 	"fmt"
-
-	"github.com/go-resty/resty"
 )
 
 // LinodeType represents a linode type object
 type LinodeType struct {
-	ID         string
-	Disk       int
-	Class      string // enum: nanode, standard, highmem
-	Price      *LinodePrice
-	Label      string
-	Addons     *LinodeAddons
-	NetworkOut int `json:"network_out"`
-	Memory     int
-	Transfer   int
-	VCPUs      int
+	ID         string          `json:"id"`
+	Disk       int             `json:"disk"`
+	Class      LinodeTypeClass `json:"class"` // enum: nanode, standard, highmem
+	Price      *LinodePrice    `json:"price"`
+	Label      string          `json:"label"`
+	Addons     *LinodeAddons   `json:"addons"`
+	NetworkOut int             `json:"network_out"`
+	Memory     int             `json:"memory"`
+	Transfer   int             `json:"transfer"`
+	VCPUs      int             `json:"vcpus"`
 }
 
 // LinodePrice represents a linode type price object
 type LinodePrice struct {
-	Hourly  float32
-	Monthly float32
+	Hourly  float32 `json:"hourly"`
+	Monthly float32 `json:"monthly"`
 }
 
 // LinodeBackupsAddon represents a linode backups addon object
 type LinodeBackupsAddon struct {
-	Price *LinodePrice
+	Price *LinodePrice `json:"price"`
 }
 
 // LinodeAddons represent the linode addons object
 type LinodeAddons struct {
-	Backups *LinodeBackupsAddon
+	Backups *LinodeBackupsAddon `json:"backups"`
 }
+
+// LinodeTypeClass constants start with Class and include Linode API Instance Type Classes
+type LinodeTypeClass string
+
+// LinodeTypeClass contants are the Instance Type Classes that an Instance Type can be assigned
+const (
+	ClassNanode   LinodeTypeClass = "nanode"
+	ClassStandard LinodeTypeClass = "standard"
+	ClassHighmem  LinodeTypeClass = "highmem"
+)
 
 // LinodeTypesPagedResponse represents a linode types API response for listing
 type LinodeTypesPagedResponse struct {
 	*PageOptions
-	Data []*LinodeType
+	Data []LinodeType `json:"data"`
 }
 
 func (LinodeTypesPagedResponse) endpoint(c *Client) string {
@@ -52,15 +60,11 @@ func (LinodeTypesPagedResponse) endpoint(c *Client) string {
 }
 
 func (resp *LinodeTypesPagedResponse) appendData(r *LinodeTypesPagedResponse) {
-	(*resp).Data = append(resp.Data, r.Data...)
-}
-
-func (LinodeTypesPagedResponse) setResult(r *resty.Request) {
-	r.SetResult(LinodeTypesPagedResponse{})
+	resp.Data = append(resp.Data, r.Data...)
 }
 
 // ListTypes lists linode types
-func (c *Client) ListTypes(ctx context.Context, opts *ListOptions) ([]*LinodeType, error) {
+func (c *Client) ListTypes(ctx context.Context, opts *ListOptions) ([]LinodeType, error) {
 	response := LinodeTypesPagedResponse{}
 	err := c.listHelper(ctx, &response, opts)
 	if err != nil {

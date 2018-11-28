@@ -5,26 +5,27 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-
-	"github.com/go-resty/resty"
 )
 
+// InstanceDisk represents an Instance Disk object
 type InstanceDisk struct {
 	CreatedStr string `json:"created"`
 	UpdatedStr string `json:"updated"`
 
-	ID         int
-	Label      string
-	Status     string
-	Size       int
-	Filesystem DiskFilesystem
-	Created    time.Time `json:"-"`
-	Updated    time.Time `json:"-"`
+	ID         int            `json:"id"`
+	Label      string         `json:"label"`
+	Status     DiskStatus     `json:"status"`
+	Size       int            `json:"size"`
+	Filesystem DiskFilesystem `json:"filesystem"`
+	Created    time.Time      `json:"-"`
+	Updated    time.Time      `json:"-"`
 }
 
+// DiskFilesystem constants start with Filesystem and include Linode API Filesystems
 type DiskFilesystem string
 
-var (
+// DiskFilesystem constants represent the filesystems types an Instance Disk may use
+const (
 	FilesystemRaw    DiskFilesystem = "raw"
 	FilesystemSwap   DiskFilesystem = "swap"
 	FilesystemExt3   DiskFilesystem = "ext3"
@@ -32,10 +33,20 @@ var (
 	FilesystemInitrd DiskFilesystem = "initrd"
 )
 
+// DiskStatus constants have the prefix "Disk" and include Linode API Instance Disk Status
+type DiskStatus string
+
+// DiskStatus constants represent the status values an Instance Disk may have
+const (
+	DiskReady    DiskStatus = "ready"
+	DiskNotReady DiskStatus = "not ready"
+	DiskDeleting DiskStatus = "deleting"
+)
+
 // InstanceDisksPagedResponse represents a paginated InstanceDisk API response
 type InstanceDisksPagedResponse struct {
 	*PageOptions
-	Data []*InstanceDisk
+	Data []InstanceDisk `json:"data"`
 }
 
 // InstanceDiskCreateOptions are InstanceDisk settings that can be used at creation
@@ -49,6 +60,7 @@ type InstanceDiskCreateOptions struct {
 
 	Filesystem      string            `json:"filesystem,omitempty"`
 	AuthorizedKeys  []string          `json:"authorized_keys,omitempty"`
+	AuthorizedUsers []string          `json:"authorized_users,omitempty"`
 	ReadOnly        bool              `json:"read_only,omitempty"`
 	StackscriptID   int               `json:"stackscript_id,omitempty"`
 	StackscriptData map[string]string `json:"stackscript_data,omitempty"`
@@ -71,20 +83,15 @@ func (InstanceDisksPagedResponse) endpointWithID(c *Client, id int) string {
 
 // appendData appends InstanceDisks when processing paginated InstanceDisk responses
 func (resp *InstanceDisksPagedResponse) appendData(r *InstanceDisksPagedResponse) {
-	(*resp).Data = append(resp.Data, r.Data...)
-}
-
-// setResult sets the Resty response type of InstanceDisk
-func (InstanceDisksPagedResponse) setResult(r *resty.Request) {
-	r.SetResult(InstanceDisksPagedResponse{})
+	resp.Data = append(resp.Data, r.Data...)
 }
 
 // ListInstanceDisks lists InstanceDisks
-func (c *Client) ListInstanceDisks(ctx context.Context, linodeID int, opts *ListOptions) ([]*InstanceDisk, error) {
+func (c *Client) ListInstanceDisks(ctx context.Context, linodeID int, opts *ListOptions) ([]InstanceDisk, error) {
 	response := InstanceDisksPagedResponse{}
 	err := c.listHelperWithID(ctx, &response, linodeID, opts)
-	for _, el := range response.Data {
-		el.fixDates()
+	for i := range response.Data {
+		response.Data[i].fixDates()
 	}
 	if err != nil {
 		return nil, err
@@ -178,13 +185,13 @@ func (c *Client) RenameInstanceDisk(ctx context.Context, linodeID int, diskID in
 }
 
 // ResizeInstanceDisk resizes the size of the Instance disk
-func (c *Client) ResizeInstanceDisk(ctx context.Context, linodeID int, diskID int, size int) (*InstanceDisk, error) {
+func (c *Client) ResizeInstanceDisk(ctx context.Context, linodeID int, diskID int, size int) error {
 	var body string
 	e, err := c.InstanceDisks.endpointWithID(linodeID)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	e = fmt.Sprintf("%s/%d", e, diskID)
+	e = fmt.Sprintf("%s/%d/resize", e, diskID)
 
 	req := c.R(ctx).SetResult(&InstanceDisk{})
 	updateOpts := map[string]interface{}{
@@ -194,17 +201,41 @@ func (c *Client) ResizeInstanceDisk(ctx context.Context, linodeID int, diskID in
 	if bodyData, err := json.Marshal(updateOpts); err == nil {
 		body = string(bodyData)
 	} else {
-		return nil, NewError(err)
+		return NewError(err)
 	}
 
-	r, err := coupleAPIErrors(req.
+	_, err = coupleAPIErrors(req.
 		SetBody(body).
 		Post(e))
 
+	return err
+}
+
+// PasswordResetInstanceDisk resets the "root" account password on the Instance disk
+func (c *Client) PasswordResetInstanceDisk(ctx context.Context, linodeID int, diskID int, password string) error {
+	var body string
+	e, err := c.InstanceDisks.endpointWithID(linodeID)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return r.Result().(*InstanceDisk).fixDates(), nil
+	e = fmt.Sprintf("%s/%d/password", e, diskID)
+
+	req := c.R(ctx).SetResult(&InstanceDisk{})
+	updateOpts := map[string]interface{}{
+		"password": password,
+	}
+
+	if bodyData, err := json.Marshal(updateOpts); err == nil {
+		body = string(bodyData)
+	} else {
+		return NewError(err)
+	}
+
+	_, err = coupleAPIErrors(req.
+		SetBody(body).
+		Post(e))
+
+	return err
 }
 
 // DeleteInstanceDisk deletes a Linode Instance Disk
@@ -215,8 +246,6 @@ func (c *Client) DeleteInstanceDisk(ctx context.Context, linodeID int, diskID in
 	}
 	e = fmt.Sprintf("%s/%d", e, diskID)
 
-	if _, err := coupleAPIErrors(c.R(ctx).Delete(e)); err != nil {
-		return err
-	}
-	return nil
+	_, err = coupleAPIErrors(c.R(ctx).Delete(e))
+	return err
 }

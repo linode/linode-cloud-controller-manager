@@ -159,14 +159,6 @@
   revision = "f3f9494671f93fcff853e3c6e9e948b3eb71e590"
 
 [[projects]]
-  digest = "1:64241365fa95f35567976f0790ecfa85c9cb3d4131cc6d6cc7adb1cc6437159f"
-  name = "github.com/go-resty/resty"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "13ff84ebd5bdfa46a342d9edb869e21560a478f8"
-  version = "v1.10.2"
-
-[[projects]]
   digest = "1:f83d740263b44fdeef3e1bce6147b5d7283fcad1a693d39639be33993ecf3db1"
   name = "github.com/gogo/protobuf"
   packages = [
@@ -275,12 +267,12 @@
   version = "v1.1.5"
 
 [[projects]]
-  digest = "1:5e86bd61e29b1ada33fda5d4c8f98d6267c0d34aed27ac1fc7c327b0737b7e3a"
+  digest = "1:bc5cabd896558322376aeacf0dfa8a3f1ff201c0326da3821e499f04e3e89569"
   name = "github.com/linode/linodego"
   packages = ["."]
   pruneopts = "UT"
-  revision = "7edbc87f0140b7561dbc20458877a56bdded5eb8"
-  version = "v0.3.0"
+  revision = "bcd50a0c5437e65b51934c794ea336aa079af08a"
+  version = "v0.6.2"
 
 [[projects]]
   digest = "1:a867990aee2ebc1ac86614ed702bf1e63061a79eac12d4326203cb9084b61839"
@@ -558,6 +550,14 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "20b71e5b60d756d3d2f80def009790325acc2b23"
+
+[[projects]]
+  digest = "1:64241365fa95f35567976f0790ecfa85c9cb3d4131cc6d6cc7adb1cc6437159f"
+  name = "gopkg.in/resty.v1"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "13ff84ebd5bdfa46a342d9edb869e21560a478f8"
+  version = "v1.10.2"
 
 [[projects]]
   digest = "1:517fc596d15da8456fefaa85bcff18dd2068ade58f1e108997c2456ff0e83d3d"

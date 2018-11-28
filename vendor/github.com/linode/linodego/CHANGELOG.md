@@ -1,5 +1,119 @@
 # Change Log
 
+## Unreleased
+
+### Fixes
+
+### Features
+
+<a name-"v0.6.2"></a>
+## [v0.6.2](https://github.com/linode/linodego/compare/v0.6.1..v0.6.2) (2018-10-26)
+
+### Fixes
+
+* add missing `Account` fields: `address_1`, `address_2`, `phone`
+
+<a name-"v0.6.1"></a>
+## [v0.6.1](https://github.com/linode/linodego/compare/v0.6.0..v0.6.1) (2018-10-26)
+
+### Features
+
+* Adds support for fetching and updating basic Profile information
+
+<a name-"v0.6.0"></a>
+## [v0.6.0](https://github.com/linode/linodego/compare/v0.5.1..v0.6.0) (2018-10-25)
+
+### Fixes
+
+* Fixes Image date handling
+* Fixes broken example code in README
+* Fixes WaitForEventFinished when encountering events without entity
+* Fixes ResizeInstanceDisk which was executing CloneInstanceDisk
+* Fixes go-resty import path to gopkg.in version for future go module support
+
+### Features
+
+* Adds support for user account operations
+* Adds support for profile tokens
+* Adds support for Tags
+* Adds PasswordResetInstanceDisk
+* Adds DiskStatus constants
+* Adds WaitForInstanceDiskStatus
+* Adds SetPollDelay for configuring poll duration
+
+  * Reduced polling time to millisecond granularity
+  * Change polling default to 3s to avoid 429 conditions
+  * Use poll delay in waitfor functions
+
+<a name="v0.5.1"></a>
+## [v0.5.1](https://github.com/linode/linodego/compare/v0.5.0...v0.5.1) (2018-09-10)
+
+### Fixes
+
+* Domain.Status was not imported from API responses correctly
+
+<a name="v0.5.0"></a>
+## [v0.5.0](https://github.com/linode/linodego/compare/v0.4.0...v0.5.0) (2018-09-09)
+
+### Breaking Changes
+
+* List functions return slice of thing instead of slice of pointer to thing
+
+### Feature
+
+* add SSHKeys methods to client (also affects InstanceCreate, InstanceDiskCreate)
+* add RebuildNodeBalancerConfig (and CreateNodeBalancerConfig with Nodes)
+
+### Fixes
+
+* Event.TimeRemaining wouldn't parse all possible API value
+* Tests no longer rely on known/special instance and volume ids
+
+<a name="0.4.0"></a>
+## [0.4.0](https://github.com/linode/linodego/compare/v0.3.0...0.4.0) (2018-08-27)
+
+### Breaking Changes
+
+Replaces bool, error results with error results, for:
+
+* instance\_snapshots.go: EnableInstanceBackups
+* instance\_snapshots.go: CancelInstanceBackups
+* instance\_snapshots.go: RestoreInstanceBackup
+* instances.go: BootInstance
+* instances.go: RebootInstance
+* instances.go: MutateInstance
+* instances.go: RescueInstance
+* instances.go: ResizeInstance
+* instances.go: ShutdownInstance
+* volumes.go: DetachVolume
+* volumes.go: ResizeVolume
+
+
+### Docs
+
+* reword text about breaking changes until first tag
+
+### Feat
+
+* added MigrateInstance and InstanceResizing from 4.0.1-4.0.3 API Changelog
+* added gometalinter to travis builds
+* added missing function and type comments as reported by linting tools
+* supply json values for all fields, useful for mocking responses using linodego types
+* use context channels in WaitFor\* functions
+* add LinodeTypeClass type (enum)
+* add TicketStatus type (enum)
+* update template thing and add a test template
+
+### Fix
+
+* TransferQuota was TransferQuote (and not parsed from the api correctly)
+* stackscripts udf was not parsed correctly
+* add InstanceCreateOptions.PrivateIP
+* check the WaitFor timeout before sleeping to avoid extra sleep
+* various linting warnings and unhandled err results as reported by linting tools
+* fix GetStackscript 404 handling
+
+
 <a name="0.3.0"></a>
 
 ## [0.3.0](https://github.com/linode/linodego/compare/v0.2.0...0.3.0) (2018-08-15)

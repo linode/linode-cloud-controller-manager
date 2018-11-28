@@ -3,14 +3,12 @@ package linodego
 import (
 	"context"
 	"fmt"
-
-	"github.com/go-resty/resty"
 )
 
 // IPAddressesPagedResponse represents a paginated IPAddress API response
 type IPAddressesPagedResponse struct {
 	*PageOptions
-	Data []*InstanceIP
+	Data []InstanceIP `json:"data"`
 }
 
 // endpoint gets the endpoint URL for IPAddress
@@ -24,16 +22,11 @@ func (IPAddressesPagedResponse) endpoint(c *Client) string {
 
 // appendData appends IPAddresses when processing paginated InstanceIPAddress responses
 func (resp *IPAddressesPagedResponse) appendData(r *IPAddressesPagedResponse) {
-	(*resp).Data = append(resp.Data, r.Data...)
-}
-
-// setResult sets the Resty response type of IPAddress
-func (IPAddressesPagedResponse) setResult(r *resty.Request) {
-	r.SetResult(IPAddressesPagedResponse{})
+	resp.Data = append(resp.Data, r.Data...)
 }
 
 // ListIPAddresses lists IPAddresses
-func (c *Client) ListIPAddresses(ctx context.Context, opts *ListOptions) ([]*InstanceIP, error) {
+func (c *Client) ListIPAddresses(ctx context.Context, opts *ListOptions) ([]InstanceIP, error) {
 	response := IPAddressesPagedResponse{}
 	err := c.listHelper(ctx, &response, opts)
 	if err != nil {
@@ -49,7 +42,7 @@ func (c *Client) GetIPAddress(ctx context.Context, id string) (*InstanceIP, erro
 		return nil, err
 	}
 	e = fmt.Sprintf("%s/%s", e, id)
-	r, err := c.R(ctx).SetResult(&InstanceIP{}).Get(e)
+	r, err := coupleAPIErrors(c.R(ctx).SetResult(&InstanceIP{}).Get(e))
 	if err != nil {
 		return nil, err
 	}

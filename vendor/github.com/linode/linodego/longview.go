@@ -3,13 +3,11 @@ package linodego
 import (
 	"context"
 	"fmt"
-
-	"github.com/go-resty/resty"
 )
 
 // LongviewClient represents a LongviewClient object
 type LongviewClient struct {
-	ID int
+	ID int `json:"id"`
 	// UpdatedStr string `json:"updated"`
 	// Updated *time.Time `json:"-"`
 }
@@ -17,7 +15,7 @@ type LongviewClient struct {
 // LongviewClientsPagedResponse represents a paginated LongviewClient API response
 type LongviewClientsPagedResponse struct {
 	*PageOptions
-	Data []*LongviewClient
+	Data []LongviewClient `json:"data"`
 }
 
 // endpoint gets the endpoint URL for LongviewClient
@@ -31,20 +29,15 @@ func (LongviewClientsPagedResponse) endpoint(c *Client) string {
 
 // appendData appends LongviewClients when processing paginated LongviewClient responses
 func (resp *LongviewClientsPagedResponse) appendData(r *LongviewClientsPagedResponse) {
-	(*resp).Data = append(resp.Data, r.Data...)
-}
-
-// setResult sets the Resty response type of LongviewClient
-func (LongviewClientsPagedResponse) setResult(r *resty.Request) {
-	r.SetResult(LongviewClientsPagedResponse{})
+	resp.Data = append(resp.Data, r.Data...)
 }
 
 // ListLongviewClients lists LongviewClients
-func (c *Client) ListLongviewClients(ctx context.Context, opts *ListOptions) ([]*LongviewClient, error) {
+func (c *Client) ListLongviewClients(ctx context.Context, opts *ListOptions) ([]LongviewClient, error) {
 	response := LongviewClientsPagedResponse{}
 	err := c.listHelper(ctx, &response, opts)
-	for _, el := range response.Data {
-		el.fixDates()
+	for i := range response.Data {
+		response.Data[i].fixDates()
 	}
 	if err != nil {
 		return nil, err

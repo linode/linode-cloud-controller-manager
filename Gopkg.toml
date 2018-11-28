@@ -2,7 +2,7 @@ required = ["github.com/json-iterator/go"]
 
 [[constraint]]
   name = "github.com/linode/linodego"
-  version = "0.3.0"
+  version = "0.6.2"
 
 [[constraint]]
   name = "github.com/pkg/errors"
