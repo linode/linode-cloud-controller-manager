@@ -18,7 +18,7 @@ Kubernetes 1.9+
 
 ## Contribution Guidelines
 
-Want to improve the linode-cloud-controller-manager? Please start [here](/CONTRIBUTING.md).
+Want to improve the linode-cloud-controller-manager? Please start [here](.github/CONTRIBUTING.md).
 
 ## Join the Kubernetes Community
 
