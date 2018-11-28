@@ -20,7 +20,10 @@ imports: $(GOPATH)/bin/goimports
 fmt: vet imports
 	gofmt -s -w *.go cloud
 
-test:
+$(GOPATH)/bin/ginkgo:
+	go install github.com/onsi/ginkgo/ginkgo
+
+test: $(GOPATH)/bin/ginkgo
 	ginkgo -r --v --progress --trace -- --v=3
 
 docker-build:
