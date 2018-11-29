@@ -21,12 +21,12 @@ func (z zones) GetZone(_ context.Context) (cloudprovider.Zone, error) {
 	return cloudprovider.Zone{Region: z.region}, nil
 }
 
-func (z zones) GetZoneByProviderID(_ context.Context, providerID string) (cloudprovider.Zone, error) {
+func (z zones) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
 	id, err := serverIDFromProviderID(providerID)
 	if err != nil {
 		return cloudprovider.Zone{}, err
 	}
-	linode, err := linodeByID(z.client, id)
+	linode, err := linodeByID(ctx, z.client, id)
 	if err != nil {
 		return cloudprovider.Zone{}, err
 	}
@@ -34,8 +34,8 @@ func (z zones) GetZoneByProviderID(_ context.Context, providerID string) (cloudp
 	return cloudprovider.Zone{Region: linode.Region}, nil
 }
 
-func (z zones) GetZoneByNodeName(_ context.Context, nodeName types.NodeName) (cloudprovider.Zone, error) {
-	linode, err := linodeByName(z.client, nodeName)
+func (z zones) GetZoneByNodeName(ctx context.Context, nodeName types.NodeName) (cloudprovider.Zone, error) {
+	linode, err := linodeByName(ctx, z.client, nodeName)
 	if err != nil {
 		return cloudprovider.Zone{}, err
 	}

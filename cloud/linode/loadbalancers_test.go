@@ -30,7 +30,7 @@ func TestCCMLoadBalancers(t *testing.T) {
 	}{
 		[]func(t *testing.T, client *linodego.Client){
 			testGetLoadBalancer,
-			testCreateNoadBalancer,
+			testCreateNodeBalancer,
 			testBuildLoadBalancerRequest,
 			testEnsureLoadBalancerDeleted,
 			testEnsureLoadBalancer,
@@ -49,7 +49,7 @@ func TestCCMLoadBalancers(t *testing.T) {
 
 }
 
-func testCreateNoadBalancer(t *testing.T, client *linodego.Client) {
+func testCreateNodeBalancer(t *testing.T, client *linodego.Client) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        randString(10),
@@ -68,7 +68,7 @@ func testCreateNoadBalancer(t *testing.T, client *linodego.Client) {
 		},
 	}
 	lb := &loadbalancers{client, "us-west"}
-	id, err := lb.createNoadBalancer(svc)
+	id, err := lb.createNodeBalancer(context.TODO(), svc)
 	if id == -1 {
 		t.Error("unexpected nodeID")
 		t.Logf("expected: >%v", 0)
@@ -523,7 +523,7 @@ func testBuildLoadBalancerRequest(t *testing.T, client *linodego.Client) {
 	}
 
 	lb := &loadbalancers{client, "us-west"}
-	id, err := lb.buildLoadBalancerRequest(svc, nodes)
+	id, err := lb.buildLoadBalancerRequest(context.TODO(), svc, nodes)
 	if id == "" {
 		t.Error("unexpected nodeID")
 		t.Logf("expected: != \"\"")
@@ -596,7 +596,7 @@ func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client) {
 	}
 
 	lb := &loadbalancers{client, "us-west"}
-	_, err := lb.createNoadBalancer(svc)
+	_, err := lb.createNodeBalancer(context.TODO(), svc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -643,7 +643,7 @@ func testEnsureLoadBalancer(t *testing.T, client *linodego.Client) {
 
 	lb := &loadbalancers{client, "us-west"}
 
-	_, err := lb.createNoadBalancer(svc)
+	_, err := lb.createNodeBalancer(context.TODO(), svc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -753,7 +753,7 @@ func testGetLoadBalancer(t *testing.T, client *linodego.Client) {
 			},
 		},
 	}
-	_, err := lb.createNoadBalancer(svc)
+	_, err := lb.createNodeBalancer(context.TODO(), svc)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -23,33 +23,33 @@ func newInstances(client *linodego.Client) cloudprovider.Instances {
 	return &instances{client}
 }
 
-func (i *instances) NodeAddresses(_ context.Context, name types.NodeName) ([]v1.NodeAddress, error) {
-	linode, err := linodeByName(i.client, name)
+func (i *instances) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error) {
+	linode, err := linodeByName(ctx, i.client, name)
 	if err != nil {
 		return nil, err
 	}
-	return i.nodeAddresses(linode)
+	return i.nodeAddresses(ctx, linode)
 }
 
-func (i *instances) NodeAddressesByProviderID(_ context.Context, providerID string) ([]v1.NodeAddress, error) {
+func (i *instances) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
 	id, err := serverIDFromProviderID(providerID)
 	if err != nil {
 		return nil, err
 	}
 
-	linode, err := linodeByID(i.client, id)
+	linode, err := linodeByID(ctx, i.client, id)
 	if err != nil {
 		return nil, err
 	}
 
-	return i.nodeAddresses(linode)
+	return i.nodeAddresses(ctx, linode)
 }
 
-func (i *instances) nodeAddresses(linode *linodego.Instance) ([]v1.NodeAddress, error) {
+func (i *instances) nodeAddresses(ctx context.Context, linode *linodego.Instance) ([]v1.NodeAddress, error) {
 	var addresses []v1.NodeAddress
 	addresses = append(addresses, v1.NodeAddress{Type: v1.NodeHostName, Address: linode.Label})
 
-	ips, err := i.client.GetInstanceIPAddresses(context.TODO(), linode.ID)
+	ips, err := i.client.GetInstanceIPAddresses(ctx, linode.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -69,28 +69,28 @@ func (i *instances) nodeAddresses(linode *linodego.Instance) ([]v1.NodeAddress, 
 	return addresses, nil
 }
 
-func (i *instances) InstanceID(_ context.Context, nodeName types.NodeName) (string, error) {
-	linode, err := linodeByName(i.client, nodeName)
+func (i *instances) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
+	linode, err := linodeByName(ctx, i.client, nodeName)
 	if err != nil {
 		return "", err
 	}
 	return strconv.Itoa(linode.ID), nil
 }
 
-func (i *instances) InstanceType(_ context.Context, nodeName types.NodeName) (string, error) {
-	linode, err := linodeByName(i.client, nodeName)
+func (i *instances) InstanceType(ctx context.Context, nodeName types.NodeName) (string, error) {
+	linode, err := linodeByName(ctx, i.client, nodeName)
 	if err != nil {
 		return "", err
 	}
 	return linode.Type, nil
 }
 
-func (i *instances) InstanceTypeByProviderID(_ context.Context, providerID string) (string, error) {
+func (i *instances) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
 	id, err := serverIDFromProviderID(providerID)
 	if err != nil {
 		return "", err
 	}
-	linode, err := linodeByID(i.client, id)
+	linode, err := linodeByID(ctx, i.client, id)
 	if err != nil {
 		return "", err
 	}
@@ -105,12 +105,12 @@ func (i *instances) CurrentNodeName(_ context.Context, hostname string) (types.N
 	return types.NodeName(hostname), nil
 }
 
-func (i *instances) InstanceExistsByProviderID(_ context.Context, providerID string) (bool, error) {
+func (i *instances) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
 	id, err := serverIDFromProviderID(providerID)
 	if err != nil {
 		return false, err
 	}
-	_, err = linodeByID(i.client, id)
+	_, err = linodeByID(ctx, i.client, id)
 	if err == nil {
 		return true, nil
 	}
@@ -122,13 +122,13 @@ func (i *instances) InstanceShutdownByProviderID(ctx context.Context, providerID
 	return false, cloudprovider.NotImplemented
 }
 
-func linodeByID(client *linodego.Client, id string) (*linodego.Instance, error) {
+func linodeByID(ctx context.Context, client *linodego.Client, id string) (*linodego.Instance, error) {
 	linodeID, err := strconv.Atoi(id)
 	if err != nil {
 		return nil, err
 	}
 
-	instance, err := client.GetInstance(context.TODO(), linodeID)
+	instance, err := client.GetInstance(ctx, linodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -138,13 +138,13 @@ func linodeByID(client *linodego.Client, id string) (*linodego.Instance, error) 
 	return instance, nil
 
 }
-func linodeByName(client *linodego.Client, nodeName types.NodeName) (*linodego.Instance, error) {
+func linodeByName(ctx context.Context, client *linodego.Client, nodeName types.NodeName) (*linodego.Instance, error) {
 	jsonFilter, err := json.Marshal(map[string]string{"label": string(nodeName)})
 	if err != nil {
 		return nil, err
 	}
 
-	linodes, err := client.ListInstances(context.TODO(), linodego.NewListOptions(0, string(jsonFilter)))
+	linodes, err := client.ListInstances(ctx, linodego.NewListOptions(0, string(jsonFilter)))
 	if err != nil {
 		return nil, err
 	}

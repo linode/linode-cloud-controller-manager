@@ -66,9 +66,9 @@ func newLoadbalancers(client *linodego.Client, zone string) cloudprovider.LoadBa
 // GetLoadBalancer returns the *v1.LoadBalancerStatus of service.
 //
 // GetLoadBalancer will not modify service.
-func (l *loadbalancers) GetLoadBalancer(_ context.Context, clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
+func (l *loadbalancers) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
 	lbName := cloudprovider.GetLoadBalancerName(service)
-	lb, err := l.lbByName(l.client, lbName)
+	lb, err := l.lbByName(ctx, l.client, lbName)
 	if err != nil {
 		if err == lbNotFound {
 			return nil, false, nil
@@ -97,7 +97,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	}
 
 	if !exists {
-		ip, err := l.buildLoadBalancerRequest(service, nodes)
+		ip, err := l.buildLoadBalancerRequest(ctx, service, nodes)
 		if err != nil {
 			return nil, err
 		}
@@ -129,14 +129,14 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 // the droplets in nodes.
 //
 // UpdateLoadBalancer will not modify service or nodes.
-func (l *loadbalancers) UpdateLoadBalancer(_ context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
+func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	lbName := cloudprovider.GetLoadBalancerName(service)
-	lb, err := l.lbByName(l.client, lbName)
+	lb, err := l.lbByName(ctx, l.client, lbName)
 	if err != nil {
 		return err
 	}
 
-	nb, err := l.lbByName(l.client, lbName)
+	nb, err := l.lbByName(ctx, l.client, lbName)
 	if err != nil {
 		return err
 	}
@@ -144,7 +144,7 @@ func (l *loadbalancers) UpdateLoadBalancer(_ context.Context, clusterName string
 	if err != nil {
 		return err
 	}
-	nbConfigs, err := l.client.ListNodeBalancerConfigs(context.TODO(), lb.ID, linodego.NewListOptions(0, string(jsonFilter)))
+	nbConfigs, err := l.client.ListNodeBalancerConfigs(ctx, lb.ID, linodego.NewListOptions(0, string(jsonFilter)))
 	if err != nil {
 		return err
 	}
@@ -163,7 +163,7 @@ func (l *loadbalancers) UpdateLoadBalancer(_ context.Context, clusterName string
 		found := false
 		for _, nbc := range nbConfigs {
 			if _, found := nodePort[nbc.Port]; !found {
-				if err = l.client.DeleteNodeBalancerConfig(context.TODO(), lb.ID, nbc.ID); err != nil {
+				if err = l.client.DeleteNodeBalancerConfig(ctx, lb.ID, nbc.ID); err != nil {
 					return err
 				}
 				continue
@@ -192,7 +192,7 @@ func (l *loadbalancers) UpdateLoadBalancer(_ context.Context, clusterName string
 					return err
 				}
 
-				_, err = l.client.UpdateNodeBalancerConfig(context.TODO(), lb.ID, nbc.ID, opt.GetUpdateOptions())
+				_, err = l.client.UpdateNodeBalancerConfig(ctx, lb.ID, nbc.ID, opt.GetUpdateOptions())
 				if err != nil {
 					return err
 				}
@@ -205,14 +205,14 @@ func (l *loadbalancers) UpdateLoadBalancer(_ context.Context, clusterName string
 					return err
 				}
 
-				nodeList, err := l.client.ListNodeBalancerNodes(context.TODO(), lb.ID, nbc.ID, linodego.NewListOptions(0, string(jsonFilter)))
+				nodeList, err := l.client.ListNodeBalancerNodes(ctx, lb.ID, nbc.ID, linodego.NewListOptions(0, string(jsonFilter)))
 				if err != nil {
 					return err
 				}
 
 				for _, n := range nodeList {
 					if _, found := kubeNode[n.Label]; !found {
-						if err = l.client.DeleteNodeBalancerNode(context.TODO(), lb.ID, nbc.ID, n.ID); err != nil {
+						if err = l.client.DeleteNodeBalancerNode(ctx, lb.ID, nbc.ID, n.ID); err != nil {
 							return err
 						}
 						continue
@@ -220,7 +220,7 @@ func (l *loadbalancers) UpdateLoadBalancer(_ context.Context, clusterName string
 
 					node := l.buildNodeBalancerNode(kubeNode[n.Label], port.Port)
 					updateOpt := node.GetUpdateOptions()
-					if _, err := l.client.UpdateNodeBalancerNode(context.TODO(), lb.ID, nbc.ID, n.ID, updateOpt); err != nil {
+					if _, err := l.client.UpdateNodeBalancerNode(ctx, lb.ID, nbc.ID, n.ID, updateOpt); err != nil {
 						return err
 					}
 				}
@@ -232,14 +232,14 @@ func (l *loadbalancers) UpdateLoadBalancer(_ context.Context, clusterName string
 				return err
 			}
 			createOpt := config.GetCreateOptions()
-			nbConfig, err := l.client.CreateNodeBalancerConfig(context.TODO(), lb.ID, createOpt)
+			nbConfig, err := l.client.CreateNodeBalancerConfig(ctx, lb.ID, createOpt)
 			if err != nil {
 				return err
 			}
 			for _, n := range nodes {
 				node := l.buildNodeBalancerNode(n, port.Port)
 				createNodeOpt := node.GetCreateOptions()
-				if _, err := l.client.CreateNodeBalancerNode(context.TODO(), lb.ID, nbConfig.ID, createNodeOpt); err != nil {
+				if _, err := l.client.CreateNodeBalancerNode(ctx, lb.ID, nbConfig.ID, createNodeOpt); err != nil {
 					return err
 				}
 			}
@@ -264,20 +264,20 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 		return nil
 	}
 	lbName := cloudprovider.GetLoadBalancerName(service)
-	lb, err := l.lbByName(l.client, lbName)
+	lb, err := l.lbByName(ctx, l.client, lbName)
 	if err != nil {
 		return err
 	}
-	return l.client.DeleteNodeBalancer(context.TODO(), lb.ID)
+	return l.client.DeleteNodeBalancer(ctx, lb.ID)
 }
 
 // The returned error will be lbNotFound if the load balancer does not exist.
-func (l *loadbalancers) lbByName(client *linodego.Client, name string) (*linodego.NodeBalancer, error) {
+func (l *loadbalancers) lbByName(ctx context.Context, client *linodego.Client, name string) (*linodego.NodeBalancer, error) {
 	jsonFilter, err := json.Marshal(map[string]string{"label": name})
 	if err != nil {
 		return nil, err
 	}
-	lbs, err := l.client.ListNodeBalancers(context.TODO(), linodego.NewListOptions(0, string(jsonFilter)))
+	lbs, err := l.client.ListNodeBalancers(ctx, linodego.NewListOptions(0, string(jsonFilter)))
 	if err != nil {
 		return nil, err
 	}
@@ -289,11 +289,11 @@ func (l *loadbalancers) lbByName(client *linodego.Client, name string) (*linodeg
 	return nil, lbNotFound
 }
 
-func (l *loadbalancers) createNoadBalancer(service *v1.Service) (int, error) {
+func (l *loadbalancers) createNodeBalancer(ctx context.Context, service *v1.Service) (int, error) {
 	lbName := cloudprovider.GetLoadBalancerName(service)
 
 	connThrottle := 20
-	nodeBalancer, err := l.client.CreateNodeBalancer(context.TODO(), linodego.NodeBalancerCreateOptions{
+	nodeBalancer, err := l.client.CreateNodeBalancer(ctx, linodego.NodeBalancerCreateOptions{
 		Label:              &lbName,
 		Region:             l.zone,
 		ClientConnThrottle: &connThrottle,
@@ -393,13 +393,13 @@ func (l *loadbalancers) buildNodeBalancerConfig(service *v1.Service, port int) (
 
 // buildLoadBalancerRequest returns a *godo.LoadBalancerRequest to balance
 // requests for service across nodes.
-func (l *loadbalancers) buildLoadBalancerRequest(service *v1.Service, nodes []*v1.Node) (string, error) {
-	lb, err := l.createNoadBalancer(service)
+func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, service *v1.Service, nodes []*v1.Node) (string, error) {
+	lb, err := l.createNodeBalancer(ctx, service)
 	if err != nil {
 		return "", err
 	}
 
-	nodeBalancer, err := l.client.GetNodeBalancer(context.TODO(), lb)
+	nodeBalancer, err := l.client.GetNodeBalancer(ctx, lb)
 	if err != nil {
 		return "", err
 	}
@@ -415,7 +415,7 @@ func (l *loadbalancers) buildLoadBalancerRequest(service *v1.Service, nodes []*v
 			return "", err
 		}
 		createOpt := config.GetCreateOptions()
-		nbConfig, err := l.client.CreateNodeBalancerConfig(context.TODO(), lb, createOpt)
+		nbConfig, err := l.client.CreateNodeBalancerConfig(ctx, lb, createOpt)
 		if err != nil {
 			return "", err
 		}
@@ -424,7 +424,7 @@ func (l *loadbalancers) buildLoadBalancerRequest(service *v1.Service, nodes []*v
 			node := l.buildNodeBalancerNode(n, port.Port)
 
 			createOpt := node.GetCreateOptions()
-			if _, err := l.client.CreateNodeBalancerNode(context.TODO(), lb, nbConfig.ID, createOpt); err != nil {
+			if _, err := l.client.CreateNodeBalancerNode(ctx, lb, nbConfig.ID, createOpt); err != nil {
 				return "", err
 			}
 		}
