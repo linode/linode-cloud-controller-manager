@@ -26,7 +26,7 @@ const (
 	annLinodeTLSPorts = "service.beta.kubernetes.io/linode-loadbalancer-tls-ports"
 
 	// annLinodeTLSPassThrough is the annotation used to specify whether the
-	// Linode loadbalancer should pass encrypted data to backend droplets.
+	// Linode loadbalancer should pass encrypted data to backend Linodes.
 	// This is optional and defaults to false.
 	annLinodeCheckPath       = "service.beta.kubernetes.io/linode-loadbalancer-check-path"
 	annLinodeCheckBody       = "service.beta.kubernetes.io/linode-loadbalancer-check-body"
@@ -126,7 +126,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 }
 
 // UpdateLoadBalancer updates the load balancer for service to balance across
-// the droplets in nodes.
+// the Linodes in nodes.
 //
 // UpdateLoadBalancer will not modify service or nodes.
 func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
