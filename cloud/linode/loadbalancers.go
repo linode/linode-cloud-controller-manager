@@ -218,7 +218,7 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 						continue
 					}
 
-					node := l.buildNodeBalancerNode(kubeNode[n.Label], port.Port)
+					node := l.buildNodeBalancerNode(kubeNode[n.Label], port)
 					updateOpt := node.GetUpdateOptions()
 					if _, err := l.client.UpdateNodeBalancerNode(ctx, lb.ID, nbc.ID, n.ID, updateOpt); err != nil {
 						return err
@@ -237,7 +237,7 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 				return err
 			}
 			for _, n := range nodes {
-				node := l.buildNodeBalancerNode(n, port.Port)
+				node := l.buildNodeBalancerNode(n, port)
 				createNodeOpt := node.GetCreateOptions()
 				if _, err := l.client.CreateNodeBalancerNode(ctx, lb.ID, nbConfig.ID, createNodeOpt); err != nil {
 					return err
@@ -421,7 +421,7 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, service *v
 		}
 
 		for _, n := range nodes {
-			node := l.buildNodeBalancerNode(n, port.Port)
+			node := l.buildNodeBalancerNode(n, port)
 
 			createOpt := node.GetCreateOptions()
 			if _, err := l.client.CreateNodeBalancerNode(ctx, lb, nbConfig.ID, createOpt); err != nil {
@@ -432,9 +432,9 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, service *v
 	return *nodeBalancer.IPv4, nil
 }
 
-func (l *loadbalancers) buildNodeBalancerNode(node *v1.Node, port int32) linodego.NodeBalancerNode {
+func (l *loadbalancers) buildNodeBalancerNode(node *v1.Node, port v1.ServicePort) linodego.NodeBalancerNode {
 	return linodego.NodeBalancerNode{
-		Address: fmt.Sprintf("%v:%v", getNodeInternalIp(node), port),
+		Address: fmt.Sprintf("%v:%v", getNodeInternalIp(node), port.NodePort),
 		Label:   node.Name,
 		Mode:    "accept",
 		Weight:  100,
