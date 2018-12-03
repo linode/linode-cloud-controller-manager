@@ -327,6 +327,49 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "DELETE":
 		id := filepath.Base(r.URL.Path)
 		delete(f.nb, id)
+	case "PUT":
+		if strings.Contains(r.URL.Path, "configs") {
+			parts := strings.Split(r.URL.Path[1:], "/")
+			nbcco := new(linodego.NodeBalancerConfigUpdateOptions)
+			if err := json.NewDecoder(r.Body).Decode(nbcco); err != nil {
+				f.t.Fatal(err)
+			}
+			nbcid, err := strconv.Atoi(parts[3])
+			if err != nil {
+				f.t.Fatal(err)
+			}
+			nbid, err := strconv.Atoi(parts[1])
+			if err != nil {
+				f.t.Fatal(err)
+			}
+			nbcc := linodego.NodeBalancerConfig{
+				ID:             nbcid,
+				Port:           nbcco.Port,
+				Protocol:       nbcco.Protocol,
+				Algorithm:      nbcco.Algorithm,
+				Stickiness:     nbcco.Stickiness,
+				Check:          nbcco.Check,
+				CheckInterval:  nbcco.CheckInterval,
+				CheckAttempts:  nbcco.CheckAttempts,
+				CheckPath:      nbcco.CheckPath,
+				CheckBody:      nbcco.CheckBody,
+				CheckPassive:   *nbcco.CheckPassive,
+				CheckTimeout:   nbcco.CheckTimeout,
+				CipherSuite:    nbcco.CipherSuite,
+				NodeBalancerID: nbid,
+				SSLCommonName:  "",
+				SSLFingerprint: "",
+				SSLCert:        nbcco.SSLCert,
+				SSLKey:         nbcco.SSLKey,
+			}
+			f.nbc[strconv.Itoa(nbcc.ID)] = &nbcc
+			resp, err := json.Marshal(nbcc)
+			if err != nil {
+				f.t.Fatal(err)
+			}
+			_, _ = w.Write(resp)
+			return
+		}
 	}
 }
 

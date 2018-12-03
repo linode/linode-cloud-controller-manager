@@ -281,7 +281,7 @@ func (c *Client) UpdateNodeBalancerConfig(ctx context.Context, nodebalancerID in
 	if bodyData, err := json.Marshal(updateOpts); err == nil {
 		body = string(bodyData)
 	} else {
-		return nil, NewError(err)
+		return nil, NewError(fmt.Errorf("Error converting NodeBalancer update options to JSON %v", err))
 	}
 
 	r, err := coupleAPIErrors(req.

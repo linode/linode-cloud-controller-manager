@@ -184,9 +184,10 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 					return err
 				}
 
+				fmt.Printf("options: %+v\n", opt.GetUpdateOptions())
 				_, err = l.client.UpdateNodeBalancerConfig(ctx, lb.ID, nbc.ID, opt.GetUpdateOptions())
 				if err != nil {
-					return err
+					return fmt.Errorf("Error updating NodeBalancer config: %v", err)
 				}
 
 				nodeList, err := l.client.ListNodeBalancerNodes(ctx, lb.ID, nbc.ID, nil)
