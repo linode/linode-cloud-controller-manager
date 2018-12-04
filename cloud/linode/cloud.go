@@ -49,9 +49,9 @@ func newCloud() (cloudprovider.Interface, error) {
 	}
 
 	nbPrefix := os.Getenv(nbPrefixEnv)
-	matched, _ := regexp.MatchString(`^[0-9A-Za-z_-]{,9}$`, nbPrefixEnv)
+	matched, _ := regexp.MatchString(`^[0-9A-Za-z_-]{,12}$`, nbPrefixEnv)
 	if !matched {
-		return nil, fmt.Errorf("%s must be up to 9 alphanumeric characters, including hyphen and underscore", nbPrefixEnv)
+		return nil, fmt.Errorf("%s must be up to 12 alphanumeric characters, including hyphen and underscore", nbPrefixEnv)
 	}
 
 	// Initialize Linode API Client
