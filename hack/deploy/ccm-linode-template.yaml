@@ -88,6 +88,8 @@ spec:
                 secretKeyRef:
                   name: ccm-linode
                   key: region
+            - name: LINODE_NB_PREFIX
+              value: {{ .Values.linodeNBPrefix }}
       volumes:
       - name: k8s
         hostPath:

@@ -261,6 +261,24 @@ b8QPmGZdja1VyGqpAMkPmQOu9N5RbhKw1UOU/XGa31p6v96oayL+u8Q=
 	}
 }
 
+func TestGetLoadBalancer_prefix(t *testing.T) {
+	lb := &loadbalancers{nil, "region", "prefix-"}
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:         randString(10),
+			UID:          "abc123",
+			GenerateName: "foo",
+			ClusterName:  "bar",
+		},
+	}
+
+	label := lb.GetLoadBalancerName(svc)
+
+	if label != "prefix-abc123" {
+		t.Error("unexpected loadbalancer name")
+	}
+}
+
 func Test_getTLSPorts(t *testing.T) {
 	testcases := []struct {
 		name     string
