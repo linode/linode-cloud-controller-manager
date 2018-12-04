@@ -655,7 +655,6 @@ func testEnsureLoadBalancer(t *testing.T, client *linodego.Client) {
 	if !exists {
 		t.Fatal("Node balancer not found")
 	}
-	fmt.Println(nb.Ingress, "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
 
 	testcases := []struct {
 		name        string
@@ -718,6 +717,9 @@ func testEnsureLoadBalancer(t *testing.T, client *linodego.Client) {
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
 			lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), test.clusterName, test.service, test.nodes)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if lbStatus.Ingress[0].IP != test.nbIP {
 				t.Error("unexpected error")
 				t.Logf("expected: %v", test.nbIP)
