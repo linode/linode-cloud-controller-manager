@@ -261,7 +261,7 @@ b8QPmGZdja1VyGqpAMkPmQOu9N5RbhKw1UOU/XGa31p6v96oayL+u8Q=
 	}
 }
 
-func TestGetLoadBalancer_prefix(t *testing.T) {
+func TestGetLoadBalancerName_prefix(t *testing.T) {
 	lb := &loadbalancers{nil, "region", "prefix-"}
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -274,8 +274,12 @@ func TestGetLoadBalancer_prefix(t *testing.T) {
 
 	label := lb.GetLoadBalancerName(svc)
 
-	if label != "prefix-abc123" {
+	expected := "prefix-abc123"
+
+	if label != expected {
 		t.Error("unexpected loadbalancer name")
+		t.Logf("expected: %q", expected)
+		t.Logf("actual: %q", label)
 	}
 }
 

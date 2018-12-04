@@ -274,7 +274,7 @@ func (l *loadbalancers) lbByName(ctx context.Context, client *linodego.Client, n
 	return nil, lbNotFound
 }
 
-// l.GetLoadBalancerName is a Linode friendly version of cloudprovider.GetLoadBalancerName
+// GetLoadBalancerName is a Linode friendly version of cloudprovider.GetLoadBalancerName
 func (l *loadbalancers) GetLoadBalancerName(service *v1.Service) string {
 	// Linode NodeBalancer names must be 3-32 chars (letters, numbers, dashes, underscore)
 	ret := string(service.UID)
