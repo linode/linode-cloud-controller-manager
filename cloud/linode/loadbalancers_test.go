@@ -67,7 +67,7 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client) {
 			},
 		},
 	}
-	lb := &loadbalancers{client, "us-west"}
+	lb := &loadbalancers{client, "us-west", "test-pre-"}
 	id, err := lb.createNodeBalancer(context.TODO(), svc)
 	if id == -1 {
 		t.Error("unexpected nodeID")
@@ -522,7 +522,7 @@ func testBuildLoadBalancerRequest(t *testing.T, client *linodego.Client) {
 		},
 	}
 
-	lb := &loadbalancers{client, "us-west"}
+	lb := &loadbalancers{client, "us-west", "test-pre-"}
 	id, err := lb.buildLoadBalancerRequest(context.TODO(), svc, nodes)
 	if id == "" {
 		t.Error("unexpected nodeID")
@@ -557,6 +557,9 @@ func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client) {
 			},
 		},
 	}
+
+	const testClusterName = "linodelb"
+
 	testcases := []struct {
 		name        string
 		clusterName string
@@ -565,13 +568,13 @@ func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client) {
 	}{
 		{
 			"load balancer delete",
-			"linodelb",
+			testClusterName,
 			svc,
 			nil,
 		},
 		{
 			"load balancer not exists",
-			"linodelb",
+			testClusterName,
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "notexists",
@@ -595,12 +598,12 @@ func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client) {
 		},
 	}
 
-	lb := &loadbalancers{client, "us-west"}
+	lb := &loadbalancers{client, "us-west", "test-pre-"}
 	_, err := lb.createNodeBalancer(context.TODO(), svc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc) }()
+	defer func(testClusterName string) { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), testClusterName, svc) }(testClusterName)
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
@@ -641,7 +644,7 @@ func testEnsureLoadBalancer(t *testing.T, client *linodego.Client) {
 		},
 	}
 
-	lb := &loadbalancers{client, "us-west"}
+	lb := &loadbalancers{client, "us-west", "test-pre-"}
 
 	_, err := lb.createNodeBalancer(context.TODO(), svc)
 	if err != nil {
@@ -735,7 +738,7 @@ func testEnsureLoadBalancer(t *testing.T, client *linodego.Client) {
 }
 
 func testGetLoadBalancer(t *testing.T, client *linodego.Client) {
-	lb := &loadbalancers{client, "us-west"}
+	lb := &loadbalancers{client, "us-west", "test-pre-"}
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test",

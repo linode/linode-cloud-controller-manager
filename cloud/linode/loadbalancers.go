@@ -54,20 +54,21 @@ const (
 var lbNotFound = errors.New("loadbalancer not found")
 
 type loadbalancers struct {
-	client *linodego.Client
-	zone   string
+	client   *linodego.Client
+	zone     string
+	nbPrefix string
 }
 
 // newLoadbalancers returns a cloudprovider.LoadBalancer whose concrete type is a *loadbalancer.
-func newLoadbalancers(client *linodego.Client, zone string) cloudprovider.LoadBalancer {
-	return &loadbalancers{client: client, zone: zone}
+func newLoadbalancers(client *linodego.Client, zone, nbPrefix string) cloudprovider.LoadBalancer {
+	return &loadbalancers{client: client, zone: zone, nbPrefix: nbPrefix}
 }
 
 // GetLoadBalancer returns the *v1.LoadBalancerStatus of service.
 //
 // GetLoadBalancer will not modify service.
 func (l *loadbalancers) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
-	lbName := cloudprovider.GetLoadBalancerName(service)
+	lbName := l.GetLoadBalancerName(service)
 	lb, err := l.lbByName(ctx, l.client, lbName)
 	if err != nil {
 		if err == lbNotFound {
@@ -130,7 +131,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 //
 // UpdateLoadBalancer will not modify service or nodes.
 func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
-	lbName := cloudprovider.GetLoadBalancerName(service)
+	lbName := l.GetLoadBalancerName(service)
 	lb, err := l.lbByName(ctx, l.client, lbName)
 	if err != nil {
 		return err
@@ -247,7 +248,7 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 	if !exists {
 		return nil
 	}
-	lbName := cloudprovider.GetLoadBalancerName(service)
+	lbName := l.GetLoadBalancerName(service)
 	lb, err := l.lbByName(ctx, l.client, lbName)
 	if err != nil {
 		return err
@@ -273,8 +274,24 @@ func (l *loadbalancers) lbByName(ctx context.Context, client *linodego.Client, n
 	return nil, lbNotFound
 }
 
+// l.GetLoadBalancerName is a Linode friendly version of cloudprovider.GetLoadBalancerName
+func (l *loadbalancers) GetLoadBalancerName(service *v1.Service) string {
+	// Linode NodeBalancer names must be 3-32 chars (letters, numbers, dashes, underscore)
+	ret := string(service.UID)
+	ret = strings.Replace(ret, "-", "", -1)
+
+	if len(l.nbPrefix) > 0 {
+		ret = l.nbPrefix + ret
+	}
+
+	if len(ret) > 32 {
+		ret = ret[:32]
+	}
+	return ret
+}
+
 func (l *loadbalancers) createNodeBalancer(ctx context.Context, service *v1.Service) (int, error) {
-	lbName := cloudprovider.GetLoadBalancerName(service)
+	lbName := l.GetLoadBalancerName(service)
 
 	connThrottle := 20
 	nodeBalancer, err := l.client.CreateNodeBalancer(ctx, linodego.NodeBalancerCreateOptions{

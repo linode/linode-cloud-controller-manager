@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 
 	"github.com/linode/linodego"
 	"golang.org/x/oauth2"
@@ -15,11 +16,13 @@ import (
 const (
 	ProviderName   = "linode"
 	accessTokenEnv = "LINODE_API_TOKEN"
+	nbPrefixEnv    = "LINODE_NB_PREFIX"
 	regionEnv      = "LINODE_REGION"
 )
 
 type linodeCloud struct {
 	client        *linodego.Client
+	nbPrefix      string
 	instances     cloudprovider.Instances
 	zones         cloudprovider.Zones
 	loadbalancers cloudprovider.LoadBalancer
@@ -45,6 +48,12 @@ func newCloud() (cloudprovider.Interface, error) {
 		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", regionEnv)
 	}
 
+	nbPrefix := os.Getenv(nbPrefixEnv)
+	matched, _ := regexp.MatchString(`^[0-9A-Za-z_-]{,9}$`, nbPrefixEnv)
+	if !matched {
+		return nil, fmt.Errorf("%s must be up to 9 alphanumeric characters, including hyphen and underscore", nbPrefixEnv)
+	}
+
 	// Initialize Linode API Client
 	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{
 		AccessToken: apiToken,
@@ -62,9 +71,10 @@ func newCloud() (cloudprovider.Interface, error) {
 	// Return struct that satisfies cloudprovider.Interface
 	return &linodeCloud{
 		client:        &linodeClient,
+		nbPrefix:      nbPrefix,
 		instances:     newInstances(&linodeClient),
 		zones:         newZones(&linodeClient, region),
-		loadbalancers: newLoadbalancers(&linodeClient, region),
+		loadbalancers: newLoadbalancers(&linodeClient, region, nbPrefix),
 	}, nil
 }
 
