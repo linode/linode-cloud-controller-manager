@@ -12,10 +12,7 @@ import (
 	"github.com/linode/linodego"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 )
-
-var _ cloudprovider.LoadBalancer = new(loadbalancers)
 
 func TestCCMLoadBalancers(t *testing.T) {
 	fake := newFake(t)
@@ -25,28 +22,37 @@ func TestCCMLoadBalancers(t *testing.T) {
 	linodeClient := linodego.NewClient(http.DefaultClient)
 	linodeClient.SetBaseURL(ts.URL)
 
-	testCases := struct {
-		f []func(t *testing.T, client *linodego.Client)
+	testCases := []struct {
+		name string
+		f    func(*testing.T, *linodego.Client)
 	}{
-		[]func(t *testing.T, client *linodego.Client){
-			testGetLoadBalancer,
-			testCreateNodeBalancer,
-			testBuildLoadBalancerRequest,
-			testEnsureLoadBalancerDeleted,
-			testEnsureLoadBalancer,
-			testGetLoadBalancer,
+		{
+			name: "Get Load Balancer",
+			f:    testGetLoadBalancer,
+		},
+		{
+			name: "Create Load Balancer",
+			f:    testCreateNodeBalancer,
+		},
+		{
+			name: "Build Load Balancer Request",
+			f:    testBuildLoadBalancerRequest,
+		},
+		{
+			name: "Ensure Load Balancer Deleted",
+			f:    testEnsureLoadBalancerDeleted,
+		},
+		{
+			name: "Ensure Load Balancer",
+			f:    testEnsureLoadBalancer,
 		},
 	}
-	for _, tf := range testCases.f {
-		t.Run("Running", func(t *testing.T) {
-			tf(t, &linodeClient)
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.f(t, &linodeClient)
 		})
 	}
-
-	//x:= func(f func(t *testing.T, client *linodego.Client)){}
-
-	//t.Run(test.name, func(t *testing.T) {
-
 }
 
 func testCreateNodeBalancer(t *testing.T, client *linodego.Client) {

@@ -32,7 +32,7 @@ func (i *instances) NodeAddresses(ctx context.Context, name types.NodeName) ([]v
 }
 
 func (i *instances) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
-	id, err := serverIDFromProviderID(providerID)
+	id, err := linodeIDFromProviderID(providerID)
 	if err != nil {
 		return nil, err
 	}
@@ -54,17 +54,19 @@ func (i *instances) nodeAddresses(ctx context.Context, linode *linodego.Instance
 		return nil, err
 	}
 
+	if (len(ips.IPv4.Public) == 0) && (len(ips.IPv4.Private) == 0) {
+		return nil, fmt.Errorf("Linode has no IP addresses")
+	}
+
 	if len(ips.IPv4.Public) > 0 {
 		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeExternalIP, Address: ips.IPv4.Public[0].Address})
-	} else {
-		return nil, fmt.Errorf("could not get public ip")
 	}
+	// Allow Nodes to not have an ExternalIP, if this proves problematic this will be reverted
 
 	if len(ips.IPv4.Private) > 0 {
 		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: ips.IPv4.Private[0].Address})
-	} else {
-		return nil, fmt.Errorf("could not get private ip")
 	}
+	// Allow Nodes to not have an InternalIP, if this proves problematic this will be reverted
 
 	return addresses, nil
 }
@@ -86,7 +88,7 @@ func (i *instances) InstanceType(ctx context.Context, nodeName types.NodeName) (
 }
 
 func (i *instances) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
-	id, err := serverIDFromProviderID(providerID)
+	id, err := linodeIDFromProviderID(providerID)
 	if err != nil {
 		return "", err
 	}
@@ -106,7 +108,7 @@ func (i *instances) CurrentNodeName(_ context.Context, hostname string) (types.N
 }
 
 func (i *instances) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
-	id, err := serverIDFromProviderID(providerID)
+	id, err := linodeIDFromProviderID(providerID)
 	if err != nil {
 		return false, err
 	}
@@ -138,6 +140,7 @@ func linodeByID(ctx context.Context, client *linodego.Client, id string) (*linod
 	return instance, nil
 
 }
+
 func linodeByName(ctx context.Context, client *linodego.Client, nodeName types.NodeName) (*linodego.Instance, error) {
 	jsonFilter, err := json.Marshal(map[string]string{"label": string(nodeName)})
 	if err != nil {
@@ -158,25 +161,23 @@ func linodeByName(ctx context.Context, client *linodego.Client, nodeName types.N
 	return &linodes[0], nil
 }
 
-// serverIDFromProviderID returns a server's ID from providerID.
+// serverIDFromProviderID returns a Linode ID from a providerID.
 //
-// The providerID spec should be retrievable from the Kubernetes
-// node object. The expected format is: linode://server-id
-
-func serverIDFromProviderID(providerID string) (string, error) {
+// The providerID can be seen on the the Kubernetes Node object. The expected
+// format is: linode://linodeID
+func linodeIDFromProviderID(providerID string) (string, error) {
 	if providerID == "" {
 		return "", errors.New("providerID cannot be empty string")
 	}
 
-	split := strings.Split(providerID, "/")
-	if len(split) != 3 {
-		return "", fmt.Errorf("unexpected providerID format: %s, format should be: linode://12345", providerID)
+	split := strings.Split(providerID, "://")
+	if len(split) != 2 {
+		return "", fmt.Errorf("Unexpected providerID format: %s, format should be: linode://12345", providerID)
 	}
 
-	// since split[0] is actually "linode:"
-	if strings.TrimSuffix(split[0], ":") != ProviderName {
-		return "", fmt.Errorf("provider name from providerID should be linode: %s", providerID)
+	if split[0] != ProviderName {
+		return "", fmt.Errorf("Provider scheme from providerID should be 'linode://', %s", providerID)
 	}
 
-	return split[2], nil
+	return split[1], nil
 }

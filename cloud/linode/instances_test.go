@@ -9,10 +9,7 @@ import (
 
 	"github.com/linode/linodego"
 	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 )
-
-var _ cloudprovider.Instances = new(instances)
 
 func TestCCMInstances(t *testing.T) {
 	fake := newFake(t)
@@ -22,15 +19,80 @@ func TestCCMInstances(t *testing.T) {
 	linodeClient := linodego.NewClient(http.DefaultClient)
 	linodeClient.SetBaseURL(ts.URL)
 
-	testNodeAddresses(t, &linodeClient)
-	testNodeAddressesByProviderID(t, &linodeClient)
-	testInstanceID(t, &linodeClient)
-	testInstanceType(t, &linodeClient)
-	testInstanceTypeByProviderID(t, &linodeClient)
-	testInstanceExistsByProviderID(t, &linodeClient)
+	testCases := []struct {
+		name string
+		f    func(*testing.T, *linodego.Client)
+	}{
+		{
+			name: "Instances Init",
+			f:    testNewInstances,
+		},
+		{
+			name: "Node Addresses",
+			f:    testNodeAddresses,
+		},
+		{
+			name: "Node Addresses by ProviderID",
+			f:    testNodeAddressesByProviderID,
+		},
+		{
+			name: "Intance ID",
+			f:    testInstanceID,
+		},
+		{
+			name: "Instance Type",
+			f:    testInstanceType,
+		},
+		{
+			name: "Instance Type by ProviderID",
+			f:    testInstanceTypeByProviderID,
+		},
+		{
+			name: "Instance Exists By Provider ID",
+			f:    testInstanceExistsByProviderID,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.f(t, &linodeClient)
+		})
+	}
+}
+
+func testNewInstances(t *testing.T, client *linodego.Client) {
+	linodeInstances := newInstances(client)
+	if linodeInstances.(*instances).client != client {
+		t.Errorf("instances not initialized")
+	}
 }
 
 func testNodeAddresses(t *testing.T, client *linodego.Client) {
+	testCases := []struct {
+		name string
+		f    func(*testing.T, *linodego.Client)
+	}{
+		{
+			name: "Node Addresses Found",
+			f:    testNodeAddressesFound,
+		},
+		{
+			name: "Node Addresses Not Found",
+			f:    testNodeAddressesNotFound,
+		},
+		// TODO: Add test for the failure mode of multiple Linodes returned for the
+		// same label. The API should prevent this but we must handle it gracefully on
+		// the Kubernetes side.
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.f(t, client)
+		})
+	}
+}
+
+func testNodeAddressesFound(t *testing.T, client *linodego.Client) {
 	expectedAddresses := []v1.NodeAddress{
 		{
 			Type:    v1.NodeHostName,
@@ -56,10 +118,55 @@ func testNodeAddresses(t *testing.T, client *linodego.Client) {
 	if err != nil {
 		t.Errorf("unexpected err, expected nil. got: %v", err)
 	}
+}
 
+func testNodeAddressesNotFound(t *testing.T, client *linodego.Client) {
+	instances := newInstances(client)
+
+	_, err := instances.NodeAddresses(context.TODO(), "non-existant")
+	if err == nil {
+		t.Errorf("Expected error for nonexistent Linode label")
+	}
 }
 
 func testNodeAddressesByProviderID(t *testing.T, client *linodego.Client) {
+	testCases := []struct {
+		name string
+		f    func(*testing.T, *linodego.Client)
+	}{
+		{
+			name: "Node Addresses by ProviderID Found",
+			f:    testNodeAddressesByProviderIDFound,
+		},
+		{
+			name: "Node Addresses by ProviderID Bad LinodeID",
+			f:    testNodeAddressesByProviderIDBadLinodeID,
+		},
+		{
+			name: "Node Addresses by ProviderID Bad ProviderName",
+			f:    testNodeAddressesByProviderIDBadProviderName,
+		},
+		{
+			name: "Node Addresses by ProviderID Bad Format",
+			f:    testNodeAddressesByProviderIDBadProviderIDFormat,
+		},
+		{
+			name: "Node Addresses by ProviderID Empty ProviderID",
+			f:    testNodeAddressesByProviderIDEmptyProviderID,
+		},
+		// TODO: Add a test for a Linode which returns no IP addresses. This should be
+		// prevented by the API but we must handle it gracefully on the Kubernetes
+		// side.
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.f(t, client)
+		})
+	}
+}
+
+func testNodeAddressesByProviderIDFound(t *testing.T, client *linodego.Client) {
 	expectedAddresses := []v1.NodeAddress{
 		{
 			Type:    v1.NodeHostName,
@@ -74,6 +181,7 @@ func testNodeAddressesByProviderID(t *testing.T, client *linodego.Client) {
 			Address: "192.168.133.65",
 		},
 	}
+
 	instances := newInstances(client)
 
 	addresses, err := instances.NodeAddressesByProviderID(context.TODO(), "linode://123")
@@ -86,6 +194,42 @@ func testNodeAddressesByProviderID(t *testing.T, client *linodego.Client) {
 	}
 }
 
+func testNodeAddressesByProviderIDBadLinodeID(t *testing.T, client *linodego.Client) {
+	instances := newInstances(client)
+
+	_, err := instances.NodeAddressesByProviderID(context.TODO(), "linode://456")
+	if err == nil {
+		t.Errorf("Expected error for nonexistent LinodeID")
+	}
+}
+
+func testNodeAddressesByProviderIDBadProviderName(t *testing.T, client *linodego.Client) {
+	instances := newInstances(client)
+
+	_, err := instances.NodeAddressesByProviderID(context.TODO(), "thecloud://123")
+	if err == nil {
+		t.Errorf("Expected error for bad ProviderID")
+	}
+}
+
+func testNodeAddressesByProviderIDBadProviderIDFormat(t *testing.T, client *linodego.Client) {
+	instances := newInstances(client)
+
+	_, err := instances.NodeAddressesByProviderID(context.TODO(), "linode123")
+	if err == nil {
+		t.Errorf("Expected error for bad ProviderID format")
+	}
+}
+
+func testNodeAddressesByProviderIDEmptyProviderID(t *testing.T, client *linodego.Client) {
+	instances := newInstances(client)
+
+	_, err := instances.NodeAddressesByProviderID(context.TODO(), "")
+	if err == nil {
+		t.Errorf("Expected error for empty ProviderID")
+	}
+}
+
 func testInstanceID(t *testing.T, client *linodego.Client) {
 	instances := newInstances(client)
 	id, err := instances.InstanceID(context.TODO(), "test-instance")
@@ -93,7 +237,7 @@ func testInstanceID(t *testing.T, client *linodego.Client) {
 		t.Errorf("expected nil error, got: %v", err)
 	}
 	if id != "123" {
-		t.Errorf("expected id 1234, got %s", id)
+		t.Errorf("expected id 123, got %s", id)
 	}
 
 	_, err = instances.InstanceID(context.TODO(), "test-linode")

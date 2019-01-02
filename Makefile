@@ -24,7 +24,7 @@ $(GOPATH)/bin/ginkgo:
 	go get -u github.com/onsi/ginkgo/ginkgo
 
 test: $(GOPATH)/bin/ginkgo
-	ginkgo -r --v --progress --trace -- --v=3
+	ginkgo -r --v --progress --trace --cover -- --v=3
 
 docker-build:
 	docker build . -t ${IMG}
