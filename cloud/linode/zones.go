@@ -22,7 +22,7 @@ func (z zones) GetZone(_ context.Context) (cloudprovider.Zone, error) {
 }
 
 func (z zones) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
-	id, err := serverIDFromProviderID(providerID)
+	id, err := linodeIDFromProviderID(providerID)
 	if err != nil {
 		return cloudprovider.Zone{}, err
 	}
