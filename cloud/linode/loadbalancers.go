@@ -49,6 +49,11 @@ const (
 	// should use. Options are round_robin and least_connections. Defaults
 	// to round_robin.
 	annLinodeAlgorithm = "service.beta.kubernetes.io/linode-loadbalancer-algorithm"
+
+	// annLinodeThrottle is the annotation specifying the value of the Client Connection
+	// Throttle, which limits the number of subsequent new connections per second from the
+	// same client IP. Options are a number between 1-20, or 0 to disable. Defaults to 20.
+	annLinodeThrottle = "service.beta.kubernetes.io/linode-loadbalancer-throttle"
 )
 
 var lbNotFound = errors.New("loadbalancer not found")
@@ -134,6 +139,17 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 	lb, err := l.lbByName(ctx, l.client, lbName)
 	if err != nil {
 		return err
+	}
+
+	connThrottle := getConnectionThrottle(service)
+	if connThrottle != lb.ClientConnThrottle {
+		update := lb.GetUpdateOptions()
+		update.ClientConnThrottle = &connThrottle
+
+		lb, err = l.client.UpdateNodeBalancer(ctx, lb.ID, update)
+		if err != nil {
+			return err
+		}
 	}
 
 	nbConfigs, err := l.client.ListNodeBalancerConfigs(ctx, lb.ID, nil)
@@ -276,7 +292,8 @@ func (l *loadbalancers) lbByName(ctx context.Context, client *linodego.Client, n
 func (l *loadbalancers) createNodeBalancer(ctx context.Context, service *v1.Service) (int, error) {
 	lbName := cloudprovider.GetLoadBalancerName(service)
 
-	connThrottle := 20
+	connThrottle := getConnectionThrottle(service)
+
 	nodeBalancer, err := l.client.CreateNodeBalancer(ctx, linodego.NodeBalancerCreateOptions{
 		Label:              &lbName,
 		Region:             l.zone,
@@ -541,4 +558,24 @@ func getSSLCertInfo(service *v1.Service) (string, string) {
 		key = string(kb)
 	}
 	return cert, key
+}
+
+func getConnectionThrottle(service *v1.Service) int {
+	connThrottle := 20
+
+	if connThrottleString := service.Annotations[annLinodeThrottle]; connThrottleString != "" {
+		parsed, err := strconv.Atoi(connThrottleString)
+		if err == nil {
+			if parsed < 0 {
+				parsed = 0
+			}
+
+			if parsed > 20 {
+				parsed = 20
+			}
+			connThrottle = parsed
+		}
+	}
+
+	return connThrottle
 }

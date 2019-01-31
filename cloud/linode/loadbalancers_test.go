@@ -267,6 +267,88 @@ b8QPmGZdja1VyGqpAMkPmQOu9N5RbhKw1UOU/XGa31p6v96oayL+u8Q=
 	}
 }
 
+func Test_getConnectionThrottle(t *testing.T) {
+	testcases := []struct {
+		name     string
+		service  *v1.Service
+		expected int
+	}{
+		{
+			"throttle not specified",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        randString(10),
+					UID:         "abc123",
+					Annotations: map[string]string{},
+				},
+			},
+			20,
+		},
+		{
+			"throttle value is a string",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(10),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annLinodeThrottle: "foo",
+					},
+				},
+			},
+			20,
+		},
+		{
+			"throttle value is less than 0",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(10),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annLinodeThrottle: "-123",
+					},
+				},
+			},
+			0,
+		},
+		{
+			"throttle value is valid",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(10),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annLinodeThrottle: "1",
+					},
+				},
+			},
+			1,
+		},
+		{
+			"throttle value is too high",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(10),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annLinodeThrottle: "21",
+					},
+				},
+			},
+			20,
+		},
+	}
+
+	for _, test := range testcases {
+		t.Run(test.name, func(t *testing.T) {
+			connThrottle := getConnectionThrottle(test.service)
+
+			if test.expected != connThrottle {
+				t.Fatalf("expected throttle value (%d) does not match actual value (%d)", test.expected, connThrottle)
+			}
+		})
+	}
+}
+
 func Test_getTLSPorts(t *testing.T) {
 	testcases := []struct {
 		name     string
