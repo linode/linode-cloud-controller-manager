@@ -194,6 +194,28 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 					return err
 				}
 
+				// Add missing Kube nodes to the NodeBalancer
+				for _, n := range nodes {
+					found := false
+					for _, nbNode := range nodeList {
+						if nbNode.Label == n.Name {
+							found = true
+							break
+						}
+					}
+
+					if found {
+						continue
+					}
+
+					node := l.buildNodeBalancerNode(n, port)
+					createNodeOpt := node.GetCreateOptions()
+					if _, err := l.client.CreateNodeBalancerNode(ctx, lb.ID, nbc.ID, createNodeOpt); err != nil {
+						return err
+					}
+				}
+
+				// Update existing NodeBalancer nodes
 				for _, n := range nodeList {
 					if _, found := kubeNode[n.Label]; !found {
 						if err = l.client.DeleteNodeBalancerNode(ctx, lb.ID, nbc.ID, n.ID); err != nil {
