@@ -58,9 +58,11 @@ func TestCCMLoadBalancers(t *testing.T) {
 func testCreateNodeBalancer(t *testing.T, client *linodego.Client) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        randString(10),
-			UID:         "foobar123",
-			Annotations: map[string]string{},
+			Name: randString(10),
+			UID:  "foobar123",
+			Annotations: map[string]string{
+				annLinodeThrottle: "15",
+			},
 		},
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
@@ -73,6 +75,7 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client) {
 			},
 		},
 	}
+
 	lb := &loadbalancers{client, "us-west"}
 	id, err := lb.createNodeBalancer(context.TODO(), svc)
 	if id == -1 {
@@ -85,6 +88,20 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client) {
 		t.Logf("expected: %v", nil)
 		t.Logf("actual: %v", err)
 	}
+
+	nb, err := client.GetNodeBalancer(context.TODO(), id)
+	if !reflect.DeepEqual(err, nil) {
+		t.Error("unexpected error")
+		t.Logf("expected: %v", nil)
+		t.Logf("actual: %v", err)
+	}
+
+	if nb.ClientConnThrottle != 15 {
+		t.Error("unexpected ClientConnThrottle")
+		t.Logf("expected: %v", 15)
+		t.Logf("actual: %v", nb.ClientConnThrottle)
+	}
+
 	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc) }()
 }
 
