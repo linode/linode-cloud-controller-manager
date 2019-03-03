@@ -10,7 +10,7 @@ import (
 
 	"github.com/linode/linodego"
 	"github.com/pkg/errors"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
@@ -137,13 +137,10 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 	}
 
 	nbConfigs, err := l.client.ListNodeBalancerConfigs(ctx, lb.ID, nil)
+	var nbNodes []linodego.NodeBalancerNodeCreateOptions
+
 	if err != nil {
 		return err
-	}
-
-	kubeNode := map[string]*v1.Node{}
-	for _, node := range nodes {
-		kubeNode[node.Name] = node
 	}
 
 	nodePort := map[int]v1.ServicePort{}
@@ -152,6 +149,15 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 	}
 
 	for _, port := range service.Spec.Ports {
+		for _, node := range nodes {
+			nbNodes = append(nbNodes, l.buildNodeBalancerNodeCreateOptions(node, port))
+		}
+
+		opt, err := l.buildNodeBalancerConfig(service, int(port.Port))
+		if err != nil {
+			return err
+		}
+
 		found := false
 		for _, nbc := range nbConfigs {
 			if _, found := nodePort[nbc.Port]; !found {
@@ -160,94 +166,27 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 				}
 				continue
 			}
+
 			if nbc.Port == int(port.Port) {
 				found = true
-				protocol, err := getProtocol(service)
+
+				rebuildConfig := opt.GetRebuildOptions()
+				rebuildConfig.Nodes = nbNodes
+
+				_, err = l.client.RebuildNodeBalancerConfig(ctx, lb.ID, nbc.ID, rebuildConfig)
 				if err != nil {
-					return err
-				}
-
-				nbc.Protocol = protocol
-				nbc.Algorithm = getAlgorithm(service)
-				/*healthArgs, err := getHealthCheck(service)
-				if err != nil {
-					return err
-				}
-				args = mergeMaps(args, healthArgs)
-				tlsArgs, err := getTLSArgs(service, nbc.Port, protocol)
-				if err != nil {
-					return err
-				}
-				args = mergeMaps(args, tlsArgs)*/
-				opt, err := l.buildNodeBalancerConfig(service, int(port.Port))
-				if err != nil {
-					return err
-				}
-
-				_, err = l.client.UpdateNodeBalancerConfig(ctx, lb.ID, nbc.ID, opt.GetUpdateOptions())
-				if err != nil {
-					return fmt.Errorf("Error updating NodeBalancer config: %v", err)
-				}
-
-				nodeList, err := l.client.ListNodeBalancerNodes(ctx, lb.ID, nbc.ID, nil)
-				if err != nil {
-					return err
-				}
-
-				// Add missing Kube nodes to the NodeBalancer
-				for _, n := range nodes {
-					found := false
-					for _, nbNode := range nodeList {
-						if nbNode.Label == n.Name {
-							found = true
-							break
-						}
-					}
-
-					if found {
-						continue
-					}
-
-					node := l.buildNodeBalancerNode(n, port)
-					createNodeOpt := node.GetCreateOptions()
-					if _, err := l.client.CreateNodeBalancerNode(ctx, lb.ID, nbc.ID, createNodeOpt); err != nil {
-						return err
-					}
-				}
-
-				// Update existing NodeBalancer nodes
-				for _, n := range nodeList {
-					if _, found := kubeNode[n.Label]; !found {
-						if err = l.client.DeleteNodeBalancerNode(ctx, lb.ID, nbc.ID, n.ID); err != nil {
-							return err
-						}
-						continue
-					}
-
-					node := l.buildNodeBalancerNode(kubeNode[n.Label], port)
-					updateOpt := node.GetUpdateOptions()
-					if _, err := l.client.UpdateNodeBalancerNode(ctx, lb.ID, nbc.ID, n.ID, updateOpt); err != nil {
-						return err
-					}
+					return fmt.Errorf("Error rebuilding NodeBalancer config: %v", err)
 				}
 			}
 		}
+
 		if !found {
-			config, err := l.buildNodeBalancerConfig(service, int(port.Port))
+			createOpts := opt.GetCreateOptions()
+			createOpts.Nodes = nbNodes
+
+			_, err := l.client.CreateNodeBalancerConfig(ctx, lb.ID, createOpts)
 			if err != nil {
 				return err
-			}
-			createOpt := config.GetCreateOptions()
-			nbConfig, err := l.client.CreateNodeBalancerConfig(ctx, lb.ID, createOpt)
-			if err != nil {
-				return err
-			}
-			for _, n := range nodes {
-				node := l.buildNodeBalancerNode(n, port)
-				createNodeOpt := node.GetCreateOptions()
-				if _, err := l.client.CreateNodeBalancerNode(ctx, lb.ID, nbConfig.ID, createNodeOpt); err != nil {
-					return err
-				}
 			}
 		}
 	}
@@ -427,9 +366,8 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, service *v
 		}
 
 		for _, n := range nodes {
-			node := l.buildNodeBalancerNode(n, port)
+			createOpt := l.buildNodeBalancerNodeCreateOptions(n, port)
 
-			createOpt := node.GetCreateOptions()
 			if _, err := l.client.CreateNodeBalancerNode(ctx, lb, nbConfig.ID, createOpt); err != nil {
 				return "", err
 			}
@@ -438,8 +376,8 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, service *v
 	return *nodeBalancer.IPv4, nil
 }
 
-func (l *loadbalancers) buildNodeBalancerNode(node *v1.Node, port v1.ServicePort) linodego.NodeBalancerNode {
-	return linodego.NodeBalancerNode{
+func (l *loadbalancers) buildNodeBalancerNodeCreateOptions(node *v1.Node, port v1.ServicePort) linodego.NodeBalancerNodeCreateOptions {
+	return linodego.NodeBalancerNodeCreateOptions{
 		Address: fmt.Sprintf("%v:%v", getNodeInternalIp(node), port.NodePort),
 		Label:   node.Name,
 		Mode:    "accept",
