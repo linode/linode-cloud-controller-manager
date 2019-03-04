@@ -80,10 +80,10 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	urlPath := r.URL.Path
 	switch r.Method {
 	case "GET":
-		whichApi := strings.Split(urlPath[1:], "/")
-		switch whichApi[0] {
+		whichAPI := strings.Split(urlPath[1:], "/")
+		switch whichAPI[0] {
 		case "linode":
-			switch whichApi[1] {
+			switch whichAPI[1] {
 			case "instances":
 				rx, _ := regexp.Compile("/linode/instances/[0-9]+/ips")
 				if rx.MatchString(urlPath) {
@@ -139,7 +139,76 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		case "nodebalancers":
-			rx, _ := regexp.Compile("/nodebalancers/[0-9]+/configs")
+			rx, _ := regexp.Compile("/nodebalancers/[0-9]+/configs/[0-9]+/nodes/[0-9]+")
+			if rx.MatchString(urlPath) {
+				id := filepath.Base(urlPath)
+				nbn, found := f.nbn[id]
+				if found {
+					rr, _ := json.Marshal(nbn)
+					_, _ = w.Write(rr)
+
+				} else {
+					w.WriteHeader(404)
+					resp := linodego.APIError{
+						Errors: []linodego.APIErrorReason{
+							{Reason: "Not Found"},
+						},
+					}
+					rr, _ := json.Marshal(resp)
+					_, _ = w.Write(rr)
+				}
+				return
+			}
+			rx, _ = regexp.Compile("/nodebalancers/[0-9]+/configs/[0-9]+/nodes")
+			if rx.MatchString(urlPath) {
+				res := 0
+				parts := strings.Split(r.URL.Path[1:], "/")
+				nbcID, err := strconv.Atoi(parts[3])
+				if err != nil {
+					f.t.Fatal(err)
+				}
+
+				data := []linodego.NodeBalancerNode{}
+
+				for _, nbn := range f.nbn {
+					if nbcID == nbn.ConfigID {
+						data = append(data, *nbn)
+					}
+				}
+
+				resp := linodego.NodeBalancerNodesPagedResponse{
+					PageOptions: &linodego.PageOptions{
+						Page:    1,
+						Pages:   1,
+						Results: res,
+					},
+					Data: data,
+				}
+				rr, _ := json.Marshal(resp)
+				_, _ = w.Write(rr)
+				return
+			}
+			rx, _ = regexp.Compile("/nodebalancers/[0-9]+/configs/[0-9]+")
+			if rx.MatchString(urlPath) {
+				id := filepath.Base(urlPath)
+				nbc, found := f.nbc[id]
+				if found {
+					rr, _ := json.Marshal(nbc)
+					_, _ = w.Write(rr)
+
+				} else {
+					w.WriteHeader(404)
+					resp := linodego.APIError{
+						Errors: []linodego.APIErrorReason{
+							{Reason: "Not Found"},
+						},
+					}
+					rr, _ := json.Marshal(resp)
+					_, _ = w.Write(rr)
+				}
+				return
+			}
+			rx, _ = regexp.Compile("/nodebalancers/[0-9]+/configs")
 			if rx.MatchString(urlPath) {
 				res := 0
 				data := []linodego.NodeBalancerConfig{}
@@ -172,25 +241,23 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				_, _ = w.Write(rr)
 				return
 			}
-			rx, _ = regexp.Compile("/nodebalancers/[0-9]+/configs/[0-9]+")
-			if rx.MatchString(urlPath) {
-				id := filepath.Base(urlPath)
-				nbc := f.nbc[id]
-				if nbc != nil {
-					rr, _ := json.Marshal(nbc)
-					_, _ = w.Write(rr)
-
-				}
-				return
-			}
 			rx, _ = regexp.Compile("/nodebalancers/[0-9]+")
 			if rx.MatchString(urlPath) {
 				id := filepath.Base(urlPath)
-				nb := f.nb[id]
-				if nb != nil {
+				nb, found := f.nb[id]
+				if found {
 					rr, _ := json.Marshal(nb)
 					_, _ = w.Write(rr)
 
+				} else {
+					w.WriteHeader(404)
+					resp := linodego.APIError{
+						Errors: []linodego.APIErrorReason{
+							{Reason: "Not Found"},
+						},
+					}
+					rr, _ := json.Marshal(resp)
+					_, _ = w.Write(rr)
 				}
 				return
 			}
@@ -233,10 +300,11 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "POST":
 		tp := filepath.Base(r.URL.Path)
 		if tp == "nodebalancers" {
-			nbco := new(linodego.NodeBalancerCreateOptions)
-			if err := json.NewDecoder(r.Body).Decode(nbco); err != nil {
+			nbco := linodego.NodeBalancerCreateOptions{}
+			if err := json.NewDecoder(r.Body).Decode(&nbco); err != nil {
 				f.t.Fatal(err)
 			}
+
 			ip := net.IPv4(byte(rand.Intn(100)), byte(rand.Intn(100)), byte(rand.Intn(100)), byte(rand.Intn(100))).String()
 			hostname := fmt.Sprintf("nb-%s.%s.linode.com", strings.Replace(ip, ".", "-", 4), strings.ToLower(nbco.Region))
 			nb := linodego.NodeBalancer{

@@ -70,17 +70,38 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client) {
 					Port:     int32(80),
 					NodePort: int32(30000),
 				},
+				{
+					Name:     randString(10),
+					Protocol: "TCP",
+					Port:     int32(8080),
+					NodePort: int32(30001),
+				},
 			},
 		},
 	}
 	lb := &loadbalancers{client, "us-west"}
-	configs := []*linodego.NodeBalancerConfigCreateOptions{}
-	id, err := lb.createNodeBalancer(context.TODO(), svc, configs)
-	if id == nil {
-		t.Error("unexpected nodeID")
-		t.Logf("expected: >%v", 0)
-		t.Logf("actual: %v", id)
+	var nodes []*v1.Node
+	nb, err := lb.buildLoadBalancerRequest(context.TODO(), svc, nodes)
+	if err != nil {
+		t.Fatal(err)
 	}
+	if nb.Region != lb.zone {
+		t.Error("unexpected nodebalancer region")
+		t.Logf("expected: %s", lb.zone)
+		t.Logf("actual: %s", nb.Region)
+	}
+
+	configs, err := client.ListNodeBalancerConfigs(context.TODO(), nb.ID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(configs) != len(svc.Spec.Ports) {
+		t.Error("unexpected nodebalancer config count")
+		t.Logf("expected: %v", len(svc.Spec.Ports))
+		t.Logf("actual: %v", len(configs))
+	}
+
 	if !reflect.DeepEqual(err, nil) {
 		t.Error("unexpected error")
 		t.Logf("expected: %v", nil)
@@ -530,16 +551,39 @@ func testBuildLoadBalancerRequest(t *testing.T, client *linodego.Client) {
 	}
 
 	lb := &loadbalancers{client, "us-west"}
-	id, err := lb.buildLoadBalancerRequest(context.TODO(), svc, nodes)
-	if id == nil {
+	nb, err := lb.buildLoadBalancerRequest(context.TODO(), svc, nodes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if lb == nil {
 		t.Error("unexpected nodeID")
 		t.Logf("expected: != \"\"")
-		t.Logf("actual: %v", id)
+		t.Logf("actual: %v", lb)
 	}
 	if !reflect.DeepEqual(err, err) {
 		t.Error("unexpected error")
 		t.Logf("expected: %v", nil)
 		t.Logf("actual: %v", err)
+	}
+
+	configs, err := client.ListNodeBalancerConfigs(context.TODO(), nb.ID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(configs) != len(svc.Spec.Ports) {
+		t.Error("unexpected nodebalancer config count")
+		t.Logf("expected: %v", len(svc.Spec.Ports))
+		t.Logf("actual: %v", len(configs))
+	}
+
+	nbNodes, _ := client.ListNodeBalancerNodes(context.TODO(), nb.ID, configs[0].ID, nil)
+
+	if len(nbNodes) != len(nodes) {
+		t.Error("unexpected nodebalancer nodes count")
+		t.Logf("expected: %v", len(nodes))
+		t.Logf("actual: %v", len(nbNodes))
 	}
 
 }
