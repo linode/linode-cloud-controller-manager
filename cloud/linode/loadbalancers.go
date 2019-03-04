@@ -234,19 +234,17 @@ func (l *loadbalancers) lbByName(ctx context.Context, client *linodego.Client, n
 	return nil, lbNotFound
 }
 
-func (l *loadbalancers) createNodeBalancer(ctx context.Context, service *v1.Service) (int, error) {
+func (l *loadbalancers) createNodeBalancer(ctx context.Context, service *v1.Service, configs []*linodego.NodeBalancerConfigCreateOptions) (*linodego.NodeBalancer, error) {
 	lbName := cloudprovider.GetLoadBalancerName(service)
 
 	connThrottle := 20
-	nodeBalancer, err := l.client.CreateNodeBalancer(ctx, linodego.NodeBalancerCreateOptions{
+	createOpts := linodego.NodeBalancerCreateOptions{
 		Label:              &lbName,
 		Region:             l.zone,
 		ClientConnThrottle: &connThrottle,
-	})
-	if err != nil {
-		return -1, err
+		Configs:            configs,
 	}
-	return nodeBalancer.ID, nil
+	return l.client.CreateNodeBalancer(ctx, createOpts)
 }
 
 func (l *loadbalancers) buildNodeBalancerConfig(service *v1.Service, port int) (linodego.NodeBalancerConfig, error) {
@@ -339,41 +337,28 @@ func (l *loadbalancers) buildNodeBalancerConfig(service *v1.Service, port int) (
 // buildLoadBalancerRequest returns a *godo.LoadBalancerRequest to balance
 // requests for service across nodes.
 func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, service *v1.Service, nodes []*v1.Node) (string, error) {
-	lb, err := l.createNodeBalancer(ctx, service)
-	if err != nil {
-		return "", err
-	}
-
-	nodeBalancer, err := l.client.GetNodeBalancer(ctx, lb)
-	if err != nil {
-		return "", err
-	}
-	if nodeBalancer == nil {
-		return "", fmt.Errorf("nodebalancer with id %v not found", lb)
-	}
+	var configs []*linodego.NodeBalancerConfigCreateOptions
 
 	ports := service.Spec.Ports
 	for _, port := range ports {
-
 		config, err := l.buildNodeBalancerConfig(service, int(port.Port))
 		if err != nil {
 			return "", err
 		}
 		createOpt := config.GetCreateOptions()
-		nbConfig, err := l.client.CreateNodeBalancerConfig(ctx, lb, createOpt)
-		if err != nil {
-			return "", err
-		}
 
 		for _, n := range nodes {
-			createOpt := l.buildNodeBalancerNodeCreateOptions(n, port)
-
-			if _, err := l.client.CreateNodeBalancerNode(ctx, lb, nbConfig.ID, createOpt); err != nil {
-				return "", err
-			}
+			createOpt.Nodes = append(createOpt.Nodes, l.buildNodeBalancerNodeCreateOptions(n, port))
 		}
+
+		configs = append(configs, &createOpt)
 	}
-	return *nodeBalancer.IPv4, nil
+	lb, err := l.createNodeBalancer(ctx, service, configs)
+	if err != nil {
+		return "", err
+	}
+
+	return *lb.IPv4, nil
 }
 
 func (l *loadbalancers) buildNodeBalancerNodeCreateOptions(node *v1.Node, port v1.ServicePort) linodego.NodeBalancerNodeCreateOptions {

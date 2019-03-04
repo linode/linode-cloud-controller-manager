@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/linode/linodego"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -74,8 +74,9 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client) {
 		},
 	}
 	lb := &loadbalancers{client, "us-west"}
-	id, err := lb.createNodeBalancer(context.TODO(), svc)
-	if id == -1 {
+	configs := []*linodego.NodeBalancerConfigCreateOptions{}
+	id, err := lb.createNodeBalancer(context.TODO(), svc, configs)
+	if id == nil {
 		t.Error("unexpected nodeID")
 		t.Logf("expected: >%v", 0)
 		t.Logf("actual: %v", id)
@@ -602,7 +603,8 @@ func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client) {
 	}
 
 	lb := &loadbalancers{client, "us-west"}
-	_, err := lb.createNodeBalancer(context.TODO(), svc)
+	configs := []*linodego.NodeBalancerConfigCreateOptions{}
+	_, err := lb.createNodeBalancer(context.TODO(), svc, configs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -649,7 +651,8 @@ func testEnsureLoadBalancer(t *testing.T, client *linodego.Client) {
 
 	lb := &loadbalancers{client, "us-west"}
 
-	_, err := lb.createNodeBalancer(context.TODO(), svc)
+	configs := []*linodego.NodeBalancerConfigCreateOptions{}
+	_, err := lb.createNodeBalancer(context.TODO(), svc, configs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -761,7 +764,9 @@ func testGetLoadBalancer(t *testing.T, client *linodego.Client) {
 			},
 		},
 	}
-	_, err := lb.createNodeBalancer(context.TODO(), svc)
+
+	configs := []*linodego.NodeBalancerConfigCreateOptions{}
+	_, err := lb.createNodeBalancer(context.TODO(), svc, configs)
 	if err != nil {
 		t.Fatal(err)
 	}

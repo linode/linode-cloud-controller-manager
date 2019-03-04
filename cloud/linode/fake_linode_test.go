@@ -248,6 +248,44 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				UpdatedStr: time.Now().Format("2006-01-02T15:04:05"),
 			}
 			f.nb[strconv.Itoa(nb.ID)] = &nb
+
+			for _, nbcco := range nbco.Configs {
+				nbc := linodego.NodeBalancerConfig{
+					ID:             rand.Intn(9999),
+					Port:           nbcco.Port,
+					Protocol:       nbcco.Protocol,
+					Algorithm:      nbcco.Algorithm,
+					Stickiness:     nbcco.Stickiness,
+					Check:          nbcco.Check,
+					CheckInterval:  nbcco.CheckInterval,
+					CheckAttempts:  nbcco.CheckAttempts,
+					CheckPath:      nbcco.CheckPath,
+					CheckBody:      nbcco.CheckBody,
+					CheckPassive:   *nbcco.CheckPassive,
+					CheckTimeout:   nbcco.CheckTimeout,
+					CipherSuite:    nbcco.CipherSuite,
+					NodeBalancerID: nb.ID,
+					SSLCommonName:  "",
+					SSLFingerprint: "",
+					SSLCert:        nbcco.SSLCert,
+					SSLKey:         nbcco.SSLKey,
+				}
+				f.nbc[strconv.Itoa(nbc.ID)] = &nbc
+
+				for _, nbnco := range nbcco.Nodes {
+					nbn := linodego.NodeBalancerNode{
+						ID:             rand.Intn(99999),
+						Address:        nbnco.Address,
+						Label:          nbnco.Label,
+						Weight:         nbnco.Weight,
+						Mode:           nbnco.Mode,
+						NodeBalancerID: nb.ID,
+						ConfigID:       nbc.ID,
+					}
+					f.nbn[strconv.Itoa(nbn.ID)] = &nbn
+				}
+			}
+
 			resp, err := json.Marshal(nb)
 			if err != nil {
 				f.t.Fatal(err)
