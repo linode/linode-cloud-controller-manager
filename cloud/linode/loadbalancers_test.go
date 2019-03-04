@@ -531,7 +531,7 @@ func testBuildLoadBalancerRequest(t *testing.T, client *linodego.Client) {
 
 	lb := &loadbalancers{client, "us-west"}
 	id, err := lb.buildLoadBalancerRequest(context.TODO(), svc, nodes)
-	if id == "" {
+	if id == nil {
 		t.Error("unexpected nodeID")
 		t.Logf("expected: != \"\"")
 		t.Logf("actual: %v", id)

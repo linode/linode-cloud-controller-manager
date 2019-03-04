@@ -80,7 +80,8 @@ func (l *loadbalancers) GetLoadBalancer(ctx context.Context, clusterName string,
 	return &v1.LoadBalancerStatus{
 		Ingress: []v1.LoadBalancerIngress{
 			{
-				IP: *lb.IPv4,
+				IP:       *lb.IPv4,
+				Hostname: *lb.Hostname,
 			},
 		},
 	}, true, nil
@@ -97,7 +98,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	}
 
 	if !exists {
-		ip, err := l.buildLoadBalancerRequest(ctx, service, nodes)
+		lb, err := l.buildLoadBalancerRequest(ctx, service, nodes)
 		if err != nil {
 			return nil, err
 		}
@@ -105,7 +106,8 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 		return &v1.LoadBalancerStatus{
 			Ingress: []v1.LoadBalancerIngress{
 				{
-					IP: ip,
+					IP:       *lb.IPv4,
+					Hostname: *lb.Hostname,
 				},
 			},
 		}, nil
@@ -122,7 +124,6 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	}
 
 	return lbStatus, nil
-
 }
 
 // UpdateLoadBalancer updates the load balancer for service to balance across
@@ -335,16 +336,16 @@ func (l *loadbalancers) buildNodeBalancerConfig(service *v1.Service, port int) (
 	return config, nil
 }
 
-// buildLoadBalancerRequest returns a *godo.LoadBalancerRequest to balance
+// buildLoadBalancerRequest returns a linodego.NodeBalancer
 // requests for service across nodes.
-func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, service *v1.Service, nodes []*v1.Node) (string, error) {
+func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, service *v1.Service, nodes []*v1.Node) (*linodego.NodeBalancer, error) {
 	var configs []*linodego.NodeBalancerConfigCreateOptions
 
 	ports := service.Spec.Ports
 	for _, port := range ports {
 		config, err := l.buildNodeBalancerConfig(service, int(port.Port))
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		createOpt := config.GetCreateOptions()
 
@@ -354,12 +355,7 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, service *v
 
 		configs = append(configs, &createOpt)
 	}
-	lb, err := l.createNodeBalancer(ctx, service, configs)
-	if err != nil {
-		return "", err
-	}
-
-	return *lb.IPv4, nil
+	return l.createNodeBalancer(ctx, service, configs)
 }
 
 func (l *loadbalancers) buildNodeBalancerNodeCreateOptions(node *v1.Node, port v1.ServicePort) linodego.NodeBalancerNodeCreateOptions {
