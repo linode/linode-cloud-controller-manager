@@ -137,7 +137,6 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 	}
 
 	nbConfigs, err := l.client.ListNodeBalancerConfigs(ctx, lb.ID, nil)
-	var nbNodes []linodego.NodeBalancerNodeCreateOptions
 
 	if err != nil {
 		return err
@@ -149,6 +148,8 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 	}
 
 	for _, port := range service.Spec.Ports {
+		var nbNodes []linodego.NodeBalancerNodeCreateOptions
+
 		for _, node := range nodes {
 			nbNodes = append(nbNodes, l.buildNodeBalancerNodeCreateOptions(node, port))
 		}
