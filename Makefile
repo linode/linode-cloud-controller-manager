@@ -8,7 +8,11 @@ build: fmt
 	go build -o dist/linode-cloud-controller-manager github.com/linode/linode-cloud-controller-manager
 
 run: build
-	dist/linode-cloud-controller-manager --logtostderr=true --stderrthreshold=INFO
+	dist/linode-cloud-controller-manager \
+		--logtostderr=true \
+		--stderrthreshold=INFO \
+		--cloud-provider=linode \
+		--kubeconfig=${KUBECONFIG}
 
 $(GOPATH)/bin/goimports:
 	GO111MODULE=off go get golang.org/x/tools/cmd/goimports
