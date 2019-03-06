@@ -10,8 +10,9 @@ import (
 	"testing"
 
 	"github.com/linode/linodego"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 func TestCCMLoadBalancers(t *testing.T) {
@@ -33,6 +34,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 		{
 			name: "Create Load Balancer",
 			f:    testCreateNodeBalancer,
+		},
+		{
+			name: "Update Load Balancer",
+			f:    testUpdateLoadBalancer,
 		},
 		{
 			name: "Build Load Balancer Request",
@@ -99,6 +104,58 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client) {
 	if nb.ClientConnThrottle != 15 {
 		t.Error("unexpected ClientConnThrottle")
 		t.Logf("expected: %v", 15)
+		t.Logf("actual: %v", nb.ClientConnThrottle)
+	}
+
+	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc) }()
+}
+
+func testUpdateLoadBalancer(t *testing.T, client *linodego.Client) {
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: randString(10),
+			UID:  "foobar123",
+			Annotations: map[string]string{
+				annLinodeThrottle: "15",
+			},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     randString(10),
+					Protocol: "TCP",
+					Port:     int32(80),
+					NodePort: int32(30000),
+				},
+			},
+		},
+	}
+
+	lb := &loadbalancers{client, "us-west"}
+	_, err := lb.EnsureLoadBalancer(context.TODO(), "lnodelb", svc, []*v1.Node{})
+	if err != nil {
+		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
+	}
+	svc.ObjectMeta.SetAnnotations(map[string]string{
+		annLinodeThrottle: "10",
+	})
+	err = lb.UpdateLoadBalancer(context.TODO(), "lnodelb", svc, []*v1.Node{})
+	if err != nil {
+		t.Errorf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
+	}
+
+	lbName := cloudprovider.GetLoadBalancerName(svc)
+	nb, err := lb.lbByName(context.TODO(), lb.client, lbName)
+
+	if !reflect.DeepEqual(err, nil) {
+		t.Error("unexpected error")
+		t.Logf("expected: %v", nil)
+		t.Logf("actual: %v", err)
+	}
+
+	if nb.ClientConnThrottle != 10 {
+		t.Error("unexpected ClientConnThrottle")
+		t.Logf("expected: %v", 10)
 		t.Logf("actual: %v", nb.ClientConnThrottle)
 	}
 
@@ -451,7 +508,7 @@ func Test_getProtocol(t *testing.T) {
 				},
 			},
 			"",
-			fmt.Errorf("invalid protocol: %q specifed in annotation: %q", "invalid", annLinodeProtocol),
+			fmt.Errorf("invalid protocol: %q specified in annotation: %q", "invalid", annLinodeProtocol),
 		},
 	}
 
@@ -518,7 +575,7 @@ func Test_getHealthCheckType(t *testing.T) {
 				},
 			},
 			"",
-			fmt.Errorf("invalid health check type: %q specifed in annotation: %q", "invalid", annLinodeHealthCheckType),
+			fmt.Errorf("invalid health check type: %q specified in annotation: %q", "invalid", annLinodeHealthCheckType),
 		},
 	}
 

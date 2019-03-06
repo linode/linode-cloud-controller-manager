@@ -10,7 +10,7 @@ import (
 
 	"github.com/linode/linodego"
 	"github.com/pkg/errors"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
@@ -450,7 +450,7 @@ func getProtocol(service *v1.Service) (linodego.ConfigProtocol, error) {
 	}
 
 	if protocol != "tcp" && protocol != "http" && protocol != "https" {
-		return "", fmt.Errorf("invalid protocol: %q specifed in annotation: %q", protocol, annLinodeProtocol)
+		return "", fmt.Errorf("invalid protocol: %q specified in annotation: %q", protocol, annLinodeProtocol)
 	}
 
 	return linodego.ConfigProtocol(protocol), nil
@@ -462,7 +462,7 @@ func getHealthCheckType(service *v1.Service) (linodego.ConfigCheck, error) {
 		return linodego.CheckConnection, nil
 	}
 	if hType != "connection" && hType != "http" && hType != "http_body" {
-		return "", fmt.Errorf("invalid health check type: %q specifed in annotation: %q", hType, annLinodeHealthCheckType)
+		return "", fmt.Errorf("invalid health check type: %q specified in annotation: %q", hType, annLinodeHealthCheckType)
 	}
 	return linodego.ConfigCheck(hType), nil
 }
