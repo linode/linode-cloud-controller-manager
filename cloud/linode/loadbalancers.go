@@ -16,7 +16,7 @@ import (
 
 const (
 	// annLinodeProtocol is the annotation used to specify the default protocol
-	// for Linode load balancers. For ports specifed in annLinodeTLSPorts, this protocol
+	// for Linode load balancers. For ports specified in annLinodeTLSPorts, this protocol
 	// is overwritten to https. Options are tcp, http and https. Defaults to tcp.
 	annLinodeProtocol = "service.beta.kubernetes.io/linode-loadbalancer-protocol"
 
@@ -166,6 +166,11 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 
 	for _, port := range service.Spec.Ports {
 		found := false
+
+		if port.Protocol == v1.ProtocolUDP {
+			return fmt.Errorf("Error updating NodeBalancer Config: ports with the UDP protocol are not supported")
+		}
+
 		for _, nbc := range nbConfigs {
 			if _, found := nodePort[nbc.Port]; !found {
 				if err = l.client.DeleteNodeBalancerConfig(ctx, lb.ID, nbc.ID); err != nil {
@@ -175,6 +180,7 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 			}
 			if nbc.Port == int(port.Port) {
 				found = true
+
 				protocol, err := getProtocol(service)
 				if err != nil {
 					return err
@@ -407,6 +413,9 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, service *v
 
 	ports := service.Spec.Ports
 	for _, port := range ports {
+		if port.Protocol == v1.ProtocolUDP {
+			return "", fmt.Errorf("Error creating NodeBalancer Config: ports with the UDP protocol are not supported")
+		}
 
 		config, err := l.buildNodeBalancerConfig(service, int(port.Port))
 		if err != nil {
@@ -458,29 +467,23 @@ func getHealthCheckType(service *v1.Service) (linodego.ConfigCheck, error) {
 	if !ok {
 		return linodego.CheckConnection, nil
 	}
-	if hType != "connection" && hType != "http" && hType != "http_body" {
+	if hType != "none" && hType != "connection" && hType != "http" && hType != "http_body" {
 		return "", fmt.Errorf("invalid health check type: %q specified in annotation: %q", hType, annLinodeHealthCheckType)
 	}
 	return linodego.ConfigCheck(hType), nil
 }
 
 func isTLSPort(service *v1.Service, port int) (bool, error) {
-	tlsPorts, ok := service.Annotations[annLinodeTLSPorts]
-	if !ok {
-		return false, nil
+	tlsPortsSlice, err := getTLSPorts(service)
+	if err != nil {
+		return false, err
 	}
-	tlsPortsSlice := strings.Split(tlsPorts, ",")
-	for _, p := range tlsPortsSlice {
-		tlsPort, err := strconv.Atoi(p)
-		if err != nil {
-			return false, err
-		}
+	for _, tlsPort := range tlsPortsSlice {
 		if port == tlsPort {
 			return true, nil
 		}
 	}
 	return false, nil
-
 }
 
 // getTLSPorts returns the ports of service that are set to use TLS.
@@ -524,6 +527,8 @@ func getAlgorithm(service *v1.Service) linodego.ConfigAlgorithm {
 		return linodego.AlgorithmLeastConn
 	case "source":
 		return linodego.AlgorithmSource
+	case "round_robin":
+		return linodego.AlgorithmRoundRobin
 	default:
 		return linodego.AlgorithmRoundRobin
 	}
@@ -533,13 +538,14 @@ func getStickiness(service *v1.Service) linodego.ConfigStickiness {
 	stickiness := service.Annotations[annLinodeSessionPersistence]
 
 	switch stickiness {
-	case "none":
-		return linodego.StickinessNone
 	case "http_cookie":
 		return linodego.StickinessHTTPCookie
-	default:
+	case "table":
 		return linodego.StickinessTable
-
+	case "none":
+		return linodego.StickinessNone
+	default:
+		return linodego.StickinessNone
 	}
 }
 
@@ -547,12 +553,12 @@ func getSSLCertInfo(service *v1.Service) (string, string) {
 	cert := service.Annotations[annLinodeSSLCertificate]
 	if cert != "" {
 		cb, _ := base64.StdEncoding.DecodeString(cert)
-		cert = string(cb)
+		cert = strings.TrimSpace(string(cb))
 	}
 	key := service.Annotations[annLinodeSSLKey]
 	if key != "" {
 		kb, _ := base64.StdEncoding.DecodeString(key)
-		key = string(kb)
+		key = strings.TrimSpace(string(kb))
 	}
 	return cert, key
 }

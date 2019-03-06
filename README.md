@@ -38,17 +38,17 @@ Kubernetes Services of type `LoadBalancer` will be served through a [Linode Node
 
 The Linode CCM accepts several annotations which affect the properties of the underlying NodeBalancer deployment.
 
-All of the service annotation names listed below have been shortened for readability.  Each annotation **MUST** be prefixed with `service.beta.kubernetes.io/linode-loadbalancer-`.
+All of the service annotation names listed below have been shortened for readability.  Each annotation **MUST** be prefixed with `service.beta.kubernetes.io/linode-loadbalancer-`.  The values, such as `http`, are case-sensitive.
 
 Annotation (Suffix) | Values | Default | Description
 ---|---|---|---
 `throttle` | `0`-`20` (`0` to disable) | `20` | Client Connection Throttle, which limits the number of subsequent new connections per second from the same client IP
 `protocol` | `tcp`, `http`, `https` | `tcp` | This annotation is used to specify the default protocol for Linode NodeBalancer. For ports specified in the `linode-loadbalancer-tls-ports` annotation, this protocol is overwritten to `https`
-`stickiness` | `none`, `table`, `http_cookie` | none | Controls how session stickiness is handled on this port.
+`stickiness` | `none`, `table`, `http_cookie` | `none` | Controls how session stickiness is handled on this port.
 `algorithm` | `round_robin`, `least_connections` | `round_robin` | Specifies which algorithm the Linode NodeBalancer should use
 `tls-ports` | int (e.g. `443,6443,7443`) | | This annotation specifies the ports the NodeBalancer should use for `https`
-`ssl-cert` | string | | The SSL certificate for this service. The full certificate chain may be provided.
-`ssl-key` | string | | The private key corresponding to this port's certificate.  The key can not be passphrase protected.
+`ssl-cert` | string | | The Base64 Encoded SSL certificates for this service. The full certificate chain may be provided. (`base64 -w0 ssl.crt`)
+`ssl-key` | string | | The Base64 Encoded private key corresponding to this port's certificate.  The key can not be passphrase protected. (`base64 -w0 ssl.key`)
 `check-type` | `none`, `connection`, `http`, `http_body` | | The type of health check to perform against back-ends to ensure they are serving requests
 `check-path` | string | | The URL path to check on each back-end during health checks
 `check-body` | string | | Text which must be present in the response body to pass the NodeBalancer health check
