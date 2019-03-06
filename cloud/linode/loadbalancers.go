@@ -126,65 +126,60 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	return lbStatus, nil
 }
 
-// UpdateLoadBalancer updates the load balancer for service to balance across
-// the Linodes in nodes.
-//
-// UpdateLoadBalancer will not modify service or nodes.
+// UpdateLoadBalancer updates the NodeBalancer to have configs that match the Service's ports
 func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
+	// Get the NodeBalancer
 	lbName := cloudprovider.GetLoadBalancerName(service)
 	lb, err := l.lbByName(ctx, l.client, lbName)
 	if err != nil {
 		return err
 	}
 
-	nbConfigs, err := l.client.ListNodeBalancerConfigs(ctx, lb.ID, nil)
-
+	// Get all of the NodeBalancer's configs
+	nbCfgs, err := l.client.ListNodeBalancerConfigs(ctx, lb.ID, nil)
 	if err != nil {
 		return err
 	}
 
-	nodePort := map[int]v1.ServicePort{}
-	for _, port := range service.Spec.Ports {
-		nodePort[int(port.Port)] = port
+	// Delete any configs for ports that have been removed from the Service
+	if err = l.deleteUnusedConfigs(ctx, &nbCfgs, &(service.Spec.Ports)); err != nil {
+		return err
 	}
 
+	// Add or overwrite configs for each of the Service's ports
 	for _, port := range service.Spec.Ports {
-		var nbNodes []linodego.NodeBalancerNodeCreateOptions
-
-		for _, node := range nodes {
-			nbNodes = append(nbNodes, l.buildNodeBalancerNodeCreateOptions(node, port))
-		}
-
-		opt, err := l.buildNodeBalancerConfig(service, int(port.Port))
+		// Construct a new config for this port
+		newNBCfg, err := l.buildNodeBalancerConfig(service, int(port.Port))
 		if err != nil {
 			return err
 		}
 
-		found := false
-		for _, nbc := range nbConfigs {
-			if _, found := nodePort[nbc.Port]; !found {
-				if err = l.client.DeleteNodeBalancerConfig(ctx, lb.ID, nbc.ID); err != nil {
-					return err
-				}
-				continue
-			}
+		// Add all of the Nodes to the config
+		var newNBNodes []linodego.NodeBalancerNodeCreateOptions
+		for _, node := range nodes {
+			newNBNodes = append(newNBNodes, l.buildNodeBalancerNodeCreateOptions(node, port.NodePort))
+		}
 
+		// Look for an existing config for this port
+		var existingNBCfg *linodego.NodeBalancerConfig
+		for _, nbc := range nbCfgs {
 			if nbc.Port == int(port.Port) {
-				found = true
-
-				rebuildConfig := opt.GetRebuildOptions()
-				rebuildConfig.Nodes = nbNodes
-
-				_, err = l.client.RebuildNodeBalancerConfig(ctx, lb.ID, nbc.ID, rebuildConfig)
-				if err != nil {
-					return fmt.Errorf("Error rebuilding NodeBalancer config: %v", err)
-				}
+				existingNBCfg = &nbc
+				break
 			}
 		}
 
-		if !found {
-			createOpts := opt.GetCreateOptions()
-			createOpts.Nodes = nbNodes
+		// If there's an existing config, rebuild it, otherwise, create it
+		if existingNBCfg != nil {
+			rebuildOpts := newNBCfg.GetRebuildOptions()
+			rebuildOpts.Nodes = newNBNodes
+
+			if _, err = l.client.RebuildNodeBalancerConfig(ctx, lb.ID, existingNBCfg.ID, rebuildOpts); err != nil {
+				return fmt.Errorf("Error rebuilding NodeBalancer config: %v", err)
+			}
+		} else {
+			createOpts := newNBCfg.GetCreateOptions()
+			createOpts.Nodes = newNBNodes
 
 			_, err := l.client.CreateNodeBalancerConfig(ctx, lb.ID, createOpts)
 			if err != nil {
@@ -193,6 +188,22 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 		}
 	}
 
+	return nil
+}
+
+// Delete any NodeBalancer configs for ports that no longer exist on the Service
+// Note: Don't build a map or other lookup structure here, it is not worth the overhead
+func (l *loadbalancers) deleteUnusedConfigs(ctx context.Context, nbConfigs *[]linodego.NodeBalancerConfig, servicePorts *[]v1.ServicePort) error {
+	for _, nbc := range *(nbConfigs) {
+		for _, sp := range *(servicePorts) {
+			if nbc.Port == int(sp.Port) {
+				continue
+			}
+		}
+		if err := l.client.DeleteNodeBalancerConfig(ctx, nbc.NodeBalancerID, nbc.ID); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -350,7 +361,7 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, service *v
 		createOpt := config.GetCreateOptions()
 
 		for _, n := range nodes {
-			createOpt.Nodes = append(createOpt.Nodes, l.buildNodeBalancerNodeCreateOptions(n, port))
+			createOpt.Nodes = append(createOpt.Nodes, l.buildNodeBalancerNodeCreateOptions(n, port.NodePort))
 		}
 
 		configs = append(configs, &createOpt)
@@ -358,9 +369,9 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, service *v
 	return l.createNodeBalancer(ctx, service, configs)
 }
 
-func (l *loadbalancers) buildNodeBalancerNodeCreateOptions(node *v1.Node, port v1.ServicePort) linodego.NodeBalancerNodeCreateOptions {
+func (l *loadbalancers) buildNodeBalancerNodeCreateOptions(node *v1.Node, nodePort int32) linodego.NodeBalancerNodeCreateOptions {
 	return linodego.NodeBalancerNodeCreateOptions{
-		Address: fmt.Sprintf("%v:%v", getNodeInternalIp(node), port.NodePort),
+		Address: fmt.Sprintf("%v:%v", getNodeInternalIp(node), nodePort),
 		Label:   node.Name,
 		Mode:    "accept",
 		Weight:  100,
