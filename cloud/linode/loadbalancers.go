@@ -142,7 +142,7 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 	}
 
 	// Delete any configs for ports that have been removed from the Service
-	if err = l.deleteUnusedConfigs(ctx, &nbCfgs, &(service.Spec.Ports)); err != nil {
+	if err = l.deleteUnusedConfigs(ctx, nbCfgs, service.Spec.Ports); err != nil {
 		return err
 	}
 
@@ -193,9 +193,9 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 
 // Delete any NodeBalancer configs for ports that no longer exist on the Service
 // Note: Don't build a map or other lookup structure here, it is not worth the overhead
-func (l *loadbalancers) deleteUnusedConfigs(ctx context.Context, nbConfigs *[]linodego.NodeBalancerConfig, servicePorts *[]v1.ServicePort) error {
-	for _, nbc := range *(nbConfigs) {
-		for _, sp := range *(servicePorts) {
+func (l *loadbalancers) deleteUnusedConfigs(ctx context.Context, nbConfigs []linodego.NodeBalancerConfig, servicePorts []v1.ServicePort) error {
+	for _, nbc := range nbConfigs {
+		for _, sp := range servicePorts {
 			if nbc.Port == int(sp.Port) {
 				continue
 			}
