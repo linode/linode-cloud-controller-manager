@@ -13,10 +13,18 @@ import (
 )
 
 const (
+	// The name of this cloudprovider
 	ProviderName   = "linode"
 	accessTokenEnv = "LINODE_API_TOKEN"
 	regionEnv      = "LINODE_REGION"
 )
+
+// Options is a configuration object for this cloudprovider implementation.
+// We expect it to be initialized with flags external to this package, likely in
+// main.go
+var Options struct {
+	LinodeGoDebug bool
+}
 
 type linodeCloud struct {
 	client        *linodego.Client
@@ -57,7 +65,9 @@ func newCloud() (cloudprovider.Interface, error) {
 	}
 
 	linodeClient := linodego.NewClient(oauth2Client)
-	linodeClient.SetDebug(true)
+	if Options.LinodeGoDebug {
+		linodeClient.SetDebug(true)
+	}
 
 	// Return struct that satisfies cloudprovider.Interface
 	return &linodeCloud{

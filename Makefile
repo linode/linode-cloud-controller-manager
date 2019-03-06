@@ -1,15 +1,29 @@
 IMG ?= linode/linode-cloud-controller-manager:latest
 
+export GO111MODULE=on
+
 all: build
 
 build: fmt
 	go build -o dist/linode-cloud-controller-manager github.com/linode/linode-cloud-controller-manager
 
 run: build
-	dist/linode-cloud-controller-manager --logtostderr=true --stderrthreshold=INFO
+	dist/linode-cloud-controller-manager \
+		--logtostderr=true \
+		--stderrthreshold=INFO \
+		--cloud-provider=linode \
+		--kubeconfig=${KUBECONFIG}
+
+run-debug: build
+	dist/linode-cloud-controller-manager \
+		--logtostderr=true \
+		--stderrthreshold=INFO \
+		--cloud-provider=linode \
+		--kubeconfig=${KUBECONFIG} \
+		--linodego-debug
 
 $(GOPATH)/bin/goimports:
-	go get golang.org/x/tools/cmd/goimports
+	GO111MODULE=off go get golang.org/x/tools/cmd/goimports
 
 vet:
 	go vet -composites=false ./...
@@ -21,7 +35,7 @@ fmt: vet imports
 	gofmt -s -w *.go cloud
 
 $(GOPATH)/bin/ginkgo:
-	go get -u github.com/onsi/ginkgo/ginkgo
+	GO111MODULE=off go get -u github.com/onsi/ginkgo/ginkgo
 
 test: $(GOPATH)/bin/ginkgo
 	ginkgo -r --v --progress --trace --cover -- --v=3
