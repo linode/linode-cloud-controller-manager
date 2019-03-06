@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	_ "github.com/linode/linode-cloud-controller-manager/cloud/linode"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode"
 	"github.com/spf13/pflag"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
@@ -20,6 +20,9 @@ func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	command := app.NewCloudControllerManagerCommand()
+
+	// Add Linode-specific flags
+	command.Flags().BoolVar(&linode.Options.LinodeGoDebug, "linodego-debug", false, "enables debug output for the LinodeAPI wrapper")
 
 	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)

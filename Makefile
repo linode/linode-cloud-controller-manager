@@ -14,6 +14,14 @@ run: build
 		--cloud-provider=linode \
 		--kubeconfig=${KUBECONFIG}
 
+run-debug: build
+	dist/linode-cloud-controller-manager \
+		--logtostderr=true \
+		--stderrthreshold=INFO \
+		--cloud-provider=linode \
+		--kubeconfig=${KUBECONFIG} \
+		--linodego-debug
+
 $(GOPATH)/bin/goimports:
 	GO111MODULE=off go get golang.org/x/tools/cmd/goimports
 
