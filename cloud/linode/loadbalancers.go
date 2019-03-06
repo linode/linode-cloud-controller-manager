@@ -25,15 +25,12 @@ const (
 	// (e.g. 443,6443,7443).
 	annLinodeTLSPorts = "service.beta.kubernetes.io/linode-loadbalancer-tls-ports"
 
-	// annLinodeTLSPassThrough is the annotation used to specify whether the
-	// Linode loadbalancer should pass encrypted data to backend Linodes.
-	// This is optional and defaults to false.
 	annLinodeCheckPath       = "service.beta.kubernetes.io/linode-loadbalancer-check-path"
 	annLinodeCheckBody       = "service.beta.kubernetes.io/linode-loadbalancer-check-body"
 	annLinodeHealthCheckType = "service.beta.kubernetes.io/linode-loadbalancer-check-type"
 
 	// annLinodeCertificateID is the annotation specifying the certificate ID
-	// used for https protocol. This annoataion is required if annLinodeTLSPorts
+	// used for https protocol. This annotation is required if annLinodeTLSPorts
 	// is passed.
 	annLinodeSSLCertificate = "service.beta.kubernetes.io/linode-loadbalancer-ssl-cert"
 	annLinodeSSLKey         = "service.beta.kubernetes.io/linode-loadbalancer-ssl-key"
