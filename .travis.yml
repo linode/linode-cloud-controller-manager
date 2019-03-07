@@ -1,12 +1,16 @@
 sudo: required
+dist: xenial
 
 services:
   - docker
 
 language: go
 
+env:
+- GO111MODULE=on
+
 go:
-  - 1.10.x
+  - 1.11.x
   - tip
 
 cache:
@@ -19,8 +23,8 @@ matrix:
     - go: tip
 
 before_install:
-  - go get github.com/mattn/goveralls
-  - go get github.com/lawrencewoodman/roveralls
+  - GO111MODULE=off go get github.com/mattn/goveralls
+  - GO111MODULE=off go get github.com/lawrencewoodman/roveralls
 
 install:
   - wget -O - -q https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $GOPATH/bin latest

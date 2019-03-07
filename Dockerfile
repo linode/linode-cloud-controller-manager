@@ -1,15 +1,15 @@
 # Build the manager binary
-FROM golang:1.11.2 as builder
+FROM golang:1.11.5 as builder
 
 WORKDIR /go/src/github.com/linode/linode-cloud-controller-manager
-COPY cloud/    cloud/
-COPY *.go      ./
-COPY vendor/   vendor/
+COPY go.* *.go ./
+COPY cloud/ ./cloud
+ENV GO111MODULE=on
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o linode-cloud-controller-manager github.com/linode/linode-cloud-controller-manager
 
-FROM ubuntu:latest
+FROM alpine:latest
+RUN apk update && apk add ca-certificates && rm -rf /var/cache/apk/*
 WORKDIR /root/
-RUN apt-get update -qq && apt-get install -qy ca-certificates
-COPY --from=builder /go/src/github.com/linode/linode-cloud-controller-manager/linode-cloud-controller-manager .
-ENTRYPOINT ["./linode-cloud-controller-manager"]
+COPY --from=builder /go/src/github.com/linode/linode-cloud-controller-manager/linode-cloud-controller-manager /
+ENTRYPOINT ["/linode-cloud-controller-manager"]
