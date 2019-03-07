@@ -16,7 +16,7 @@ import (
 
 const (
 	// annLinodeProtocol is the annotation used to specify the default protocol
-	// for Linode load balancers. For ports specifed in annLinodeTLSPorts, this protocol
+	// for Linode load balancers. For ports specified in annLinodeTLSPorts, this protocol
 	// is overwritten to https. Options are tcp, http and https. Defaults to tcp.
 	annLinodeProtocol = "service.beta.kubernetes.io/linode-loadbalancer-protocol"
 
@@ -25,15 +25,12 @@ const (
 	// (e.g. 443,6443,7443).
 	annLinodeTLSPorts = "service.beta.kubernetes.io/linode-loadbalancer-tls-ports"
 
-	// annLinodeTLSPassThrough is the annotation used to specify whether the
-	// Linode loadbalancer should pass encrypted data to backend Linodes.
-	// This is optional and defaults to false.
 	annLinodeCheckPath       = "service.beta.kubernetes.io/linode-loadbalancer-check-path"
 	annLinodeCheckBody       = "service.beta.kubernetes.io/linode-loadbalancer-check-body"
 	annLinodeHealthCheckType = "service.beta.kubernetes.io/linode-loadbalancer-check-type"
 
 	// annLinodeCertificateID is the annotation specifying the certificate ID
-	// used for https protocol. This annoataion is required if annLinodeTLSPorts
+	// used for https protocol. This annotation is required if annLinodeTLSPorts
 	// is passed.
 	annLinodeSSLCertificate = "service.beta.kubernetes.io/linode-loadbalancer-ssl-cert"
 	annLinodeSSLKey         = "service.beta.kubernetes.io/linode-loadbalancer-ssl-key"
@@ -49,6 +46,11 @@ const (
 	// should use. Options are round_robin and least_connections. Defaults
 	// to round_robin.
 	annLinodeAlgorithm = "service.beta.kubernetes.io/linode-loadbalancer-algorithm"
+
+	// annLinodeThrottle is the annotation specifying the value of the Client Connection
+	// Throttle, which limits the number of subsequent new connections per second from the
+	// same client IP. Options are a number between 1-20, or 0 to disable. Defaults to 20.
+	annLinodeThrottle = "service.beta.kubernetes.io/linode-loadbalancer-throttle"
 )
 
 var lbNotFound = errors.New("loadbalancer not found")
@@ -135,6 +137,17 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 		return err
 	}
 
+	connThrottle := getConnectionThrottle(service)
+	if connThrottle != lb.ClientConnThrottle {
+		update := lb.GetUpdateOptions()
+		update.ClientConnThrottle = &connThrottle
+
+		lb, err = l.client.UpdateNodeBalancer(ctx, lb.ID, update)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Get all of the NodeBalancer's configs
 	nbCfgs, err := l.client.ListNodeBalancerConfigs(ctx, lb.ID, nil)
 	if err != nil {
@@ -148,6 +161,10 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 
 	// Add or overwrite configs for each of the Service's ports
 	for _, port := range service.Spec.Ports {
+		if port.Protocol == v1.ProtocolUDP {
+			return fmt.Errorf("Error updating NodeBalancer Config: ports with the UDP protocol are not supported")
+		}
+
 		// Construct a new config for this port
 		newNBCfg, err := l.buildNodeBalancerConfig(service, int(port.Port))
 		if err != nil {
@@ -250,7 +267,7 @@ func (l *loadbalancers) lbByName(ctx context.Context, client *linodego.Client, n
 func (l *loadbalancers) createNodeBalancer(ctx context.Context, service *v1.Service, configs []*linodego.NodeBalancerConfigCreateOptions) (*linodego.NodeBalancer, error) {
 	lbName := cloudprovider.GetLoadBalancerName(service)
 
-	connThrottle := 20
+	connThrottle := getConnectionThrottle(service)
 	createOpts := linodego.NodeBalancerCreateOptions{
 		Label:              &lbName,
 		Region:             l.zone,
@@ -354,6 +371,10 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, service *v
 
 	ports := service.Spec.Ports
 	for _, port := range ports {
+		if port.Protocol == v1.ProtocolUDP {
+			return nil, fmt.Errorf("Error creating NodeBalancer Config: ports with the UDP protocol are not supported")
+		}
+
 		config, err := l.buildNodeBalancerConfig(service, int(port.Port))
 		if err != nil {
 			return nil, err
@@ -386,7 +407,7 @@ func getProtocol(service *v1.Service) (linodego.ConfigProtocol, error) {
 	}
 
 	if protocol != "tcp" && protocol != "http" && protocol != "https" {
-		return "", fmt.Errorf("invalid protocol: %q specifed in annotation: %q", protocol, annLinodeProtocol)
+		return "", fmt.Errorf("invalid protocol: %q specified in annotation: %q", protocol, annLinodeProtocol)
 	}
 
 	return linodego.ConfigProtocol(protocol), nil
@@ -397,29 +418,23 @@ func getHealthCheckType(service *v1.Service) (linodego.ConfigCheck, error) {
 	if !ok {
 		return linodego.CheckConnection, nil
 	}
-	if hType != "connection" && hType != "http" && hType != "http_body" {
-		return "", fmt.Errorf("invalid health check type: %q specifed in annotation: %q", hType, annLinodeHealthCheckType)
+	if hType != "none" && hType != "connection" && hType != "http" && hType != "http_body" {
+		return "", fmt.Errorf("invalid health check type: %q specified in annotation: %q", hType, annLinodeHealthCheckType)
 	}
 	return linodego.ConfigCheck(hType), nil
 }
 
 func isTLSPort(service *v1.Service, port int) (bool, error) {
-	tlsPorts, ok := service.Annotations[annLinodeTLSPorts]
-	if !ok {
-		return false, nil
+	tlsPortsSlice, err := getTLSPorts(service)
+	if err != nil {
+		return false, err
 	}
-	tlsPortsSlice := strings.Split(tlsPorts, ",")
-	for _, p := range tlsPortsSlice {
-		tlsPort, err := strconv.Atoi(p)
-		if err != nil {
-			return false, err
-		}
+	for _, tlsPort := range tlsPortsSlice {
 		if port == tlsPort {
 			return true, nil
 		}
 	}
 	return false, nil
-
 }
 
 // getTLSPorts returns the ports of service that are set to use TLS.
@@ -463,6 +478,8 @@ func getAlgorithm(service *v1.Service) linodego.ConfigAlgorithm {
 		return linodego.AlgorithmLeastConn
 	case "source":
 		return linodego.AlgorithmSource
+	case "round_robin":
+		return linodego.AlgorithmRoundRobin
 	default:
 		return linodego.AlgorithmRoundRobin
 	}
@@ -472,13 +489,14 @@ func getStickiness(service *v1.Service) linodego.ConfigStickiness {
 	stickiness := service.Annotations[annLinodeSessionPersistence]
 
 	switch stickiness {
-	case "none":
-		return linodego.StickinessNone
 	case "http_cookie":
 		return linodego.StickinessHTTPCookie
-	default:
+	case "table":
 		return linodego.StickinessTable
-
+	case "none":
+		return linodego.StickinessNone
+	default:
+		return linodego.StickinessNone
 	}
 }
 
@@ -486,12 +504,32 @@ func getSSLCertInfo(service *v1.Service) (string, string) {
 	cert := service.Annotations[annLinodeSSLCertificate]
 	if cert != "" {
 		cb, _ := base64.StdEncoding.DecodeString(cert)
-		cert = string(cb)
+		cert = strings.TrimSpace(string(cb))
 	}
 	key := service.Annotations[annLinodeSSLKey]
 	if key != "" {
 		kb, _ := base64.StdEncoding.DecodeString(key)
-		key = string(kb)
+		key = strings.TrimSpace(string(kb))
 	}
 	return cert, key
+}
+
+func getConnectionThrottle(service *v1.Service) int {
+	connThrottle := 20
+
+	if connThrottleString := service.Annotations[annLinodeThrottle]; connThrottleString != "" {
+		parsed, err := strconv.Atoi(connThrottleString)
+		if err == nil {
+			if parsed < 0 {
+				parsed = 0
+			}
+
+			if parsed > 20 {
+				parsed = 20
+			}
+			connThrottle = parsed
+		}
+	}
+
+	return connThrottle
 }

@@ -539,7 +539,9 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	case "PUT":
-		if strings.Contains(r.URL.Path, "configs") {
+		if strings.Contains(r.URL.Path, "nodes") {
+			f.t.Fatal("PUT ...nodes is not supported by the mock API")
+		} else if strings.Contains(r.URL.Path, "configs") {
 			parts := strings.Split(r.URL.Path[1:], "/")
 			nbcco := new(linodego.NodeBalancerConfigUpdateOptions)
 			if err := json.NewDecoder(r.Body).Decode(nbcco); err != nil {
@@ -596,6 +598,42 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			_, _ = w.Write(resp)
 			return
+		} else if strings.Contains(r.URL.Path, "nodebalancer") {
+			parts := strings.Split(r.URL.Path[1:], "/")
+			nbuo := new(linodego.NodeBalancerUpdateOptions)
+			if err := json.NewDecoder(r.Body).Decode(nbuo); err != nil {
+				f.t.Fatal(err)
+			}
+			if _, err := strconv.Atoi(parts[1]); err != nil {
+				f.t.Fatal(err)
+			}
+
+			if nb, found := f.nb[parts[1]]; found {
+				if nbuo.ClientConnThrottle != nil {
+					nb.ClientConnThrottle = *nbuo.ClientConnThrottle
+				}
+				if nbuo.Label != nil {
+					nb.Label = nbuo.Label
+				}
+
+				f.nb[strconv.Itoa(nb.ID)] = nb
+				resp, err := json.Marshal(nb)
+				if err != nil {
+					f.t.Fatal(err)
+				}
+				_, _ = w.Write(resp)
+				return
+			}
+
+			w.WriteHeader(404)
+			resp := linodego.APIError{
+				Errors: []linodego.APIErrorReason{
+					{Reason: "Not Found"},
+				},
+			}
+			rr, _ := json.Marshal(resp)
+			_, _ = w.Write(rr)
+
 		}
 	}
 }
