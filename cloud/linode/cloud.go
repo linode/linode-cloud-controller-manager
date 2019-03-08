@@ -68,6 +68,7 @@ func newCloud() (cloudprovider.Interface, error) {
 	if Options.LinodeGoDebug {
 		linodeClient.SetDebug(true)
 	}
+	linodeClient.SetUserAgent(fmt.Sprintf("linode-cloud-controller-manager %s", linodego.DefaultUserAgent))
 
 	// Return struct that satisfies cloudprovider.Interface
 	return &linodeCloud{
