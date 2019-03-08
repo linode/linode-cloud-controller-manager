@@ -100,11 +100,7 @@ When supplying or implying an `https` value for the `service.beta.kubernetes.io/
 * `service.beta.kubernetes.io/linode-loadbalancer-ssl-key`
 * `service.beta.kubernetes.io/linode-loadbalancer-ssl-cert`
 
-## Upstream Documentation Including Deployment Instructions
-
-[Kubernetes Cloud Controller Manager](https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/).
-
-### Generating a Manifest for Deployment
+## Generating a Manifest for Deployment
 
 Use the script located at `./hack/deploy/generate-manifest.sh` to generate a self-contained deployment manifest for the Linode CCM. Two arguments are required.
 
@@ -121,6 +117,15 @@ Example:
 ```
 
 This will create a file `ccm-linode.yaml` which you can use to deploy the CCM.
+
+`kubectl apply -f ccm-linode.yaml`
+
+Note: Your kubelets, controller-manager, and apiserver must be started with `--cloud-provider=external` as noted in the following documentation.
+
+### Upstream Documentation Including Deployment Instructions
+
+[Kubernetes Cloud Controller Manager](https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/).
+
 
 ## Upstream Developer Documentation
 
