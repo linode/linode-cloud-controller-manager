@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ccm-linode
+  namespace: kube-system
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: system:ccm-linode
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  # TODO: make these permissions more fine-grained
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: ccm-linode
+  namespace: kube-system
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ccm-linode
+  labels:
+    app: ccm-linode
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: ccm-linode
+  template:
+    metadata:
+      labels:
+        app: ccm-linode
+    spec:
+      serviceAccountName: ccm-linode
+      nodeSelector:
+        # The CCM will only run on a Node labelled as a master, you may want to change this
+        node-role.kubernetes.io/master: ""
+      tolerations:
+      # The CCM can run on Nodes tainted as masters
+      - key: "node-role.kubernetes.io/master"
+        effect: "NoSchedule"
+      # The CCM is a "critical addon"
+      - key: "CriticalAddonsOnly"
+        operator: "Exists"
+      # This taint is set on all Nodes when an external CCM is used
+      - key: node.cloudprovider.kubernetes.io/uninitialized
+        value: "true"
+        effect: NoSchedule
+      - key: node.kubernetes.io/not-ready
+        operator: Exists
+        effect: NoSchedule
+      - key: node.kubernetes.io/unreachable
+        operator: Exists
+        effect: NoSchedule
+      hostNetwork: true
+      containers:
+      - image: {{ .Image }}
+        imagePullPolicy: Always
+        name: ccm-linode
+        args:
+        - --cloud-provider=linode
+        - --v=3
+        volumeMounts:
+        - mountPath: /etc/kubernetes
+          name: k8s
+        env:
+        - name: LINODE_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: linode
+              key: token
+        - name: LINODE_REGION
+          valueFrom:
+            secretKeyRef:
+              name: linode
+              key: region
+      volumes:
+      - name: k8s
+        hostPath:
+          path: /etc/kubernetes
