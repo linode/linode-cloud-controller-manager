@@ -31,7 +31,7 @@ func (f *Framework) DeleteManifest() error {
 	return ApplyManifest("delete", data)
 }
 
-func (f *Framework) readManifest() (string, error)  {
+func (f *Framework) readManifest() (string, error) {
 	dir, err := os.Getwd()
 	if err != nil {
 		return "", err
@@ -54,12 +54,3 @@ func (f *Framework) readManifest() (string, error)  {
 	}
 	return tmplBuf.String(), nil
 }
-
-func (f *Framework) WaitForReadyDriver() error  {
-	return nil
-	/*return wait.Poll(retryInterval, retryTimout, func() (bool, error) {
-		f.kubeClient.AppsV1().DaemonSets(core.NamespaceSystem).Get("csi-linode-node", metav1.GetOptions{})
-	} )
-*/
-}
-

@@ -1,6 +1,5 @@
 package framework
 
-
 import (
 	"github.com/appscode/go/crypto/rand"
 	"k8s.io/client-go/kubernetes"
@@ -8,24 +7,23 @@ import (
 )
 
 var (
-	Image = "linode/linode-cloud-controller-manager:latest"
-	ApiToken =""
+	Image    = "linode/linode-cloud-controller-manager:latest"
+	ApiToken = ""
 
-	testServerResourceName      = "e2e-test-server-" + rand.Characters(5)
-	testServerHTTPSResourceName = "e2e-test-server-https-" + rand.Characters(5)
-	emptyServiceName            = "e2e-empty-" + rand.Characters(5)
+	KubeConfigFile         = ""
+	testServerResourceName = "e2e-test-server-" + rand.Characters(5)
 )
 
 const (
-	MaxRetry   = 100
+	MaxRetry        = 100
 	testServerImage = "appscode/test-server:2.3"
 )
 
 type Framework struct {
 	restConfig *rest.Config
 	kubeClient kubernetes.Interface
-	namespace    string
-	name         string
+	namespace  string
+	name       string
 }
 
 func New(
@@ -33,14 +31,13 @@ func New(
 	kubeClient kubernetes.Interface,
 ) *Framework {
 	return &Framework{
-		restConfig:restConfig,
-		kubeClient:kubeClient,
+		restConfig: restConfig,
+		kubeClient: kubeClient,
 
-		name:         "cloud-controller-manager",
-		namespace:    rand.WithUniqSuffix("ccm"),
+		name:      "cloud-controller-manager",
+		namespace: rand.WithUniqSuffix("ccm"),
 	}
 }
-
 
 func (f *Framework) Invoke() *Invocation {
 	r := &rootInvocation{
@@ -49,7 +46,7 @@ func (f *Framework) Invoke() *Invocation {
 	}
 	return &Invocation{
 		rootInvocation: r,
-		LoadBalancer: &lbInvocation{rootInvocation: r},
+		LoadBalancer:   &lbInvocation{rootInvocation: r},
 	}
 }
 

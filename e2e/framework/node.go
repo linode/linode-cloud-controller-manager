@@ -9,7 +9,7 @@ const (
 )
 
 func (i *Invocation) GetNodeList() ([]string, error) {
-	workers := make([]string,0)
+	workers := make([]string, 0)
 	nodes, err := i.kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err

@@ -2,15 +2,15 @@ package e2e_test
 
 import (
 	"flag"
-	"github.com/linode/linode-cloud-controller-manager/test/e2e/framework"
+	"github.com/appscode/go/crypto/rand"
+	"github.com/linode/linode-cloud-controller-manager/e2e/framework"
+	"github.com/onsi/ginkgo/reporters"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 	"os"
 	"path/filepath"
 	"testing"
-	"github.com/appscode/go/crypto/rand"
-	"github.com/onsi/ginkgo/reporters"
-	"k8s.io/client-go/util/homedir"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/kubernetes"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -19,17 +19,16 @@ import (
 
 var (
 	useExisting = false
-	kubecofigFile = filepath.Join(homedir.HomeDir(), ".kube/config")
+	dlt         = false
 	ClusterName = rand.WithUniqSuffix("ccm-linode")
 )
 
-
-func init()  {
+func init() {
 	flag.StringVar(&framework.Image, "image", framework.Image, "registry/repository:tag")
 	flag.StringVar(&framework.ApiToken, "api-token", os.Getenv("LINODE_API_TOKEN"), "linode api token")
-
+	flag.BoolVar(&dlt, "delete", dlt, "Delete cluster after test")
 	flag.BoolVar(&useExisting, "use-existing", useExisting, "Use existing kubernetes cluster")
-	flag.StringVar(&kubecofigFile, "kubeconfig", kubecofigFile, "To use existing cluster provide kubeconfig file" )
+	flag.StringVar(&framework.KubeConfigFile, "kubeconfig", filepath.Join(homedir.HomeDir(), ".kube/config"), "To use existing cluster provide kubeconfig file")
 }
 
 const (
@@ -40,7 +39,6 @@ var (
 	root *framework.Framework
 )
 
-
 func TestE2e(t *testing.T) {
 	RegisterFailHandler(Fail)
 	SetDefaultEventuallyTimeout(TIMEOUT)
@@ -50,18 +48,18 @@ func TestE2e(t *testing.T) {
 
 }
 
-var _ = BeforeSuite (func() {
+var _ = BeforeSuite(func() {
 
 	if !useExisting {
 		err := framework.CreateCluster(ClusterName)
 		Expect(err).NotTo(HaveOccurred())
 		dir, err := os.Getwd()
 		Expect(err).NotTo(HaveOccurred())
-		kubecofigFile = filepath.Join(dir, ClusterName+".conf")
+		framework.KubeConfigFile = filepath.Join(dir, ClusterName+".conf")
 	}
 
-	By("Using kubeconfig from " + kubecofigFile)
-	config, err := clientcmd.BuildConfigFromFlags("", kubecofigFile)
+	By("Using kubeconfig from " + framework.KubeConfigFile)
+	config, err := clientcmd.BuildConfigFromFlags("", framework.KubeConfigFile)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Clients
@@ -70,28 +68,19 @@ var _ = BeforeSuite (func() {
 	// Framework
 	root = framework.New(config, kubeClient)
 
-	By("Using namespace " + root.Namespace())
-
-	// Create namespace
+	By("Using Namespace " + root.Namespace())
 	err = root.CreateNamespace()
 	Expect(err).NotTo(HaveOccurred())
 
+	By("Creating Manifest")
 	err = root.ApplyManifest()
 	Expect(err).NotTo(HaveOccurred())
 
 })
 
 var _ = AfterSuite(func() {
-	/*err := root.DeleteManifest()
-	Expect(err).NotTo(HaveOccurred())*/
-
-
-	if !useExisting {
-		err := framework.DeleteCluster()
+	if dlt || !useExisting {
+		err := framework.DeleteCluster(ClusterName)
 		Expect(err).NotTo(HaveOccurred())
 	}
-
-
-
 })
-

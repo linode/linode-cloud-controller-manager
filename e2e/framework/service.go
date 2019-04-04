@@ -2,11 +2,12 @@ package framework
 
 import (
 	"fmt"
+	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"github.com/pkg/errors"
 	"net/url"
 	"time"
 )
@@ -21,12 +22,38 @@ func (i *lbInvocation) CreateService(selector map[string]string) error {
 			},
 		},
 		Spec: core.ServiceSpec{
-			Ports: i.testServerServicePorts(),
+			Ports:    i.testServerServicePorts(),
 			Selector: selector,
-			Type: core.ServiceTypeLoadBalancer,
+			Type:     core.ServiceTypeLoadBalancer,
 		},
 	})
+	if err != nil {
+		return err
+	}
 
+	return i.waitForServerReady()
+}
+
+func (i *lbInvocation) DeleteService() error {
+	err := i.kubeClient.CoreV1().Services(i.Namespace()).Delete(testServerResourceName, nil)
+	return err
+}
+
+func (i *lbInvocation) waitForServerReady() error {
+	var err error
+	var ep *core.Endpoints
+	for it := 0; it < MaxRetry; it++ {
+		ep, err = i.kubeClient.CoreV1().Endpoints(i.Namespace()).Get(testServerResourceName, metav1.GetOptions{})
+		if err == nil {
+			if len(ep.Subsets) > 0 {
+				if len(ep.Subsets[0].Addresses) > 0 {
+					break
+				}
+			}
+		}
+		glog.Infoln("Waiting for TestServer to be ready")
+		time.Sleep(time.Second * 5)
+	}
 	return err
 }
 
@@ -35,7 +62,7 @@ func (i *lbInvocation) getLoadBalancerURLs() ([]string, error) {
 
 	svc, err := i.GetServiceWithLoadBalancerStatus(testServerResourceName, i.Namespace())
 	if err != nil {
-		return  serverAddr, err
+		return serverAddr, err
 	}
 
 	ips := make([]string, 0)
@@ -83,7 +110,6 @@ func (i *lbInvocation) GetServiceWithLoadBalancerStatus(name, namespace string) 
 	}
 	return svc, nil
 }
-
 
 func (i *lbInvocation) testServerServicePorts() []core.ServicePort {
 	return []core.ServicePort{
