@@ -1,9 +1,9 @@
-package e2e_test
+package test
 
 import (
+	"e2e_test/test/framework"
 	"flag"
 	"github.com/appscode/go/crypto/rand"
-	"github.com/linode/linode-cloud-controller-manager/e2e/framework"
 	"github.com/onsi/ginkgo/reporters"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -80,7 +80,7 @@ var _ = BeforeSuite(func() {
 
 var _ = AfterSuite(func() {
 	if dlt || !useExisting {
-		err := framework.DeleteCluster(ClusterName)
-		Expect(err).NotTo(HaveOccurred())
+		//err := framework.DeleteCluster(ClusterName)
+		//Expect(err).NotTo(HaveOccurred())
 	}
 })

@@ -1,10 +1,10 @@
-package e2e_test
+package test
 
 import (
+	"e2e_test/test/framework"
 	"fmt"
 	"github.com/appscode/go/wait"
 	"github.com/codeskyblue/go-sh"
-	"github.com/linode/linode-cloud-controller-manager/e2e/framework"
 	"strings"
 
 	. "github.com/onsi/ginkgo"
@@ -87,7 +87,7 @@ var _ = Describe("CloudControllerManager", func() {
 
 					var counter1, counter2 int
 
-					By("Waiting for Response from the LoadBalancer url: "+eps[0])
+					By("Waiting for Response from the LoadBalancer url: " + eps[0])
 					err = wait.PollImmediate(framework.RetryInterval, framework.RetryTimout, func() (bool, error) {
 						resp, err := sh.Command("curl", "--max-time", "5", "-s", eps[0]).Output()
 						if err != nil {
@@ -95,10 +95,10 @@ var _ = Describe("CloudControllerManager", func() {
 						}
 						stringResp := string(resp)
 						if strings.Contains(stringResp, pods[0]) {
-							fmt.Println("Got response from "+pods[0])
+							fmt.Println("Got response from " + pods[0])
 							counter1++
 						} else if strings.Contains(stringResp, pods[1]) {
-							fmt.Println("Got response from "+pods[1])
+							fmt.Println("Got response from " + pods[1])
 							counter2++
 						}
 
