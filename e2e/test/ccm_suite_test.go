@@ -49,7 +49,6 @@ func TestE2e(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-
 	if !useExisting {
 		err := framework.CreateCluster(ClusterName)
 		Expect(err).NotTo(HaveOccurred())
@@ -79,8 +78,8 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
-	if dlt || !useExisting {
-		//err := framework.DeleteCluster(ClusterName)
-		//Expect(err).NotTo(HaveOccurred())
+	if dlt || !useExisting{
+		err := framework.DeleteCluster(ClusterName)
+		Expect(err).NotTo(HaveOccurred())
 	}
 })
