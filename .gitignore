@@ -34,3 +34,5 @@ dist/
 .vscode/
 coverage.txt
 *.coverprofile
+
+junit.xml
