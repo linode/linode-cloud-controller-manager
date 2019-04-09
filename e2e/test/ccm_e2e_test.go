@@ -3,9 +3,10 @@ package test
 import (
 	"e2e_test/test/framework"
 	"fmt"
+	"strings"
+
 	"github.com/appscode/go/wait"
 	"github.com/codeskyblue/go-sh"
-	"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

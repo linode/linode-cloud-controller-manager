@@ -3,15 +3,16 @@ package test
 import (
 	"e2e_test/test/framework"
 	"flag"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
 	"github.com/appscode/go/crypto/rand"
 	"github.com/onsi/ginkgo/reporters"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
-	"os"
-	"path/filepath"
-	"testing"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -78,7 +79,7 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
-	if dlt || !useExisting{
+	if dlt || !useExisting {
 		err := framework.DeleteCluster(ClusterName)
 		Expect(err).NotTo(HaveOccurred())
 	}

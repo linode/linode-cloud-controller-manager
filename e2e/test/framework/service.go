@@ -2,14 +2,15 @@ package framework
 
 import (
 	"fmt"
+	"net/url"
+	"time"
+
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"net/url"
-	"time"
 )
 
 func (i *lbInvocation) CreateService(selector map[string]string) error {

@@ -631,7 +631,7 @@ func Test_getNodeInternalIp(t *testing.T) {
 				Status: v1.NodeStatus{
 					Addresses: []v1.NodeAddress{
 						{
-							Type: v1.NodeInternalIP,
+							Type:    v1.NodeInternalIP,
 							Address: "127.0.0.1",
 						},
 					},
@@ -645,7 +645,7 @@ func Test_getNodeInternalIp(t *testing.T) {
 				Status: v1.NodeStatus{
 					Addresses: []v1.NodeAddress{
 						{
-							Type: v1.NodeExternalIP,
+							Type:    v1.NodeExternalIP,
 							Address: "127.0.0.1",
 						},
 					},
@@ -884,7 +884,7 @@ func testEnsureLoadBalancer(t *testing.T, client *linodego.Client) {
 					Status: v1.NodeStatus{
 						Addresses: []v1.NodeAddress{
 							{
-								Type: v1.NodeInternalIP,
+								Type:    v1.NodeInternalIP,
 								Address: "127.0.0.1",
 							},
 						},
@@ -897,7 +897,7 @@ func testEnsureLoadBalancer(t *testing.T, client *linodego.Client) {
 					Status: v1.NodeStatus{
 						Addresses: []v1.NodeAddress{
 							{
-								Type:v1.NodeInternalIP,
+								Type:    v1.NodeInternalIP,
 								Address: "127.0.0.2",
 							},
 						},
@@ -910,7 +910,7 @@ func testEnsureLoadBalancer(t *testing.T, client *linodego.Client) {
 					Status: v1.NodeStatus{
 						Addresses: []v1.NodeAddress{
 							{
-								Type: v1.NodeInternalIP,
+								Type:    v1.NodeInternalIP,
 								Address: "127.0.0.3",
 							},
 						},

@@ -1,7 +1,7 @@
 export GO111MODULE=on
 
 imports: $(GOPATH)/bin/goimports
-	goimports -w *.go cloud
+	goimports -w test
 
 gingko_test: $(GOPATH)/bin/ginkgo
 	@if [ -z "${LINODE_API_TOKEN}" ]; then\
