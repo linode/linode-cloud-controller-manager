@@ -46,9 +46,7 @@ Annotation (Suffix) | Values | Default | Description
 `protocol` | `tcp`, `http`, `https` | `tcp` | This annotation is used to specify the default protocol for Linode NodeBalancer. For ports specified in the `linode-loadbalancer-tls-ports` annotation, this protocol is overwritten to `https`
 `stickiness` | `none`, `table`, `http_cookie` | `none` | Controls how session stickiness is handled on this port.
 `algorithm` | `round_robin`, `least_connections` | `round_robin` | Specifies which algorithm the Linode NodeBalancer should use
-`tls-ports` | int (e.g. `443,6443,7443`) | | This annotation specifies the ports the NodeBalancer should use for `https`
-`ssl-cert` | string | | The Base64 Encoded SSL certificates for this service. The full certificate chain may be provided. (`base64 -w0 ssl.crt`)
-`ssl-key` | string | | The Base64 Encoded private key corresponding to this port's certificate.  The key can not be passphrase protected. (`base64 -w0 ssl.key`)
+`tls` | json array (e.g. `[ { "tls-secret-name": "prod-app-tls", "port": 443}, {"tls-secret-name": "dev-app-tls", "port": 8443} ]`) | | Specifies TLS ports with their corresponding secrets, the secret type should be `kubernetes.io/tls`
 `check-type` | `none`, `connection`, `http`, `http_body` | | The type of health check to perform against back-ends to ensure they are serving requests
 `check-path` | string | | The URL path to check on each back-end during health checks
 `check-body` | string | | Text which must be present in the response body to pass the NodeBalancer health check
