@@ -71,11 +71,6 @@ var _ = BeforeSuite(func() {
 	By("Using Namespace " + root.Namespace())
 	err = root.CreateNamespace()
 	Expect(err).NotTo(HaveOccurred())
-
-	By("Creating Manifest")
-	err = root.ApplyManifest()
-	Expect(err).NotTo(HaveOccurred())
-
 })
 
 var _ = AfterSuite(func() {

@@ -6,6 +6,7 @@ set -o nounset
 
 export LINODE_API_TOKEN="$1"
 export CLUSTER_NAME="$2"
+export IMAGE="$3"
 
 
 cat > cluster.tf <<EOF
@@ -28,6 +29,7 @@ module "k8s" {
   source  = "git::https://github.com/linode/terraform-linode-k8s.git?ref=for-cli"
   linode_token = "${LINODE_API_TOKEN}"
   linode_group = "${CLUSTER_NAME}"
+  ccm_image = "${IMAGE}"
   server_type_node = "\${var.server_type_node}"
   nodes = "\${var.nodes}"
   server_type_master = "\${var.server_type_master}"
