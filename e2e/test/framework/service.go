@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func (i *lbInvocation) CreateService(selector map[string]string, annotations map[string]string) error {
+func (i *lbInvocation) CreateService(selector, annotations map[string]string, ports []core.ServicePort) error {
 	_, err := i.kubeClient.CoreV1().Services(i.Namespace()).Create(&core.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        testServerResourceName,
@@ -24,7 +24,7 @@ func (i *lbInvocation) CreateService(selector map[string]string, annotations map
 			},
 		},
 		Spec: core.ServiceSpec{
-			Ports:    i.testServerServicePorts(),
+			Ports:    ports,
 			Selector: selector,
 			Type:     core.ServiceTypeLoadBalancer,
 		},

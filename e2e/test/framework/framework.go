@@ -16,7 +16,7 @@ var (
 
 const (
 	MaxRetry        = 100
-	testServerImage = "appscode/test-server:2.3"
+	TestServerImage = "appscode/test-server:2.3"
 )
 
 type Framework struct {
