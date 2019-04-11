@@ -2,13 +2,13 @@ package test
 
 import (
 	"e2e_test/test/framework"
-	"fmt"
 	"github.com/appscode/go/wait"
 	"github.com/codeskyblue/go-sh"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"log"
 	"strings"
 )
 
@@ -69,7 +69,7 @@ var _ = Describe("CloudControllerManager", func() {
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	PDescribe("Test", func() {
+	Describe("Test", func() {
 		Context("Simple", func() {
 			Context("Load Balancer", func() {
 				var (
@@ -128,10 +128,10 @@ var _ = Describe("CloudControllerManager", func() {
 						}
 						stringResp := string(resp)
 						if strings.Contains(stringResp, pods[0]) {
-							fmt.Println("Got response from " + pods[0])
+							log.Println("Got response from " + pods[0])
 							counter1++
 						} else if strings.Contains(stringResp, pods[1]) {
-							fmt.Println("Got response from " + pods[1])
+							log.Println("Got response from " + pods[1])
 							counter2++
 						}
 
@@ -215,7 +215,7 @@ var _ = Describe("CloudControllerManager", func() {
 				})
 			})
 
-			Context("With Multiple TLS Port", func() {
+			Context("With Multiple TLS Ports", func() {
 				var (
 					pods        []string
 					labels      map[string]string
@@ -297,7 +297,71 @@ var _ = Describe("CloudControllerManager", func() {
 					}
 				})
 			})
+
+			Context("With Multiple HTTP Ports", func() {
+				var (
+					pods   []string
+					labels map[string]string
+				)
+
+				BeforeEach(func() {
+					pods = []string{"test-pod"}
+					ports := []core.ContainerPort{
+						{
+							Name:          "http-1",
+							ContainerPort: 8080,
+						},
+						{
+							Name:          "http-2",
+							ContainerPort: 8989,
+						},
+					}
+					servicePorts := []core.ServicePort{
+						{
+							Name:       "http-1",
+							Port:       80,
+							TargetPort: intstr.FromInt(8080),
+							Protocol:   "TCP",
+						},
+						{
+							Name:       "http-2",
+							Port:       8888,
+							TargetPort: intstr.FromInt(8989),
+							Protocol:   "TCP",
+						},
+					}
+					labels = map[string]string{
+						"app": "test-loadbalancer",
+					}
+
+					By("Creating Pods")
+					createPodWithLabel(pods, ports, framework.TestServerImage, labels, true)
+
+					By("Creating Service")
+					createServiceWithSelector(labels, servicePorts)
+				})
+
+				AfterEach(func() {
+					By("Deleting the Pods")
+					deletePods(pods)
+
+					By("Deleting the Service")
+					deleteService()
+				})
+
+				It("should reach all pods", func() {
+					By("Checking TCP Response")
+					eps, err := f.LoadBalancer.GetHTTPEndpoints()
+					Expect(err).NotTo(HaveOccurred())
+					Expect(len(eps)).Should(BeNumerically(">=", 1))
+
+					By("Waiting for Response from the LoadBalancer url: " + eps[0] + " " + eps[1])
+					for _, ep := range eps {
+						err = framework.WaitForHTTPResponse(ep, pods[0])
+						Expect(err).NotTo(HaveOccurred())
+					}
+				})
+			})
 		})
 	})
-
 })

@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"github.com/appscode/go/wait"
 	"github.com/golang/glog"
 	"io/ioutil"
@@ -115,7 +114,7 @@ func getHTTPSResponse(domain, ip, port string) (string, error) {
 	}
 	client := &http.Client{Transport: tr}
 
-	fmt.Println("Waiting for response from https://" + ip + ":" + port)
+	log.Println("Waiting for response from https://" + ip + ":" + port)
 	u := "https://" + domain + ":" + port
 	req, err := http.NewRequest(http.MethodGet, u, nil)
 	if err != nil {
@@ -136,9 +135,9 @@ func getHTTPSResponse(domain, ip, port string) (string, error) {
 	return bodyString, nil
 }
 
-func WaitForHTTPSResponse(ep string, podName string) error {
+func WaitForHTTPSResponse(link string, podName string) error {
 	return wait.PollImmediate(RetryInterval, RetryTimout, func() (bool, error) {
-		u, err := url.Parse(ep)
+		u, err := url.Parse(link)
 		if err != nil {
 			return false, nil
 		}
@@ -150,7 +149,37 @@ func WaitForHTTPSResponse(ep string, podName string) error {
 		}
 
 		if strings.Contains(resp, podName) {
-			fmt.Println("Got response from " + podName + " using url " + ep)
+			log.Println("Got response from " + podName + " using url " + link)
+			return true, nil
+		}
+
+		return false, nil
+	})
+}
+
+func getHTTPResponse(link string) (bool, string, error) {
+	resp, err := http.Get(link)
+	if err != nil {
+		return false, "", err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return false, "", err
+	}
+
+	return resp.StatusCode == 200, string(bodyBytes), nil
+}
+
+func WaitForHTTPResponse(link string, podName string) error {
+	return wait.PollImmediate(RetryInterval, RetryTimout, func() (bool, error) {
+		ok, _, err := getHTTPResponse(link)
+		if err != nil {
+			return false, nil
+		}
+		if ok {
+			log.Println("Got response from " + podName + " using url " + link)
 			return true, nil
 		}
 
