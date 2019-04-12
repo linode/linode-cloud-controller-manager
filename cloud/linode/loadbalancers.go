@@ -353,27 +353,21 @@ func (l *loadbalancers) buildNodeBalancerConfig(service *v1.Service, port int) (
 	return config, nil
 }
 
-func (l *loadbalancers) processHTTPS(service *v1.Service, nbConfig *linodego.NodeBalancerConfig, port int) error  {
+func (l *loadbalancers) processHTTPS(service *v1.Service, nbConfig *linodego.NodeBalancerConfig, port int) error {
 	if err := l.retrieveKubeClient(); err != nil {
-		return  err
+		return err
 	}
 	tlsAnnotations, err := getTLSAnnotations(service)
 	if err != nil {
-		return  err
+		return err
 	}
 
-	tlsPorts, err := getTLSPorts(tlsAnnotations)
-	if err != nil {
-		return  err
-	}
-	isTLS, err := isTLSPort(tlsPorts, port)
-	if err != nil {
-		return  err
-	}
+	tlsPorts := getTLSPorts(tlsAnnotations)
+	isTLS := isTLSPort(tlsPorts, port)
 	if isTLS {
 		nbConfig.SSLCert, nbConfig.SSLKey, err = getTLSCertInfo(l.kubeClient, tlsAnnotations, service.Namespace, port)
 		if err != nil {
-			return  err
+			return err
 		}
 	}
 	return nil
@@ -415,15 +409,18 @@ func (l *loadbalancers) buildNodeBalancerNodeCreateOptions(node *v1.Node, nodePo
 }
 
 func (l *loadbalancers) retrieveKubeClient() error {
-	kubeConfig, err := rest.InClusterConfig()
-	if err != nil {
-		return err
+	if l.kubeClient != nil {
+		kubeConfig, err := rest.InClusterConfig()
+		if err != nil {
+			return err
+		}
+
+		l.kubeClient, err = kubernetes.NewForConfig(kubeConfig)
+		if err != nil {
+			return err
+		}
 	}
 
-	l.kubeClient, err = kubernetes.NewForConfig(kubeConfig)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -452,23 +449,23 @@ func getHealthCheckType(service *v1.Service) (linodego.ConfigCheck, error) {
 	return linodego.ConfigCheck(hType), nil
 }
 
-func isTLSPort(tlsPortsSlice []int, port int) (bool, error) {
+func isTLSPort(tlsPortsSlice []int, port int) bool {
 	for _, tlsPort := range tlsPortsSlice {
 		if port == tlsPort {
-			return true, nil
+			return true
 		}
 	}
-	return false, nil
+	return false
 }
 
 // getTLSPorts returns the ports of service that are set to use TLS.
-func getTLSPorts(tlsAnnotations []*tlsAnnotation) ([]int, error) {
+func getTLSPorts(tlsAnnotations []*tlsAnnotation) []int {
 	tlsPortsInt := make([]int, 0)
 	for _, tlsAnnotation := range tlsAnnotations {
 		tlsPortsInt = append(tlsPortsInt, tlsAnnotation.Port)
 	}
 
-	return tlsPortsInt, nil
+	return tlsPortsInt
 }
 
 func getTLSAnnotations(service *v1.Service) ([]*tlsAnnotation, error) {
