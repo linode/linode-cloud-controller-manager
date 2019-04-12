@@ -34,5 +34,5 @@ script:
   - make test
   - make docker-build
   - golangci-lint run
-  - travis_wait 20 roveralls
+  - travis_wait 20 roveralls -ignore e2e
   - goveralls -coverprofile=roveralls.coverprofile -service=travis-ci
