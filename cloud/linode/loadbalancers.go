@@ -33,13 +33,6 @@ const (
 	annLinodeHealthCheckPassive  = "service.beta.kubernetes.io/linode-loadbalancer-check-passive"
 	annLinodeLoadBalancerTLS     = "service.beta.kubernetes.io/linode-loadbalancer-tls"
 
-	annLinodeSessionPersistence = "service.beta.kubernetes.io/linode-loadbalancer-stickiness"
-
-	// annLinodeAlgorithm is the annotation specifying which algorithm Linode loadbalancer
-	// should use. Options are round_robin and least_connections. Defaults
-	// to round_robin.
-	annLinodeAlgorithm = "service.beta.kubernetes.io/linode-loadbalancer-algorithm"
-
 	// annLinodeThrottle is the annotation specifying the value of the Client Connection
 	// Throttle, which limits the number of subsequent new connections per second from the
 	// same client IP. Options are a number between 1-20, or 0 to disable. Defaults to 20.
@@ -293,8 +286,6 @@ func (l *loadbalancers) buildNodeBalancerConfig(service *v1.Service, port int) (
 	config := linodego.NodeBalancerConfig{
 		Port:       port,
 		Protocol:   protocol,
-		Algorithm:  getAlgorithm(service),
-		Stickiness: getStickiness(service),
 		Check:      health,
 	}
 
@@ -489,38 +480,6 @@ func getNodeInternalIp(node *v1.Node) string {
 		}
 	}
 	return ""
-}
-
-// getAlgorithm returns the load balancing algorithm to use for service.
-// round_robin is returned when service does not specify an algorithm.
-func getAlgorithm(service *v1.Service) linodego.ConfigAlgorithm {
-	algo := service.Annotations[annLinodeAlgorithm]
-
-	switch algo {
-	case "least_connections":
-		return linodego.AlgorithmLeastConn
-	case "source":
-		return linodego.AlgorithmSource
-	case "round_robin":
-		return linodego.AlgorithmRoundRobin
-	default:
-		return linodego.AlgorithmRoundRobin
-	}
-}
-
-func getStickiness(service *v1.Service) linodego.ConfigStickiness {
-	stickiness := service.Annotations[annLinodeSessionPersistence]
-
-	switch stickiness {
-	case "http_cookie":
-		return linodego.StickinessHTTPCookie
-	case "table":
-		return linodego.StickinessTable
-	case "none":
-		return linodego.StickinessNone
-	default:
-		return linodego.StickinessNone
-	}
 }
 
 func getTLSCertInfo(kubeClient kubernetes.Interface, tlsAnnotations []*tlsAnnotation, namespace string, port int) (string, string, error) {
