@@ -409,7 +409,7 @@ func (l *loadbalancers) buildNodeBalancerNodeCreateOptions(node *v1.Node, nodePo
 }
 
 func (l *loadbalancers) retrieveKubeClient() error {
-	if l.kubeClient != nil {
+	if l.kubeClient == nil {
 		kubeConfig, err := rest.InClusterConfig()
 		if err != nil {
 			return err
