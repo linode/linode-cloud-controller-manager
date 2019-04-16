@@ -15,13 +15,13 @@ fmt: vet $(GOPATH)/bin/goimports
 	# goimports runs a gofmt
 	goimports -w *.go cloud
 
-build: fmt
+build: test fmt
 	go build -o dist/linode-cloud-controller-manager github.com/linode/linode-cloud-controller-manager
 
 test: $(GOPATH)/bin/ginkgo
 	ginkgo -r --v --progress --trace --cover --skipPackage=test -- --v=3
 
-docker-build: test build
+docker-build: build
 	docker build . -t ${IMG}
 
 docker-push:
