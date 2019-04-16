@@ -1,14 +1,15 @@
 export GO111MODULE=on
+IMG ?= fahimabrar/linode-cloud-controller-manager:lka2
 
 imports: $(GOPATH)/bin/goimports
 	goimports -w test
 
-gingko_test: $(GOPATH)/bin/ginkgo
+ginkgo_test: $(GOPATH)/bin/ginkgo
 	@if [ -z "${LINODE_API_TOKEN}" ]; then\
 		echo "Skipping Test, LINODE_API_TOKEN is not set";\
 	else \
 		go list -m; \
-		ginkgo -r --v --progress --trace --cover -- --v=3; \
+		ginkgo -r --v --progress --trace --cover -- --v=3 --image=${IMG}; \
 	fi
 
 install-terraform:
