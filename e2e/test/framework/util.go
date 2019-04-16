@@ -4,8 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"github.com/appscode/go/wait"
-	"github.com/golang/glog"
 	"io/ioutil"
 	"log"
 	"net"
@@ -16,6 +14,9 @@ import (
 	"path"
 	"strings"
 	"time"
+
+	"github.com/appscode/go/wait"
+	"github.com/golang/glog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

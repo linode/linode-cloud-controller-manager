@@ -2,14 +2,15 @@ package test
 
 import (
 	"e2e_test/test/framework"
+	"log"
+	"strings"
+
 	"github.com/appscode/go/wait"
 	"github.com/codeskyblue/go-sh"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"log"
-	"strings"
 )
 
 var _ = Describe("CloudControllerManager", func() {
