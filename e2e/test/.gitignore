@@ -1,0 +1,2 @@
+# dont commit temporary kubeconfigs written here by Terraform
+*.conf

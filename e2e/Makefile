@@ -4,7 +4,8 @@ IMG ?= fahimabrar/linode-cloud-controller-manager:lka2
 imports: $(GOPATH)/bin/goimports
 	goimports -w test
 
-ginkgo_test: $(GOPATH)/bin/ginkgo
+.PHONY: test
+test: $(GOPATH)/bin/ginkgo
 	@if [ -z "${LINODE_API_TOKEN}" ]; then\
 		echo "Skipping Test, LINODE_API_TOKEN is not set";\
 	else \
