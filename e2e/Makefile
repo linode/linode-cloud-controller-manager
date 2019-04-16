@@ -1,5 +1,5 @@
 export GO111MODULE=on
-IMG ?= fahimabrar/linode-cloud-controller-manager:lka2
+IMG ?= linode/linode-cloud-controller-manager:latest
 
 imports: $(GOPATH)/bin/goimports
 	goimports -w test
@@ -18,3 +18,4 @@ install-terraform:
 	wget https://releases.hashicorp.com/terraform/0.11.13/terraform_0.11.13_linux_amd64.zip
 	unzip terraform_0.11.13_linux_amd64.zip
 	sudo mv terraform /usr/local/bin/
+

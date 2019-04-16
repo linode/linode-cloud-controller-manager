@@ -1,2 +1,5 @@
-# dont commit temporary kubeconfigs written here by Terraform
+# dont commit temporary files written here by Terraform
 *.conf
+cluster.tf
+terraform*
+.terraform

@@ -4,6 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"reflect"
+	"testing"
+
 	"github.com/linode/linodego"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -11,10 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"net/http"
-	"net/http/httptest"
-	"reflect"
-	"testing"
 )
 
 func TestCCMLoadBalancers(t *testing.T) {
@@ -1186,10 +1187,10 @@ bSiPJQsGIKtQvyCaZY2szyOoeUGgOId+He7ITlezxKrjdj+1pLMESvAxKeo=
 
 func Test_isTLSPort(t *testing.T) {
 	testcases := []struct {
-		name      string
-		tlsPorts  []int
-		port      int
-		ok        bool
+		name     string
+		tlsPorts []int
+		port     int
+		ok       bool
 	}{
 		{
 			name:     "Test TLS port",
