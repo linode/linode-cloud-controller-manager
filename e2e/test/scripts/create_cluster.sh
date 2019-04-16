@@ -27,6 +27,7 @@ variable "ssh_public_key" {
 }
 module "k8s" {
   source  = "git::https://github.com/linode/terraform-linode-k8s.git?ref=for-cli"
+  k8s_version = "v1.13.5"
   linode_token = "${LINODE_API_TOKEN}"
   linode_group = "${CLUSTER_NAME}"
   ccm_image = "${IMAGE}"
