@@ -44,8 +44,6 @@ Annotation (Suffix) | Values | Default | Description
 ---|---|---|---
 `throttle` | `0`-`20` (`0` to disable) | `20` | Client Connection Throttle, which limits the number of subsequent new connections per second from the same client IP
 `protocol` | `tcp`, `http`, `https` | `tcp` | This annotation is used to specify the default protocol for Linode NodeBalancer. For ports specified in the `linode-loadbalancer-tls-ports` annotation, this protocol is overwritten to `https`
-`stickiness` | `none`, `table`, `http_cookie` | `none` | Controls how session stickiness is handled on this port.
-`algorithm` | `round_robin`, `least_connections` | `round_robin` | Specifies which algorithm the Linode NodeBalancer should use
 `tls` | json array (e.g. `[ { "tls-secret-name": "prod-app-tls", "port": 443}, {"tls-secret-name": "dev-app-tls", "port": 8443} ]`) | | Specifies TLS ports with their corresponding secrets, the secret type should be `kubernetes.io/tls`
 `check-type` | `none`, `connection`, `http`, `http_body` | | The type of health check to perform against back-ends to ensure they are serving requests
 `check-path` | string | | The URL path to check on each back-end during health checks
@@ -87,16 +85,39 @@ spec:
   sessionAffinity: None
 ```
 
-#### SSL Termination
+## Why `stickiness` and `algorithm` annotations don't exit
 
-Linode NodeBalancers include SSL Termination features which are described in the official [NodeBalancer SSL Configuration](https://www.linode.com/docs/platform/nodebalancer/nodebalancer-ssl-configuration/#install-the-ssl-certificate-and-private-key-on-your-nodebalancer) guide.  Supplemental  details can be found in the [Linode APIv4 NodeBalancer: Create Config](https://developers.linode.com/api/docs/v4#operation/createNodeBalancerConfig) documentation.
+As kube-proxy will simply double-hop the traffic to a random backend Pod anyway, it doesn't matter which backend Node traffic is forwarded-to for the sake of session stickiness.
+So these annotations are not necessary to implement session stickiness. 
 
-When using these features in the Cloud Controller Manager, it is important to provide all of the required parameters and properly formatted values.
+## How to use sessionAffinity
 
-When supplying or implying an `https` value for the `service.beta.kubernetes.io/linode-loadbalancer-protocol` annotation, the following annotations are required:
+In Kubernetes, sessionAffinity refers to a mechanism that allows a client always to be redirected to the same pod when the client hits a service.
 
-* `service.beta.kubernetes.io/linode-loadbalancer-ssl-key`
-* `service.beta.kubernetes.io/linode-loadbalancer-ssl-cert`
+To enable sessionAffinity `service.spec.sessionAffinity` field must be set to `ClientIP` as the following service yaml:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: wordpress-lsmnl-wordpress
+  namespace: wordpress-lsmnl
+  labels:
+    app: wordpress-lsmnl-wordpress
+spec:
+  type: LoadBalancer
+  selector:
+    app: wordpress-lsmnl-wordpress
+  sessionAffinity: ClientIP
+```
+
+The max session sticky time can be set by setting the field `service.spec.sessionAffinityConfig.clientIP.timeoutSeconds` as below:
+
+```yaml
+sessionAffinityConfig:
+  clientIP:
+    timeoutSeconds: 100
+```
 
 ## Generating a Manifest for Deployment
 
