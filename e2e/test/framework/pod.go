@@ -7,7 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func (i *lbInvocation) GetPodObject(podName, nodeName string, labels map[string]string) *core.Pod {
+func (i *lbInvocation) GetPodObject(podName, image string, ports []core.ContainerPort, labels map[string]string) *core.Pod {
 	return &core.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
@@ -18,7 +18,7 @@ func (i *lbInvocation) GetPodObject(podName, nodeName string, labels map[string]
 			Containers: []core.Container{
 				{
 					Name:  "server",
-					Image: testServerImage,
+					Image: image,
 					Env: []core.EnvVar{
 						{
 							Name: "POD_NAME",
@@ -29,19 +29,18 @@ func (i *lbInvocation) GetPodObject(podName, nodeName string, labels map[string]
 							},
 						},
 					},
-					Ports: []core.ContainerPort{
-						{
-							Name:          "http-1",
-							ContainerPort: 8080,
-						},
-					},
+					Ports: ports,
 				},
-			},
-			NodeSelector: map[string]string{
-				"kubernetes.io/hostname": nodeName,
 			},
 		},
 	}
+}
+
+func (i *lbInvocation) SetNodeSelector(pod *core.Pod, nodeName string) *core.Pod {
+	pod.Spec.NodeSelector = map[string]string{
+		"kubernetes.io/hostname": nodeName,
+	}
+	return pod
 }
 
 func (i *lbInvocation) CreatePod(pod *core.Pod) error {

@@ -87,7 +87,7 @@ o/aoxqmE0mN1lyCPOa9UP//LlsREkWVKI3+Wld/xERtzf66hjcH+ilsXDxxpMEXo
 bSiPJQsGIKtQvyCaZY2szyOoeUGgOId+He7ITlezxKrjdj+1pLMESvAxKeo=
 -----END RSA PRIVATE KEY-----`
 
-func (i *lbInvocation) CreateTLSSecret(secretName string, host string) (err error) {
+func (i *lbInvocation) CreateTLSSecret(secretName string) (err error) {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: secretName,
@@ -104,7 +104,7 @@ func (i *lbInvocation) CreateTLSSecret(secretName string, host string) (err erro
 	return err
 }
 
-func (i *lbInvocation) DeleteSecret() error {
-	err := i.kubeClient.CoreV1().Secrets(i.Namespace()).Delete("tls-secret", nil)
+func (i *lbInvocation) DeleteSecret(name string) error {
+	err := i.kubeClient.CoreV1().Secrets(i.Namespace()).Delete(name, nil)
 	return err
 }
