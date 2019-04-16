@@ -17,13 +17,11 @@ require (
 	github.com/onsi/gomega v1.5.0
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/errors v0.8.0
-	golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a // indirect
+	golang.org/x/net v0.0.0-20190108225652-1e06a53dbb7e // indirect
+	golang.org/x/sync v0.0.0-20181221193216-37e7f081c4d4 // indirect
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/api v0.0.0-20180904230853-4e7be11eab3f
 	k8s.io/apimachinery v0.0.0-20180621070125-103fd098999d
 	k8s.io/client-go v8.0.0+incompatible
-	k8s.io/klog v0.2.0 // indirect
-	k8s.io/kubernetes v1.14.0
-	k8s.io/utils v0.0.0-20190308190857-21c4ce38f2a7 // indirect
 )
