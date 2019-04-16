@@ -284,9 +284,9 @@ func (l *loadbalancers) buildNodeBalancerConfig(service *v1.Service, port int) (
 	}
 
 	config := linodego.NodeBalancerConfig{
-		Port:       port,
-		Protocol:   protocol,
-		Check:      health,
+		Port:     port,
+		Protocol: protocol,
+		Check:    health,
 	}
 
 	if health == linodego.CheckHTTP || health == linodego.CheckHTTPBody {
