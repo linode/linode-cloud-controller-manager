@@ -39,6 +39,12 @@ cd $GOPATH/src/github.com/linode/linode-cloud-controller-manager
 make build
 ```
 
+By default the tests use $HOME/.ssh/id\_rsa.pub as the public key used to provision the cluster, so it needs to be added to your agent.
+
+```
+ssh-add $HOME/.ssh/id_rsa
+```
+
 Come back here and run the tests
 
 ```
