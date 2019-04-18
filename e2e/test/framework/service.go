@@ -13,8 +13,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func (i *lbInvocation) CreateService(selector, annotations map[string]string, ports []core.ServicePort) error {
-	_, err := i.kubeClient.CoreV1().Services(i.Namespace()).Create(&core.Service{
+func (i *lbInvocation) CreateService(selector, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) error {
+	var sessionAffinity core.ServiceAffinity = "None"
+	if isSessionAffinityClientIP {
+		sessionAffinity = "ClientIP"
+	}
+	svc := &core.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        testServerResourceName,
 			Namespace:   i.Namespace(),
@@ -27,8 +31,11 @@ func (i *lbInvocation) CreateService(selector, annotations map[string]string, po
 			Ports:    ports,
 			Selector: selector,
 			Type:     core.ServiceTypeLoadBalancer,
+			SessionAffinity: sessionAffinity,
 		},
-	})
+	}
+
+	_, err := i.kubeClient.CoreV1().Services(i.Namespace()).Create(svc)
 	if err != nil {
 		return err
 	}
