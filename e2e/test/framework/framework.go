@@ -2,6 +2,7 @@ package framework
 
 import (
 	"github.com/appscode/go/crypto/rand"
+	"github.com/linode/linodego"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -11,7 +12,7 @@ var (
 	ApiToken = ""
 
 	KubeConfigFile         = ""
-	testServerResourceName = "e2e-test-server-" + rand.Characters(5)
+	TestServerResourceName = "e2e-test-server-" + rand.Characters(5)
 )
 
 const (
@@ -24,15 +25,19 @@ type Framework struct {
 	kubeClient kubernetes.Interface
 	namespace  string
 	name       string
+
+	linodeClient linodego.Client
 }
 
 func New(
 	restConfig *rest.Config,
 	kubeClient kubernetes.Interface,
+	linodeClient linodego.Client,
 ) *Framework {
 	return &Framework{
 		restConfig: restConfig,
 		kubeClient: kubeClient,
+		linodeClient: linodeClient,
 
 		name:      "cloud-controller-manager",
 		namespace: rand.WithUniqSuffix("ccm"),

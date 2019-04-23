@@ -2,15 +2,14 @@ package test
 
 import (
 	"e2e_test/test/framework"
-	"log"
-	"strings"
-
 	"github.com/appscode/go/wait"
 	"github.com/codeskyblue/go-sh"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"log"
+	"strings"
 )
 
 var _ = Describe("CloudControllerManager", func() {
@@ -23,6 +22,9 @@ var _ = Describe("CloudControllerManager", func() {
 	const (
 		annLinodeLoadBalancerTLS = "service.beta.kubernetes.io/linode-loadbalancer-tls"
 		annLinodeProtocol        = "service.beta.kubernetes.io/linode-loadbalancer-protocol"
+		annLinodeHealthCheckType = "service.beta.kubernetes.io/linode-loadbalancer-check-type"
+		annLinodeCheckBody       = "service.beta.kubernetes.io/linode-loadbalancer-check-body"
+		annLinodeCheckPath       = "service.beta.kubernetes.io/linode-loadbalancer-check-path"
 	)
 
 	BeforeEach(func() {
@@ -73,20 +75,42 @@ var _ = Describe("CloudControllerManager", func() {
 	var getResponseFromSamePod = func(link string) {
 		var oldResp, newResp string
 		Eventually(func() string {
-			resp, _ := sh.Command("curl",  "-s", link).Output()
+			resp, _ := sh.Command("curl", "-s", link).Output()
 			oldResp = string(resp)
 			log.Println(oldResp)
 			return oldResp
 		}).ShouldNot(Equal(""))
 
-		for i := 0; i <= 10; i++{
+		for i := 0; i <= 10; i++ {
 			resp, err := sh.Command("curl", "-s", link).Output()
 			newResp = string(resp)
 			log.Println(newResp)
-			if err == nil{
+			if err == nil {
 				Expect(oldResp == newResp).Should(BeTrue())
 			}
 		}
+	}
+
+	var checkNodeBalancerConfig = func(checkType, path, body string) {
+		By("Getting NodeBalancer Configuration")
+		nbConfig, err := f.LoadBalancer.GetNodeBalancerConfig(framework.TestServerResourceName)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Checking Health Check Type")
+		Expect(string(nbConfig.Check) == checkType).Should(BeTrue())
+
+		By("Checking Health Check Path")
+		Expect(nbConfig.CheckPath == path).Should(BeTrue())
+
+		By("Checking Health Check Body")
+		Expect(nbConfig.CheckBody == body).Should(BeTrue())
+
+		By("Checking the Number of Up nodes")
+		Eventually(func() int {
+			nbConfig, err := f.LoadBalancer.GetNodeBalancerConfig(framework.TestServerResourceName)
+			Expect(err).NotTo(HaveOccurred())
+			return nbConfig.NodesStatus.Up
+		}).Should(Equal(2))
 	}
 
 	Describe("Test", func() {
@@ -432,6 +456,64 @@ var _ = Describe("CloudControllerManager", func() {
 
 					By("Waiting for Response from the LoadBalancer url: " + eps[0])
 					getResponseFromSamePod(eps[0])
+				})
+			})
+
+			Context("For HTTP body health check", func() {
+				var (
+					pods        []string
+					labels      map[string]string
+					annotations map[string]string
+
+					checkType = "http_body"
+					path      = "/"
+					body      = "nginx"
+				)
+				BeforeEach(func() {
+					pods = []string{"test-pod"}
+					ports := []core.ContainerPort{
+						{
+							Name:          "http",
+							ContainerPort: 80,
+						},
+					}
+					servicePorts := []core.ServicePort{
+						{
+							Name:       "http",
+							Port:       80,
+							TargetPort: intstr.FromInt(80),
+							Protocol:   "TCP",
+						},
+					}
+
+					labels = map[string]string{
+						"app": "test-loadbalancer",
+					}
+					annotations = map[string]string{
+						annLinodeHealthCheckType: checkType,
+						annLinodeCheckPath:       path,
+						annLinodeCheckBody:       body,
+						annLinodeProtocol:        "http",
+					}
+
+					By("Creating Pod")
+					createPodWithLabel(pods, ports, "nginx", labels, false)
+
+					By("Creating Service")
+					createServiceWithAnnotations(labels, annotations, servicePorts, false)
+				})
+
+				AfterEach(func() {
+					By("Deleting the Pods")
+					deletePods(pods)
+
+					By("Deleting the Service")
+					deleteService()
+				})
+
+				It("should successfully check the health of 2 nodes", func() {
+					By("Checking NodeBalancer Configurations")
+					checkNodeBalancerConfig(checkType, path, body)
 				})
 			})
 		})

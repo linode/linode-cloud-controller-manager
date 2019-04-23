@@ -20,7 +20,7 @@ func (i *lbInvocation) CreateService(selector, annotations map[string]string, po
 	}
 	svc := &core.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        testServerResourceName,
+			Name:        TestServerResourceName,
 			Namespace:   i.Namespace(),
 			Annotations: annotations,
 			Labels: map[string]string{
@@ -44,7 +44,7 @@ func (i *lbInvocation) CreateService(selector, annotations map[string]string, po
 }
 
 func (i *lbInvocation) DeleteService() error {
-	err := i.kubeClient.CoreV1().Services(i.Namespace()).Delete(testServerResourceName, nil)
+	err := i.kubeClient.CoreV1().Services(i.Namespace()).Delete(TestServerResourceName, nil)
 	return err
 }
 
@@ -52,7 +52,7 @@ func (i *lbInvocation) waitForServerReady() error {
 	var err error
 	var ep *core.Endpoints
 	for it := 0; it < MaxRetry; it++ {
-		ep, err = i.kubeClient.CoreV1().Endpoints(i.Namespace()).Get(testServerResourceName, metav1.GetOptions{})
+		ep, err = i.kubeClient.CoreV1().Endpoints(i.Namespace()).Get(TestServerResourceName, metav1.GetOptions{})
 		if err == nil {
 			if len(ep.Subsets) > 0 {
 				if len(ep.Subsets[0].Addresses) > 0 {
@@ -69,7 +69,7 @@ func (i *lbInvocation) waitForServerReady() error {
 func (i *lbInvocation) getLoadBalancerURLs() ([]string, error) {
 	var serverAddr []string
 
-	svc, err := i.GetServiceWithLoadBalancerStatus(testServerResourceName, i.Namespace())
+	svc, err := i.GetServiceWithLoadBalancerStatus(TestServerResourceName, i.Namespace())
 	if err != nil {
 		return serverAddr, err
 	}
