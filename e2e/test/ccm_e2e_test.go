@@ -91,6 +91,15 @@ var _ = Describe("CloudControllerManager", func() {
 		}
 	}
 
+	var checkNumberOfUpNodes = func(numNodes int) {
+		By("Checking the Number of Up Nodes")
+		Eventually(func() int {
+			nbConfig, err := f.LoadBalancer.GetNodeBalancerConfig(framework.TestServerResourceName)
+			Expect(err).NotTo(HaveOccurred())
+			return nbConfig.NodesStatus.Up
+		}).Should(Equal(numNodes))
+	}
+
 	var checkNodeBalancerConfig = func(checkType, path, body string) {
 		By("Getting NodeBalancer Configuration")
 		nbConfig, err := f.LoadBalancer.GetNodeBalancerConfig(framework.TestServerResourceName)
@@ -105,12 +114,16 @@ var _ = Describe("CloudControllerManager", func() {
 		By("Checking Health Check Body")
 		Expect(nbConfig.CheckBody == body).Should(BeTrue())
 
-		By("Checking the Number of Up nodes")
-		Eventually(func() int {
-			nbConfig, err := f.LoadBalancer.GetNodeBalancerConfig(framework.TestServerResourceName)
-			Expect(err).NotTo(HaveOccurred())
-			return nbConfig.NodesStatus.Up
-		}).Should(Equal(2))
+		checkNumberOfUpNodes(2)
+	}
+
+	var addNewNode = func() {
+		_, err := sh.Command("terraform", "apply", "-var", "nodes=3", "-auto-approve").Output()
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	var waitForNodeAddition = func() {
+		checkNumberOfUpNodes(3)
 	}
 
 	Describe("Test", func() {
@@ -514,6 +527,56 @@ var _ = Describe("CloudControllerManager", func() {
 				It("should successfully check the health of 2 nodes", func() {
 					By("Checking NodeBalancer Configurations")
 					checkNodeBalancerConfig(checkType, path, body)
+				})
+			})
+
+			Context("With Node Addition", func() {
+				var (
+					pods   []string
+					labels map[string]string
+				)
+
+				BeforeEach(func() {
+					pods = []string{"test-pod"}
+					ports := []core.ContainerPort{
+						{
+							Name:          "http-1",
+							ContainerPort: 8080,
+						},
+					}
+					servicePorts := []core.ServicePort{
+						{
+							Name:       "http-1",
+							Port:       80,
+							TargetPort: intstr.FromInt(8080),
+							Protocol:   "TCP",
+						},
+					}
+					labels = map[string]string{
+						"app": "test-loadbalancer",
+					}
+
+					By("Creating Pods")
+					createPodWithLabel(pods, ports, framework.TestServerImage, labels, false)
+
+					By("Creating Service")
+					createServiceWithSelector(labels, servicePorts, false)
+				})
+
+				AfterEach(func() {
+					By("Deleting the Pods")
+					deletePods(pods)
+
+					By("Deleting the Service")
+					deleteService()
+				})
+
+				It("should reach the same pod every time it requests", func() {
+					By("Adding a New Node")
+					addNewNode()
+
+					By("Waiting for the Node to be Added to the NodeBalancer")
+					waitForNodeAddition()
 				})
 			})
 		})
