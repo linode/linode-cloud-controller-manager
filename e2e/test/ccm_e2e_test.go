@@ -60,14 +60,33 @@ var _ = Describe("CloudControllerManager", func() {
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	var createServiceWithSelector = func(selector map[string]string, ports []core.ServicePort) {
-		err = f.LoadBalancer.CreateService(selector, nil, ports)
+	var createServiceWithSelector = func(selector map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) {
+		err = f.LoadBalancer.CreateService(selector, nil, ports, isSessionAffinityClientIP)
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	var createServiceWithAnnotations = func(labels map[string]string, annotations map[string]string, ports []core.ServicePort) {
-		err = f.LoadBalancer.CreateService(labels, annotations, ports)
+	var createServiceWithAnnotations = func(labels map[string]string, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) {
+		err = f.LoadBalancer.CreateService(labels, annotations, ports, isSessionAffinityClientIP)
 		Expect(err).NotTo(HaveOccurred())
+	}
+
+	var getResponseFromSamePod = func(link string) {
+		var oldResp, newResp string
+		Eventually(func() string {
+			resp, _ := sh.Command("curl",  "-s", link).Output()
+			oldResp = string(resp)
+			log.Println(oldResp)
+			return oldResp
+		}).ShouldNot(Equal(""))
+
+		for i := 0; i <= 10; i++{
+			resp, err := sh.Command("curl", "-s", link).Output()
+			newResp = string(resp)
+			log.Println(newResp)
+			if err == nil{
+				Expect(oldResp == newResp).Should(BeTrue())
+			}
+		}
 	}
 
 	Describe("Test", func() {
@@ -102,7 +121,7 @@ var _ = Describe("CloudControllerManager", func() {
 					createPodWithLabel(pods, ports, framework.TestServerImage, labels, true)
 
 					By("Creating Service")
-					createServiceWithSelector(labels, servicePorts)
+					createServiceWithSelector(labels, servicePorts, false)
 				})
 
 				AfterEach(func() {
@@ -190,7 +209,7 @@ var _ = Describe("CloudControllerManager", func() {
 					Expect(err).NotTo(HaveOccurred())
 
 					By("Creating Service")
-					createServiceWithAnnotations(labels, annotations, servicePorts)
+					createServiceWithAnnotations(labels, annotations, servicePorts, false)
 				})
 
 				AfterEach(func() {
@@ -270,7 +289,7 @@ var _ = Describe("CloudControllerManager", func() {
 					Expect(err).NotTo(HaveOccurred())
 
 					By("Creating Service")
-					createServiceWithAnnotations(labels, annotations, servicePorts)
+					createServiceWithAnnotations(labels, annotations, servicePorts, false)
 				})
 
 				AfterEach(func() {
@@ -339,7 +358,7 @@ var _ = Describe("CloudControllerManager", func() {
 					createPodWithLabel(pods, ports, framework.TestServerImage, labels, true)
 
 					By("Creating Service")
-					createServiceWithSelector(labels, servicePorts)
+					createServiceWithSelector(labels, servicePorts, false)
 				})
 
 				AfterEach(func() {
@@ -361,6 +380,58 @@ var _ = Describe("CloudControllerManager", func() {
 						err = framework.WaitForHTTPResponse(ep, pods[0])
 						Expect(err).NotTo(HaveOccurred())
 					}
+				})
+			})
+
+			Context("With SessionAffinity", func() {
+				var (
+					pods   []string
+					labels map[string]string
+				)
+
+				BeforeEach(func() {
+					pods = []string{"test-pod-1", "test-pod-2"}
+					ports := []core.ContainerPort{
+						{
+							Name:          "http-1",
+							ContainerPort: 8080,
+						},
+					}
+					servicePorts := []core.ServicePort{
+						{
+							Name:       "http-1",
+							Port:       80,
+							TargetPort: intstr.FromInt(8080),
+							Protocol:   "TCP",
+						},
+					}
+					labels = map[string]string{
+						"app": "test-loadbalancer",
+					}
+
+					By("Creating Pods")
+					createPodWithLabel(pods, ports, framework.TestServerImage, labels, false)
+
+					By("Creating Service")
+					createServiceWithSelector(labels, servicePorts, true)
+				})
+
+				AfterEach(func() {
+					By("Deleting the Pods")
+					deletePods(pods)
+
+					By("Deleting the Service")
+					deleteService()
+				})
+
+				It("should reach the same pod every time it requests", func() {
+					By("Checking TCP Response")
+					eps, err := f.LoadBalancer.GetHTTPEndpoints()
+					Expect(err).NotTo(HaveOccurred())
+					Expect(len(eps)).Should(BeNumerically(">=", 1))
+
+					By("Waiting for Response from the LoadBalancer url: " + eps[0])
+					getResponseFromSamePod(eps[0])
 				})
 			})
 		})
