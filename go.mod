@@ -7,6 +7,7 @@ require (
 	github.com/NYTimes/gziphandler v0.0.0-20170623195520-56545f4a5d46 // indirect
 	github.com/PuerkitoBio/purell v1.0.0 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20160726150825-5bd2802263f2 // indirect
+	github.com/appscode/go v0.0.0-20190424183524-60025f1135c9 // indirect
 	github.com/beorn7/perks v0.0.0-20160229213445-3ac7bf7a47d1 // indirect
 	github.com/cockroachdb/cmux v0.0.0-20170110192607-30d10be49292 // indirect
 	github.com/coreos/bbolt v1.3.2 // indirect
@@ -35,33 +36,26 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway v1.8.1 // indirect
 	github.com/hashicorp/golang-lru v0.0.0-20160207214719-a0d98a5f2880 // indirect
 	github.com/imdario/mergo v0.3.5 // indirect
-	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jonboulle/clockwork v0.1.0 // indirect
-	github.com/json-iterator/go v1.1.5 // indirect
 	github.com/linode/linodego v0.7.1
 	github.com/mailru/easyjson v0.0.0-20170624190925-2f5df55504eb // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
-	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
-	github.com/modern-go/reflect2 v0.0.0-20180701023420-4b7aa43c6742 // indirect
 	github.com/natefinch/lumberjack v2.0.0+incompatible // indirect
 	github.com/onsi/ginkgo v1.7.0 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect
 	github.com/opencontainers/go-digest v0.0.0-20170106003457-a6d0ee40d420 // indirect
 	github.com/pborman/uuid v0.0.0-20150603214016-ca53cad383ca // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
-	github.com/pkg/errors v0.8.0
+	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v0.0.0-20170531130054-e7e903064f5e // indirect
 	github.com/prometheus/client_model v0.0.0-20150212101744-fa8ad6fec335 // indirect
 	github.com/prometheus/common v0.0.0-20170427095455-13ba4ddd0caa // indirect
 	github.com/prometheus/procfs v0.0.0-20170519190837-65c1f6f8f0fc // indirect
 	github.com/spf13/afero v1.2.1 // indirect
-	github.com/spf13/cobra v0.0.0-20180319062004-c439c4fa0937 // indirect
-	github.com/spf13/pflag v1.0.1
-	github.com/stretchr/testify v1.3.0 // indirect
+	github.com/spf13/pflag v1.0.3
 	github.com/ugorji/go v0.0.0-20170107133203-ded73eae5db7 // indirect
 	github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 // indirect
 	go.etcd.io/bbolt v1.3.2 // indirect
-	golang.org/x/crypto v0.0.0-20180808211826-de0752318171 // indirect
 	golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be
 	golang.org/x/sync v0.0.0-20190227155943-e225da77a7e6 // indirect
 	golang.org/x/time v0.0.0-20161028155119-f51c12702a4d // indirect

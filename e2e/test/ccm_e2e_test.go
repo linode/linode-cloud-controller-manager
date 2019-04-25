@@ -2,14 +2,16 @@ package test
 
 import (
 	"e2e_test/test/framework"
+	"log"
+	"strconv"
+	"strings"
+
 	"github.com/appscode/go/wait"
 	"github.com/codeskyblue/go-sh"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"log"
-	"strings"
 )
 
 var _ = Describe("CloudControllerManager", func() {
@@ -20,11 +22,14 @@ var _ = Describe("CloudControllerManager", func() {
 	)
 
 	const (
-		annLinodeLoadBalancerTLS = "service.beta.kubernetes.io/linode-loadbalancer-tls"
-		annLinodeProtocol        = "service.beta.kubernetes.io/linode-loadbalancer-protocol"
-		annLinodeHealthCheckType = "service.beta.kubernetes.io/linode-loadbalancer-check-type"
-		annLinodeCheckBody       = "service.beta.kubernetes.io/linode-loadbalancer-check-body"
-		annLinodeCheckPath       = "service.beta.kubernetes.io/linode-loadbalancer-check-path"
+		annLinodeLoadBalancerTLS     = "service.beta.kubernetes.io/linode-loadbalancer-tls"
+		annLinodeProtocol            = "service.beta.kubernetes.io/linode-loadbalancer-protocol"
+		annLinodeHealthCheckType     = "service.beta.kubernetes.io/linode-loadbalancer-check-type"
+		annLinodeCheckBody           = "service.beta.kubernetes.io/linode-loadbalancer-check-body"
+		annLinodeCheckPath           = "service.beta.kubernetes.io/linode-loadbalancer-check-path"
+		annLinodeHealthCheckInterval = "service.beta.kubernetes.io/linode-loadbalancer-check-interval"
+		annLinodeHealthCheckTimeout  = "service.beta.kubernetes.io/linode-loadbalancer-check-timeout"
+		annLinodeHealthCheckAttempts = "service.beta.kubernetes.io/linode-loadbalancer-check-attempts"
 	)
 
 	BeforeEach(func() {
@@ -100,7 +105,7 @@ var _ = Describe("CloudControllerManager", func() {
 		}).Should(Equal(numNodes))
 	}
 
-	var checkNodeBalancerConfig = func(checkType, path, body string) {
+	var checkNodeBalancerConfig = func(checkType, path, body, interval, timeout, attempts string) {
 		By("Getting NodeBalancer Configuration")
 		nbConfig, err := f.LoadBalancer.GetNodeBalancerConfig(framework.TestServerResourceName)
 		Expect(err).NotTo(HaveOccurred())
@@ -108,11 +113,39 @@ var _ = Describe("CloudControllerManager", func() {
 		By("Checking Health Check Type")
 		Expect(string(nbConfig.Check) == checkType).Should(BeTrue())
 
-		By("Checking Health Check Path")
-		Expect(nbConfig.CheckPath == path).Should(BeTrue())
+		if path != "" {
+			By("Checking Health Check Path")
+			Expect(nbConfig.CheckPath == path).Should(BeTrue())
+		}
 
-		By("Checking Health Check Body")
-		Expect(nbConfig.CheckBody == body).Should(BeTrue())
+		if body != "" {
+			By("Checking Health Check Body")
+			Expect(nbConfig.CheckBody == body).Should(BeTrue())
+		}
+
+		if interval != "" {
+			By("Checking TCP Connection Health Check Body")
+			intInterval, err := strconv.Atoi(interval)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(nbConfig.CheckInterval == intInterval).Should(BeTrue())
+		}
+
+		if timeout != "" {
+			By("Checking TCP Connection Health Check Timeout")
+			intTimeout, err := strconv.Atoi(timeout)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(nbConfig.CheckTimeout == intTimeout).Should(BeTrue())
+		}
+
+		if attempts != "" {
+			By("Checking TCP Connection Health Check Attempts")
+			intAttempts, err := strconv.Atoi(attempts)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(nbConfig.CheckAttempts == intAttempts).Should(BeTrue())
+		}
 
 		checkNumberOfUpNodes(2)
 	}
@@ -526,7 +559,7 @@ var _ = Describe("CloudControllerManager", func() {
 
 				It("should successfully check the health of 2 nodes", func() {
 					By("Checking NodeBalancer Configurations")
-					checkNodeBalancerConfig(checkType, path, body)
+					checkNodeBalancerConfig(checkType, path, body, "", "", "")
 				})
 			})
 
@@ -577,6 +610,66 @@ var _ = Describe("CloudControllerManager", func() {
 
 					By("Waiting for the Node to be Added to the NodeBalancer")
 					waitForNodeAddition()
+				})
+			})
+
+			FContext("For TCP Connection health check", func() {
+				var (
+					pods        []string
+					labels      map[string]string
+					annotations map[string]string
+
+					checkType = "connection"
+					interval  = "10"
+					timeout   = "5"
+					attempts  = "4"
+				)
+				BeforeEach(func() {
+					pods = []string{"test-pod"}
+					ports := []core.ContainerPort{
+						{
+							Name:          "http",
+							ContainerPort: 80,
+						},
+					}
+					servicePorts := []core.ServicePort{
+						{
+							Name:       "http",
+							Port:       80,
+							TargetPort: intstr.FromInt(80),
+							Protocol:   "TCP",
+						},
+					}
+
+					labels = map[string]string{
+						"app": "test-loadbalancer",
+					}
+					annotations = map[string]string{
+						annLinodeHealthCheckType:     checkType,
+						annLinodeProtocol:            "tcp",
+						annLinodeHealthCheckInterval: interval,
+						annLinodeHealthCheckTimeout:  timeout,
+						annLinodeHealthCheckAttempts: attempts,
+					}
+
+					By("Creating Pod")
+					createPodWithLabel(pods, ports, "nginx", labels, false)
+
+					By("Creating Service")
+					createServiceWithAnnotations(labels, annotations, servicePorts, false)
+				})
+
+				AfterEach(func() {
+					By("Deleting the Pods")
+					deletePods(pods)
+
+					By("Deleting the Service")
+					deleteService()
+				})
+
+				It("should successfully check the health of 2 nodes", func() {
+					By("Checking NodeBalancer Configurations")
+					checkNodeBalancerConfig(checkType, "", "", interval, timeout, attempts)
 				})
 			})
 		})
