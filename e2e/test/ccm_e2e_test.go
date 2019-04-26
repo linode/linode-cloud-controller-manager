@@ -30,6 +30,7 @@ var _ = Describe("CloudControllerManager", func() {
 		annLinodeHealthCheckInterval = "service.beta.kubernetes.io/linode-loadbalancer-check-interval"
 		annLinodeHealthCheckTimeout  = "service.beta.kubernetes.io/linode-loadbalancer-check-timeout"
 		annLinodeHealthCheckAttempts = "service.beta.kubernetes.io/linode-loadbalancer-check-attempts"
+		annLinodeHealthCheckPassive  = "service.beta.kubernetes.io/linode-loadbalancer-check-passive"
 	)
 
 	BeforeEach(func() {
@@ -105,7 +106,7 @@ var _ = Describe("CloudControllerManager", func() {
 		}).Should(Equal(numNodes))
 	}
 
-	var checkNodeBalancerConfig = func(checkType, path, body, interval, timeout, attempts string) {
+	var checkNodeBalancerConfig = func(checkType, path, body, interval, timeout, attempts, checkPassive string) {
 		By("Getting NodeBalancer Configuration")
 		nbConfig, err := f.LoadBalancer.GetNodeBalancerConfig(framework.TestServerResourceName)
 		Expect(err).NotTo(HaveOccurred())
@@ -145,6 +146,14 @@ var _ = Describe("CloudControllerManager", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(nbConfig.CheckAttempts == intAttempts).Should(BeTrue())
+		}
+
+		if checkPassive != "" {
+			By("Checking for Passive Health Check")
+			boolCheckPassive, err := strconv.ParseBool(checkPassive)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(nbConfig.CheckPassive == boolCheckPassive).Should(BeTrue())
 		}
 
 		checkNumberOfUpNodes(2)
@@ -559,7 +568,7 @@ var _ = Describe("CloudControllerManager", func() {
 
 				It("should successfully check the health of 2 nodes", func() {
 					By("Checking NodeBalancer Configurations")
-					checkNodeBalancerConfig(checkType, path, body, "", "", "")
+					checkNodeBalancerConfig(checkType, path, body, "", "", "", "")
 				})
 			})
 
@@ -613,7 +622,7 @@ var _ = Describe("CloudControllerManager", func() {
 				})
 			})
 
-			FContext("For TCP Connection health check", func() {
+			Context("For TCP Connection health check", func() {
 				var (
 					pods        []string
 					labels      map[string]string
@@ -669,7 +678,62 @@ var _ = Describe("CloudControllerManager", func() {
 
 				It("should successfully check the health of 2 nodes", func() {
 					By("Checking NodeBalancer Configurations")
-					checkNodeBalancerConfig(checkType, "", "", interval, timeout, attempts)
+					checkNodeBalancerConfig(checkType, "", "", interval, timeout, attempts, "")
+				})
+			})
+
+			Context("For Passive Health Check", func() {
+				var (
+					pods        []string
+					labels      map[string]string
+					annotations map[string]string
+
+					checkType    = "none"
+					checkPassive = "true"
+				)
+				BeforeEach(func() {
+					pods = []string{"test-pod"}
+					ports := []core.ContainerPort{
+						{
+							Name:          "http",
+							ContainerPort: 80,
+						},
+					}
+					servicePorts := []core.ServicePort{
+						{
+							Name:       "http",
+							Port:       80,
+							TargetPort: intstr.FromInt(80),
+							Protocol:   "TCP",
+						},
+					}
+
+					labels = map[string]string{
+						"app": "test-loadbalancer",
+					}
+					annotations = map[string]string{
+						annLinodeHealthCheckPassive: checkPassive,
+						annLinodeHealthCheckType:    checkType,
+					}
+
+					By("Creating Pod")
+					createPodWithLabel(pods, ports, "nginx", labels, false)
+
+					By("Creating Service")
+					createServiceWithAnnotations(labels, annotations, servicePorts, false)
+				})
+
+				AfterEach(func() {
+					By("Deleting the Pods")
+					deletePods(pods)
+
+					By("Deleting the Service")
+					deleteService()
+				})
+
+				It("should successfully check the health of 2 nodes", func() {
+					By("Checking NodeBalancer Configurations")
+					checkNodeBalancerConfig(checkType, "", "", "", "", "", checkPassive)
 				})
 			})
 		})
