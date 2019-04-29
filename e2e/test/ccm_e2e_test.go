@@ -404,7 +404,7 @@ var _ = Describe("CloudControllerManager", func() {
 				)
 
 				BeforeEach(func() {
-					pods = []string{"test-pod"}
+					pods = []string{"test-pod-http"}
 					ports := []core.ContainerPort{
 						{
 							Name:          "http-1",
@@ -525,7 +525,7 @@ var _ = Describe("CloudControllerManager", func() {
 					body      = "nginx"
 				)
 				BeforeEach(func() {
-					pods = []string{"test-pod"}
+					pods = []string{"test-pod-http-body"}
 					ports := []core.ContainerPort{
 						{
 							Name:          "http",
@@ -579,7 +579,7 @@ var _ = Describe("CloudControllerManager", func() {
 				)
 
 				BeforeEach(func() {
-					pods = []string{"test-pod"}
+					pods = []string{"test-pod-node-add"}
 					ports := []core.ContainerPort{
 						{
 							Name:          "http-1",
@@ -634,7 +634,7 @@ var _ = Describe("CloudControllerManager", func() {
 					attempts  = "4"
 				)
 				BeforeEach(func() {
-					pods = []string{"test-pod"}
+					pods = []string{"test-pod-tcp"}
 					ports := []core.ContainerPort{
 						{
 							Name:          "http",
@@ -692,7 +692,7 @@ var _ = Describe("CloudControllerManager", func() {
 					checkPassive = "true"
 				)
 				BeforeEach(func() {
-					pods = []string{"test-pod"}
+					pods = []string{"test-pod-passive-hc"}
 					ports := []core.ContainerPort{
 						{
 							Name:          "http",
@@ -734,6 +734,62 @@ var _ = Describe("CloudControllerManager", func() {
 				It("should successfully check the health of 2 nodes", func() {
 					By("Checking NodeBalancer Configurations")
 					checkNodeBalancerConfig(checkType, "", "", "", "", "", checkPassive)
+				})
+			})
+
+			Context("For HTTP Status Health Check", func() {
+				var (
+					pods        []string
+					labels      map[string]string
+					annotations map[string]string
+
+					checkType = "http"
+					path      = "/"
+				)
+				BeforeEach(func() {
+					pods = []string{"test-pod-http-status"}
+					ports := []core.ContainerPort{
+						{
+							Name:          "http",
+							ContainerPort: 80,
+						},
+					}
+					servicePorts := []core.ServicePort{
+						{
+							Name:       "http",
+							Port:       80,
+							TargetPort: intstr.FromInt(80),
+							Protocol:   "TCP",
+						},
+					}
+
+					labels = map[string]string{
+						"app": "test-loadbalancer",
+					}
+					annotations = map[string]string{
+						annLinodeHealthCheckType: checkType,
+						annLinodeCheckPath:       path,
+						annLinodeProtocol:        "http",
+					}
+
+					By("Creating Pod")
+					createPodWithLabel(pods, ports, "nginx", labels, false)
+
+					By("Creating Service")
+					createServiceWithAnnotations(labels, annotations, servicePorts, false)
+				})
+
+				AfterEach(func() {
+					By("Deleting the Pods")
+					deletePods(pods)
+
+					By("Deleting the Service")
+					deleteService()
+				})
+
+				It("should successfully check the health of 2 nodes", func() {
+					By("Checking NodeBalancer Configurations")
+					checkNodeBalancerConfig(checkType, path, "", "", "", "", "")
 				})
 			})
 		})
