@@ -28,9 +28,9 @@ func (i *lbInvocation) CreateService(selector, annotations map[string]string, po
 			},
 		},
 		Spec: core.ServiceSpec{
-			Ports:    ports,
-			Selector: selector,
-			Type:     core.ServiceTypeLoadBalancer,
+			Ports:           ports,
+			Selector:        selector,
+			Type:            core.ServiceTypeLoadBalancer,
 			SessionAffinity: sessionAffinity,
 		},
 	}

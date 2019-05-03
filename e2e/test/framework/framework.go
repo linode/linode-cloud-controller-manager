@@ -35,8 +35,8 @@ func New(
 	linodeClient linodego.Client,
 ) *Framework {
 	return &Framework{
-		restConfig: restConfig,
-		kubeClient: kubeClient,
+		restConfig:   restConfig,
+		kubeClient:   kubeClient,
 		linodeClient: linodeClient,
 
 		name:      "cloud-controller-manager",

@@ -3,13 +3,14 @@ package test
 import (
 	"e2e_test/test/framework"
 	"flag"
-	"github.com/linode/linodego"
-	"golang.org/x/oauth2"
 	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/linode/linodego"
+	"golang.org/x/oauth2"
 
 	"github.com/appscode/go/crypto/rand"
 	"github.com/onsi/ginkgo/reporters"
