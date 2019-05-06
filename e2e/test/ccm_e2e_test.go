@@ -164,6 +164,11 @@ var _ = Describe("CloudControllerManager", func() {
 		Expect(err).NotTo(HaveOccurred())
 	}
 
+	var deleteNewNode = func() {
+		_, err := sh.Command("terraform", "apply", "-var", "nodes=2", "-auto-approve").Output()
+		Expect(err).NotTo(HaveOccurred())
+	}
+
 	var waitForNodeAddition = func() {
 		checkNumberOfUpNodes(3)
 	}
@@ -611,6 +616,9 @@ var _ = Describe("CloudControllerManager", func() {
 
 					By("Deleting the Service")
 					deleteService()
+
+					By("Deleting the Newly Created Nodes")
+					deleteNewNode()
 				})
 
 				It("should reach the same pod every time it requests", func() {
