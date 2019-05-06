@@ -63,7 +63,6 @@ var getLinodeClient = func() linodego.Client {
 	}
 
 	linodeClient := linodego.NewClient(oauth2Client)
-	linodeClient.SetDebug(true)
 
 	return linodeClient
 }
