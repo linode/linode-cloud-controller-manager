@@ -2,7 +2,9 @@ package test
 
 import (
 	"e2e_test/test/framework"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -81,18 +83,23 @@ var _ = Describe("CloudControllerManager", func() {
 	var getResponseFromSamePod = func(link string) {
 		var oldResp, newResp string
 		Eventually(func() string {
-			resp, _ := sh.Command("curl", "-s", link).Output()
-			oldResp = string(resp)
-			log.Println(oldResp)
+			resp, err := http.Get(link)
+			if err == nil {
+				byteData, _ := ioutil.ReadAll(resp.Body)
+				defer resp.Body.Close()
+				oldResp = string(byteData)
+			}
+
 			return oldResp
 		}).ShouldNot(Equal(""))
 
 		for i := 0; i <= 10; i++ {
-			resp, err := sh.Command("curl", "-s", link).Output()
-			newResp = string(resp)
-			log.Println(newResp)
+			resp, err := http.Get(link)
 			if err == nil {
-				Expect(oldResp == newResp).Should(BeTrue())
+				byteData, _ := ioutil.ReadAll(resp.Body)
+				defer resp.Body.Close()
+				newResp = string(byteData)
+				log.Println(newResp)
 			}
 		}
 	}
