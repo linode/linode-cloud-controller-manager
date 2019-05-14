@@ -2,7 +2,10 @@ package test
 
 import (
 	"e2e_test/test/framework"
+	"io/ioutil"
 	"log"
+	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/appscode/go/wait"
@@ -21,8 +24,15 @@ var _ = Describe("CloudControllerManager", func() {
 	)
 
 	const (
-		annLinodeLoadBalancerTLS = "service.beta.kubernetes.io/linode-loadbalancer-tls"
-		annLinodeProtocol        = "service.beta.kubernetes.io/linode-loadbalancer-protocol"
+		annLinodeLoadBalancerTLS     = "service.beta.kubernetes.io/linode-loadbalancer-tls"
+		annLinodeProtocol            = "service.beta.kubernetes.io/linode-loadbalancer-protocol"
+		annLinodeHealthCheckType     = "service.beta.kubernetes.io/linode-loadbalancer-check-type"
+		annLinodeCheckBody           = "service.beta.kubernetes.io/linode-loadbalancer-check-body"
+		annLinodeCheckPath           = "service.beta.kubernetes.io/linode-loadbalancer-check-path"
+		annLinodeHealthCheckInterval = "service.beta.kubernetes.io/linode-loadbalancer-check-interval"
+		annLinodeHealthCheckTimeout  = "service.beta.kubernetes.io/linode-loadbalancer-check-timeout"
+		annLinodeHealthCheckAttempts = "service.beta.kubernetes.io/linode-loadbalancer-check-attempts"
+		annLinodeHealthCheckPassive  = "service.beta.kubernetes.io/linode-loadbalancer-check-passive"
 	)
 
 	BeforeEach(func() {
@@ -73,20 +83,101 @@ var _ = Describe("CloudControllerManager", func() {
 	var getResponseFromSamePod = func(link string) {
 		var oldResp, newResp string
 		Eventually(func() string {
-			resp, _ := sh.Command("curl",  "-s", link).Output()
-			oldResp = string(resp)
-			log.Println(oldResp)
+			resp, err := http.Get(link)
+			if err == nil {
+				byteData, _ := ioutil.ReadAll(resp.Body)
+				defer resp.Body.Close()
+				oldResp = string(byteData)
+			}
+
 			return oldResp
 		}).ShouldNot(Equal(""))
 
-		for i := 0; i <= 10; i++{
-			resp, err := sh.Command("curl", "-s", link).Output()
-			newResp = string(resp)
-			log.Println(newResp)
-			if err == nil{
-				Expect(oldResp == newResp).Should(BeTrue())
+		for i := 0; i <= 10; i++ {
+			resp, err := http.Get(link)
+			if err == nil {
+				byteData, _ := ioutil.ReadAll(resp.Body)
+				defer resp.Body.Close()
+				newResp = string(byteData)
+				log.Println(newResp)
 			}
 		}
+	}
+
+	var checkNumberOfUpNodes = func(numNodes int) {
+		By("Checking the Number of Up Nodes")
+		Eventually(func() int {
+			nbConfig, err := f.LoadBalancer.GetNodeBalancerConfig(framework.TestServerResourceName)
+			Expect(err).NotTo(HaveOccurred())
+			return nbConfig.NodesStatus.Up
+		}).Should(Equal(numNodes))
+	}
+
+	var checkNodeBalancerConfig = func(checkType, path, body, interval, timeout, attempts, checkPassive string) {
+		By("Getting NodeBalancer Configuration")
+		nbConfig, err := f.LoadBalancer.GetNodeBalancerConfig(framework.TestServerResourceName)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Checking Health Check Type")
+		Expect(string(nbConfig.Check) == checkType).Should(BeTrue())
+
+		if path != "" {
+			By("Checking Health Check Path")
+			Expect(nbConfig.CheckPath == path).Should(BeTrue())
+		}
+
+		if body != "" {
+			By("Checking Health Check Body")
+			Expect(nbConfig.CheckBody == body).Should(BeTrue())
+		}
+
+		if interval != "" {
+			By("Checking TCP Connection Health Check Body")
+			intInterval, err := strconv.Atoi(interval)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(nbConfig.CheckInterval == intInterval).Should(BeTrue())
+		}
+
+		if timeout != "" {
+			By("Checking TCP Connection Health Check Timeout")
+			intTimeout, err := strconv.Atoi(timeout)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(nbConfig.CheckTimeout == intTimeout).Should(BeTrue())
+		}
+
+		if attempts != "" {
+			By("Checking TCP Connection Health Check Attempts")
+			intAttempts, err := strconv.Atoi(attempts)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(nbConfig.CheckAttempts == intAttempts).Should(BeTrue())
+		}
+
+		if checkPassive != "" {
+			By("Checking for Passive Health Check")
+			boolCheckPassive, err := strconv.ParseBool(checkPassive)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(nbConfig.CheckPassive == boolCheckPassive).Should(BeTrue())
+		}
+
+		checkNumberOfUpNodes(2)
+	}
+
+	var addNewNode = func() {
+		_, err := sh.Command("terraform", "apply", "-var", "nodes=3", "-auto-approve").Output()
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	var deleteNewNode = func() {
+		_, err := sh.Command("terraform", "apply", "-var", "nodes=2", "-auto-approve").Output()
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	var waitForNodeAddition = func() {
+		checkNumberOfUpNodes(3)
 	}
 
 	Describe("Test", func() {
@@ -325,7 +416,7 @@ var _ = Describe("CloudControllerManager", func() {
 				)
 
 				BeforeEach(func() {
-					pods = []string{"test-pod"}
+					pods = []string{"test-pod-http"}
 					ports := []core.ContainerPort{
 						{
 							Name:          "http-1",
@@ -432,6 +523,288 @@ var _ = Describe("CloudControllerManager", func() {
 
 					By("Waiting for Response from the LoadBalancer url: " + eps[0])
 					getResponseFromSamePod(eps[0])
+				})
+			})
+
+			Context("For HTTP body health check", func() {
+				var (
+					pods        []string
+					labels      map[string]string
+					annotations map[string]string
+
+					checkType = "http_body"
+					path      = "/"
+					body      = "nginx"
+				)
+				BeforeEach(func() {
+					pods = []string{"test-pod-http-body"}
+					ports := []core.ContainerPort{
+						{
+							Name:          "http",
+							ContainerPort: 80,
+						},
+					}
+					servicePorts := []core.ServicePort{
+						{
+							Name:       "http",
+							Port:       80,
+							TargetPort: intstr.FromInt(80),
+							Protocol:   "TCP",
+						},
+					}
+
+					labels = map[string]string{
+						"app": "test-loadbalancer",
+					}
+					annotations = map[string]string{
+						annLinodeHealthCheckType: checkType,
+						annLinodeCheckPath:       path,
+						annLinodeCheckBody:       body,
+						annLinodeProtocol:        "http",
+					}
+
+					By("Creating Pod")
+					createPodWithLabel(pods, ports, "nginx", labels, false)
+
+					By("Creating Service")
+					createServiceWithAnnotations(labels, annotations, servicePorts, false)
+				})
+
+				AfterEach(func() {
+					By("Deleting the Pods")
+					deletePods(pods)
+
+					By("Deleting the Service")
+					deleteService()
+				})
+
+				It("should successfully check the health of 2 nodes", func() {
+					By("Checking NodeBalancer Configurations")
+					checkNodeBalancerConfig(checkType, path, body, "", "", "", "")
+				})
+			})
+
+			Context("With Node Addition", func() {
+				var (
+					pods   []string
+					labels map[string]string
+				)
+
+				BeforeEach(func() {
+					pods = []string{"test-pod-node-add"}
+					ports := []core.ContainerPort{
+						{
+							Name:          "http-1",
+							ContainerPort: 8080,
+						},
+					}
+					servicePorts := []core.ServicePort{
+						{
+							Name:       "http-1",
+							Port:       80,
+							TargetPort: intstr.FromInt(8080),
+							Protocol:   "TCP",
+						},
+					}
+					labels = map[string]string{
+						"app": "test-loadbalancer",
+					}
+
+					By("Creating Pods")
+					createPodWithLabel(pods, ports, framework.TestServerImage, labels, false)
+
+					By("Creating Service")
+					createServiceWithSelector(labels, servicePorts, false)
+				})
+
+				AfterEach(func() {
+					By("Deleting the Pods")
+					deletePods(pods)
+
+					By("Deleting the Service")
+					deleteService()
+
+					By("Deleting the Newly Created Nodes")
+					deleteNewNode()
+				})
+
+				It("should reach the same pod every time it requests", func() {
+					By("Adding a New Node")
+					addNewNode()
+
+					By("Waiting for the Node to be Added to the NodeBalancer")
+					waitForNodeAddition()
+				})
+			})
+
+			Context("For TCP Connection health check", func() {
+				var (
+					pods        []string
+					labels      map[string]string
+					annotations map[string]string
+
+					checkType = "connection"
+					interval  = "10"
+					timeout   = "5"
+					attempts  = "4"
+				)
+				BeforeEach(func() {
+					pods = []string{"test-pod-tcp"}
+					ports := []core.ContainerPort{
+						{
+							Name:          "http",
+							ContainerPort: 80,
+						},
+					}
+					servicePorts := []core.ServicePort{
+						{
+							Name:       "http",
+							Port:       80,
+							TargetPort: intstr.FromInt(80),
+							Protocol:   "TCP",
+						},
+					}
+
+					labels = map[string]string{
+						"app": "test-loadbalancer",
+					}
+					annotations = map[string]string{
+						annLinodeHealthCheckType:     checkType,
+						annLinodeProtocol:            "tcp",
+						annLinodeHealthCheckInterval: interval,
+						annLinodeHealthCheckTimeout:  timeout,
+						annLinodeHealthCheckAttempts: attempts,
+					}
+
+					By("Creating Pod")
+					createPodWithLabel(pods, ports, "nginx", labels, false)
+
+					By("Creating Service")
+					createServiceWithAnnotations(labels, annotations, servicePorts, false)
+				})
+
+				AfterEach(func() {
+					By("Deleting the Pods")
+					deletePods(pods)
+
+					By("Deleting the Service")
+					deleteService()
+				})
+
+				It("should successfully check the health of 2 nodes", func() {
+					By("Checking NodeBalancer Configurations")
+					checkNodeBalancerConfig(checkType, "", "", interval, timeout, attempts, "")
+				})
+			})
+
+			Context("For Passive Health Check", func() {
+				var (
+					pods        []string
+					labels      map[string]string
+					annotations map[string]string
+
+					checkType    = "none"
+					checkPassive = "true"
+				)
+				BeforeEach(func() {
+					pods = []string{"test-pod-passive-hc"}
+					ports := []core.ContainerPort{
+						{
+							Name:          "http",
+							ContainerPort: 80,
+						},
+					}
+					servicePorts := []core.ServicePort{
+						{
+							Name:       "http",
+							Port:       80,
+							TargetPort: intstr.FromInt(80),
+							Protocol:   "TCP",
+						},
+					}
+
+					labels = map[string]string{
+						"app": "test-loadbalancer",
+					}
+					annotations = map[string]string{
+						annLinodeHealthCheckPassive: checkPassive,
+						annLinodeHealthCheckType:    checkType,
+					}
+
+					By("Creating Pod")
+					createPodWithLabel(pods, ports, "nginx", labels, false)
+
+					By("Creating Service")
+					createServiceWithAnnotations(labels, annotations, servicePorts, false)
+				})
+
+				AfterEach(func() {
+					By("Deleting the Pods")
+					deletePods(pods)
+
+					By("Deleting the Service")
+					deleteService()
+				})
+
+				It("should successfully check the health of 2 nodes", func() {
+					By("Checking NodeBalancer Configurations")
+					checkNodeBalancerConfig(checkType, "", "", "", "", "", checkPassive)
+				})
+			})
+
+			Context("For HTTP Status Health Check", func() {
+				var (
+					pods        []string
+					labels      map[string]string
+					annotations map[string]string
+
+					checkType = "http"
+					path      = "/"
+				)
+				BeforeEach(func() {
+					pods = []string{"test-pod-http-status"}
+					ports := []core.ContainerPort{
+						{
+							Name:          "http",
+							ContainerPort: 80,
+						},
+					}
+					servicePorts := []core.ServicePort{
+						{
+							Name:       "http",
+							Port:       80,
+							TargetPort: intstr.FromInt(80),
+							Protocol:   "TCP",
+						},
+					}
+
+					labels = map[string]string{
+						"app": "test-loadbalancer",
+					}
+					annotations = map[string]string{
+						annLinodeHealthCheckType: checkType,
+						annLinodeCheckPath:       path,
+						annLinodeProtocol:        "http",
+					}
+
+					By("Creating Pod")
+					createPodWithLabel(pods, ports, "nginx", labels, false)
+
+					By("Creating Service")
+					createServiceWithAnnotations(labels, annotations, servicePorts, false)
+				})
+
+				AfterEach(func() {
+					By("Deleting the Pods")
+					deletePods(pods)
+
+					By("Deleting the Service")
+					deleteService()
+				})
+
+				It("should successfully check the health of 2 nodes", func() {
+					By("Checking NodeBalancer Configurations")
+					checkNodeBalancerConfig(checkType, path, "", "", "", "", "")
 				})
 			})
 		})

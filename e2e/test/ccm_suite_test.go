@@ -3,10 +3,14 @@ package test
 import (
 	"e2e_test/test/framework"
 	"flag"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/linode/linodego"
+	"golang.org/x/oauth2"
 
 	"github.com/appscode/go/crypto/rand"
 	"github.com/onsi/ginkgo/reporters"
@@ -49,6 +53,20 @@ func TestE2e(t *testing.T) {
 
 }
 
+var getLinodeClient = func() linodego.Client {
+	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: framework.ApiToken})
+
+	oauth2Client := &http.Client{
+		Transport: &oauth2.Transport{
+			Source: tokenSource,
+		},
+	}
+
+	linodeClient := linodego.NewClient(oauth2Client)
+
+	return linodeClient
+}
+
 var _ = BeforeSuite(func() {
 	if !useExisting {
 		err := framework.CreateCluster(ClusterName)
@@ -64,9 +82,10 @@ var _ = BeforeSuite(func() {
 
 	// Clients
 	kubeClient := kubernetes.NewForConfigOrDie(config)
+	linodeClient := getLinodeClient()
 
 	// Framework
-	root = framework.New(config, kubeClient)
+	root = framework.New(config, kubeClient, linodeClient)
 
 	By("Using Namespace " + root.Namespace())
 	err = root.CreateNamespace()
