@@ -17,6 +17,8 @@ import (
 )
 
 func main() {
+	fmt.Printf("Linode Cloud Controller Manager starting up\n")
+
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	command := app.NewCloudControllerManagerCommand()
