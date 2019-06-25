@@ -1,6 +1,14 @@
-IMG ?= linode/linode-cloud-controller-manager:latest
+IMG ?= linode/linode-cloud-controller-manager:canary
 
 export GO111MODULE=on
+
+.PHONY: all
+all: build
+
+.PHONY: clean
+clean:
+	go clean .
+	rm -r dist/*
 
 $(GOPATH)/bin/goimports:
 	GO111MODULE=off go get golang.org/x/tools/cmd/goimports
@@ -8,25 +16,54 @@ $(GOPATH)/bin/goimports:
 $(GOPATH)/bin/ginkgo:
 	GO111MODULE=off go get -u github.com/onsi/ginkgo/ginkgo
 
+.PHONY: vet
+# lint the codebase
 vet:
-	go vet -composites=false ./...
+	go vet . ./cloud/...
 
+.PHONY: fmt
+# goimports runs a go fmt
+# we say code is not worth formatting unless it's linted
 fmt: vet $(GOPATH)/bin/goimports
-	# goimports runs a gofmt
 	goimports -w *.go cloud
 
-test: $(GOPATH)/bin/ginkgo
+.PHONY: test
+# we say code is not worth testing unless it's formatted
+test: $(GOPATH)/bin/ginkgo fmt
 	ginkgo -r --v --progress --trace --cover --skipPackage=test -- --v=3
 
-build: test fmt
-	go build -o dist/linode-cloud-controller-manager github.com/linode/linode-cloud-controller-manager
+.PHONY: build-linux
+build-linux:
+	echo "cross compiling ccm-linode for linux/amd64" && \
+		GOOS=linux GOARCH=amd64 \
+		CGO_ENABLED=0 \
+		go build -o dist/ccm-linode-linux-amd64 .
 
-docker-build: build
+.PHONY: build
+build:
+	echo "compiling ccm-linode" && \
+		CGO_ENABLED=0 \
+		go build -o dist/ccm-linode .
+
+.PHONY: imgname
+# print the Docker image name that will be used
+# useful for subsequently defining it on the shell
+imgname:
+	echo IMG=${IMG}
+
+.PHONY: docker-build
+# we cross compile the binary for linux, then build a container
+docker-build: build-linux
 	docker build . -t ${IMG}
 
+.PHONY: docker-push
+# must run the docker build before pushing the image
 docker-push:
+	echo "[reminder] Did you run `make docker-build`?"
 	docker push ${IMG}
 
+.PHONY: run
+# run the ccm locally, really only makes sense on linux anyway
 run: build
 	dist/linode-cloud-controller-manager \
 		--logtostderr=true \
@@ -34,6 +71,8 @@ run: build
 		--cloud-provider=linode \
 		--kubeconfig=${KUBECONFIG}
 
+.PHONY: run-debug
+# run the ccm locally, really only makes sense on linux anyway
 run-debug: build
 	dist/linode-cloud-controller-manager \
 		--logtostderr=true \
@@ -41,6 +80,4 @@ run-debug: build
 		--cloud-provider=linode \
 		--kubeconfig=${KUBECONFIG} \
 		--linodego-debug
-
-all: build
 
