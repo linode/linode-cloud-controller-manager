@@ -3,11 +3,9 @@ package linode
 import (
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 
 	"github.com/linode/linodego"
-	"golang.org/x/oauth2"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 )
@@ -53,18 +51,8 @@ func newCloud() (cloudprovider.Interface, error) {
 		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", regionEnv)
 	}
 
-	// Initialize Linode API Client
-	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{
-		AccessToken: apiToken,
-	})
-
-	oauth2Client := &http.Client{
-		Transport: &oauth2.Transport{
-			Source: tokenSource,
-		},
-	}
-
-	linodeClient := linodego.NewClient(oauth2Client)
+	linodeClient := linodego.NewClient(nil)
+	linodeClient.SetToken(apiToken)
 	if Options.LinodeGoDebug {
 		linodeClient.SetDebug(true)
 	}
