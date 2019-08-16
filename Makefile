@@ -34,16 +34,16 @@ test: $(GOPATH)/bin/ginkgo fmt
 
 .PHONY: build-linux
 build-linux:
-	echo "cross compiling ccm-linode for linux/amd64" && \
+	echo "cross compiling linode-cloud-controller-manager for linux/amd64" && \
 		GOOS=linux GOARCH=amd64 \
 		CGO_ENABLED=0 \
-		go build -o dist/ccm-linode-linux-amd64 .
+		go build -o dist/linode-cloud-controller-manager-linux-amd64 .
 
 .PHONY: build
 build:
-	echo "compiling ccm-linode" && \
+	echo "compiling linode-cloud-controller-manager" && \
 		CGO_ENABLED=0 \
-		go build -o dist/ccm-linode .
+		go build -o dist/linode-cloud-controller-manager .
 
 .PHONY: imgname
 # print the Docker image name that will be used
