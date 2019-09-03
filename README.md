@@ -121,7 +121,7 @@ sessionAffinityConfig:
 
 ## Generating a Manifest for Deployment
 
-Use the script located at `./hack/deploy/generate-manifest.sh` to generate a self-contained deployment manifest for the Linode CCM. Two arguments are required.
+Use the script located at `./deploy/generate-manifest.sh` to generate a self-contained deployment manifest for the Linode CCM. Two arguments are required.
 
 The first argument must be a Linode APIv4 Personal Access Token with all permissions.
 (https://cloud.linode.com/profile/tokens)
@@ -132,7 +132,7 @@ The second argument must be a Linode region.
 Example:
 
 ```sh
-./generate-manifest.sh $LINODE_API_TOKEN us-east
+./deploy/generate-manifest.sh $LINODE_API_TOKEN us-east
 ```
 
 This will create a file `ccm-linode.yaml` which you can use to deploy the CCM.
