@@ -43,8 +43,8 @@ All of the service annotation names listed below have been shortened for readabi
 Annotation (Suffix) | Values | Default | Description
 ---|---|---|---
 `throttle` | `0`-`20` (`0` to disable) | `20` | Client Connection Throttle, which limits the number of subsequent new connections per second from the same client IP
-`protocol` | `tcp`, `http`, `https` | `tcp` | This annotation is used to specify the default protocol for Linode NodeBalancer. For ports specified in the `linode-loadbalancer-tls-ports` annotation, this protocol is overwritten to `https`
-`tls` | json array (e.g. `[ { "tls-secret-name": "prod-app-tls", "port": 443}, {"tls-secret-name": "dev-app-tls", "port": 8443} ]`) | | Specifies TLS ports with their corresponding secrets, the secret type should be `kubernetes.io/tls`
+`default-protocol` | `tcp`, `http`, `https` | `tcp` | This annotation is used to specify the default protocol for Linode NodeBalancer.
+`port-*` | json (e.g. `{ "tls-secret-name": "prod-app-tls", "protocol": "https"}`) | | Specifies the secret and protocol for a port corresponding secrets, the secret type should be `kubernetes.io/tls`
 `check-type` | `none`, `connection`, `http`, `http_body` | | The type of health check to perform against back-ends to ensure they are serving requests
 `check-path` | string | | The URL path to check on each back-end during health checks
 `check-body` | string | | Text which must be present in the response body to pass the NodeBalancer health check
@@ -63,6 +63,12 @@ metadata:
   namespace: wordpress-lsmnl
   annotations:
     service.beta.kubernetes.io/linode-loadbalancer-throttle: "4"
+    service.beta.kubernetes.io/linode-loadbalancer-default-protocol: "http"
+    service.beta.kubernetes.io/linode-loadbalancer-port-443: |
+      {
+        "tls-secret-name": "prod-app-tls",
+        "protocol": "https"
+      }
   labels:
     app: wordpress-lsmnl-wordpress
 spec:
