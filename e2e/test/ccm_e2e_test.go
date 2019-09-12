@@ -113,51 +113,54 @@ var _ = Describe("CloudControllerManager", func() {
 		}).Should(Equal(numNodes))
 	}
 
-	var checkNodeBalancerConfig = func(checkType, path, body, interval, timeout, attempts, checkPassive string) {
+	type checkArgs struct {
+		checkType, path, body, interval, timeout, attempts, checkPassive string
+	}
+	var checkNodeBalancerConfig = func(args checkArgs) {
 		By("Getting NodeBalancer Configuration")
 		nbConfig, err := f.LoadBalancer.GetNodeBalancerConfig(framework.TestServerResourceName)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Checking Health Check Type")
-		Expect(string(nbConfig.Check) == checkType).Should(BeTrue())
+		Expect(string(nbConfig.Check) == args.checkType).Should(BeTrue())
 
-		if path != "" {
+		if args.path != "" {
 			By("Checking Health Check Path")
-			Expect(nbConfig.CheckPath == path).Should(BeTrue())
+			Expect(nbConfig.CheckPath == args.path).Should(BeTrue())
 		}
 
-		if body != "" {
+		if args.body != "" {
 			By("Checking Health Check Body")
-			Expect(nbConfig.CheckBody == body).Should(BeTrue())
+			Expect(nbConfig.CheckBody == args.body).Should(BeTrue())
 		}
 
-		if interval != "" {
+		if args.interval != "" {
 			By("Checking TCP Connection Health Check Body")
-			intInterval, err := strconv.Atoi(interval)
+			intInterval, err := strconv.Atoi(args.interval)
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(nbConfig.CheckInterval == intInterval).Should(BeTrue())
 		}
 
-		if timeout != "" {
+		if args.timeout != "" {
 			By("Checking TCP Connection Health Check Timeout")
-			intTimeout, err := strconv.Atoi(timeout)
+			intTimeout, err := strconv.Atoi(args.timeout)
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(nbConfig.CheckTimeout == intTimeout).Should(BeTrue())
 		}
 
-		if attempts != "" {
+		if args.attempts != "" {
 			By("Checking TCP Connection Health Check Attempts")
-			intAttempts, err := strconv.Atoi(attempts)
+			intAttempts, err := strconv.Atoi(args.attempts)
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(nbConfig.CheckAttempts == intAttempts).Should(BeTrue())
 		}
 
-		if checkPassive != "" {
+		if args.checkPassive != "" {
 			By("Checking for Passive Health Check")
-			boolCheckPassive, err := strconv.ParseBool(checkPassive)
+			boolCheckPassive, err := strconv.ParseBool(args.checkPassive)
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(nbConfig.CheckPassive == boolCheckPassive).Should(BeTrue())
@@ -580,7 +583,11 @@ var _ = Describe("CloudControllerManager", func() {
 
 				It("should successfully check the health of 2 nodes", func() {
 					By("Checking NodeBalancer Configurations")
-					checkNodeBalancerConfig(checkType, path, body, "", "", "", "")
+					checkNodeBalancerConfig(checkArgs{
+						checkType: checkType,
+						path:      path,
+						body:      body,
+					})
 				})
 			})
 
@@ -693,7 +700,12 @@ var _ = Describe("CloudControllerManager", func() {
 
 				It("should successfully check the health of 2 nodes", func() {
 					By("Checking NodeBalancer Configurations")
-					checkNodeBalancerConfig(checkType, "", "", interval, timeout, attempts, "")
+					checkNodeBalancerConfig(checkArgs{
+						checkType: checkType,
+						interval:  interval,
+						timeout:   timeout,
+						attempts:  attempts,
+					})
 				})
 			})
 
@@ -748,7 +760,10 @@ var _ = Describe("CloudControllerManager", func() {
 
 				It("should successfully check the health of 2 nodes", func() {
 					By("Checking NodeBalancer Configurations")
-					checkNodeBalancerConfig(checkType, "", "", "", "", "", checkPassive)
+					checkNodeBalancerConfig(checkArgs{
+						checkType:    checkType,
+						checkPassive: checkPassive,
+					})
 				})
 			})
 
@@ -804,7 +819,10 @@ var _ = Describe("CloudControllerManager", func() {
 
 				It("should successfully check the health of 2 nodes", func() {
 					By("Checking NodeBalancer Configurations")
-					checkNodeBalancerConfig(checkType, path, "", "", "", "", "")
+					checkNodeBalancerConfig(checkArgs{
+						checkType: checkType,
+						path:      path,
+					})
 				})
 			})
 		})
