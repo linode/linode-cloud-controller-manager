@@ -1054,7 +1054,6 @@ bSiPJQsGIKtQvyCaZY2szyOoeUGgOId+He7ITlezxKrjdj+1pLMESvAxKeo=
 		name       string
 		portConfig *portConfig
 		namespace  string
-		port       int
 		cert       string
 		key        string
 		err        error
