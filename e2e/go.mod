@@ -14,7 +14,7 @@ require (
 	github.com/googleapis/gnostic v0.2.0 // indirect
 	github.com/gregjones/httpcache v0.0.0-20190212212710-3befbb6ad0cc // indirect
 	github.com/imdario/mergo v0.3.7 // indirect
-	github.com/linode/linodego v0.7.1
+	github.com/linode/linodego v0.11.0
 	github.com/onsi/ginkgo v1.8.0
 	github.com/onsi/gomega v1.5.0
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
