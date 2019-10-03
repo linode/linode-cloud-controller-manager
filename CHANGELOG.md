@@ -1,5 +1,11 @@
 # Release History
 
+## [v0.2.4](https://github.com/linode/linode-cloud-controller-manager/compare/v0.2.3..v0.2.4) (2019-10-03)
+
+### Enhancements
+
+* Dependencies updated
+
 ## [v0.2.3](https://github.com/linode/linode-cloud-controller-manager/compare/v0.2.2..v0.2.3) (2019-06-26)
 
 ### Features
