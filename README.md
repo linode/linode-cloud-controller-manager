@@ -53,6 +53,12 @@ Annotation (Suffix) | Values | Default | Description
 `check-attempts` | int (1-30) | | Number of health check failures necessary to remove a back-end from the service
 `check-passive` | bool | `false` | When `true`, `5xx` status codes will cause the health check to fail
 
+These annotations are deprecated, and will be removed Q2 2020.
+
+Annotation (Suffix) | Values | Default | Description
+`protocol` | `tcp`, `http`, `https` | `tcp` | This annotation is used to specify the default protocol for Linode NodeBalancer. For ports specified in the `linode-loadbalancer-tls-ports` annotation, this protocol is overwritten to `https`
+`tls` | json array (e.g. `[ { "tls-secret-name": "prod-app-tls", "port": 443}, {"tls-secret-name": "dev-app-tls", "port": 8443} ]`) | | Specifies TLS ports with their corresponding secrets, the secret type should be `kubernetes.io/tls
+
 For example,
 
 ```yaml

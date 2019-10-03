@@ -47,6 +47,11 @@ type loadbalancers struct {
 	kubeClient kubernetes.Interface
 }
 
+type tlsAnnotationDeprecated struct {
+	TlsSecretName string `json:"tls-secret-name"`
+	Port          int    `json:"port"`
+}
+
 type portConfigAnnotation struct {
 	TlsSecretName string `json:"tls-secret-name"`
 	Protocol      string `json:"protocol"`
@@ -455,6 +460,15 @@ func getHealthCheckType(service *v1.Service) (linodego.ConfigCheck, error) {
 	return linodego.ConfigCheck(hType), nil
 }
 
+func isTLSPortDeprecated(tlsPortsSlice []int, port int) bool {
+	for _, tlsPort := range tlsPortsSlice {
+		if port == tlsPort {
+			return true
+		}
+	}
+	return false
+}
+
 func getPortConfigAnnotation(service *v1.Service, port int) (*portConfigAnnotation, error) {
 	portConfigAnnotation := portConfigAnnotation{}
 
@@ -519,4 +533,69 @@ func getConnectionThrottle(service *v1.Service) int {
 	}
 
 	return connThrottle
+}
+
+const (
+	// annLinodeProtocolDeprecated is the annotation used to specify the default protocol
+	// for Linode load balancers. For ports specified in annLinodeTLSPorts, this protocol
+	// is overwritten to https. Options are tcp, http and https. Defaults to tcp.
+	annLinodeProtocolDeprecated        = "service.beta.kubernetes.io/linode-loadbalancer-protocol"
+	annLinodeLoadBalancerTLSDeprecated = "service.beta.kubernetes.io/linode-loadbalancer-tls"
+)
+
+func getProtocolDeprecated(service *v1.Service) (linodego.ConfigProtocol, error) {
+	protocol, ok := service.Annotations[annLinodeProtocolDeprecated]
+	if !ok {
+		return linodego.ProtocolTCP, nil
+	}
+
+	if protocol != "tcp" && protocol != "http" && protocol != "https" {
+		return "", fmt.Errorf("invalid protocol: %q specified in annotation: %q", protocol, annLinodeProtocolDeprecated)
+	}
+
+	return linodego.ConfigProtocol(protocol), nil
+}
+
+func getTLSCertInfoDeprecated(kubeClient kubernetes.Interface, tlsAnnotations []*tlsAnnotationDeprecated, namespace string, port int) (string, string, error) {
+	for _, tlsAnnotation := range tlsAnnotations {
+		if tlsAnnotation.Port == port {
+			secret, err := kubeClient.CoreV1().Secrets(namespace).Get(tlsAnnotation.TlsSecretName, metav1.GetOptions{})
+			if err != nil {
+				return "", "", err
+			}
+
+			cert := string(secret.Data[v1.TLSCertKey])
+			cert = strings.TrimSpace(cert)
+
+			key := string(secret.Data[v1.TLSPrivateKeyKey])
+
+			key = strings.TrimSpace(key)
+
+			return cert, key, nil
+		}
+	}
+
+	return "", "", fmt.Errorf("cert & key for port %v is not specified in annotation %v", port, annLinodeLoadBalancerTLSDeprecated)
+}
+
+func getTLSPortsDeprecated(tlsAnnotations []*tlsAnnotationDeprecated) []int {
+	tlsPortsInt := make([]int, 0)
+	for _, tlsAnnotation := range tlsAnnotations {
+		tlsPortsInt = append(tlsPortsInt, tlsAnnotation.Port)
+	}
+
+	return tlsPortsInt
+}
+
+func getTLSAnnotationsDeprecated(service *v1.Service) ([]*tlsAnnotationDeprecated, error) {
+	annotationJSON, ok := service.Annotations[annLinodeLoadBalancerTLSDeprecated]
+	if !ok {
+		return nil, fmt.Errorf("annotation %v must be specified", annLinodeLoadBalancerTLSDeprecated)
+	}
+	tlsAnnotations := make([]*tlsAnnotationDeprecated, 0)
+	err := json.Unmarshal([]byte(annotationJSON), &tlsAnnotations)
+	if err != nil {
+		return nil, err
+	}
+	return tlsAnnotations, nil
 }
