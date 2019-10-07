@@ -44,7 +44,7 @@ Annotation (Suffix) | Values | Default | Description
 ---|---|---|---
 `throttle` | `0`-`20` (`0` to disable) | `20` | Client Connection Throttle, which limits the number of subsequent new connections per second from the same client IP
 `default-protocol` | `tcp`, `http`, `https` | `tcp` | This annotation is used to specify the default protocol for Linode NodeBalancer.
-`port-*` | json (e.g. `{ "tls-secret-name": "prod-app-tls", "protocol": "https"}`) | | Specifies the secret and protocol for a port corresponding secrets, the secret type should be `kubernetes.io/tls`
+`port-*` | json (e.g. `{ "tls-secret-name": "prod-app-tls", "protocol": "https"}`) | | Specifies the secret and protocol for a port corresponding secrets. The secret type should be `kubernetes.io/tls`. `*` is the port being configured, e.g. `linode-loadbalancer-port-443`
 `check-type` | `none`, `connection`, `http`, `http_body` | | The type of health check to perform against back-ends to ensure they are serving requests
 `check-path` | string | | The URL path to check on each back-end during health checks
 `check-body` | string | | Text which must be present in the response body to pass the NodeBalancer health check
@@ -52,6 +52,15 @@ Annotation (Suffix) | Values | Default | Description
 `check-timeout` | int (1-30) | | Duration, in seconds, to wait for a health check to succeed before considering it a failure
 `check-attempts` | int (1-30) | | Number of health check failures necessary to remove a back-end from the service
 `check-passive` | bool | `false` | When `true`, `5xx` status codes will cause the health check to fail
+
+#### Deprecated Annotations
+
+These annotations are deprecated, and will be removed Q3 2020.
+
+Annotation (Suffix) | Values | Default | Description
+---|---|---|---
+`protocol` | `tcp`, `http`, `https` | `tcp` | This annotation is used to specify the default protocol for Linode NodeBalancer. For ports specified in the `linode-loadbalancer-tls-ports` annotation, this protocol is overwritten to `https`
+`tls` | json array (e.g. `[ { "tls-secret-name": "prod-app-tls", "port": 443}, {"tls-secret-name": "dev-app-tls", "port": 8443} ]`) | | Specifies TLS ports with their corresponding secrets, the secret type should be `kubernetes.io/tls
 
 For example,
 

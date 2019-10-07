@@ -464,7 +464,7 @@ func getPortConfigAnnotation(service *v1.Service, port int) (*portConfigAnnotati
 	annotationKey := annLinodePortConfigPrefix + strconv.Itoa(port)
 	annotationJSON, ok := service.Annotations[annotationKey]
 	if !ok {
-		return &portConfigAnnotation, nil
+		return tryDeprecatedTLSAnnotation(service, port, &portConfigAnnotation)
 	}
 
 	err := json.Unmarshal([]byte(annotationJSON), &portConfigAnnotation)
@@ -522,4 +522,47 @@ func getConnectionThrottle(service *v1.Service) int {
 	}
 
 	return connThrottle
+}
+
+const (
+	annLinodeProtocolDeprecated        = "service.beta.kubernetes.io/linode-loadbalancer-protocol"
+	annLinodeLoadBalancerTLSDeprecated = "service.beta.kubernetes.io/linode-loadbalancer-tls"
+)
+
+type tlsAnnotationDeprecated struct {
+	TLSSecretName string `json:"tls-secret-name"`
+	Port          int    `json:"port"`
+}
+
+func tryDeprecatedTLSAnnotation(service *v1.Service, port int, portConfigAnnotation *portConfigAnnotation) (*portConfigAnnotation, error) {
+	tlsAnnotation, err := getTLSAnnotationDeprecated(service, port)
+	if err != nil {
+		return portConfigAnnotation, err
+	}
+
+	if tlsAnnotation != nil {
+		portConfigAnnotation.Protocol = "https"
+		portConfigAnnotation.TLSSecretName = tlsAnnotation.TLSSecretName
+	} else if protocol, ok := service.Annotations[annLinodeProtocolDeprecated]; ok {
+		portConfigAnnotation.Protocol = protocol
+	}
+	return portConfigAnnotation, nil
+}
+
+func getTLSAnnotationDeprecated(service *v1.Service, port int) (*tlsAnnotationDeprecated, error) {
+	annotationJSON, ok := service.Annotations[annLinodeLoadBalancerTLSDeprecated]
+	if !ok {
+		return nil, nil
+	}
+	tlsAnnotations := make([]*tlsAnnotationDeprecated, 0)
+	err := json.Unmarshal([]byte(annotationJSON), &tlsAnnotations)
+	if err != nil {
+		return nil, err
+	}
+	for _, tlsAnnotation := range tlsAnnotations {
+		if tlsAnnotation.Port == port {
+			return tlsAnnotation, nil
+		}
+	}
+	return nil, nil
 }
