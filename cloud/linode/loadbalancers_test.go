@@ -402,7 +402,7 @@ func Test_getHealthCheckType(t *testing.T) {
 	}
 }
 
-func Test_getNodeInternalIp(t *testing.T) {
+func Test_getNodeInternalIP(t *testing.T) {
 	testcases := []struct {
 		name    string
 		node    *v1.Node
@@ -440,7 +440,7 @@ func Test_getNodeInternalIp(t *testing.T) {
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
-			ip := getNodeInternalIp(test.node)
+			ip := getNodeInternalIP(test.node)
 			if ip != test.address {
 				t.Error("unexpected certificate")
 				t.Logf("expected: %q", test.address)
@@ -824,11 +824,11 @@ func Test_getTLSPorts(t *testing.T) {
 			name: "Test get TLS ports",
 			ann: []*tlsAnnotation{
 				{
-					TlsSecretName: "secret-1",
+					TLSSecretName: "secret-1",
 					Port:          8080,
 				},
 				{
-					TlsSecretName: "secret-2",
+					TLSSecretName: "secret-2",
 					Port:          8081,
 				},
 			},
@@ -875,7 +875,7 @@ func Test_getTLSAnnotations(t *testing.T) {
 			ann:  map[string]string{annLinodeLoadBalancerTLS: `[ { "tls-secret-name": "prod-app-tls", "port": 443} ]`},
 			annTLS: []*tlsAnnotation{
 				{
-					TlsSecretName: "prod-app-tls",
+					TLSSecretName: "prod-app-tls",
 					Port:          443,
 				},
 			},
@@ -886,11 +886,11 @@ func Test_getTLSAnnotations(t *testing.T) {
 			ann:  map[string]string{annLinodeLoadBalancerTLS: `[ { "tls-secret-name": "prod-app-tls", "port": 443}, {"tls-secret-name": "dev-app-tls", "port": 8443} ]`},
 			annTLS: []*tlsAnnotation{
 				{
-					TlsSecretName: "prod-app-tls",
+					TLSSecretName: "prod-app-tls",
 					Port:          443,
 				},
 				{
-					TlsSecretName: "dev-app-tls",
+					TLSSecretName: "dev-app-tls",
 					Port:          8443,
 				},
 			},
@@ -1038,7 +1038,7 @@ bSiPJQsGIKtQvyCaZY2szyOoeUGgOId+He7ITlezxKrjdj+1pLMESvAxKeo=
 			name: "Test valid Cert info",
 			annTLS: []*tlsAnnotation{
 				{
-					TlsSecretName: "tls-secret",
+					TLSSecretName: "tls-secret",
 					Port:          8080,
 				},
 			},
@@ -1052,7 +1052,7 @@ bSiPJQsGIKtQvyCaZY2szyOoeUGgOId+He7ITlezxKrjdj+1pLMESvAxKeo=
 			name: "Test invalid Cert info",
 			annTLS: []*tlsAnnotation{
 				{
-					TlsSecretName: "tls-secret",
+					TLSSecretName: "tls-secret",
 					Port:          8080,
 				},
 			},
@@ -1066,7 +1066,7 @@ bSiPJQsGIKtQvyCaZY2szyOoeUGgOId+He7ITlezxKrjdj+1pLMESvAxKeo=
 			name: "Test no secret found",
 			annTLS: []*tlsAnnotation{
 				{
-					TlsSecretName: "secret",
+					TLSSecretName: "secret",
 					Port:          8080,
 				},
 			},

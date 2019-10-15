@@ -55,7 +55,7 @@ func (i *instances) nodeAddresses(ctx context.Context, linode *linodego.Instance
 	}
 
 	if (len(ips.IPv4.Public) == 0) && (len(ips.IPv4.Private) == 0) {
-		return nil, fmt.Errorf("Linode has no IP addresses")
+		return nil, fmt.Errorf("instance has no IP addresses")
 	}
 
 	if len(ips.IPv4.Public) > 0 {
@@ -138,7 +138,6 @@ func linodeByID(ctx context.Context, client *linodego.Client, id string) (*linod
 		return nil, fmt.Errorf("linode not found with id %v", linodeID)
 	}
 	return instance, nil
-
 }
 
 func linodeByName(ctx context.Context, client *linodego.Client, nodeName types.NodeName) (*linodego.Instance, error) {
@@ -172,11 +171,11 @@ func linodeIDFromProviderID(providerID string) (string, error) {
 
 	split := strings.Split(providerID, "://")
 	if len(split) != 2 {
-		return "", fmt.Errorf("Unexpected providerID format: %s, format should be: linode://12345", providerID)
+		return "", fmt.Errorf("unexpected providerID format: %s, format should be: linode://12345", providerID)
 	}
 
 	if split[0] != ProviderName {
-		return "", fmt.Errorf("Provider scheme from providerID should be 'linode://', %s", providerID)
+		return "", fmt.Errorf("provider scheme from providerID should be 'linode://', %s", providerID)
 	}
 
 	return split[1], nil

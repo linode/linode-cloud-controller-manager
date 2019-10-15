@@ -39,7 +39,7 @@ const (
 	annLinodeThrottle = "service.beta.kubernetes.io/linode-loadbalancer-throttle"
 )
 
-var lbNotFound = errors.New("loadbalancer not found")
+var errLbNotFound = errors.New("loadbalancer not found")
 
 type loadbalancers struct {
 	client *linodego.Client
@@ -49,7 +49,7 @@ type loadbalancers struct {
 }
 
 type tlsAnnotation struct {
-	TlsSecretName string `json:"tls-secret-name"`
+	TLSSecretName string `json:"tls-secret-name"`
 	Port          int    `json:"port"`
 }
 
@@ -65,7 +65,7 @@ func (l *loadbalancers) GetLoadBalancer(ctx context.Context, clusterName string,
 	lbName := cloudprovider.GetLoadBalancerName(service)
 	lb, err := l.lbByName(ctx, l.client, lbName)
 	if err != nil {
-		if err == lbNotFound {
+		if err == errLbNotFound {
 			return nil, false, nil
 		}
 
@@ -122,6 +122,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 }
 
 // UpdateLoadBalancer updates the NodeBalancer to have configs that match the Service's ports
+//nolint:funlen
 func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	// Get the NodeBalancer
 	lbName := cloudprovider.GetLoadBalancerName(service)
@@ -155,7 +156,7 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 	// Add or overwrite configs for each of the Service's ports
 	for _, port := range service.Spec.Ports {
 		if port.Protocol == v1.ProtocolUDP {
-			return fmt.Errorf("Error updating NodeBalancer Config: ports with the UDP protocol are not supported")
+			return fmt.Errorf("error updating NodeBalancer Config: ports with the UDP protocol are not supported")
 		}
 
 		// Construct a new config for this port
@@ -173,6 +174,7 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 		// Look for an existing config for this port
 		var existingNBCfg *linodego.NodeBalancerConfig
 		for _, nbc := range nbCfgs {
+			nbc := nbc
 			if nbc.Port == int(port.Port) {
 				existingNBCfg = &nbc
 				break
@@ -185,7 +187,7 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 			rebuildOpts.Nodes = newNBNodes
 
 			if _, err = l.client.RebuildNodeBalancerConfig(ctx, lb.ID, existingNBCfg.ID, rebuildOpts); err != nil {
-				return fmt.Errorf("Error rebuilding NodeBalancer config: %v", err)
+				return fmt.Errorf("error rebuilding NodeBalancer config: %v", err)
 			}
 		} else {
 			createOpts := newNBCfg.GetCreateOptions()
@@ -242,7 +244,7 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 	return l.client.DeleteNodeBalancer(ctx, lb.ID)
 }
 
-// The returned error will be lbNotFound if the load balancer does not exist.
+// The returned error will be errLbNotFound if the load balancer does not exist.
 func (l *loadbalancers) lbByName(ctx context.Context, client *linodego.Client, name string) (*linodego.NodeBalancer, error) {
 	jsonFilter, err := json.Marshal(map[string]string{"label": name})
 	if err != nil {
@@ -257,7 +259,7 @@ func (l *loadbalancers) lbByName(ctx context.Context, client *linodego.Client, n
 		return &lbs[0], nil
 	}
 
-	return nil, lbNotFound
+	return nil, errLbNotFound
 }
 
 func (l *loadbalancers) createNodeBalancer(ctx context.Context, service *v1.Service, configs []*linodego.NodeBalancerConfigCreateOptions) (*linodego.NodeBalancer, error) {
@@ -273,6 +275,7 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, service *v1.Serv
 	return l.client.CreateNodeBalancer(ctx, createOpts)
 }
 
+//nolint:funlen
 func (l *loadbalancers) buildNodeBalancerConfig(service *v1.Service, port int) (linodego.NodeBalancerConfig, error) {
 	protocol, err := getProtocol(service)
 	if err != nil {
@@ -368,12 +371,12 @@ func (l *loadbalancers) processHTTPS(service *v1.Service, nbConfig *linodego.Nod
 // buildLoadBalancerRequest returns a linodego.NodeBalancer
 // requests for service across nodes.
 func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, service *v1.Service, nodes []*v1.Node) (*linodego.NodeBalancer, error) {
-	var configs []*linodego.NodeBalancerConfigCreateOptions
-
 	ports := service.Spec.Ports
+	configs := make([]*linodego.NodeBalancerConfigCreateOptions, 0, len(ports))
+
 	for _, port := range ports {
 		if port.Protocol == v1.ProtocolUDP {
-			return nil, fmt.Errorf("Error creating NodeBalancer Config: ports with the UDP protocol are not supported")
+			return nil, fmt.Errorf("error creating NodeBalancer Config: ports with the UDP protocol are not supported")
 		}
 
 		config, err := l.buildNodeBalancerConfig(service, int(port.Port))
@@ -393,7 +396,7 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, service *v
 
 func (l *loadbalancers) buildNodeBalancerNodeCreateOptions(node *v1.Node, nodePort int32) linodego.NodeBalancerNodeCreateOptions {
 	return linodego.NodeBalancerNodeCreateOptions{
-		Address: fmt.Sprintf("%v:%v", getNodeInternalIp(node), nodePort),
+		Address: fmt.Sprintf("%v:%v", getNodeInternalIP(node), nodePort),
 		Label:   node.Name,
 		Mode:    "accept",
 		Weight:  100,
@@ -473,7 +476,7 @@ func getTLSAnnotations(service *v1.Service) ([]*tlsAnnotation, error) {
 	return tlsAnnotations, nil
 }
 
-func getNodeInternalIp(node *v1.Node) string {
+func getNodeInternalIP(node *v1.Node) string {
 	for _, addr := range node.Status.Addresses {
 		if addr.Type == v1.NodeInternalIP {
 			return addr.Address
@@ -485,7 +488,7 @@ func getNodeInternalIp(node *v1.Node) string {
 func getTLSCertInfo(kubeClient kubernetes.Interface, tlsAnnotations []*tlsAnnotation, namespace string, port int) (string, string, error) {
 	for _, tlsAnnotation := range tlsAnnotations {
 		if tlsAnnotation.Port == port {
-			secret, err := kubeClient.CoreV1().Secrets(namespace).Get(tlsAnnotation.TlsSecretName, metav1.GetOptions{})
+			secret, err := kubeClient.CoreV1().Secrets(namespace).Get(tlsAnnotation.TLSSecretName, metav1.GetOptions{})
 			if err != nil {
 				return "", "", err
 			}
