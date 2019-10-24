@@ -518,7 +518,7 @@ func Test_tryDeprecatedTLSAnnotation(t *testing.T) {
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
 			svc.Annotations = test.ann
-			portConfigAnnotation, _ := tryDeprecatedTLSAnnotation(svc, 443, &portConfigAnnotation{})
+			portConfigAnnotation, _ := tryDeprecatedTLSAnnotation(svc, 443)
 			if portConfigAnnotation.Protocol != test.expectedProtocol {
 				t.Error("unexpected error")
 				t.Logf("expected: %v", test.expectedProtocol)

@@ -272,7 +272,7 @@ func Test_getPortConfig(t *testing.T) {
 	testcases := []struct {
 		name               string
 		service            *v1.Service
-		expectedPortConfig *portConfig
+		expectedPortConfig portConfig
 		err                error
 	}{
 		{
@@ -283,7 +283,7 @@ func Test_getPortConfig(t *testing.T) {
 					UID:  "abc123",
 				},
 			},
-			&portConfig{Port: 443, Protocol: "tcp"},
+			portConfig{Port: 443, Protocol: "tcp"},
 
 			nil,
 		},
@@ -298,7 +298,7 @@ func Test_getPortConfig(t *testing.T) {
 					},
 				},
 			},
-			&portConfig{Port: 443, Protocol: "tcp"},
+			portConfig{Port: 443, Protocol: "tcp"},
 			nil,
 		},
 		{
@@ -312,7 +312,7 @@ func Test_getPortConfig(t *testing.T) {
 					},
 				},
 			},
-			&portConfig{Port: 443, Protocol: "http"},
+			portConfig{Port: 443, Protocol: "http"},
 			nil,
 		},
 		{
@@ -326,7 +326,7 @@ func Test_getPortConfig(t *testing.T) {
 					},
 				},
 			},
-			nil,
+			portConfig{},
 			fmt.Errorf("invalid protocol: %q specified", "invalid"),
 		},
 		{
@@ -341,7 +341,7 @@ func Test_getPortConfig(t *testing.T) {
 					},
 				},
 			},
-			&portConfig{Port: 443, Protocol: "http"},
+			portConfig{Port: 443, Protocol: "http"},
 			nil,
 		},
 		{
@@ -355,7 +355,7 @@ func Test_getPortConfig(t *testing.T) {
 					},
 				},
 			},
-			&portConfig{Port: 443, Protocol: "http"},
+			portConfig{Port: 443, Protocol: "http"},
 			nil,
 		},
 		{
@@ -369,7 +369,7 @@ func Test_getPortConfig(t *testing.T) {
 					},
 				},
 			},
-			nil,
+			portConfig{},
 			fmt.Errorf("invalid protocol: %q specified", "invalid"),
 		},
 	}
@@ -893,13 +893,13 @@ func Test_getPortConfigAnnotation(t *testing.T) {
 	testcases := []struct {
 		name     string
 		ann      map[string]string
-		expected *portConfigAnnotation
+		expected portConfigAnnotation
 		err      string
 	}{
 		{
 			name: "Test single port annotation",
 			ann:  map[string]string{annLinodePortConfigPrefix + "443": `{ "tls-secret-name": "prod-app-tls", "protocol": "https" }`},
-			expected: &portConfigAnnotation{
+			expected: portConfigAnnotation{
 				TLSSecretName: "prod-app-tls",
 				Protocol:      "https",
 			},
@@ -911,7 +911,7 @@ func Test_getPortConfigAnnotation(t *testing.T) {
 				annLinodePortConfigPrefix + "443": `{ "tls-secret-name": "prod-app-tls", "protocol": "https" }`,
 				annLinodePortConfigPrefix + "80":  `{ "protocol": "http" }`,
 			},
-			expected: &portConfigAnnotation{
+			expected: portConfigAnnotation{
 				TLSSecretName: "prod-app-tls",
 				Protocol:      "https",
 			},
@@ -920,7 +920,7 @@ func Test_getPortConfigAnnotation(t *testing.T) {
 		{
 			name: "Test no port annotation",
 			ann:  map[string]string{},
-			expected: &portConfigAnnotation{
+			expected: portConfigAnnotation{
 				Protocol: "",
 			},
 			err: "",
@@ -930,7 +930,7 @@ func Test_getPortConfigAnnotation(t *testing.T) {
 			ann: map[string]string{
 				annLinodePortConfigPrefix + "443": `{ "tls-secret-name": "prod-app-tls" `,
 			},
-			expected: nil,
+			expected: portConfigAnnotation{},
 			err:      "unexpected end of JSON input",
 		},
 	}
@@ -1052,7 +1052,7 @@ bSiPJQsGIKtQvyCaZY2szyOoeUGgOId+He7ITlezxKrjdj+1pLMESvAxKeo=
 
 	testcases := []struct {
 		name       string
-		portConfig *portConfig
+		portConfig portConfig
 		namespace  string
 		cert       string
 		key        string
@@ -1060,7 +1060,7 @@ bSiPJQsGIKtQvyCaZY2szyOoeUGgOId+He7ITlezxKrjdj+1pLMESvAxKeo=
 	}{
 		{
 			name: "Test valid Cert info",
-			portConfig: &portConfig{
+			portConfig: portConfig{
 				TLSSecretName: "tls-secret",
 				Port:          8080,
 			},
@@ -1071,28 +1071,28 @@ bSiPJQsGIKtQvyCaZY2szyOoeUGgOId+He7ITlezxKrjdj+1pLMESvAxKeo=
 		},
 		{
 			name: "Test unspecified Cert info",
-			portConfig: &portConfig{
+			portConfig: portConfig{
 				Port: 8080,
 			},
 			namespace: "test",
 			cert:      "",
 			key:       "",
-			err:       fmt.Errorf("cert & key for port 8080 is not specified"),
+			err:       fmt.Errorf("TLS secret name for port 8080 is not specified"),
 		},
 		{
 			name: "Test blank Cert info",
-			portConfig: &portConfig{
+			portConfig: portConfig{
 				TLSSecretName: "",
 				Port:          8080,
 			},
 			namespace: "test",
 			cert:      "",
 			key:       "",
-			err:       fmt.Errorf("cert & key for port 8080 is not specified"),
+			err:       fmt.Errorf("TLS secret name for port 8080 is not specified"),
 		},
 		{
 			name: "Test no secret found",
-			portConfig: &portConfig{
+			portConfig: portConfig{
 				TLSSecretName: "secret",
 				Port:          8080,
 			},

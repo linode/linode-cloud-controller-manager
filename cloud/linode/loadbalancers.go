@@ -346,7 +346,7 @@ func (l *loadbalancers) buildNodeBalancerConfig(service *v1.Service, port int) (
 	config.CheckPassive = checkPassive
 
 	if portConfig.Protocol == linodego.ProtocolHTTPS {
-		if err = l.addSSLCert(service, &config, portConfig); err != nil {
+		if err = l.addTLSCert(service, &config, portConfig); err != nil {
 			return config, err
 		}
 	}
@@ -354,13 +354,13 @@ func (l *loadbalancers) buildNodeBalancerConfig(service *v1.Service, port int) (
 	return config, nil
 }
 
-func (l *loadbalancers) addSSLCert(service *v1.Service, nbConfig *linodego.NodeBalancerConfig, portConfig *portConfig) error {
+func (l *loadbalancers) addTLSCert(service *v1.Service, nbConfig *linodego.NodeBalancerConfig, config portConfig) error {
 	err := l.retrieveKubeClient()
 	if err != nil {
 		return err
 	}
 
-	nbConfig.SSLCert, nbConfig.SSLKey, err = getTLSCertInfo(l.kubeClient, service.Namespace, portConfig)
+	nbConfig.SSLCert, nbConfig.SSLKey, err = getTLSCertInfo(l.kubeClient, service.Namespace, config)
 	if err != nil {
 		return err
 	}
@@ -418,10 +418,11 @@ func (l *loadbalancers) retrieveKubeClient() error {
 	return nil
 }
 
-func getPortConfig(service *v1.Service, port int) (*portConfig, error) {
+func getPortConfig(service *v1.Service, port int) (portConfig, error) {
+	portConfig := portConfig{}
 	portConfigAnnotation, err := getPortConfigAnnotation(service, port)
 	if err != nil {
-		return nil, err
+		return portConfig, err
 	}
 	protocol := portConfigAnnotation.Protocol
 	if protocol == "" {
@@ -435,16 +436,14 @@ func getPortConfig(service *v1.Service, port int) (*portConfig, error) {
 	protocol = strings.ToLower(protocol)
 
 	if protocol != "tcp" && protocol != "http" && protocol != "https" {
-		return nil, fmt.Errorf("invalid protocol: %q specified", protocol)
+		return portConfig, fmt.Errorf("invalid protocol: %q specified", protocol)
 	}
 
-	portConfig := portConfig{
-		TLSSecretName: portConfigAnnotation.TLSSecretName,
-		Protocol:      linodego.ConfigProtocol(protocol),
-		Port:          port,
-	}
+	portConfig.Port = port
+	portConfig.Protocol = linodego.ConfigProtocol(protocol)
+	portConfig.TLSSecretName = portConfigAnnotation.TLSSecretName
 
-	return &portConfig, nil
+	return portConfig, nil
 }
 
 func getHealthCheckType(service *v1.Service) (linodego.ConfigCheck, error) {
@@ -458,21 +457,20 @@ func getHealthCheckType(service *v1.Service) (linodego.ConfigCheck, error) {
 	return linodego.ConfigCheck(hType), nil
 }
 
-func getPortConfigAnnotation(service *v1.Service, port int) (*portConfigAnnotation, error) {
-	portConfigAnnotation := portConfigAnnotation{}
-
+func getPortConfigAnnotation(service *v1.Service, port int) (portConfigAnnotation, error) {
 	annotationKey := annLinodePortConfigPrefix + strconv.Itoa(port)
 	annotationJSON, ok := service.Annotations[annotationKey]
 	if !ok {
-		return tryDeprecatedTLSAnnotation(service, port, &portConfigAnnotation)
+		return tryDeprecatedTLSAnnotation(service, port)
 	}
 
-	err := json.Unmarshal([]byte(annotationJSON), &portConfigAnnotation)
+	annotation := portConfigAnnotation{}
+	err := json.Unmarshal([]byte(annotationJSON), &annotation)
 	if err != nil {
-		return nil, err
+		return annotation, err
 	}
 
-	return &portConfigAnnotation, nil
+	return annotation, nil
 }
 
 func getNodeInternalIP(node *v1.Node) string {
@@ -484,12 +482,12 @@ func getNodeInternalIP(node *v1.Node) string {
 	return ""
 }
 
-func getTLSCertInfo(kubeClient kubernetes.Interface, namespace string, portConfig *portConfig) (string, string, error) {
-	if portConfig.TLSSecretName == "" {
-		return "", "", fmt.Errorf("cert & key for port %v is not specified", portConfig.Port)
+func getTLSCertInfo(kubeClient kubernetes.Interface, namespace string, config portConfig) (string, string, error) {
+	if config.TLSSecretName == "" {
+		return "", "", fmt.Errorf("TLS secret name for port %v is not specified", config.Port)
 	}
 
-	secret, err := kubeClient.CoreV1().Secrets(namespace).Get(portConfig.TLSSecretName, metav1.GetOptions{})
+	secret, err := kubeClient.CoreV1().Secrets(namespace).Get(config.TLSSecretName, metav1.GetOptions{})
 	if err != nil {
 		return "", "", err
 	}
@@ -522,47 +520,4 @@ func getConnectionThrottle(service *v1.Service) int {
 	}
 
 	return connThrottle
-}
-
-const (
-	annLinodeProtocolDeprecated        = "service.beta.kubernetes.io/linode-loadbalancer-protocol"
-	annLinodeLoadBalancerTLSDeprecated = "service.beta.kubernetes.io/linode-loadbalancer-tls"
-)
-
-type tlsAnnotationDeprecated struct {
-	TLSSecretName string `json:"tls-secret-name"`
-	Port          int    `json:"port"`
-}
-
-func tryDeprecatedTLSAnnotation(service *v1.Service, port int, portConfigAnnotation *portConfigAnnotation) (*portConfigAnnotation, error) {
-	tlsAnnotation, err := getTLSAnnotationDeprecated(service, port)
-	if err != nil {
-		return portConfigAnnotation, err
-	}
-
-	if tlsAnnotation != nil {
-		portConfigAnnotation.Protocol = "https"
-		portConfigAnnotation.TLSSecretName = tlsAnnotation.TLSSecretName
-	} else if protocol, ok := service.Annotations[annLinodeProtocolDeprecated]; ok {
-		portConfigAnnotation.Protocol = protocol
-	}
-	return portConfigAnnotation, nil
-}
-
-func getTLSAnnotationDeprecated(service *v1.Service, port int) (*tlsAnnotationDeprecated, error) {
-	annotationJSON, ok := service.Annotations[annLinodeLoadBalancerTLSDeprecated]
-	if !ok {
-		return nil, nil
-	}
-	tlsAnnotations := make([]*tlsAnnotationDeprecated, 0)
-	err := json.Unmarshal([]byte(annotationJSON), &tlsAnnotations)
-	if err != nil {
-		return nil, err
-	}
-	for _, tlsAnnotation := range tlsAnnotations {
-		if tlsAnnotation.Port == port {
-			return tlsAnnotation, nil
-		}
-	}
-	return nil, nil
 }
