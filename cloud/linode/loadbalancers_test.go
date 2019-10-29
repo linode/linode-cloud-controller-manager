@@ -2,7 +2,6 @@ package linode
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -269,61 +268,121 @@ func Test_getConnectionThrottle(t *testing.T) {
 	}
 }
 
-func Test_getProtocol(t *testing.T) {
+func Test_getPortConfig(t *testing.T) {
 	testcases := []struct {
-		name     string
-		service  *v1.Service
-		protocol linodego.ConfigProtocol
-		err      error
+		name               string
+		service            *v1.Service
+		expectedPortConfig portConfig
+		err                error
 	}{
 		{
-			"no protocol specified",
+			"default no protocol specified",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: randString(10),
 					UID:  "abc123",
 				},
 			},
-			linodego.ProtocolTCP,
+			portConfig{Port: 443, Protocol: "tcp"},
+
 			nil,
 		},
 		{
-			"tcp protocol specified",
+			"default tcp protocol specified",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: randString(10),
 					UID:  "abc123",
 					Annotations: map[string]string{
-						annLinodeProtocol: "http",
+						annLinodeDefaultProtocol: "tcp",
 					},
 				},
 			},
-			linodego.ProtocolHTTP,
+			portConfig{Port: 443, Protocol: "tcp"},
 			nil,
 		},
 		{
-			"invalid protocol",
+			"default capitalized protocol specified",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: randString(10),
 					UID:  "abc123",
 					Annotations: map[string]string{
-						annLinodeProtocol: "invalid",
+						annLinodeDefaultProtocol: "HTTP",
 					},
 				},
 			},
-			"",
-			fmt.Errorf("invalid protocol: %q specified in annotation: %q", "invalid", annLinodeProtocol),
+			portConfig{Port: 443, Protocol: "http"},
+			nil,
+		},
+		{
+			"default invalid protocol",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(10),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annLinodeDefaultProtocol: "invalid",
+					},
+				},
+			},
+			portConfig{},
+			fmt.Errorf("invalid protocol: %q specified", "invalid"),
+		},
+		{
+			"port config falls back to default",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(10),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annLinodeDefaultProtocol:          "http",
+						annLinodePortConfigPrefix + "443": `{}`,
+					},
+				},
+			},
+			portConfig{Port: 443, Protocol: "http"},
+			nil,
+		},
+		{
+			"port config capitalized protocol",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(10),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annLinodePortConfigPrefix + "443": `{ "protocol": "HTTp" }`,
+					},
+				},
+			},
+			portConfig{Port: 443, Protocol: "http"},
+			nil,
+		},
+		{
+			"port config invalid protocol",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(10),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annLinodePortConfigPrefix + "443": `{ "protocol": "invalid" }`,
+					},
+				},
+			},
+			portConfig{},
+			fmt.Errorf("invalid protocol: %q specified", "invalid"),
 		},
 	}
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
-			protocol, err := getProtocol(test.service)
-			if protocol != test.protocol {
-				t.Error("unexpected protocol")
-				t.Logf("expected: %q", test.protocol)
-				t.Logf("actual: %q", protocol)
+			testPort := 443
+			portConfig, err := getPortConfig(test.service, testPort)
+
+			if !reflect.DeepEqual(portConfig, test.expectedPortConfig) {
+				t.Error("unexpected port config")
+				t.Logf("expected: %q", test.expectedPortConfig)
+				t.Logf("actual: %q", portConfig)
 			}
 
 			if !reflect.DeepEqual(err, test.err) {
@@ -457,7 +516,7 @@ func testBuildLoadBalancerRequest(t *testing.T, client *linodego.Client) {
 			Name: "test",
 			UID:  "foobar123",
 			Annotations: map[string]string{
-				annLinodeProtocol: "tcp",
+				annLinodeDefaultProtocol: "tcp",
 			},
 		},
 		Spec: v1.ServiceSpec{
@@ -533,7 +592,7 @@ func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client) {
 			Name: "test",
 			UID:  "foobar123",
 			Annotations: map[string]string{
-				annLinodeProtocol: "tcp",
+				annLinodeDefaultProtocol: "tcp",
 			},
 		},
 		Spec: v1.ServiceSpec{
@@ -567,7 +626,7 @@ func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client) {
 					Name: "notexists",
 					UID:  "notexists123",
 					Annotations: map[string]string{
-						annLinodeProtocol: "tcp",
+						annLinodeDefaultProtocol: "tcp",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -611,7 +670,7 @@ func testEnsureLoadBalancer(t *testing.T, client *linodego.Client) {
 			Name: "testensure",
 			UID:  "foobar123",
 			Annotations: map[string]string{
-				annLinodeProtocol: "tcp",
+				annLinodeDefaultProtocol: "tcp",
 			},
 		},
 		Spec: v1.ServiceSpec{
@@ -733,7 +792,7 @@ func testGetLoadBalancer(t *testing.T, client *linodego.Client) {
 			Name: "test",
 			UID:  "foobar123",
 			Annotations: map[string]string{
-				annLinodeProtocol: "tcp",
+				annLinodeDefaultProtocol: "tcp",
 			},
 		},
 		Spec: v1.ServiceSpec{
@@ -776,7 +835,7 @@ func testGetLoadBalancer(t *testing.T, client *linodego.Client) {
 					Name: "notexists",
 					UID:  "notexists123",
 					Annotations: map[string]string{
-						annLinodeProtocol: "tcp",
+						annLinodeDefaultProtocol: "tcp",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -814,40 +873,7 @@ func testGetLoadBalancer(t *testing.T, client *linodego.Client) {
 	}
 }
 
-func Test_getTLSPorts(t *testing.T) {
-	testcases := []struct {
-		name    string
-		ann     []*tlsAnnotation
-		portLen int
-	}{
-		{
-			name: "Test get TLS ports",
-			ann: []*tlsAnnotation{
-				{
-					TLSSecretName: "secret-1",
-					Port:          8080,
-				},
-				{
-					TLSSecretName: "secret-2",
-					Port:          8081,
-				},
-			},
-			portLen: 2,
-		},
-	}
-	for _, test := range testcases {
-		t.Run(test.name, func(t *testing.T) {
-			ports := getTLSPorts(test.ann)
-			if len(ports) != test.portLen {
-				t.Error("unexpected error")
-				t.Logf("expected: %v", test.portLen)
-				t.Logf("actual: %v", len(ports))
-			}
-		})
-	}
-}
-
-func Test_getTLSAnnotations(t *testing.T) {
+func Test_getPortConfigAnnotation(t *testing.T) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test",
@@ -865,60 +891,59 @@ func Test_getTLSAnnotations(t *testing.T) {
 	}
 
 	testcases := []struct {
-		name   string
-		ann    map[string]string
-		annTLS []*tlsAnnotation
-		err    error
+		name     string
+		ann      map[string]string
+		expected portConfigAnnotation
+		err      string
 	}{
 		{
-			name: "Test single TLS annotation",
-			ann:  map[string]string{annLinodeLoadBalancerTLS: `[ { "tls-secret-name": "prod-app-tls", "port": 443} ]`},
-			annTLS: []*tlsAnnotation{
-				{
-					TLSSecretName: "prod-app-tls",
-					Port:          443,
-				},
+			name: "Test single port annotation",
+			ann:  map[string]string{annLinodePortConfigPrefix + "443": `{ "tls-secret-name": "prod-app-tls", "protocol": "https" }`},
+			expected: portConfigAnnotation{
+				TLSSecretName: "prod-app-tls",
+				Protocol:      "https",
 			},
-			err: nil,
+			err: "",
 		},
 		{
-			name: "Test multiple TLS annotation",
-			ann:  map[string]string{annLinodeLoadBalancerTLS: `[ { "tls-secret-name": "prod-app-tls", "port": 443}, {"tls-secret-name": "dev-app-tls", "port": 8443} ]`},
-			annTLS: []*tlsAnnotation{
-				{
-					TLSSecretName: "prod-app-tls",
-					Port:          443,
-				},
-				{
-					TLSSecretName: "dev-app-tls",
-					Port:          8443,
-				},
+			name: "Test multiple port annotation",
+			ann: map[string]string{
+				annLinodePortConfigPrefix + "443": `{ "tls-secret-name": "prod-app-tls", "protocol": "https" }`,
+				annLinodePortConfigPrefix + "80":  `{ "protocol": "http" }`,
 			},
-			err: nil,
+			expected: portConfigAnnotation{
+				TLSSecretName: "prod-app-tls",
+				Protocol:      "https",
+			},
+			err: "",
 		},
 		{
-			name:   "Test without TLS annotation",
-			ann:    nil,
-			annTLS: nil,
-			err:    fmt.Errorf("annotation %v must be specified", annLinodeLoadBalancerTLS),
+			name: "Test no port annotation",
+			ann:  map[string]string{},
+			expected: portConfigAnnotation{
+				Protocol: "",
+			},
+			err: "",
 		},
 		{
-			name:   "Test invalid json",
-			ann:    map[string]string{annLinodeLoadBalancerTLS: `[ { "tls-secret-name": "prod-app-tls", "port": 443}`},
-			annTLS: nil,
-			err:    json.Unmarshal([]byte(`[ { "tls-secret-name": "prod-app-tls", "port": 443}`), &tlsAnnotation{}),
+			name: "Test invalid json",
+			ann: map[string]string{
+				annLinodePortConfigPrefix + "443": `{ "tls-secret-name": "prod-app-tls" `,
+			},
+			expected: portConfigAnnotation{},
+			err:      "unexpected end of JSON input",
 		},
 	}
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
 			svc.Annotations = test.ann
-			ann, err := getTLSAnnotations(svc)
-			if !reflect.DeepEqual(ann, test.annTLS) {
+			ann, err := getPortConfigAnnotation(svc, 443)
+			if !reflect.DeepEqual(ann, test.expected) {
 				t.Error("unexpected error")
-				t.Logf("expected: %v", test.annTLS)
+				t.Logf("expected: %v", test.expected)
 				t.Logf("actual: %v", ann)
 			}
-			if !reflect.DeepEqual(err, test.err) {
+			if test.err != "" && test.err != err.Error() {
 				t.Error("unexpected error")
 				t.Logf("expected: %v", test.err)
 				t.Logf("actual: %v", err)
@@ -1026,52 +1051,52 @@ bSiPJQsGIKtQvyCaZY2szyOoeUGgOId+He7ITlezxKrjdj+1pLMESvAxKeo=
 	}
 
 	testcases := []struct {
-		name      string
-		annTLS    []*tlsAnnotation
-		namespace string
-		port      int
-		cert      string
-		key       string
-		err       error
+		name       string
+		portConfig portConfig
+		namespace  string
+		cert       string
+		key        string
+		err        error
 	}{
 		{
 			name: "Test valid Cert info",
-			annTLS: []*tlsAnnotation{
-				{
-					TLSSecretName: "tls-secret",
-					Port:          8080,
-				},
+			portConfig: portConfig{
+				TLSSecretName: "tls-secret",
+				Port:          8080,
 			},
 			namespace: "test",
-			port:      8080,
 			cert:      cert,
 			key:       key,
 			err:       nil,
 		},
 		{
-			name: "Test invalid Cert info",
-			annTLS: []*tlsAnnotation{
-				{
-					TLSSecretName: "tls-secret",
-					Port:          8080,
-				},
+			name: "Test unspecified Cert info",
+			portConfig: portConfig{
+				Port: 8080,
 			},
 			namespace: "test",
-			port:      8081,
 			cert:      "",
 			key:       "",
-			err:       fmt.Errorf("cert & key for port %v is not specified in annotation %v", 8081, annLinodeLoadBalancerTLS),
+			err:       fmt.Errorf("TLS secret name for port 8080 is not specified"),
+		},
+		{
+			name: "Test blank Cert info",
+			portConfig: portConfig{
+				TLSSecretName: "",
+				Port:          8080,
+			},
+			namespace: "test",
+			cert:      "",
+			key:       "",
+			err:       fmt.Errorf("TLS secret name for port 8080 is not specified"),
 		},
 		{
 			name: "Test no secret found",
-			annTLS: []*tlsAnnotation{
-				{
-					TLSSecretName: "secret",
-					Port:          8080,
-				},
+			portConfig: portConfig{
+				TLSSecretName: "secret",
+				Port:          8080,
 			},
 			namespace: "test",
-			port:      8080,
 			cert:      "",
 			key:       "",
 			err: errors.NewNotFound(schema.GroupResource{
@@ -1083,7 +1108,7 @@ bSiPJQsGIKtQvyCaZY2szyOoeUGgOId+He7ITlezxKrjdj+1pLMESvAxKeo=
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
-			cert, key, err := getTLSCertInfo(kubeClient, test.annTLS, test.namespace, test.port)
+			cert, key, err := getTLSCertInfo(kubeClient, test.namespace, test.portConfig)
 			if cert != test.cert {
 				t.Error("unexpected error")
 				t.Logf("expected: %v", test.cert)
@@ -1098,38 +1123,6 @@ bSiPJQsGIKtQvyCaZY2szyOoeUGgOId+He7ITlezxKrjdj+1pLMESvAxKeo=
 				t.Error("unexpected error")
 				t.Logf("expected: %v", test.err)
 				t.Logf("actual: %v", err)
-			}
-		})
-	}
-}
-
-func Test_isTLSPort(t *testing.T) {
-	testcases := []struct {
-		name     string
-		tlsPorts []int
-		port     int
-		ok       bool
-	}{
-		{
-			name:     "Test TLS port",
-			tlsPorts: []int{8080, 443, 7443},
-			port:     443,
-			ok:       true,
-		},
-		{
-			name:     "Test not TLS port",
-			tlsPorts: []int{8080, 443, 7443},
-			port:     80,
-			ok:       false,
-		},
-	}
-	for _, test := range testcases {
-		t.Run(test.name, func(t *testing.T) {
-			ok := isTLSPort(test.tlsPorts, test.port)
-			if ok != test.ok {
-				t.Error("unexpected error")
-				t.Logf("expected: %v", test.ok)
-				t.Logf("actual: %v", ok)
 			}
 		})
 	}

@@ -16,7 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-var _ = Describe("CloudControllerManager", func() {
+var _ = Describe("CloudControllerManagerDeprecated", func() {
 	var (
 		err     error
 		f       *framework.Invocation
@@ -24,8 +24,8 @@ var _ = Describe("CloudControllerManager", func() {
 	)
 
 	const (
-		annLinodeDefaultProtocol     = "service.beta.kubernetes.io/linode-loadbalancer-default-protocol"
-		annLinodePortConfigPrefix    = "service.beta.kubernetes.io/linode-loadbalancer-port-"
+		annLinodeLoadBalancerTLS     = "service.beta.kubernetes.io/linode-loadbalancer-tls"
+		annLinodeProtocol            = "service.beta.kubernetes.io/linode-loadbalancer-protocol"
 		annLinodeHealthCheckType     = "service.beta.kubernetes.io/linode-loadbalancer-check-type"
 		annLinodeCheckBody           = "service.beta.kubernetes.io/linode-loadbalancer-check-body"
 		annLinodeCheckPath           = "service.beta.kubernetes.io/linode-loadbalancer-check-path"
@@ -113,62 +113,54 @@ var _ = Describe("CloudControllerManager", func() {
 		}).Should(Equal(numNodes))
 	}
 
-	type checkArgs struct {
-		checkType, path, body, interval, timeout, attempts, checkPassive, protocol string
-	}
-	var checkNodeBalancerConfig = func(args checkArgs) {
+	var checkNodeBalancerConfig = func(checkType, path, body, interval, timeout, attempts, checkPassive string) {
 		By("Getting NodeBalancer Configuration")
 		nbConfig, err := f.LoadBalancer.GetNodeBalancerConfig(framework.TestServerResourceName)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Checking Health Check Type")
-		Expect(string(nbConfig.Check) == args.checkType).Should(BeTrue())
+		Expect(string(nbConfig.Check) == checkType).Should(BeTrue())
 
-		if args.path != "" {
+		if path != "" {
 			By("Checking Health Check Path")
-			Expect(nbConfig.CheckPath == args.path).Should(BeTrue())
+			Expect(nbConfig.CheckPath == path).Should(BeTrue())
 		}
 
-		if args.body != "" {
+		if body != "" {
 			By("Checking Health Check Body")
-			Expect(nbConfig.CheckBody == args.body).Should(BeTrue())
+			Expect(nbConfig.CheckBody == body).Should(BeTrue())
 		}
 
-		if args.interval != "" {
+		if interval != "" {
 			By("Checking TCP Connection Health Check Body")
-			intInterval, err := strconv.Atoi(args.interval)
+			intInterval, err := strconv.Atoi(interval)
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(nbConfig.CheckInterval == intInterval).Should(BeTrue())
 		}
 
-		if args.timeout != "" {
+		if timeout != "" {
 			By("Checking TCP Connection Health Check Timeout")
-			intTimeout, err := strconv.Atoi(args.timeout)
+			intTimeout, err := strconv.Atoi(timeout)
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(nbConfig.CheckTimeout == intTimeout).Should(BeTrue())
 		}
 
-		if args.attempts != "" {
+		if attempts != "" {
 			By("Checking TCP Connection Health Check Attempts")
-			intAttempts, err := strconv.Atoi(args.attempts)
+			intAttempts, err := strconv.Atoi(attempts)
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(nbConfig.CheckAttempts == intAttempts).Should(BeTrue())
 		}
 
-		if args.checkPassive != "" {
+		if checkPassive != "" {
 			By("Checking for Passive Health Check")
-			boolCheckPassive, err := strconv.ParseBool(args.checkPassive)
+			boolCheckPassive, err := strconv.ParseBool(checkPassive)
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(nbConfig.CheckPassive == boolCheckPassive).Should(BeTrue())
-		}
-
-		if args.protocol != "" {
-			By("Checking for Protocol")
-			Expect(string(nbConfig.Protocol) == args.protocol).Should(BeTrue())
 		}
 
 		checkNumberOfUpNodes(2)
@@ -296,8 +288,8 @@ var _ = Describe("CloudControllerManager", func() {
 						"app": "test-loadbalancer",
 					}
 					annotations = map[string]string{
-						annLinodePortConfigPrefix + "80": `{ "tls-secret-name": "` + secretName + `" }`,
-						annLinodeDefaultProtocol:         "https",
+						annLinodeLoadBalancerTLS: `[ { "tls-secret-name": "` + secretName + `", "port": 80} ]`,
+						annLinodeProtocol:        "https",
 					}
 
 					By("Creating Pod")
@@ -334,7 +326,7 @@ var _ = Describe("CloudControllerManager", func() {
 				})
 			})
 
-			Context("With Multiple HTTP and HTTPS Ports", func() {
+			Context("With Multiple TLS Ports", func() {
 				var (
 					pods        []string
 					labels      map[string]string
@@ -350,44 +342,29 @@ var _ = Describe("CloudControllerManager", func() {
 						"app": "test-loadbalancer",
 					}
 					annotations = map[string]string{
-						annLinodeDefaultProtocol:           "https",
-						annLinodePortConfigPrefix + "80":   `{"protocol": "http"}`,
-						annLinodePortConfigPrefix + "8080": `{"protocol": "http"}`,
-						annLinodePortConfigPrefix + "443":  `{"tls-secret-name": "` + secretName1 + `"}`,
-						annLinodePortConfigPrefix + "8443": `{"tls-secret-name": "` + secretName2 + `", "protocol": "https"}`,
+						annLinodeLoadBalancerTLS: `[ { "tls-secret-name": "` + secretName1 + `", "port": 80},  {"tls-secret-name": "` + secretName2 + `", "port": 443}]`,
+						annLinodeProtocol:        "https",
 					}
 					ports := []core.ContainerPort{
 						{
-							Name:          "alpha",
+							Name:          "https1",
 							ContainerPort: 8080,
 						},
 						{
-							Name:          "beta",
+							Name:          "https2",
 							ContainerPort: 8989,
 						},
 					}
 					servicePorts := []core.ServicePort{
 						{
-							Name:       "http-1",
-							Port:       80,
-							TargetPort: intstr.FromInt(8989),
-							Protocol:   "TCP",
-						},
-						{
-							Name:       "http-2",
-							Port:       8080,
-							TargetPort: intstr.FromInt(8080),
-							Protocol:   "TCP",
-						},
-						{
 							Name:       "https-1",
-							Port:       443,
+							Port:       80,
 							TargetPort: intstr.FromInt(8080),
 							Protocol:   "TCP",
 						},
 						{
 							Name:       "https-2",
-							Port:       8443,
+							Port:       443,
 							TargetPort: intstr.FromInt(8989),
 							Protocol:   "TCP",
 						},
@@ -418,24 +395,82 @@ var _ = Describe("CloudControllerManager", func() {
 					deleteSecret(secretName2)
 				})
 
-				It("should reach the pods", func() {
+				It("should reach the pod via tls", func() {
 					By("Checking TCP Response")
 					eps, err := f.LoadBalancer.GetHTTPEndpoints()
 					Expect(err).NotTo(HaveOccurred())
-					Expect(len(eps)).Should(BeNumerically("==", 4))
+					Expect(len(eps)).Should(BeNumerically(">=", 1))
 
-					// in order of the spec
-					http80, http8080, https443, https8443 := eps[0], eps[1], eps[2], eps[3]
-
-					waitForResponse := func(endpoint string, fn func(string, string) error) {
-						By("Waiting for Response from the LoadBalancer url: " + endpoint)
-						err := fn(endpoint, pods[0])
+					By("Waiting for Response from the LoadBalancer urls: " + eps[0] + ", " + eps[1])
+					for _, ep := range eps {
+						err = framework.WaitForHTTPSResponse(ep, pods[0])
 						Expect(err).NotTo(HaveOccurred())
 					}
-					waitForResponse(http80, framework.WaitForHTTPResponse)
-					waitForResponse(http8080, framework.WaitForHTTPResponse)
-					waitForResponse(https443, framework.WaitForHTTPSResponse)
-					waitForResponse(https8443, framework.WaitForHTTPSResponse)
+				})
+			})
+
+			Context("With Multiple HTTP Ports", func() {
+				var (
+					pods   []string
+					labels map[string]string
+				)
+
+				BeforeEach(func() {
+					pods = []string{"test-pod-http"}
+					ports := []core.ContainerPort{
+						{
+							Name:          "http-1",
+							ContainerPort: 8080,
+						},
+						{
+							Name:          "http-2",
+							ContainerPort: 8989,
+						},
+					}
+					servicePorts := []core.ServicePort{
+						{
+							Name:       "http-1",
+							Port:       80,
+							TargetPort: intstr.FromInt(8080),
+							Protocol:   "TCP",
+						},
+						{
+							Name:       "http-2",
+							Port:       8888,
+							TargetPort: intstr.FromInt(8989),
+							Protocol:   "TCP",
+						},
+					}
+					labels = map[string]string{
+						"app": "test-loadbalancer",
+					}
+
+					By("Creating Pods")
+					createPodWithLabel(pods, ports, framework.TestServerImage, labels, true)
+
+					By("Creating Service")
+					createServiceWithSelector(labels, servicePorts, false)
+				})
+
+				AfterEach(func() {
+					By("Deleting the Pods")
+					deletePods(pods)
+
+					By("Deleting the Service")
+					deleteService()
+				})
+
+				It("should reach all pods", func() {
+					By("Checking TCP Response")
+					eps, err := f.LoadBalancer.GetHTTPEndpoints()
+					Expect(err).NotTo(HaveOccurred())
+					Expect(len(eps)).Should(BeNumerically(">=", 1))
+
+					By("Waiting for Response from the LoadBalancer url: " + eps[0] + " " + eps[1])
+					for _, ep := range eps {
+						err = framework.WaitForHTTPResponse(ep, pods[0])
+						Expect(err).NotTo(HaveOccurred())
+					}
 				})
 			})
 
@@ -500,7 +535,6 @@ var _ = Describe("CloudControllerManager", func() {
 					checkType = "http_body"
 					path      = "/"
 					body      = "nginx"
-					protocol  = "http"
 				)
 				BeforeEach(func() {
 					pods = []string{"test-pod-http-body"}
@@ -526,7 +560,7 @@ var _ = Describe("CloudControllerManager", func() {
 						annLinodeHealthCheckType: checkType,
 						annLinodeCheckPath:       path,
 						annLinodeCheckBody:       body,
-						annLinodeDefaultProtocol: protocol,
+						annLinodeProtocol:        "http",
 					}
 
 					By("Creating Pod")
@@ -546,12 +580,7 @@ var _ = Describe("CloudControllerManager", func() {
 
 				It("should successfully check the health of 2 nodes", func() {
 					By("Checking NodeBalancer Configurations")
-					checkNodeBalancerConfig(checkArgs{
-						checkType: checkType,
-						path:      path,
-						body:      body,
-						protocol:  protocol,
-					})
+					checkNodeBalancerConfig(checkType, path, body, "", "", "", "")
 				})
 			})
 
@@ -618,7 +647,6 @@ var _ = Describe("CloudControllerManager", func() {
 					interval  = "10"
 					timeout   = "5"
 					attempts  = "4"
-					protocol  = "tcp"
 				)
 				BeforeEach(func() {
 					pods = []string{"test-pod-tcp"}
@@ -642,7 +670,7 @@ var _ = Describe("CloudControllerManager", func() {
 					}
 					annotations = map[string]string{
 						annLinodeHealthCheckType:     checkType,
-						annLinodeDefaultProtocol:     protocol,
+						annLinodeProtocol:            "tcp",
 						annLinodeHealthCheckInterval: interval,
 						annLinodeHealthCheckTimeout:  timeout,
 						annLinodeHealthCheckAttempts: attempts,
@@ -665,13 +693,7 @@ var _ = Describe("CloudControllerManager", func() {
 
 				It("should successfully check the health of 2 nodes", func() {
 					By("Checking NodeBalancer Configurations")
-					checkNodeBalancerConfig(checkArgs{
-						checkType: checkType,
-						interval:  interval,
-						timeout:   timeout,
-						attempts:  attempts,
-						protocol:  protocol,
-					})
+					checkNodeBalancerConfig(checkType, "", "", interval, timeout, attempts, "")
 				})
 			})
 
@@ -726,10 +748,7 @@ var _ = Describe("CloudControllerManager", func() {
 
 				It("should successfully check the health of 2 nodes", func() {
 					By("Checking NodeBalancer Configurations")
-					checkNodeBalancerConfig(checkArgs{
-						checkType:    checkType,
-						checkPassive: checkPassive,
-					})
+					checkNodeBalancerConfig(checkType, "", "", "", "", "", checkPassive)
 				})
 			})
 
@@ -765,7 +784,7 @@ var _ = Describe("CloudControllerManager", func() {
 					annotations = map[string]string{
 						annLinodeHealthCheckType: checkType,
 						annLinodeCheckPath:       path,
-						annLinodeDefaultProtocol: "http",
+						annLinodeProtocol:        "http",
 					}
 
 					By("Creating Pod")
@@ -785,10 +804,7 @@ var _ = Describe("CloudControllerManager", func() {
 
 				It("should successfully check the health of 2 nodes", func() {
 					By("Checking NodeBalancer Configurations")
-					checkNodeBalancerConfig(checkArgs{
-						checkType: checkType,
-						path:      path,
-					})
+					checkNodeBalancerConfig(checkType, path, "", "", "", "", "")
 				})
 			})
 		})
