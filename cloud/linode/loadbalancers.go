@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/linode/linodego"
 	"github.com/pkg/errors"
@@ -403,16 +404,32 @@ func (l *loadbalancers) buildNodeBalancerNodeCreateOptions(node *v1.Node, nodePo
 }
 
 func (l *loadbalancers) retrieveKubeClient() error {
-	if l.kubeClient == nil {
-		kubeConfig, err := rest.InClusterConfig()
-		if err != nil {
-			return err
-		}
+	if l.kubeClient != nil {
+		return nil
+	}
 
-		l.kubeClient, err = kubernetes.NewForConfig(kubeConfig)
-		if err != nil {
-			return err
-		}
+	var (
+		kubeConfig *rest.Config
+		err        error
+	)
+
+	// Check to see if --kubeconfig was set. If it was, build a kubeconfig from the given file.
+	// Otherwise, use the in-cluster config.
+	kubeconfigPath := Options.KubeconfigFlag.Value.String()
+
+	if kubeconfigPath == "" {
+		kubeConfig, err = rest.InClusterConfig()
+	} else {
+		kubeConfig, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	l.kubeClient, err = kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		return err
 	}
 
 	return nil

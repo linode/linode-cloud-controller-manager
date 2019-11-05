@@ -26,6 +26,13 @@ func main() {
 	// Add Linode-specific flags
 	command.Flags().BoolVar(&linode.Options.LinodeGoDebug, "linodego-debug", false, "enables debug output for the LinodeAPI wrapper")
 
+	// Make the Linode-specific CCM bits aware of the kubeconfig flag
+	linode.Options.KubeconfigFlag = command.Flags().Lookup("kubeconfig")
+	if linode.Options.KubeconfigFlag == nil {
+		fmt.Fprintf(os.Stderr, "kubeconfig missing from CCM flag set\n")
+		os.Exit(1)
+	}
+
 	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 

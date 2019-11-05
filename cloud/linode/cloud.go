@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/linode/linodego"
+	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 )
@@ -21,7 +22,8 @@ const (
 // We expect it to be initialized with flags external to this package, likely in
 // main.go
 var Options struct {
-	LinodeGoDebug bool
+	KubeconfigFlag *pflag.Flag
+	LinodeGoDebug  bool
 }
 
 type linodeCloud struct {
