@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!--- Add changes here before release, then move them when a release is cut --->
 
+## [v0.3.0] (2019-11-06)
+
 ### Added
 
 * New LoadBalancer TLS annotations.
@@ -28,6 +30,8 @@ service.beta.kubernetes.io/linode-loadbalancer-port-443: |
 * New syntax fixes an issue where a creating a load balancer created with both
   an http and https port would fail silently.
 * Some error messages changed to meet linter standards
+* CCM now uses out-of-cluster authentication when kubeconfig is passed as a command-
+  line argument.
 
 ### Deprecated
 
