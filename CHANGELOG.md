@@ -6,7 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-<!--- Add changes here before release, then move them when a release is cut --->
+<!--- begin unreleased changes --->
+<!--- end unreleased changes --->
+<!--- remember to add diff link to footer --->
 
 ## [v0.3.0] (2019-11-06)
 
@@ -75,3 +77,9 @@ example:
 service.beta.kubernetes.io/linode-loadbalancer-tls: "[ { "tls-secret-name": "prod-app-tls", "port": 443}, {"tls-secret-name": "dev-app-tls", "port": 8443} ]"
 ```
 
+[unreleased]: https://github.com/olivierlacan/keep-a-changelog/compare/v0.3.0...HEAD
+[v0.3.0]: https://github.com/linode/linode-cloud-controller-manager/compare/v0.2.4..v0.3.0
+[v0.2.4]: https://github.com/linode/linode-cloud-controller-manager/compare/v0.2.3..v0.2.4
+[v0.2.3]: https://github.com/linode/linode-cloud-controller-manager/compare/v0.2.2..v0.2.3
+[v0.2.2]: https://github.com/linode/linode-cloud-controller-manager/compare/v0.2.1..v0.2.2
+[v0.2.1]: https://github.com/linode/linode-cloud-controller-manager/tree/v0.2.1
