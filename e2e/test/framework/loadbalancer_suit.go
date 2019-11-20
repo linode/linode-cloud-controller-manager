@@ -19,7 +19,11 @@ func (i *lbInvocation) getNodeBalancerID(svcName string) (int, error) {
 		return -1, err
 	}
 
-	nbList, err := i.linodeClient.ListNodeBalancers(context.Background(), nil)
+	nbList, errListNodeBalancers := i.linodeClient.ListNodeBalancers(context.Background(), nil)
+
+	if errListNodeBalancers != nil {
+		return -1, errListNodeBalancers
+	}
 
 	for _, nb := range nbList {
 		if *nb.IPv4 == ip {
