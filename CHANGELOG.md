@@ -77,7 +77,7 @@ example:
 service.beta.kubernetes.io/linode-loadbalancer-tls: "[ { "tls-secret-name": "prod-app-tls", "port": 443}, {"tls-secret-name": "dev-app-tls", "port": 8443} ]"
 ```
 
-[unreleased]: https://github.com/olivierlacan/keep-a-changelog/compare/v0.3.0...HEAD
+[unreleased]: https://github.com/linode/linode-cloud-controller-manager/compare/v0.3.0...HEAD
 [v0.3.0]: https://github.com/linode/linode-cloud-controller-manager/compare/v0.2.4..v0.3.0
 [v0.2.4]: https://github.com/linode/linode-cloud-controller-manager/compare/v0.2.3..v0.2.4
 [v0.2.3]: https://github.com/linode/linode-cloud-controller-manager/compare/v0.2.2..v0.2.3
