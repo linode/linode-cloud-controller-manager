@@ -191,12 +191,10 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 		if currentNBCfg == nil {
 			createOpts := newNBCfg.GetCreateOptions()
 
-			newNBCfg, err := l.client.CreateNodeBalancerConfig(ctx, lb.ID, createOpts)
+			currentNBCfg, err = l.client.CreateNodeBalancerConfig(ctx, lb.ID, createOpts)
 			if err != nil {
 				return fmt.Errorf("[port %d] error creating NodeBalancer config: %v", int(port.Port), err)
 			}
-
-			currentNBCfg = newNBCfg
 		}
 
 		rebuildOpts := currentNBCfg.GetRebuildOptions()
