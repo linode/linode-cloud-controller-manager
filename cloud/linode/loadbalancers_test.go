@@ -38,8 +38,12 @@ func TestCCMLoadBalancers(t *testing.T) {
 			f:    testCreateNodeBalancer,
 		},
 		{
-			name: "Update Load Balancer",
-			f:    testUpdateLoadBalancer,
+			name: "Update Load Balancer - Add Annotation",
+			f:    testUpdateLoadBalancerAddAnnotation,
+		},
+		{
+			name: "Update Load Balancer - Add Port",
+			f:    testUpdateLoadBalancerAddPort,
 		},
 		{
 			name: "Build Load Balancer Request",
@@ -134,7 +138,7 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client) {
 	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc) }()
 }
 
-func testUpdateLoadBalancer(t *testing.T, client *linodego.Client) {
+func testUpdateLoadBalancerAddAnnotation(t *testing.T, client *linodego.Client) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: randString(10),
@@ -155,15 +159,33 @@ func testUpdateLoadBalancer(t *testing.T, client *linodego.Client) {
 		},
 	}
 
+	nodes := []*v1.Node{
+		&v1.Node{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+		},
+	}
+
 	lb := &loadbalancers{client, "us-west", nil}
-	_, err := lb.EnsureLoadBalancer(context.TODO(), "lnodelb", svc, []*v1.Node{})
+
+	defer lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc)
+
+	_, err := lb.EnsureLoadBalancer(context.TODO(), "lnodelb", svc, nodes)
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
+
 	svc.ObjectMeta.SetAnnotations(map[string]string{
 		annLinodeThrottle: "10",
 	})
-	err = lb.UpdateLoadBalancer(context.TODO(), "lnodelb", svc, []*v1.Node{})
+
+	err = lb.UpdateLoadBalancer(context.TODO(), "lnodelb", svc, nodes)
 	if err != nil {
 		t.Errorf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
 	}
@@ -171,19 +193,109 @@ func testUpdateLoadBalancer(t *testing.T, client *linodego.Client) {
 	lbName := cloudprovider.GetLoadBalancerName(svc)
 	nb, err := lb.lbByName(context.TODO(), lb.client, lbName)
 
-	if !reflect.DeepEqual(err, nil) {
-		t.Error("unexpected error")
-		t.Logf("expected: %v", nil)
-		t.Logf("actual: %v", err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 
 	if nb.ClientConnThrottle != 10 {
-		t.Error("unexpected ClientConnThrottle")
+		t.Errorf("unexpected ClientConnThrottle: expected %d, got %d", 10, nb.ClientConnThrottle)
 		t.Logf("expected: %v", 10)
 		t.Logf("actual: %v", nb.ClientConnThrottle)
 	}
+}
 
-	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc) }()
+func testUpdateLoadBalancerAddPort(t *testing.T, client *linodego.Client) {
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: randString(10),
+			UID:  "foobar123",
+			Annotations: map[string]string{
+				annLinodeThrottle: "15",
+			},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     randString(10),
+					Protocol: "TCP",
+					Port:     int32(80),
+					NodePort: int32(30000),
+				},
+			},
+		},
+	}
+
+	nodes := []*v1.Node{
+		&v1.Node{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+		},
+	}
+
+	extraPort := v1.ServicePort{
+		Name:     randString(10),
+		Protocol: "TCP",
+		Port:     int32(81),
+		NodePort: int32(30001),
+	}
+
+	lb := &loadbalancers{client, "us-west", nil}
+
+	defer lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc)
+
+	_, err := lb.EnsureLoadBalancer(context.TODO(), "lnodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
+	}
+
+	svc.Spec.Ports = append(svc.Spec.Ports, extraPort)
+
+	err = lb.UpdateLoadBalancer(context.TODO(), "lnodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
+	}
+
+	lbName := cloudprovider.GetLoadBalancerName(svc)
+	nb, err := lb.lbByName(context.TODO(), lb.client, lbName)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	cfgs, errConfigs := client.ListNodeBalancerConfigs(context.TODO(), nb.ID, nil)
+	if errConfigs != nil {
+		t.Errorf("error getting NodeBalancer configs: %v", errConfigs)
+	}
+
+	expectedPorts := map[int]struct{}{
+		80: struct{}{},
+		81: struct{}{},
+	}
+
+	observedPorts := make(map[int]struct{})
+
+	for _, cfg := range cfgs {
+		nodes, errNodes := client.ListNodeBalancerNodes(context.TODO(), nb.ID, cfg.ID, nil)
+		if errNodes != nil {
+			t.Errorf("error getting NodeBalancer nodes: %v", errNodes)
+		}
+		
+		if len(nodes) == 0 {
+			t.Errorf("no nodes found for port %d", cfg.Port)
+		}
+
+		observedPorts[int(cfg.Port)] = struct{}{}
+	}
+
+	if !reflect.DeepEqual(expectedPorts, observedPorts) {
+		t.Errorf("NodeBalancer ports mismatch: expected %v, got %v", expectedPorts, observedPorts)
+	}
 }
 
 func Test_getConnectionThrottle(t *testing.T) {

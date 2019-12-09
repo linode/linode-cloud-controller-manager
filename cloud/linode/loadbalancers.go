@@ -178,31 +178,30 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 		}
 
 		// Look for an existing config for this port
-		var existingNBCfg *linodego.NodeBalancerConfig
-		for _, nbc := range nbCfgs {
-			nbc := nbc
+		var currentNBCfg *linodego.NodeBalancerConfig
+		for i := range nbCfgs {
+			nbc := nbCfgs[i]
 			if nbc.Port == int(port.Port) {
-				existingNBCfg = &nbc
+				currentNBCfg = &nbc
 				break
 			}
 		}
 
-		// If there's an existing config, rebuild it, otherwise, create it
-		if existingNBCfg != nil {
-			rebuildOpts := newNBCfg.GetRebuildOptions()
-			rebuildOpts.Nodes = newNBNodes
-
-			if _, err = l.client.RebuildNodeBalancerConfig(ctx, lb.ID, existingNBCfg.ID, rebuildOpts); err != nil {
-				return fmt.Errorf("[port %d] error rebuilding NodeBalancer config: %v", int(port.Port), err)
-			}
-		} else {
+		// If there's no existing config, create it
+		if currentNBCfg == nil {
 			createOpts := newNBCfg.GetCreateOptions()
-			createOpts.Nodes = newNBNodes
 
-			_, err := l.client.CreateNodeBalancerConfig(ctx, lb.ID, createOpts)
+			currentNBCfg, err = l.client.CreateNodeBalancerConfig(ctx, lb.ID, createOpts)
 			if err != nil {
-				return err
+				return fmt.Errorf("[port %d] error creating NodeBalancer config: %v", int(port.Port), err)
 			}
+		}
+
+		rebuildOpts := currentNBCfg.GetRebuildOptions()
+		rebuildOpts.Nodes = newNBNodes
+
+		if _, err = l.client.RebuildNodeBalancerConfig(ctx, lb.ID, currentNBCfg.ID, rebuildOpts); err != nil {
+			return fmt.Errorf("[port %d] error rebuilding NodeBalancer config: %v", int(port.Port), err)
 		}
 	}
 

@@ -455,20 +455,6 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			f.nbc[strconv.Itoa(nbcc.ID)] = &nbcc
 
-			for _, n := range nbcco.Nodes {
-				node := linodego.NodeBalancerNode{
-					ID:             rand.Intn(99999),
-					Address:        n.Address,
-					Label:          n.Label,
-					Weight:         n.Weight,
-					Mode:           n.Mode,
-					ConfigID:       nbcc.ID,
-					NodeBalancerID: nbid,
-				}
-
-				f.nbn[strconv.Itoa(node.ID)] = &node
-			}
-
 			resp, err := json.Marshal(nbcc)
 			if err != nil {
 				f.t.Fatal(err)
