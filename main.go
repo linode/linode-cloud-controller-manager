@@ -9,6 +9,7 @@ import (
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode"
 	"github.com/spf13/pflag"
+	"k8s.io/klog"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/kubernetes/cmd/cloud-controller-manager/app"
@@ -18,6 +19,8 @@ import (
 
 func main() {
 	fmt.Printf("Linode Cloud Controller Manager starting up\n")
+
+	klog.InitFlags(nil)
 
 	rand.Seed(time.Now().UTC().UnixNano())
 
