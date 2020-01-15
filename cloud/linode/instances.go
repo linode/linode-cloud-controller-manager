@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud"
+	"github.com/linode/linode-cloud-controller-manager/sentry"
 	"github.com/linode/linodego"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
@@ -24,25 +25,47 @@ func newInstances(client *linodego.Client) cloudprovider.Instances {
 }
 
 func (i *instances) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error) {
+	ctx = sentry.SetHubOnContext(ctx)
+	sentry.SetTag(ctx, "node_name", string(name))
+
 	linode, err := linodeByName(ctx, i.client, name)
 	if err != nil {
+		sentry.CaptureError(ctx, err)
 		return nil, err
 	}
-	return i.nodeAddresses(ctx, linode)
+
+	addresses, err := i.nodeAddresses(ctx, linode)
+	if err != nil {
+		sentry.CaptureError(ctx, err)
+		return nil, err
+	}
+
+	return addresses, nil
 }
 
 func (i *instances) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
+	ctx = sentry.SetHubOnContext(ctx)
+	sentry.SetTag(ctx, "provider_id", providerID)
+
 	id, err := linodeIDFromProviderID(providerID)
 	if err != nil {
+		sentry.CaptureError(ctx, err)
 		return nil, err
 	}
 
 	linode, err := linodeByID(ctx, i.client, id)
 	if err != nil {
+		sentry.CaptureError(ctx, err)
 		return nil, err
 	}
 
-	return i.nodeAddresses(ctx, linode)
+	addresses, err := i.nodeAddresses(ctx, linode)
+	if err != nil {
+		sentry.CaptureError(ctx, err)
+		return nil, err
+	}
+
+	return addresses, nil
 }
 
 func (i *instances) nodeAddresses(ctx context.Context, linode *linodego.Instance) ([]v1.NodeAddress, error) {
@@ -72,28 +95,44 @@ func (i *instances) nodeAddresses(ctx context.Context, linode *linodego.Instance
 }
 
 func (i *instances) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
+	ctx = sentry.SetHubOnContext(ctx)
+	sentry.SetTag(ctx, "node_name", string(nodeName))
+
 	linode, err := linodeByName(ctx, i.client, nodeName)
 	if err != nil {
+		sentry.CaptureError(ctx, err)
 		return "", err
 	}
 	return strconv.Itoa(linode.ID), nil
 }
 
 func (i *instances) InstanceType(ctx context.Context, nodeName types.NodeName) (string, error) {
+	ctx = sentry.SetHubOnContext(ctx)
+	sentry.SetTag(ctx, "node_name", string(nodeName))
+
 	linode, err := linodeByName(ctx, i.client, nodeName)
 	if err != nil {
+		sentry.CaptureError(ctx, err)
 		return "", err
 	}
 	return linode.Type, nil
 }
 
 func (i *instances) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
+	ctx = sentry.SetHubOnContext(ctx)
+	sentry.SetTag(ctx, "provider_id", providerID)
+
 	id, err := linodeIDFromProviderID(providerID)
 	if err != nil {
+		sentry.CaptureError(ctx, err)
 		return "", err
 	}
+
+	sentry.SetTag(ctx, "linode_id", id)
+
 	linode, err := linodeByID(ctx, i.client, id)
 	if err != nil {
+		sentry.CaptureError(ctx, err)
 		return "", err
 	}
 	return linode.Type, nil
@@ -108,14 +147,23 @@ func (i *instances) CurrentNodeName(_ context.Context, hostname string) (types.N
 }
 
 func (i *instances) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
+	ctx = sentry.SetHubOnContext(ctx)
+	sentry.SetTag(ctx, "provider_id", providerID)
+
 	id, err := linodeIDFromProviderID(providerID)
 	if err != nil {
+		sentry.CaptureError(ctx, err)
 		return false, err
 	}
+
+	sentry.SetTag(ctx, "linode_id", id)
+
 	_, err = linodeByID(ctx, i.client, id)
 	if err == nil {
 		return true, nil
 	}
+
+	sentry.CaptureError(ctx, err)
 
 	return false, nil
 }
