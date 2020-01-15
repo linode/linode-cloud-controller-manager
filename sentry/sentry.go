@@ -43,7 +43,7 @@ func SetHubOnContext(ctx context.Context) context.Context {
 // function also returns nil.
 func getHubFromContext(ctx context.Context) *sentry.Hub {
 	if !initialized {
-		glog.V(3).Info("getHubFromContext: Sentry not initialized")
+		glog.V(5).Info("getHubFromContext: Sentry not initialized")
 		return nil
 	}
 
