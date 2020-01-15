@@ -163,7 +163,7 @@ func (i *instances) InstanceExistsByProviderID(ctx context.Context, providerID s
 		return true, nil
 	}
 
-	// TODO: Should we capture an error here?
+	sentry.CaptureError(ctx, err)
 
 	return false, nil
 }

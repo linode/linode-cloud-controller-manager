@@ -271,6 +271,8 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 	sentry.SetTag(ctx, "cluster_name", clusterName)
 	sentry.SetTag(ctx, "service", service.Name)
 
+	// GetLoadBalancer will capture any errors it gets for Sentry, so it's unnecessary to capture
+	// them again here.
 	_, exists, err := l.GetLoadBalancer(ctx, clusterName, service)
 	if err != nil {
 		return err
