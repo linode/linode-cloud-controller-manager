@@ -56,7 +56,6 @@ require (
 	go.etcd.io/bbolt v1.3.2 // indirect
 	go.uber.org/zap v1.13.0 // indirect
 	golang.org/x/time v0.0.0-20161028155119-f51c12702a4d // indirect
-	google.golang.org/appengine v1.4.0 // indirect
 	gopkg.in/inf.v0 v0.9.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0-20150622162204-20b71e5b60d7 // indirect
 	gopkg.in/square/go-jose.v2 v2.0.0-20180411045311-89060dee6a84 // indirect
