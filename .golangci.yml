@@ -39,6 +39,7 @@ linters:
     - gochecknoinits
     - gochecknoglobals
     - wsl
+    - gomnd
   fast: false
 
 
