@@ -4,6 +4,7 @@ package sentry
 import (
 	"context"
 	"fmt"
+
 	"github.com/getsentry/sentry-go"
 	"github.com/golang/glog"
 )
@@ -13,7 +14,7 @@ var initialized bool
 // Initialize initializes a Sentry connection with the given client option values.
 func Initialize(dsn, environment, release string) error {
 	if initialized {
-		return fmt.Errorf("Sentry Initialize called after initialization")
+		return fmt.Errorf("sentry Initialize called after initialization")
 	}
 
 	var clientOptions sentry.ClientOptions
