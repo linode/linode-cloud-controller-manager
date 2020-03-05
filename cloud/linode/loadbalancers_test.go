@@ -42,6 +42,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 			f:    testUpdateLoadBalancerAddAnnotation,
 		},
 		{
+			name: "Update Load Balancer - Add Port Annotation",
+			f:    testUpdateLoadBalancerAddPortAnnotation,
+		},
+		{
 			name: "Update Load Balancer - Add Port",
 			f:    testUpdateLoadBalancerAddPort,
 		},
@@ -204,6 +208,82 @@ func testUpdateLoadBalancerAddAnnotation(t *testing.T, client *linodego.Client) 
 	}
 }
 
+func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Client) {
+	targetTestPort := 80
+	portConfigAnnotation := fmt.Sprintf("%s%d", annLinodePortConfigPrefix, targetTestPort)
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        randString(10),
+			UID:         "foobar123",
+			Annotations: map[string]string{},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     randString(10),
+					Protocol: "TCP",
+					Port:     int32(80),
+					NodePort: int32(30000),
+				},
+			},
+		},
+	}
+
+	nodes := []*v1.Node{
+		&v1.Node{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+		},
+	}
+
+	lb := &loadbalancers{client, "us-west", nil}
+
+	defer lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc)
+
+	_, err := lb.EnsureLoadBalancer(context.TODO(), "lnodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
+	}
+	svc.ObjectMeta.SetAnnotations(map[string]string{
+		portConfigAnnotation: `{"protocol": "http"}`,
+	})
+
+	err = lb.UpdateLoadBalancer(context.TODO(), "lnodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
+	}
+
+	lbName := cloudprovider.GetLoadBalancerName(svc)
+	nb, err := lb.lbByName(context.TODO(), lb.client, lbName)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	cfgs, errConfigs := client.ListNodeBalancerConfigs(context.TODO(), nb.ID, nil)
+	if errConfigs != nil {
+		t.Errorf("error getting NodeBalancer configs: %v", errConfigs)
+	}
+
+	expectedPortConfigs := map[int]string{
+		80: "http",
+	}
+	observedPortConfigs := make(map[int]string)
+
+	for _, cfg := range cfgs {
+		observedPortConfigs[int(cfg.Port)] = string(cfg.Protocol)
+	}
+
+	if !reflect.DeepEqual(expectedPortConfigs, observedPortConfigs) {
+		t.Errorf("NodeBalancer port mismatch: expected %v, got %v", expectedPortConfigs, observedPortConfigs)
+	}
+}
+
 func testUpdateLoadBalancerAddPort(t *testing.T, client *linodego.Client) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -285,7 +365,7 @@ func testUpdateLoadBalancerAddPort(t *testing.T, client *linodego.Client) {
 		if errNodes != nil {
 			t.Errorf("error getting NodeBalancer nodes: %v", errNodes)
 		}
-		
+
 		if len(nodes) == 0 {
 			t.Errorf("no nodes found for port %d", cfg.Port)
 		}
