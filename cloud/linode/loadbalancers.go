@@ -220,6 +220,7 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 		}
 
 		// If there's no existing config, create it
+		var rebuildOpts linodego.NodeBalancerConfigRebuildOptions
 		if currentNBCfg == nil {
 			createOpts := newNBCfg.GetCreateOptions()
 
@@ -228,9 +229,11 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 				sentry.CaptureError(ctx, err)
 				return fmt.Errorf("[port %d] error creating NodeBalancer config: %v", int(port.Port), err)
 			}
+			rebuildOpts = currentNBCfg.GetRebuildOptions()
+		} else {
+			rebuildOpts = newNBCfg.GetRebuildOptions()
 		}
 
-		rebuildOpts := currentNBCfg.GetRebuildOptions()
 		rebuildOpts.Nodes = newNBNodes
 
 		if _, err = l.client.RebuildNodeBalancerConfig(ctx, lb.ID, currentNBCfg.ID, rebuildOpts); err != nil {
