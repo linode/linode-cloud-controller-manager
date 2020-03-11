@@ -13,8 +13,8 @@ Second argument must be a Linode region.
 Example:
 $ ./generate-manifest.sh \$LINODE_API_TOKEN us-east"
 
-ENCODED_TOKEN=$(echo -n $1 | base64)
-ENCODED_REGION=$(echo -n $2 | base64)
+ENCODED_TOKEN=$(echo -n $1 | base64 -w0)
+ENCODED_REGION=$(echo -n $2 | base64 -w0)
 
 cat "$(dirname "$0")/ccm-linode-template.yaml" |
 sed -e "s|{{ .Values.apiTokenB64 }}|$ENCODED_TOKEN|" |
