@@ -13,4 +13,4 @@ jobs:
         name: linode/linode-cloud-controller-manager
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
-        tags: "latest,${{ GITHUB_REF }}"
+        tags: "latest,${{ github.event.release.tag_name }}"
