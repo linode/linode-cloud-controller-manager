@@ -12,9 +12,9 @@ The [Linode Community](https://www.linode.com/community/questions/) is a great p
 
 Please open a [github issue](https://guides.github.com/features/issues/) to report bugs or suggest features.
 
-When filing an issue or feature request, help us avoid duplication and redundant effort -- check existing open or recently closed issues first. 
+When filing an issue or feature request, help us avoid duplication and redundant effort -- check existing open or recently closed issues first.
 
-Detailed bug reports and requests easier for us to work with. Please include the following in your issue:
+Detailed bug reports and requests are easier for us to work with. Please include the following in your issue:
 
 * A reproducible test case or series of steps
 * The version of our code being used
@@ -44,6 +44,6 @@ If you discover a potential security issue in this project we ask that you notif
 
 ## Licensing
 
-See the LICENSE file for our project's licensing.
+See the [LICENSE file](/LICENSE) for our project's licensing.
 
 
