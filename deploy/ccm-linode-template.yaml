@@ -74,6 +74,8 @@ spec:
           args:
           - --cloud-provider=linode
           - --v=3
+          - --port=0
+          - --secure-port=10253
           volumeMounts:
           - mountPath: /etc/kubernetes
             name: k8s
