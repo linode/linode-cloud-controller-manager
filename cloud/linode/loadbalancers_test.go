@@ -13,21 +13,15 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 func TestCCMLoadBalancers(t *testing.T) {
-	fake := newFake(t)
-	ts := httptest.NewServer(fake)
-	defer ts.Close()
-
-	linodeClient := linodego.NewClient(http.DefaultClient)
-	linodeClient.SetBaseURL(ts.URL)
-
 	testCases := []struct {
 		name string
-		f    func(*testing.T, *linodego.Client)
+		f    func(*testing.T, *linodego.Client, *fakeAPI)
 	}{
 		{
 			name: "Get Load Balancer",
@@ -58,19 +52,30 @@ func TestCCMLoadBalancers(t *testing.T) {
 			f:    testEnsureLoadBalancerDeleted,
 		},
 		{
+			name: "Ensure Load Balancer Deleted - Preserve Annotation",
+			f:    testEnsureLoadBalancerPreserveAnnotation,
+		},
+		{
 			name: "Ensure Load Balancer",
 			f:    testEnsureLoadBalancer,
 		},
 	}
 
 	for _, tc := range testCases {
+		fake := newFake(t)
+		ts := httptest.NewServer(fake)
+
+		linodeClient := linodego.NewClient(http.DefaultClient)
+		linodeClient.SetBaseURL(ts.URL)
+
 		t.Run(tc.name, func(t *testing.T) {
-			tc.f(t, &linodeClient)
+			defer ts.Close()
+			tc.f(t, &linodeClient, fake)
 		})
 	}
 }
 
-func testCreateNodeBalancer(t *testing.T, client *linodego.Client) {
+func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: randString(10),
@@ -142,7 +147,7 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client) {
 	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc) }()
 }
 
-func testUpdateLoadBalancerAddAnnotation(t *testing.T, client *linodego.Client) {
+func testUpdateLoadBalancerAddAnnotation(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: randString(10),
@@ -208,7 +213,7 @@ func testUpdateLoadBalancerAddAnnotation(t *testing.T, client *linodego.Client) 
 	}
 }
 
-func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Client) {
+func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	targetTestPort := 80
 	portConfigAnnotation := fmt.Sprintf("%s%d", annLinodePortConfigPrefix, targetTestPort)
 	svc := &v1.Service{
@@ -284,7 +289,7 @@ func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Clie
 	}
 }
 
-func testUpdateLoadBalancerAddPort(t *testing.T, client *linodego.Client) {
+func testUpdateLoadBalancerAddPort(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: randString(10),
@@ -702,7 +707,7 @@ func Test_getNodeInternalIP(t *testing.T) {
 
 }
 
-func testBuildLoadBalancerRequest(t *testing.T, client *linodego.Client) {
+func testBuildLoadBalancerRequest(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test",
@@ -778,7 +783,76 @@ func testBuildLoadBalancerRequest(t *testing.T, client *linodego.Client) {
 
 }
 
-func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client) {
+func testEnsureLoadBalancerPreserveAnnotation(t *testing.T, client *linodego.Client, fake *fakeAPI) {
+	testServiceSpec := v1.ServiceSpec{
+		Ports: []v1.ServicePort{
+			{
+				Name:     "test",
+				Protocol: "TCP",
+				Port:     int32(80),
+				NodePort: int32(30000),
+			},
+		},
+	}
+
+	lb := &loadbalancers{client, "us-west", nil}
+	for _, test := range []struct {
+		name        string
+		err         error
+		deleted     bool
+		annotations map[string]string
+	}{
+		{
+			name:        "load balancer preserved",
+			annotations: map[string]string{annLinodeLoadBalancerPreserve: "true"},
+			deleted:     false,
+		},
+		{
+			name:        "load balancer not preserved (deleted)",
+			annotations: map[string]string{annLinodeLoadBalancerPreserve: "false"},
+			deleted:     true,
+		},
+		{
+			name:        "invalid value",
+			annotations: map[string]string{annLinodeLoadBalancerPreserve: "bogus"},
+			err:         fmt.Errorf("failed to parse annotation %s value: strconv.ParseBool: parsing \"bogus\": invalid syntax", annLinodeLoadBalancerPreserve),
+			deleted:     false,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			svc := &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test",
+					UID:         types.UID("foobar" + randString(10)),
+					Annotations: test.annotations,
+				},
+				Spec: testServiceSpec,
+			}
+
+			loadbal, err := lb.createNodeBalancer(context.TODO(), svc, []*linodego.NodeBalancerConfigCreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc)
+
+			didDelete := fake.didRequestOccur(http.MethodDelete, fmt.Sprintf("/nodebalancers/%d", loadbal.ID), "")
+			if didDelete && !test.deleted {
+				t.Fatal("load balancer was unexpectedly deleted")
+			} else if !didDelete && test.deleted {
+				t.Fatal("load balancer was unexpectedly preserved")
+			}
+
+			if !reflect.DeepEqual(err, test.err) {
+				t.Error("unexpected error")
+				t.Logf("expected: %v", test.err)
+				t.Logf("actual: %v", err)
+			}
+		})
+	}
+}
+
+func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client, fake *fakeAPI) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test",
@@ -856,7 +930,7 @@ func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client) {
 	}
 }
 
-func testEnsureLoadBalancer(t *testing.T, client *linodego.Client) {
+func testEnsureLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "testensure",
@@ -977,7 +1051,7 @@ func testEnsureLoadBalancer(t *testing.T, client *linodego.Client) {
 	}
 }
 
-func testGetLoadBalancer(t *testing.T, client *linodego.Client) {
+func testGetLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	lb := &loadbalancers{client, "us-west", nil}
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{

@@ -38,6 +38,8 @@ const (
 	// Throttle, which limits the number of subsequent new connections per second from the
 	// same client IP. Options are a number between 1-20, or 0 to disable. Defaults to 20.
 	annLinodeThrottle = "service.beta.kubernetes.io/linode-loadbalancer-throttle"
+
+	annLinodeLoadBalancerPreserve = "service.beta.kubernetes.io/linode-loadbalancer-preserve"
 )
 
 var errLbNotFound = errors.New("loadbalancer not found")
@@ -273,6 +275,15 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 	ctx = sentry.SetHubOnContext(ctx)
 	sentry.SetTag(ctx, "cluster_name", clusterName)
 	sentry.SetTag(ctx, "service", service.Name)
+
+	// Don't delete the underlying nodebalancer if the service has the preserve annotation.
+	if preserveRaw, ok := service.Annotations[annLinodeLoadBalancerPreserve]; ok {
+		if preserve, err := strconv.ParseBool(preserveRaw); err != nil {
+			return fmt.Errorf("failed to parse annotation %s value: %s", annLinodeLoadBalancerPreserve, err)
+		} else if preserve {
+			return nil
+		}
+	}
 
 	// GetLoadBalancer will capture any errors it gets for Sentry, so it's unnecessary to capture
 	// them again here.
