@@ -798,7 +798,6 @@ func testEnsureLoadBalancerPreserveAnnotation(t *testing.T, client *linodego.Cli
 	lb := &loadbalancers{client, "us-west", nil}
 	for _, test := range []struct {
 		name        string
-		err         error
 		deleted     bool
 		annotations map[string]string
 	}{
@@ -813,10 +812,9 @@ func testEnsureLoadBalancerPreserveAnnotation(t *testing.T, client *linodego.Cli
 			deleted:     true,
 		},
 		{
-			name:        "invalid value",
+			name:        "invalid value treated as false (deleted)",
 			annotations: map[string]string{annLinodeLoadBalancerPreserve: "bogus"},
-			err:         fmt.Errorf("failed to parse annotation %s value: strconv.ParseBool: parsing \"bogus\": invalid syntax", annLinodeLoadBalancerPreserve),
-			deleted:     false,
+			deleted:     true,
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -843,10 +841,8 @@ func testEnsureLoadBalancerPreserveAnnotation(t *testing.T, client *linodego.Cli
 				t.Fatal("load balancer was unexpectedly preserved")
 			}
 
-			if !reflect.DeepEqual(err, test.err) {
-				t.Error("unexpected error")
-				t.Logf("expected: %v", test.err)
-				t.Logf("actual: %v", err)
+			if err != nil {
+				t.Fatalf("unexpected error: %s", err)
 			}
 		})
 	}

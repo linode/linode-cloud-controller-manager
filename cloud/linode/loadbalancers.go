@@ -278,9 +278,7 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 
 	// Don't delete the underlying nodebalancer if the service has the preserve annotation.
 	if preserveRaw, ok := service.Annotations[annLinodeLoadBalancerPreserve]; ok {
-		if preserve, err := strconv.ParseBool(preserveRaw); err != nil {
-			return fmt.Errorf("failed to parse annotation %s value: %s", annLinodeLoadBalancerPreserve, err)
-		} else if preserve {
+		if preserve, err := strconv.ParseBool(preserveRaw); err == nil && preserve {
 			return nil
 		}
 	}
