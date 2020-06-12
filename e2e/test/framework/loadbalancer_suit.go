@@ -13,7 +13,7 @@ func (i *lbInvocation) GetHTTPEndpoints() ([]string, error) {
 	return i.getLoadBalancerURLs()
 }
 
-func (i *lbInvocation) getNodeBalancerID(svcName string) (int, error) {
+func (i *lbInvocation) GetNodeBalancerID(svcName string) (int, error) {
 	ip, err := i.waitForLoadBalancerIP(svcName)
 	if err != nil {
 		return -1, err
@@ -34,7 +34,7 @@ func (i *lbInvocation) getNodeBalancerID(svcName string) (int, error) {
 }
 
 func (i *lbInvocation) GetNodeBalancerConfig(svcName string) (*linodego.NodeBalancerConfig, error) {
-	id, err := i.getNodeBalancerID(svcName)
+	id, err := i.GetNodeBalancerID(svcName)
 	if err != nil {
 		return nil, err
 	}
