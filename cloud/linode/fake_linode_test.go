@@ -30,8 +30,8 @@ type fakeAPI struct {
 }
 
 type fakeRequest struct {
-	Path string
-	Body string
+	Path   string
+	Body   string
 	Method string
 }
 
@@ -79,9 +79,9 @@ func newFake(t *testing.T) *fakeAPI {
 				Region:   region,
 			},
 		},
-		nb:  make(map[string]*linodego.NodeBalancer),
-		nbc: make(map[string]*linodego.NodeBalancerConfig),
-		nbn: make(map[string]*linodego.NodeBalancerNode),
+		nb:       make(map[string]*linodego.NodeBalancer),
+		nbc:      make(map[string]*linodego.NodeBalancerConfig),
+		nbn:      make(map[string]*linodego.NodeBalancerNode),
 		requests: make(map[fakeRequest]struct{}),
 	}
 }
@@ -91,7 +91,7 @@ func (f *fakeAPI) recordRequest(r *http.Request) {
 	r.Body.Close()
 	r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 	f.requests[fakeRequest{
-		Path:    r.URL.Path,
+		Path:   r.URL.Path,
 		Method: r.Method,
 		Body:   string(bodyBytes),
 	}] = struct{}{}
@@ -99,9 +99,9 @@ func (f *fakeAPI) recordRequest(r *http.Request) {
 
 func (f *fakeAPI) didRequestOccur(method, path, body string) bool {
 	_, ok := f.requests[fakeRequest{
-		Path: path,
+		Path:   path,
 		Method: method,
-		Body: body,
+		Body:   body,
 	}]
 	return ok
 }

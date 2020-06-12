@@ -40,6 +40,7 @@ linters:
     - gochecknoglobals
     - wsl
     - gomnd
+    - godot
+    - goerr113
+    - nestif
   fast: false
-
-
