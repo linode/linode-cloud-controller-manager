@@ -51,7 +51,8 @@ Annotation (Suffix) | Values | Default | Description
 `check-interval` | int | | Duration, in seconds, to wait between health checks
 `check-timeout` | int (1-30) | | Duration, in seconds, to wait for a health check to succeed before considering it a failure
 `check-attempts` | int (1-30) | | Number of health check failures necessary to remove a back-end from the service
-`check-passive` | bool | `false` | When `true`, `5xx` status codes will cause the health check to fail
+`check-passive` | [bool](#annotation-bool-values) | `false` | When `true`, `5xx` status codes will cause the health check to fail
+`preserve` | [bool](#annotation-bool-values) | `false` | When `true`, deleting a `LoadBalancer` service does not delete the underlying NodeBalancer
 
 #### Deprecated Annotations
 
@@ -62,7 +63,11 @@ Annotation (Suffix) | Values | Default | Description
 `protocol` | `tcp`, `http`, `https` | `tcp` | This annotation is used to specify the default protocol for Linode NodeBalancer. For ports specified in the `linode-loadbalancer-tls-ports` annotation, this protocol is overwritten to `https`
 `tls` | json array (e.g. `[ { "tls-secret-name": "prod-app-tls", "port": 443}, {"tls-secret-name": "dev-app-tls", "port": 8443} ]`) | | Specifies TLS ports with their corresponding secrets, the secret type should be `kubernetes.io/tls
 
-For example,
+#### Annotation bool values
+
+For annotations with bool value types, `"1"`, `"t"`,  `"T"`, `"True"`, `"true"` and `"True"` are valid string representations of `true`. Any other values will be interpreted as false. For more details, see [strconv.ParseBool](https://golang.org/pkg/strconv/#ParseBool).
+
+#### Example usage
 
 ```yaml
 apiVersion: v1
