@@ -53,7 +53,7 @@ func TestE2e(t *testing.T) {
 
 }
 
-var getLinodeClient = func() linodego.Client {
+var getLinodeClient = func() *linodego.Client {
 	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: framework.ApiToken})
 
 	oauth2Client := &http.Client{
@@ -64,7 +64,7 @@ var getLinodeClient = func() linodego.Client {
 
 	linodeClient := linodego.NewClient(oauth2Client)
 
-	return linodeClient
+	return &linodeClient
 }
 
 var _ = BeforeSuite(func() {
@@ -85,7 +85,7 @@ var _ = BeforeSuite(func() {
 	linodeClient := getLinodeClient()
 
 	// Framework
-	root = framework.New(config, kubeClient, linodeClient)
+	root = framework.New(config, kubeClient, *linodeClient)
 
 	By("Using Namespace " + root.Namespace())
 	err = root.CreateNamespace()

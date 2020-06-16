@@ -1,8 +1,10 @@
 package linode
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
@@ -23,6 +25,14 @@ type fakeAPI struct {
 	nb       map[string]*linodego.NodeBalancer
 	nbc      map[string]*linodego.NodeBalancerConfig
 	nbn      map[string]*linodego.NodeBalancerNode
+
+	requests map[fakeRequest]struct{}
+}
+
+type fakeRequest struct {
+	Path   string
+	Body   string
+	Method string
 }
 
 type filterStruct struct {
@@ -69,13 +79,36 @@ func newFake(t *testing.T) *fakeAPI {
 				Region:   region,
 			},
 		},
-		nb:  make(map[string]*linodego.NodeBalancer),
-		nbc: make(map[string]*linodego.NodeBalancerConfig),
-		nbn: make(map[string]*linodego.NodeBalancerNode),
+		nb:       make(map[string]*linodego.NodeBalancer),
+		nbc:      make(map[string]*linodego.NodeBalancerConfig),
+		nbn:      make(map[string]*linodego.NodeBalancerNode),
+		requests: make(map[fakeRequest]struct{}),
 	}
 }
 
+func (f *fakeAPI) recordRequest(r *http.Request) {
+	bodyBytes, _ := ioutil.ReadAll(r.Body)
+	r.Body.Close()
+	r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+	f.requests[fakeRequest{
+		Path:   r.URL.Path,
+		Method: r.Method,
+		Body:   string(bodyBytes),
+	}] = struct{}{}
+}
+
+func (f *fakeAPI) didRequestOccur(method, path, body string) bool {
+	_, ok := f.requests[fakeRequest{
+		Path:   path,
+		Method: method,
+		Body:   body,
+	}]
+	return ok
+}
+
 func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	f.recordRequest(r)
+
 	w.Header().Set("Content-Type", "application/json")
 	urlPath := r.URL.Path
 	switch r.Method {

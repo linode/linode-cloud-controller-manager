@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"e2e_test/test/framework"
 	"io/ioutil"
 	"log"
@@ -24,15 +25,16 @@ var _ = Describe("CloudControllerManager", func() {
 	)
 
 	const (
-		annLinodeDefaultProtocol     = "service.beta.kubernetes.io/linode-loadbalancer-default-protocol"
-		annLinodePortConfigPrefix    = "service.beta.kubernetes.io/linode-loadbalancer-port-"
-		annLinodeHealthCheckType     = "service.beta.kubernetes.io/linode-loadbalancer-check-type"
-		annLinodeCheckBody           = "service.beta.kubernetes.io/linode-loadbalancer-check-body"
-		annLinodeCheckPath           = "service.beta.kubernetes.io/linode-loadbalancer-check-path"
-		annLinodeHealthCheckInterval = "service.beta.kubernetes.io/linode-loadbalancer-check-interval"
-		annLinodeHealthCheckTimeout  = "service.beta.kubernetes.io/linode-loadbalancer-check-timeout"
-		annLinodeHealthCheckAttempts = "service.beta.kubernetes.io/linode-loadbalancer-check-attempts"
-		annLinodeHealthCheckPassive  = "service.beta.kubernetes.io/linode-loadbalancer-check-passive"
+		annLinodeDefaultProtocol      = "service.beta.kubernetes.io/linode-loadbalancer-default-protocol"
+		annLinodePortConfigPrefix     = "service.beta.kubernetes.io/linode-loadbalancer-port-"
+		annLinodeLoadBalancerPreserve = "service.beta.kubernetes.io/linode-loadbalancer-preserve"
+		annLinodeHealthCheckType      = "service.beta.kubernetes.io/linode-loadbalancer-check-type"
+		annLinodeCheckBody            = "service.beta.kubernetes.io/linode-loadbalancer-check-body"
+		annLinodeCheckPath            = "service.beta.kubernetes.io/linode-loadbalancer-check-path"
+		annLinodeHealthCheckInterval  = "service.beta.kubernetes.io/linode-loadbalancer-check-interval"
+		annLinodeHealthCheckTimeout   = "service.beta.kubernetes.io/linode-loadbalancer-check-timeout"
+		annLinodeHealthCheckAttempts  = "service.beta.kubernetes.io/linode-loadbalancer-check-attempts"
+		annLinodeHealthCheckPassive   = "service.beta.kubernetes.io/linode-loadbalancer-check-passive"
 	)
 
 	BeforeEach(func() {
@@ -80,6 +82,11 @@ var _ = Describe("CloudControllerManager", func() {
 		Expect(err).NotTo(HaveOccurred())
 	}
 
+	var deleteNodeBalancer = func(id int) {
+		err = getLinodeClient().DeleteNodeBalancer(context.Background(), id)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
 	var getResponseFromSamePod = func(link string) {
 		var oldResp, newResp string
 		Eventually(func() string {
@@ -111,6 +118,13 @@ var _ = Describe("CloudControllerManager", func() {
 			Expect(err).NotTo(HaveOccurred())
 			return nbConfig.NodesStatus.Up
 		}).Should(Equal(numNodes))
+	}
+
+	var checkNodeBalancerExists = func(id int) {
+		By("Checking if the NodeBalancer exists")
+		nb, err := getLinodeClient().GetNodeBalancer(context.Background(), id)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(nb.ID).Should(Equal(nb.ID))
 	}
 
 	type checkArgs struct {
@@ -553,6 +567,67 @@ var _ = Describe("CloudControllerManager", func() {
 						protocol:  protocol,
 					})
 				})
+			})
+
+			Context("With Preserve Annotation", func() {
+				var (
+					pods           []string
+					labels         map[string]string
+					annotations    map[string]string
+					nodeBalancerID int
+				)
+
+				BeforeEach(func() {
+					pods = []string{"test-pod-1"}
+					ports := []core.ContainerPort{
+						{
+							Name:          "http-1",
+							ContainerPort: 8080,
+						},
+					}
+					servicePorts := []core.ServicePort{
+						{
+							Name:       "http-1",
+							Port:       80,
+							TargetPort: intstr.FromInt(8080),
+							Protocol:   "TCP",
+						},
+					}
+
+					labels = map[string]string{
+						"app": "test-loadbalancer",
+					}
+					annotations = map[string]string{
+						annLinodeLoadBalancerPreserve: "true",
+					}
+
+					By("Creating Pod")
+					createPodWithLabel(pods, ports, framework.TestServerImage, labels, false)
+
+					By("Creating Service")
+					createServiceWithAnnotations(labels, annotations, servicePorts, false)
+
+					By("Getting NodeBalancer ID")
+					nodeBalancerID, err = f.LoadBalancer.GetNodeBalancerID(framework.TestServerResourceName)
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				AfterEach(func() {
+					By("Deleting the NodeBalancer")
+					deleteNodeBalancer(nodeBalancerID)
+				})
+
+				It("should preserve the underlying nodebalancer after service deletion", func() {
+					By("Deleting the Pods")
+					deletePods(pods)
+
+					By("Deleting the Service")
+					deleteService()
+
+					By("Checking if the NodeBalancer exists")
+					checkNodeBalancerExists(nodeBalancerID)
+				})
+
 			})
 
 			Context("With Node Addition", func() {
