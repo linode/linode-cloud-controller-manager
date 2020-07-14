@@ -70,40 +70,61 @@ For annotations with bool value types, `"1"`, `"t"`,  `"T"`, `"True"`, `"true"` 
 #### Example usage
 
 ```yaml
-apiVersion: v1
 kind: Service
+apiVersion: v1
 metadata:
-  name: wordpress-lsmnl-wordpress
-  namespace: wordpress-lsmnl
+  name: https-lb
   annotations:
     service.beta.kubernetes.io/linode-loadbalancer-throttle: "4"
     service.beta.kubernetes.io/linode-loadbalancer-default-protocol: "http"
     service.beta.kubernetes.io/linode-loadbalancer-port-443: |
       {
-        "tls-secret-name": "prod-app-tls",
+        "tls-secret-name": "example-secret",
         "protocol": "https"
       }
-  labels:
-    app: wordpress-lsmnl-wordpress
 spec:
   type: LoadBalancer
-  clusterIP: 10.97.58.169
-  externalTrafficPolicy: Cluster
-  ports:
-  - name: http
-    nodePort: 32660
-    port: 80
-    protocol: TCP
-    targetPort: http
-  - name: https
-    nodePort: 30806
-    port: 443
-    protocol: TCP
-    targetPort: https
   selector:
-    app: wordpress-lsmnl-wordpress
-  sessionAffinity: None
+    app: nginx-https-example
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: http
+    - name: https
+      protocol: TCP
+      port: 443
+      targetPort: https
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-https-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx-https-example
+  template:
+    metadata:
+      labels:
+        app: nginx-https-example
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+          - name: http
+            containerPort: 80
+            protocol: TCP
+          - name: https
+            containerPort: 80
+            protocol: TCP
+
 ```
+
+See more in the [examples directory](examples)
 
 ## Why `stickiness` and `algorithm` annotations don't exit
 
