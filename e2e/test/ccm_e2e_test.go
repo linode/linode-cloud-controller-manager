@@ -17,7 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-var _ = Describe("CloudControllerManager", func() {
+var _ = Describe("e2e tests", func() {
 	var (
 		err     error
 		f       *framework.Invocation
@@ -79,6 +79,11 @@ var _ = Describe("CloudControllerManager", func() {
 
 	var createServiceWithAnnotations = func(labels map[string]string, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) {
 		err = f.LoadBalancer.CreateService(labels, annotations, ports, isSessionAffinityClientIP)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	var updateServiceWithAnnotations = func(labels map[string]string, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) {
+		err = f.LoadBalancer.UpdateService(labels, annotations, ports, isSessionAffinityClientIP)
 		Expect(err).NotTo(HaveOccurred())
 	}
 
@@ -450,6 +455,101 @@ var _ = Describe("CloudControllerManager", func() {
 					waitForResponse(http8080, framework.WaitForHTTPResponse)
 					waitForResponse(https443, framework.WaitForHTTPSResponse)
 					waitForResponse(https8443, framework.WaitForHTTPSResponse)
+				})
+			})
+
+			Context("With HTTP updating to have HTTPS", func() {
+				var (
+					pods        []string
+					labels      map[string]string
+					annotations map[string]string
+					secretName  string
+				)
+				BeforeEach(func() {
+					pods = []string{"tls-pod"}
+					secretName = "tls-secret-1"
+					labels = map[string]string{
+						"app": "test-loadbalancer",
+					}
+					annotations = map[string]string{
+						annLinodeDefaultProtocol:         "https",
+						annLinodePortConfigPrefix + "80": `{"protocol": "http"}`,
+					}
+					ports := []core.ContainerPort{
+						{
+							Name:          "alpha",
+							ContainerPort: 8080,
+						},
+					}
+					servicePorts := []core.ServicePort{
+						{
+							Name:       "http",
+							Port:       80,
+							TargetPort: intstr.FromInt(8080),
+							Protocol:   "TCP",
+						},
+					}
+
+					By("Creating Pod")
+					createPodWithLabel(pods, ports, framework.TestServerImage, labels, false)
+
+					By("Creating Service")
+					createServiceWithAnnotations(labels, annotations, servicePorts, false)
+
+					By("Creating Secret")
+					err = f.LoadBalancer.CreateTLSSecret(secretName)
+					Expect(err).NotTo(HaveOccurred())
+
+					By("Updating the Service")
+					updateAnnotations := map[string]string{
+						annLinodeDefaultProtocol:          "https",
+						annLinodePortConfigPrefix + "80":  `{"protocol": "http"}`,
+						annLinodePortConfigPrefix + "443": `{"tls-secret-name": "` + secretName + `", "protocol": "https"}`,
+					}
+					updateServicePorts := []core.ServicePort{
+						{
+							Name:       "http",
+							Port:       80,
+							TargetPort: intstr.FromInt(8080),
+							Protocol:   "TCP",
+						},
+						{
+							Name:       "https",
+							Port:       443,
+							TargetPort: intstr.FromInt(8080),
+							Protocol:   "TCP",
+						},
+					}
+					updateServiceWithAnnotations(labels, updateAnnotations, updateServicePorts, false)
+				})
+
+				AfterEach(func() {
+					By("Deleting the Secrets")
+					deletePods(pods)
+
+					By("Deleting the Service")
+					deleteService()
+
+					By("Deleting the Secret")
+					deleteSecret(secretName)
+				})
+
+				It("should reach the pods", func() {
+					By("Checking TCP Response")
+					eps, err := f.LoadBalancer.GetHTTPEndpoints()
+					Expect(err).NotTo(HaveOccurred())
+					Expect(len(eps)).Should(BeNumerically("==", 2))
+
+					// in order of the spec
+					http80, https443 := eps[0], eps[1]
+
+					waitForResponse := func(endpoint string, fn func(string, string) error) {
+						By("Waiting for Response from the LoadBalancer url: " + endpoint)
+						err := fn(endpoint, pods[0])
+						Expect(err).NotTo(HaveOccurred())
+					}
+					waitForResponse(http80, framework.WaitForHTTPResponse)
+					waitForResponse(https443, framework.WaitForHTTPSResponse)
 				})
 			})
 

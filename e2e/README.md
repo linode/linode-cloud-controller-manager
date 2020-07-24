@@ -51,3 +51,5 @@ Come back here and run the tests
 cd e2e
 make test
 ```
+
+To save time on multiple runs by allowing the cluster to remain, use `make reuse-and-test`

@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func (i *lbInvocation) CreateService(selector, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) error {
+func (i *lbInvocation) createOrUpdateService(selector, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool, isCreate bool) error {
 	var sessionAffinity core.ServiceAffinity = "None"
 	if isSessionAffinityClientIP {
 		sessionAffinity = "ClientIP"
@@ -35,12 +35,34 @@ func (i *lbInvocation) CreateService(selector, annotations map[string]string, po
 		},
 	}
 
-	_, err := i.kubeClient.CoreV1().Services(i.Namespace()).Create(svc)
-	if err != nil {
-		return err
+	service := i.kubeClient.CoreV1().Services(i.Namespace())
+	if isCreate {
+		_, err := service.Create(svc)
+		if err != nil {
+			return err
+		}
+	} else {
+		options := metav1.GetOptions{}
+		resource, err := service.Get(TestServerResourceName, options)
+		if err != nil {
+			return err
+		}
+		svc.ObjectMeta.ResourceVersion = resource.ResourceVersion
+		svc.Spec.ClusterIP = resource.Spec.ClusterIP
+		_, err = service.Update(svc)
+		if err != nil {
+			return err
+		}
 	}
 
 	return i.waitForServerReady()
+}
+
+func (i *lbInvocation) CreateService(selector, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) error {
+	return i.createOrUpdateService(selector, annotations, ports, isSessionAffinityClientIP, true)
+}
+func (i *lbInvocation) UpdateService(selector, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) error {
+	return i.createOrUpdateService(selector, annotations, ports, isSessionAffinityClientIP, false)
 }
 
 func (i *lbInvocation) DeleteService() error {
