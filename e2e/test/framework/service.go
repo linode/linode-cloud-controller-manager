@@ -1,7 +1,9 @@
 package framework
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"net/url"
 	"time"
 
@@ -54,15 +56,26 @@ func (i *lbInvocation) createOrUpdateService(selector, annotations map[string]st
 			return err
 		}
 	}
-
 	return i.waitForServerReady()
 }
 
 func (i *lbInvocation) CreateService(selector, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) error {
-	return i.createOrUpdateService(selector, annotations, ports, isSessionAffinityClientIP, true)
+	err := i.createOrUpdateService(selector, annotations, ports, isSessionAffinityClientIP, true)
+	if err != nil {
+		return err
+	}
+	return i.waitForEnsured()
 }
 func (i *lbInvocation) UpdateService(selector, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) error {
-	return i.createOrUpdateService(selector, annotations, ports, isSessionAffinityClientIP, false)
+	err := i.deleteEvents()
+	if err != nil {
+		return err
+	}
+	err = i.createOrUpdateService(selector, annotations, ports, isSessionAffinityClientIP, false)
+	if err != nil {
+		return err
+	}
+	return i.waitForEnsured()
 }
 
 func (i *lbInvocation) DeleteService() error {
@@ -86,6 +99,42 @@ func (i *lbInvocation) waitForServerReady() error {
 		time.Sleep(time.Second * 5)
 	}
 	return err
+}
+
+func (i *lbInvocation) deleteEvents() error {
+	return i.kubeClient.CoreV1().Events(i.Namespace()).DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: "involvedObject.kind=Service"})
+}
+
+func (i *lbInvocation) waitForEnsured() error {
+	var timeoutSeconds int64 = 30
+	watcher, err := i.kubeClient.CoreV1().Events(i.Namespace()).Watch(metav1.ListOptions{
+		FieldSelector:  "involvedObject.kind=Service",
+		Watch:          true,
+		TimeoutSeconds: &timeoutSeconds})
+	if err != nil {
+		return err
+	}
+
+	ch := watcher.ResultChan()
+
+	for event := range ch {
+		event, ok := event.Object.(*core.Event)
+		if !ok {
+			log.Fatal("unexpected type")
+			return errors.Errorf("failed to poll event")
+		}
+		switch event.Reason {
+		case "CreatingLoadBalancerFailed":
+			s, err := json.MarshalIndent(event, "", "\t")
+			if err != nil {
+				return err
+			}
+			return errors.Errorf("Received failure: %s", string(s))
+		case "EnsuredLoadBalancer":
+			return nil
+		}
+	}
+	return nil
 }
 
 func (i *lbInvocation) getLoadBalancerURLs() ([]string, error) {
