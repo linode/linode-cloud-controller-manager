@@ -476,12 +476,11 @@ func (l *loadbalancers) retrieveKubeClient() error {
 
 	// Check to see if --kubeconfig was set. If it was, build a kubeconfig from the given file.
 	// Otherwise, use the in-cluster config.
-	kubeconfigPath := Options.KubeconfigFlag.Value.String()
-
-	if kubeconfigPath == "" {
+	kubeconfigFlag := Options.KubeconfigFlag
+	if kubeconfigFlag == nil || kubeconfigFlag.Value.String() == "" {
 		kubeConfig, err = rest.InClusterConfig()
 	} else {
-		kubeConfig, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+		kubeConfig, err = clientcmd.BuildConfigFromFlags("", kubeconfigFlag.Value.String())
 	}
 
 	if err != nil {
