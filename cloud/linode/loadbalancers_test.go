@@ -123,8 +123,8 @@ func TestCCMLoadBalancers(t *testing.T) {
 			f:    testUpdateLoadBalancerAddPortAnnotation,
 		},
 		{
-			name: "Update Load Balancer - Add Port",
-			f:    testUpdateLoadBalancerAddPort,
+			name: "Update Load Balancer - Add TLS Port",
+			f:    testUpdateLoadBalancerAddTLSPort,
 		},
 		{
 			name: "Build Load Balancer Request",
@@ -372,7 +372,7 @@ func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Clie
 	}
 }
 
-func testUpdateLoadBalancerAddPort(t *testing.T, client *linodego.Client, _ *fakeAPI) {
+func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: randString(10),
@@ -409,7 +409,7 @@ func testUpdateLoadBalancerAddPort(t *testing.T, client *linodego.Client, _ *fak
 	extraPort := v1.ServicePort{
 		Name:     randString(10),
 		Protocol: "TCP",
-		Port:     int32(81),
+		Port:     int32(443),
 		NodePort: int32(30001),
 	}
 
@@ -417,13 +417,18 @@ func testUpdateLoadBalancerAddPort(t *testing.T, client *linodego.Client, _ *fak
 
 	defer lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc)
 
+	lb.kubeClient = fake.NewSimpleClientset()
+	addTLSSecret(t, lb.kubeClient)
+
 	_, err := lb.EnsureLoadBalancer(context.TODO(), "lnodelb", svc, nodes)
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
 
 	svc.Spec.Ports = append(svc.Spec.Ports, extraPort)
-
+	svc.ObjectMeta.SetAnnotations(map[string]string{
+		annLinodePortConfigPrefix + "443": `{ "protocol": "https", "tls-secret-name": "tls-secret"}`,
+	})
 	err = lb.UpdateLoadBalancer(context.TODO(), "lnodelb", svc, nodes)
 	if err != nil {
 		t.Errorf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
@@ -442,8 +447,8 @@ func testUpdateLoadBalancerAddPort(t *testing.T, client *linodego.Client, _ *fak
 	}
 
 	expectedPorts := map[int]struct{}{
-		80: struct{}{},
-		81: struct{}{},
+		80:  struct{}{},
+		443: struct{}{},
 	}
 
 	observedPorts := make(map[int]struct{})
@@ -1015,7 +1020,8 @@ func testEnsureLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 			Name: "testensure",
 			UID:  "foobar123",
 			Annotations: map[string]string{
-				annLinodeDefaultProtocol: "tcp",
+				annLinodeDefaultProtocol:           "tcp",
+				annLinodePortConfigPrefix + "8443": `{ "protocol": "https", "tls-secret-name": "tls-secret"}`,
 			},
 		},
 		Spec: v1.ServiceSpec{
@@ -1023,7 +1029,7 @@ func testEnsureLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 				{
 					Name:     "test",
 					Protocol: "TCP",
-					Port:     int32(8000),
+					Port:     int32(8443),
 					NodePort: int32(30000),
 				},
 				{
@@ -1037,6 +1043,8 @@ func testEnsureLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	}
 
 	lb := &loadbalancers{client, "us-west", nil}
+	lb.kubeClient = fake.NewSimpleClientset()
+	addTLSSecret(t, lb.kubeClient)
 
 	configs := []*linodego.NodeBalancerConfigCreateOptions{}
 	_, err := lb.createNodeBalancer(context.TODO(), svc, configs)

@@ -430,6 +430,11 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				SSLCert:        nbcco.SSLCert,
 				SSLKey:         nbcco.SSLKey,
 			}
+
+			if nbcc.Protocol == "https" && (nbcc.SSLKey == "" || nbcc.SSLCert == "") {
+				f.t.Fatal("HTTPS port declared without ssl cert/key specified")
+			}
+
 			f.nbc[strconv.Itoa(nbcc.ID)] = &nbcc
 			for k, n := range f.nbn {
 				if n.ConfigID == nbcc.ID {
