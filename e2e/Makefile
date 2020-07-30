@@ -13,7 +13,10 @@ test reuse-and-test: $(GOPATH)/bin/ginkgo check-token
 	ginkgo -r --v --progress --trace --cover $(TEST_ARGS) -- --v=3 --image=${IMG} $(SUITE_ARGS); \
 
 clean: check-token
-	cd test && ./scripts/delete_cluster.sh ccm-linode-for-reuse
+	cd test; \
+	./scripts/delete_cluster.sh ccm-linode-for-reuse; \
+	rm terraform.tfstate; \
+    rm -rf terraform.tfstate.d
 
 check-token:
 	@if test "$(LINODE_API_TOKEN)" = "" ; then \

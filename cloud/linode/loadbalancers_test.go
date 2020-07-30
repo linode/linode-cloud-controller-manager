@@ -139,8 +139,12 @@ func TestCCMLoadBalancers(t *testing.T) {
 			f:    testEnsureLoadBalancerPreserveAnnotation,
 		},
 		{
-			name: "Ensure Load Balancer",
-			f:    testEnsureLoadBalancer,
+			name: "Ensure Existing Load Balancer",
+			f:    testEnsureExistingLoadBalancer,
+		},
+		{
+			name: "Ensure New Load Balancer",
+			f:    testEnsureNewLoadBalancer,
 		},
 	}
 
@@ -1014,7 +1018,7 @@ func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client, fake *
 	}
 }
 
-func testEnsureLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
+func testEnsureExistingLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "testensure",
@@ -1135,6 +1139,60 @@ func testEnsureLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 				t.Logf("actual: %v", err)
 			}
 		})
+	}
+}
+func testEnsureNewLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "testensure",
+			UID:  "foobar123",
+			Annotations: map[string]string{
+				annLinodeDefaultProtocol:           "tcp",
+				annLinodePortConfigPrefix + "8443": `{ "protocol": "https", "tls-secret-name": "tls-secret"}`,
+			},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     "test",
+					Protocol: "TCP",
+					Port:     int32(8443),
+					NodePort: int32(30000),
+				},
+				{
+					Name:     "test2",
+					Protocol: "TCP",
+					Port:     int32(80),
+					NodePort: int32(30001),
+				},
+			},
+		},
+	}
+
+	nodes := []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node-1",
+			},
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+		},
+	}
+	lb := &loadbalancers{client, "us-west", nil}
+	lb.kubeClient = fake.NewSimpleClientset()
+	addTLSSecret(t, lb.kubeClient)
+
+	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc) }()
+
+	_, err := lb.EnsureLoadBalancer(context.TODO(), "lnodelb", svc, nodes)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
