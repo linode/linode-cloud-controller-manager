@@ -353,6 +353,14 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			f.nb[strconv.Itoa(nb.ID)] = &nb
 
 			for _, nbcco := range nbco.Configs {
+				if nbcco.Protocol == "https" {
+					if !strings.Contains(nbcco.SSLCert, "BEGIN CERTIFICATE") {
+						f.t.Fatal("HTTPS port declared without calid ssl cert", nbcco.SSLCert)
+					}
+					if !strings.Contains(nbcco.SSLKey, "BEGIN RSA PRIVATE KEY") {
+						f.t.Fatal("HTTPS port declared without calid ssl key", nbcco.SSLKey)
+					}
+				}
 				nbc := linodego.NodeBalancerConfig{
 					ID:             rand.Intn(9999),
 					Port:           nbcco.Port,
@@ -368,10 +376,10 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					CheckTimeout:   nbcco.CheckTimeout,
 					CipherSuite:    nbcco.CipherSuite,
 					NodeBalancerID: nb.ID,
-					SSLCommonName:  "",
-					SSLFingerprint: "",
-					SSLCert:        nbcco.SSLCert,
-					SSLKey:         nbcco.SSLKey,
+					SSLCommonName:  "sslcommonname",
+					SSLFingerprint: "sslfingerprint",
+					SSLCert:        "<REDACTED>",
+					SSLKey:         "<REDACTED>",
 				}
 				f.nbc[strconv.Itoa(nbc.ID)] = &nbc
 
@@ -410,6 +418,14 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				f.t.Fatal(err)
 			}
+			if nbcco.Protocol == "https" {
+				if !strings.Contains(nbcco.SSLCert, "BEGIN CERTIFICATE") {
+					f.t.Fatal("HTTPS port declared without calid ssl cert", nbcco.SSLCert)
+				}
+				if !strings.Contains(nbcco.SSLKey, "BEGIN RSA PRIVATE KEY") {
+					f.t.Fatal("HTTPS port declared without calid ssl key", nbcco.SSLKey)
+				}
+			}
 			nbcc := linodego.NodeBalancerConfig{
 				ID:             nbcid,
 				Port:           nbcco.Port,
@@ -425,11 +441,12 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				CheckTimeout:   nbcco.CheckTimeout,
 				CipherSuite:    nbcco.CipherSuite,
 				NodeBalancerID: nbid,
-				SSLCommonName:  "",
-				SSLFingerprint: "",
-				SSLCert:        nbcco.SSLCert,
-				SSLKey:         nbcco.SSLKey,
+				SSLCommonName:  "sslcommonname",
+				SSLFingerprint: "sslfingerprint",
+				SSLCert:        "<REDACTED>",
+				SSLKey:         "<REDACTED>",
 			}
+
 			f.nbc[strconv.Itoa(nbcc.ID)] = &nbcc
 			for k, n := range f.nbn {
 				if n.ConfigID == nbcc.ID {
@@ -481,10 +498,10 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				CheckTimeout:   nbcco.CheckTimeout,
 				CipherSuite:    nbcco.CipherSuite,
 				NodeBalancerID: nbid,
-				SSLCommonName:  "",
-				SSLFingerprint: "",
-				SSLCert:        nbcco.SSLCert,
-				SSLKey:         nbcco.SSLKey,
+				SSLCommonName:  "sslcomonname",
+				SSLFingerprint: "sslfingerprint",
+				SSLCert:        "<REDACTED>",
+				SSLKey:         "<REDACTED>",
 			}
 			f.nbc[strconv.Itoa(nbcc.ID)] = &nbcc
 
@@ -590,10 +607,10 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				CheckTimeout:   nbcco.CheckTimeout,
 				CipherSuite:    nbcco.CipherSuite,
 				NodeBalancerID: nbid,
-				SSLCommonName:  "",
-				SSLFingerprint: "",
-				SSLCert:        nbcco.SSLCert,
-				SSLKey:         nbcco.SSLKey,
+				SSLCommonName:  "sslcommonname",
+				SSLFingerprint: "sslfingerprint",
+				SSLCert:        "<REDACTED>",
+				SSLKey:         "<REDACTED>",
 			}
 			f.nbc[strconv.Itoa(nbcc.ID)] = &nbcc
 

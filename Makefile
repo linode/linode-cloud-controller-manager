@@ -30,7 +30,7 @@ fmt: vet $(GOPATH)/bin/goimports
 .PHONY: test
 # we say code is not worth testing unless it's formatted
 test: $(GOPATH)/bin/ginkgo fmt
-	ginkgo -r --v --progress --trace --cover --skipPackage=test -- --v=3
+	ginkgo -r --v --progress --trace --cover --skipPackage=test $(TEST_ARGS) -- --v=3
 
 .PHONY: build-linux
 build-linux:
