@@ -3,6 +3,7 @@ package framework
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/appscode/go/wait"
 	"github.com/linode/linodego"
@@ -33,6 +34,16 @@ func (i *lbInvocation) GetNodeBalancerID(svcName string) (int, error) {
 	return -1, fmt.Errorf("no NodeBalancer Found for service %v", svcName)
 }
 
+func (i *lbInvocation) WaitForNodeBalancerReady(svcName string, expectedID int) error {
+	return wait.PollImmediate(time.Millisecond*500, RetryTimeout, func() (bool, error) {
+		nbID, err := i.GetNodeBalancerID(svcName)
+		if err != nil {
+			return false, err
+		}
+		return nbID == expectedID, nil
+	})
+}
+
 func (i *lbInvocation) GetNodeBalancerConfig(svcName string) (*linodego.NodeBalancerConfig, error) {
 	id, err := i.GetNodeBalancerID(svcName)
 	if err != nil {
@@ -47,7 +58,7 @@ func (i *lbInvocation) GetNodeBalancerConfig(svcName string) (*linodego.NodeBala
 
 func (i *lbInvocation) waitForLoadBalancerIP(svcName string) (string, error) {
 	var ip string
-	err := wait.PollImmediate(RetryInterval, RetryTimout, func() (bool, error) {
+	err := wait.PollImmediate(RetryInterval, RetryTimeout, func() (bool, error) {
 		svc, err := i.kubeClient.CoreV1().Services(i.Namespace()).Get(svcName, metav1.GetOptions{})
 		if err != nil {
 			return false, err

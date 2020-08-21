@@ -24,7 +24,7 @@ import (
 const (
 	scriptDirectory = "scripts"
 	RetryInterval   = 5 * time.Second
-	RetryTimout     = 15 * time.Minute
+	RetryTimeout    = 15 * time.Minute
 	caCert          = `-----BEGIN CERTIFICATE-----
 MIIFejCCA2KgAwIBAgIJAN7D2Ju254yUMA0GCSqGSIb3DQEBCwUAMFIxCzAJBgNV
 BAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBX
@@ -80,7 +80,11 @@ func runCommand(cmd string, args ...string) error {
 
 func deleteInForeground() *metav1.DeleteOptions {
 	policy := metav1.DeletePropagationForeground
-	return &metav1.DeleteOptions{PropagationPolicy: &policy}
+	graceSeconds := int64(0)
+	return &metav1.DeleteOptions{
+		PropagationPolicy:  &policy,
+		GracePeriodSeconds: &graceSeconds,
+	}
 }
 
 func getHTTPSResponse(domain, ip, port string) (string, error) {
@@ -137,7 +141,7 @@ func getHTTPSResponse(domain, ip, port string) (string, error) {
 }
 
 func WaitForHTTPSResponse(link string, podName string) error {
-	return wait.PollImmediate(RetryInterval, RetryTimout, func() (bool, error) {
+	return wait.PollImmediate(RetryInterval, RetryTimeout, func() (bool, error) {
 		u, err := url.Parse(link)
 		if err != nil {
 			return false, nil
@@ -174,7 +178,7 @@ func getHTTPResponse(link string) (bool, string, error) {
 }
 
 func WaitForHTTPResponse(link string, podName string) error {
-	return wait.PollImmediate(RetryInterval, RetryTimout, func() (bool, error) {
+	return wait.PollImmediate(RetryInterval, RetryTimeout, func() (bool, error) {
 		ok, _, err := getHTTPResponse(link)
 		if err != nil {
 			return false, nil

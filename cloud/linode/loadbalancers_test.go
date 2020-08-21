@@ -287,7 +287,7 @@ func testUpdateLoadBalancerAddAnnotation(t *testing.T, client *linodego.Client, 
 	}
 
 	lbName := cloudprovider.GetLoadBalancerName(svc)
-	nb, err := lb.lbByName(context.TODO(), lb.client, lbName)
+	nb, err := lb.lbByName(context.TODO(), lbName)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -352,7 +352,7 @@ func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Clie
 	}
 
 	lbName := cloudprovider.GetLoadBalancerName(svc)
-	nb, err := lb.lbByName(context.TODO(), lb.client, lbName)
+	nb, err := lb.lbByName(context.TODO(), lbName)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -439,7 +439,7 @@ func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *
 	}
 
 	lbName := cloudprovider.GetLoadBalancerName(svc)
-	nb, err := lb.lbByName(context.TODO(), lb.client, lbName)
+	nb, err := lb.lbByName(context.TODO(), lbName)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
