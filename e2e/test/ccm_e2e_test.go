@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/appscode/go/wait"
 	"github.com/codeskyblue/go-sh"
@@ -145,17 +144,13 @@ var _ = Describe("e2e tests", func() {
 	}
 
 	var checkNodeBalancerNotExists = func(id int) {
-		err = wait.PollImmediate(time.Millisecond*500, framework.RetryTimeout, func() (bool, error) {
-			_, err := getLinodeClient().GetNodeBalancer(context.Background(), id)
-			if err != nil {
-				if apiErr, ok := err.(*linodego.APIError); ok && apiErr.Errors[0].Reason == "Not Found" {
-					return true, nil
-				}
-				return false, err
-			}
-			return false, nil
-		})
-		Expect(err).NotTo(HaveOccurred())
+		nb, err := getLinodeClient().GetNodeBalancer(context.Background(), id)
+		Expect(nb).To(BeNil())
+		Expect(err).ToNot(BeNil())
+
+		linodeErr, ok := err.(*linodego.Error)
+		Expect(ok).To(BeTrue())
+		Expect(linodeErr.Code).To(Equal(404))
 	}
 
 	type checkArgs struct {
@@ -826,6 +821,9 @@ var _ = Describe("e2e tests", func() {
 				It("should use the newly specified NodeBalancer ID", func() {
 					By("Creating new NodeBalancer")
 					nbID := createNodeBalancer()
+
+					By("Waiting for currenct NodeBalancer to be ready")
+					checkNodeBalancerID(framework.TestServerResourceName, nodeBalancerID)
 
 					By("Annotating service with new NodeBalancer ID")
 					annotations[annLinodeNodeBalancerID] = strconv.Itoa(nbID)
