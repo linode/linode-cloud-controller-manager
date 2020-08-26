@@ -384,24 +384,6 @@ func (l *loadbalancers) getNodeBalancerByID(ctx context.Context, service *v1.Ser
 	return
 }
 
-// The returned error will be errLbNotFound if the load balancer does not exist.
-func (l *loadbalancers) lbByName(ctx context.Context, name string) (*linodego.NodeBalancer, error) {
-	jsonFilter, err := json.Marshal(map[string]string{"label": name})
-	if err != nil {
-		return nil, err
-	}
-	lbs, err := l.client.ListNodeBalancers(ctx, linodego.NewListOptions(0, string(jsonFilter)))
-	if err != nil {
-		return nil, err
-	}
-
-	if len(lbs) > 0 {
-		return &lbs[0], nil
-	}
-
-	return nil, errLbNotFound
-}
-
 func (l *loadbalancers) createNodeBalancer(ctx context.Context, service *v1.Service, configs []*linodego.NodeBalancerConfigCreateOptions) (lb *linodego.NodeBalancer, err error) {
 	connThrottle := getConnectionThrottle(service)
 	createOpts := linodego.NodeBalancerCreateOptions{
