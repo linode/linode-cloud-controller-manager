@@ -696,7 +696,7 @@ var _ = Describe("e2e tests", func() {
 				})
 			})
 
-			FContext("Updated with NodeBalancerID", func() {
+			Context("Updated with NodeBalancerID", func() {
 				var (
 					pods         []string
 					labels       map[string]string
@@ -757,7 +757,7 @@ var _ = Describe("e2e tests", func() {
 				})
 			})
 
-			FContext("Created with NodeBalancerID", func() {
+			Context("Created with NodeBalancerID", func() {
 				var (
 					pods         []string
 					labels       map[string]string
@@ -839,7 +839,7 @@ var _ = Describe("e2e tests", func() {
 				})
 			})
 
-			FContext("With Preserve Annotation", func() {
+			Context("With Preserve Annotation", func() {
 				var (
 					pods           []string
 					servicePorts   []core.ServicePort
