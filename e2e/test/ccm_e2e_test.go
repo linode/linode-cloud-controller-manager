@@ -36,7 +36,7 @@ var _ = Describe("e2e tests", func() {
 		annLinodeHealthCheckTimeout   = "service.beta.kubernetes.io/linode-loadbalancer-check-timeout"
 		annLinodeHealthCheckAttempts  = "service.beta.kubernetes.io/linode-loadbalancer-check-attempts"
 		annLinodeHealthCheckPassive   = "service.beta.kubernetes.io/linode-loadbalancer-check-passive"
-		annLinodeNodeBalancerID       = "service.beta.kubernetes.io/linode-nodebalancer-id"
+		annLinodeNodeBalancerID       = "service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"
 	)
 
 	BeforeEach(func() {

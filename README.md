@@ -52,7 +52,8 @@ Annotation (Suffix) | Values | Default | Description
 `check-timeout` | int (1-30) | | Duration, in seconds, to wait for a health check to succeed before considering it a failure
 `check-attempts` | int (1-30) | | Number of health check failures necessary to remove a back-end from the service
 `check-passive` | [bool](#annotation-bool-values) | `false` | When `true`, `5xx` status codes will cause the health check to fail
-`preserve` | [bool](#annotation-bool-values) | `false` | When `true`, deleting a `LoadBalancer` service does not delete the underlying NodeBalancer
+`preserve` | [bool](#annotation-bool-values) | `false` | When `true`, deleting a `LoadBalancer` service does not delete the underlying NodeBalancer. Replaced NodeBalancers will also not be deleted
+`nodebalancer-id` | string | | The ID of the NodeBalancer to front the service. When not specified, a new NodeBalancer will be created. This can be configured on service creation or patching.
 
 #### Deprecated Annotations
 
@@ -251,7 +252,7 @@ dep ensure
 
 #### Building Docker images
 
-To build and push a Docker image, use the following make targets. 
+To build and push a Docker image, use the following make targets.
 
 ```bash
 # Set the repo/image:tag with the TAG environment variable

@@ -42,7 +42,7 @@ const (
 	annLinodeThrottle = "service.beta.kubernetes.io/linode-loadbalancer-throttle"
 
 	annLinodeLoadBalancerPreserve = "service.beta.kubernetes.io/linode-loadbalancer-preserve"
-	annLinodeNodeBalancerID       = "service.beta.kubernetes.io/linode-nodebalancer-id"
+	annLinodeNodeBalancerID       = "service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"
 )
 
 var errLbNotFound = errors.New("loadbalancer not found")
