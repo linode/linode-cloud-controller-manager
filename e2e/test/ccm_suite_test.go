@@ -113,6 +113,10 @@ var _ = AfterSuite(func() {
 		err := framework.DeleteCluster(clusterName)
 		Expect(err).NotTo(HaveOccurred())
 	} else {
+		By("Deleting Namespace " + root.Namespace())
+		err := root.DeleteNamespace()
+		Expect(err).NotTo(HaveOccurred())
+
 		By("Not deleting cluster")
 	}
 })
