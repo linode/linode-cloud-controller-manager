@@ -89,10 +89,35 @@ func (l *loadbalancers) getNodeBalancerForService(ctx context.Context, service *
 	return l.getNodeBalancerByStatus(ctx, service)
 }
 
+func (l *loadbalancers) getLatestServiceLoadBalancerStatus(ctx context.Context, service *v1.Service) (v1.LoadBalancerStatus, error) {
+	err := l.retrieveKubeClient()
+	if err != nil {
+		return v1.LoadBalancerStatus{}, err
+	}
+
+	service, err = l.kubeClient.CoreV1().Services(service.Namespace).Get(service.Name, metav1.GetOptions{})
+	if err != nil {
+		return v1.LoadBalancerStatus{}, err
+	}
+	return service.Status.LoadBalancer, nil
+}
+
 // getNodeBalancerByStatus attempts to get the NodeBalancer from the IPv4 specified in the
 // most recent LoadBalancer status.
 func (l *loadbalancers) getNodeBalancerByStatus(ctx context.Context, service *v1.Service) (*linodego.NodeBalancer, error) {
-	for _, ingress := range service.Status.LoadBalancer.Ingress {
+	lbStatus := service.Status.LoadBalancer
+
+	// UpdateLoadBalancer, DeleteLoadBalancer are invoked with a nil LoadBalancerStatus. If
+	// not present, fetch the latest status.
+	if len(lbStatus.Ingress) == 0 {
+		latestStatus, err := l.getLatestServiceLoadBalancerStatus(ctx, service)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get latest LoadBalancer status for service %s: %s", getServiceSlug(service), err)
+		}
+		lbStatus = latestStatus
+	}
+
+	for _, ingress := range lbStatus.Ingress {
 		ipv4 := ingress.IP
 		if nb, err := l.getNodeBalancerByIPv4(ctx, service, ipv4); err == nil {
 			return nb, err
@@ -108,10 +133,13 @@ func (l *loadbalancers) getNodeBalancerByStatus(ctx context.Context, service *v1
 // annotation), the old one is deleted.
 func (l *loadbalancers) cleanupOldNodeBalancer(ctx context.Context, service *v1.Service) error {
 	previousNB, err := l.getNodeBalancerByStatus(ctx, service)
-	if err != nil {
-		if err == errLbNotFound {
-			return nil
-		}
+	switch err {
+	case nil:
+		// continue execution
+		break
+	case errLbNotFound:
+		return nil
+	default:
 		return err
 	}
 
@@ -372,16 +400,14 @@ func (l *loadbalancers) getNodeBalancerByIPv4(ctx context.Context, service *v1.S
 	return nil, errLbNotFound
 }
 
-func (l *loadbalancers) getNodeBalancerByID(ctx context.Context, service *v1.Service, id int) (lb *linodego.NodeBalancer, err error) {
-	lb, err = l.client.GetNodeBalancer(ctx, id)
+func (l *loadbalancers) getNodeBalancerByID(ctx context.Context, service *v1.Service, id int) (*linodego.NodeBalancer, error) {
+	nb, err := l.client.GetNodeBalancer(ctx, id)
 	if err != nil {
 		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == http.StatusNotFound {
-			err = errLbNotFound
+			return nil, errLbNotFound
 		}
-	} else {
-		klog.Infof("found NodeBalancer (%d) for service %s/%s via %s annotation", id, service.Namespace, service.Name, annLinodeNodeBalancerID)
 	}
-	return
+	return nb, nil
 }
 
 func (l *loadbalancers) createNodeBalancer(ctx context.Context, service *v1.Service, configs []*linodego.NodeBalancerConfigCreateOptions) (lb *linodego.NodeBalancer, err error) {
