@@ -34,7 +34,11 @@ func newServiceController(loadbalancers *loadbalancers, informer v1informers.Ser
 func (s *serviceController) Run(stopCh <-chan struct{}) {
 	s.informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: func(obj interface{}) {
-			service := obj.(*v1.Service)
+			service, ok := obj.(*v1.Service)
+			if !ok {
+				return
+			}
+
 			if service.Spec.Type != "LoadBalancer" {
 				return
 			}
@@ -62,7 +66,12 @@ func (s *serviceController) processNextDeletion() bool {
 	}
 	defer s.queue.Done(key)
 
-	service := key.(*v1.Service)
+	service, ok := key.(*v1.Service)
+	if !ok {
+		klog.Errorf("expected dequeued key to be of type *v1.Service but got %T", service)
+		return true
+	}
+
 	err := s.handleServiceDeleted(service)
 	switch deleteErr := err.(type) {
 	case nil:
