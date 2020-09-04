@@ -2,6 +2,8 @@ module github.com/linode/linode-cloud-controller-manager
 
 go 1.12
 
+replace bitbucket.org/ww/goautoneg v0.0.0-20120707110453-75cd24fc2f2c => github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
+
 require (
 	bitbucket.org/ww/goautoneg v0.0.0-20120707110453-75cd24fc2f2c // indirect
 	github.com/NYTimes/gziphandler v0.0.0-20170623195520-56545f4a5d46 // indirect
