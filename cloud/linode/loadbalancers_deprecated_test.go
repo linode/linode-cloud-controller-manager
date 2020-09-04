@@ -240,9 +240,9 @@ func testEnsureLoadBalancerDeprecated(t *testing.T, client *linodego.Client) {
 		t.Fatal(err)
 	}
 
-	svc.Status.LoadBalancer = *getLoadBalancerStatus(nb)
+	svc.Status.LoadBalancer = *makeLoadBalancerStatus(nb)
 	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc) }()
-	getLBStatus, exists, err := lb.GetLoadBalancer(context.TODO(), "linodelb", svc)
+	lbStatus, exists, err := lb.GetLoadBalancer(context.TODO(), "linodelb", svc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,7 +303,7 @@ func testEnsureLoadBalancerDeprecated(t *testing.T, client *linodego.Client) {
 				},
 			},
 			"linodelb",
-			getLBStatus.Ingress[0].IP,
+			lbStatus.Ingress[0].IP,
 			nil,
 		},
 	}
@@ -356,7 +356,7 @@ func testGetLoadBalancerDeprecated(t *testing.T, client *linodego.Client) {
 		t.Fatal(err)
 	}
 
-	lbStatus := getLoadBalancerStatus(nb)
+	lbStatus := makeLoadBalancerStatus(nb)
 	svc.Status.LoadBalancer = *lbStatus
 	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc) }()
 	testcases := []struct {

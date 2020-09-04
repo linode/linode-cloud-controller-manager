@@ -18,7 +18,6 @@ import (
 
 	"github.com/linode/linode-cloud-controller-manager/sentry"
 	"github.com/linode/linodego"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -45,7 +44,17 @@ const (
 	annLinodeNodeBalancerID       = "service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"
 )
 
-var errLbNotFound = errors.New("loadbalancer not found")
+type lbNotFoundError struct {
+	serviceNn      string
+	nodeBalancerID int
+}
+
+func (e lbNotFoundError) Error() string {
+	if e.nodeBalancerID != 0 {
+		return fmt.Sprintf("LoadBalancer (%d) not found for service (%s)", e.nodeBalancerID, e.serviceNn)
+	}
+	return fmt.Sprintf("LoadBalancer not found for service (%s)", e.serviceNn)
+}
 
 type loadbalancers struct {
 	client *linodego.Client
@@ -78,13 +87,18 @@ func (l *loadbalancers) getNodeBalancerForService(ctx context.Context, service *
 	if hasIDAnn {
 		sentry.SetTag(ctx, "load_balancer_id", rawID)
 		nb, err := l.getNodeBalancerByID(ctx, service, id)
-		if err != errLbNotFound {
-			return nb, err
-		}
+		switch err.(type) {
+		case nil:
+			return nb, nil
 
-		// If the specified NodeBalancer does not exist, try to resolve the current
-		// one from the status.
-		klog.Warningf("could not find NodeBalancer from annotation on service %s; attempting to find from status", getServiceSlug(service))
+		case lbNotFoundError:
+			// If the specified NodeBalancer does not exist, try to resolve the current
+			// one from the status.
+			klog.Warningf("could not find NodeBalancer from annotation on service (%s); attempting to find from status", getServiceNn(service))
+
+		default:
+			return nil, err
+		}
 	}
 	return l.getNodeBalancerByStatus(ctx, service)
 }
@@ -105,25 +119,13 @@ func (l *loadbalancers) getLatestServiceLoadBalancerStatus(ctx context.Context, 
 // getNodeBalancerByStatus attempts to get the NodeBalancer from the IPv4 specified in the
 // most recent LoadBalancer status.
 func (l *loadbalancers) getNodeBalancerByStatus(ctx context.Context, service *v1.Service) (*linodego.NodeBalancer, error) {
-	lbStatus := service.Status.LoadBalancer
-
-	// UpdateLoadBalancer, DeleteLoadBalancer are invoked with a nil LoadBalancerStatus. If
-	// not present, fetch the latest status.
-	if len(lbStatus.Ingress) == 0 {
-		latestStatus, err := l.getLatestServiceLoadBalancerStatus(ctx, service)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get latest LoadBalancer status for service %s: %s", getServiceSlug(service), err)
-		}
-		lbStatus = latestStatus
-	}
-
-	for _, ingress := range lbStatus.Ingress {
+	for _, ingress := range service.Status.LoadBalancer.Ingress {
 		ipv4 := ingress.IP
 		if nb, err := l.getNodeBalancerByIPv4(ctx, service, ipv4); err == nil {
 			return nb, err
 		}
 	}
-	return nil, errLbNotFound
+	return nil, lbNotFoundError{serviceNn: getServiceNn(service)}
 }
 
 // cleanupOldNodeBalancer removes the service's disowned NodeBalancer if there is one.
@@ -133,11 +135,11 @@ func (l *loadbalancers) getNodeBalancerByStatus(ctx context.Context, service *v1
 // annotation), the old one is deleted.
 func (l *loadbalancers) cleanupOldNodeBalancer(ctx context.Context, service *v1.Service) error {
 	previousNB, err := l.getNodeBalancerByStatus(ctx, service)
-	switch err {
+	switch err.(type) {
 	case nil:
 		// continue execution
 		break
-	case errLbNotFound:
+	case lbNotFoundError:
 		return nil
 	default:
 		return err
@@ -151,7 +153,13 @@ func (l *loadbalancers) cleanupOldNodeBalancer(ctx context.Context, service *v1.
 	if previousNB.ID == nb.ID {
 		return nil
 	}
-	return l.client.DeleteNodeBalancer(ctx, previousNB.ID)
+
+	if err := l.client.DeleteNodeBalancer(ctx, previousNB.ID); err != nil {
+		return err
+	}
+
+	klog.Infof("successfully deleted old NodeBalancer (%d) for service (%s)", previousNB.ID, getServiceNn(service))
+	return nil
 }
 
 // GetLoadBalancer returns the *v1.LoadBalancerStatus of service.
@@ -163,16 +171,19 @@ func (l *loadbalancers) GetLoadBalancer(ctx context.Context, clusterName string,
 	sentry.SetTag(ctx, "service", service.Name)
 
 	nb, err := l.getNodeBalancerForService(ctx, service)
-	if err != nil {
-		if err == errLbNotFound {
-			return nil, false, nil
-		}
+	switch err.(type) {
+	case nil:
+		break
 
+	case lbNotFoundError:
+		return nil, false, nil
+
+	default:
 		sentry.CaptureError(ctx, err)
 		return nil, false, err
 	}
 
-	return getLoadBalancerStatus(nb), true, nil
+	return makeLoadBalancerStatus(nb), true, nil
 }
 
 // EnsureLoadBalancer ensures that the cluster is running a load balancer for
@@ -187,15 +198,15 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	var nb *linodego.NodeBalancer
 
 	nb, err = l.getNodeBalancerForService(ctx, service)
-	switch err {
-	case errLbNotFound:
+	switch err.(type) {
+	case lbNotFoundError:
 		if nb, err = l.buildLoadBalancerRequest(ctx, service, nodes); err != nil {
 			sentry.CaptureError(ctx, err)
 			return nil, err
 		}
 
 	case nil:
-		if err = l.UpdateLoadBalancer(ctx, clusterName, service, nodes); err != nil {
+		if err = l.updateNodeBalancer(ctx, service, nodes, nb); err != nil {
 			sentry.CaptureError(ctx, err)
 			return nil, err
 		}
@@ -205,7 +216,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 		return nil, err
 	}
 
-	lbStatus = getLoadBalancerStatus(nb)
+	lbStatus = makeLoadBalancerStatus(nb)
 
 	if !l.shouldPreserveNodeBalancer(service) {
 		if err := l.cleanupOldNodeBalancer(ctx, service); err != nil {
@@ -217,25 +228,14 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	return lbStatus, nil
 }
 
-// UpdateLoadBalancer updates the NodeBalancer to have configs that match the Service's ports
 //nolint:funlen
-func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
-	ctx = sentry.SetHubOnContext(ctx)
-	sentry.SetTag(ctx, "cluster_name", clusterName)
-	sentry.SetTag(ctx, "service", service.Name)
-
-	lb, err := l.getNodeBalancerForService(ctx, service)
-	if err != nil {
-		sentry.CaptureError(ctx, err)
-		return err
-	}
-
+func (l *loadbalancers) updateNodeBalancer(ctx context.Context, service *v1.Service, nodes []*v1.Node, nb *linodego.NodeBalancer) (err error) {
 	connThrottle := getConnectionThrottle(service)
-	if connThrottle != lb.ClientConnThrottle {
-		update := lb.GetUpdateOptions()
+	if connThrottle != nb.ClientConnThrottle {
+		update := nb.GetUpdateOptions()
 		update.ClientConnThrottle = &connThrottle
 
-		lb, err = l.client.UpdateNodeBalancer(ctx, lb.ID, update)
+		nb, err = l.client.UpdateNodeBalancer(ctx, nb.ID, update)
 		if err != nil {
 			sentry.CaptureError(ctx, err)
 			return err
@@ -243,7 +243,7 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 	}
 
 	// Get all of the NodeBalancer's configs
-	nbCfgs, err := l.client.ListNodeBalancerConfigs(ctx, lb.ID, nil)
+	nbCfgs, err := l.client.ListNodeBalancerConfigs(ctx, nb.ID, nil)
 	if err != nil {
 		sentry.CaptureError(ctx, err)
 		return err
@@ -291,7 +291,7 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 		if currentNBCfg == nil {
 			createOpts := newNBCfg.GetCreateOptions()
 
-			currentNBCfg, err = l.client.CreateNodeBalancerConfig(ctx, lb.ID, createOpts)
+			currentNBCfg, err = l.client.CreateNodeBalancerConfig(ctx, nb.ID, createOpts)
 			if err != nil {
 				sentry.CaptureError(ctx, err)
 				return fmt.Errorf("[port %d] error creating NodeBalancer config: %v", int(port.Port), err)
@@ -308,12 +308,42 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 
 		rebuildOpts.Nodes = newNBNodes
 
-		if _, err = l.client.RebuildNodeBalancerConfig(ctx, lb.ID, currentNBCfg.ID, rebuildOpts); err != nil {
+		if _, err = l.client.RebuildNodeBalancerConfig(ctx, nb.ID, currentNBCfg.ID, rebuildOpts); err != nil {
 			sentry.CaptureError(ctx, err)
 			return fmt.Errorf("[port %d] error rebuilding NodeBalancer config: %v", int(port.Port), err)
 		}
 	}
 	return nil
+}
+
+// UpdateLoadBalancer updates the NodeBalancer to have configs that match the Service's ports
+func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (err error) {
+	ctx = sentry.SetHubOnContext(ctx)
+	sentry.SetTag(ctx, "cluster_name", clusterName)
+	sentry.SetTag(ctx, "service", service.Name)
+
+	// UpdateLoadBalancer is invoked with a nil LoadBalancerStatus; we must fetch the latest
+	// status for NodeBalancer discovery.
+	serviceWithStatus := service.DeepCopy()
+	serviceWithStatus.Status.LoadBalancer, err = l.getLatestServiceLoadBalancerStatus(ctx, service)
+	if err != nil {
+		return fmt.Errorf("failed to get latest LoadBalancer status for service (%s): %s", getServiceNn(service), err)
+	}
+
+	nb, err := l.getNodeBalancerForService(ctx, serviceWithStatus)
+	if err != nil {
+		sentry.CaptureError(ctx, err)
+		return err
+	}
+
+	if !l.shouldPreserveNodeBalancer(service) {
+		if err := l.cleanupOldNodeBalancer(ctx, service); err != nil {
+			sentry.CaptureError(ctx, err)
+			return err
+		}
+	}
+
+	return l.updateNodeBalancer(ctx, serviceWithStatus, nodes, nb)
 }
 
 // Delete any NodeBalancer configs for ports that no longer exist on the Service
@@ -356,33 +386,40 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 	sentry.SetTag(ctx, "cluster_name", clusterName)
 	sentry.SetTag(ctx, "service", service.Name)
 
-	// Don't delete the underlying nodebalancer if the service has the preserve annotation.
+	serviceNn := getServiceNn(service)
+
+	if len(service.Status.LoadBalancer.Ingress) == 0 {
+		klog.Infof("short-circuting deletion of NodeBalancer for service(%s) as LoadBalancer ingress is not present", serviceNn)
+		return nil
+	}
+
+	nb, err := l.getNodeBalancerForService(ctx, service)
+	switch getErr := err.(type) {
+	case nil:
+		break
+
+	case lbNotFoundError:
+		klog.Infof("short-circuting deletion for NodeBalancer for service (%s) as one does not exist: %s", serviceNn, err)
+		return nil
+
+	default:
+		klog.Errorf("failed to get NodeBalancer for service (%s): %s", serviceNn, err)
+		sentry.CaptureError(ctx, getErr)
+		return err
+	}
+
 	if l.shouldPreserveNodeBalancer(service) {
+		klog.Infof("short-circuting deletion of NodeBalancer (%d) for service (%s) as annotated with %s", nb.ID, serviceNn, annLinodeLoadBalancerPreserve)
 		return nil
 	}
 
-	// GetLoadBalancer will capture any errors it gets for Sentry, so it's unnecessary to capture
-	// them again here.
-	_, exists, err := l.GetLoadBalancer(ctx, clusterName, service)
-	if err != nil {
-		return err
-	}
-
-	if !exists {
-		return nil
-	}
-
-	lb, err := l.getNodeBalancerForService(ctx, service)
-	if err != nil {
+	if err = l.client.DeleteNodeBalancer(ctx, nb.ID); err != nil {
+		klog.Errorf("failed to delete NodeBalancer (%d) for service (%s): %s", nb.ID, serviceNn, err)
 		sentry.CaptureError(ctx, err)
 		return err
 	}
 
-	if err = l.client.DeleteNodeBalancer(ctx, lb.ID); err != nil {
-		sentry.CaptureError(ctx, err)
-		return err
-	}
-
+	klog.Infof("successfully deleted NodeBalancer (%d) for service (%s)", nb.ID, serviceNn)
 	return nil
 }
 
@@ -393,19 +430,20 @@ func (l *loadbalancers) getNodeBalancerByIPv4(ctx context.Context, service *v1.S
 	}
 	for _, lb := range lbs {
 		if *lb.IPv4 == ipv4 {
-			klog.Infof("found NodeBalancer (%d) for service %s/%s via IPv4 (%s)", lb.ID, service.Namespace, service.Name, ipv4)
+			klog.V(2).Infof("found NodeBalancer (%d) for service (%s) via IPv4 (%s)", lb.ID, getServiceNn(service), ipv4)
 			return &lb, nil
 		}
 	}
-	return nil, errLbNotFound
+	return nil, lbNotFoundError{serviceNn: getServiceNn(service)}
 }
 
 func (l *loadbalancers) getNodeBalancerByID(ctx context.Context, service *v1.Service, id int) (*linodego.NodeBalancer, error) {
 	nb, err := l.client.GetNodeBalancer(ctx, id)
 	if err != nil {
 		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == http.StatusNotFound {
-			return nil, errLbNotFound
+			return nil, lbNotFoundError{serviceNn: getServiceNn(service), nodeBalancerID: id}
 		}
+		return nil, err
 	}
 	return nb, nil
 }
@@ -677,7 +715,7 @@ func getConnectionThrottle(service *v1.Service) int {
 	return connThrottle
 }
 
-func getLoadBalancerStatus(nb *linodego.NodeBalancer) *v1.LoadBalancerStatus {
+func makeLoadBalancerStatus(nb *linodego.NodeBalancer) *v1.LoadBalancerStatus {
 	return &v1.LoadBalancerStatus{
 		Ingress: []v1.LoadBalancerIngress{{
 			IP:       *nb.IPv4,
@@ -686,14 +724,15 @@ func getLoadBalancerStatus(nb *linodego.NodeBalancer) *v1.LoadBalancerStatus {
 	}
 }
 
-func getServiceSlug(service *v1.Service) string {
+// getServiceNn returns the services namespaced name.
+func getServiceNn(service *v1.Service) string {
 	return fmt.Sprintf("%s/%s", service.Namespace, service.Name)
 }
 
-func getServiceAnnotation(service *v1.Service, name string) (id string, ok bool) {
+func getServiceAnnotation(service *v1.Service, name string) (string, bool) {
 	if service.Annotations == nil {
-		id, ok = "", false
+		return "", false
 	}
-	id, ok = service.Annotations[name]
-	return
+	val, ok := service.Annotations[name]
+	return val, ok
 }

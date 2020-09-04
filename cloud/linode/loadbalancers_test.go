@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/linode/linodego"
@@ -126,6 +127,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 			f:    testUpdateLoadBalancerAddTLSPort,
 		},
 		{
+			name: "Update Load Balancer - Specify NodeBalancerID",
+			f:    testUpdateLoadBalancerAddNodeBalancerID,
+		},
+		{
 			name: "Build Load Balancer Request",
 			f:    testBuildLoadBalancerRequest,
 		},
@@ -145,6 +150,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 			name: "Ensure New Load Balancer",
 			f:    testEnsureNewLoadBalancer,
 		},
+		{
+			name: "Ensure New Load Balancer with NodeBalancerID",
+			f:    testEnsureNewLoadBalancerWithNodeBalancerID,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -159,6 +168,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 			tc.f(t, &linodeClient, fake)
 		})
 	}
+}
+
+func stubService(fake *fake.Clientset, service *v1.Service) {
+	fake.CoreV1().Services("").Create(service)
 }
 
 func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
@@ -268,6 +281,8 @@ func testUpdateLoadBalancerAddAnnotation(t *testing.T, client *linodego.Client, 
 	}
 
 	lb := &loadbalancers{client, "us-west", nil}
+	fakeClientset := fake.NewSimpleClientset()
+	lb.kubeClient = fakeClientset
 
 	defer lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc)
 
@@ -277,6 +292,7 @@ func testUpdateLoadBalancerAddAnnotation(t *testing.T, client *linodego.Client, 
 	}
 	svc.Status.LoadBalancer = *lbStatus
 
+	stubService(fakeClientset, svc)
 	svc.ObjectMeta.SetAnnotations(map[string]string{
 		annLinodeThrottle: "10",
 	})
@@ -333,6 +349,8 @@ func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Clie
 	}
 
 	lb := &loadbalancers{client, "us-west", nil}
+	fakeClientset := fake.NewSimpleClientset()
+	lb.kubeClient = fakeClientset
 
 	defer lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc)
 
@@ -340,8 +358,9 @@ func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Clie
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
-
 	svc.Status.LoadBalancer = *lbStatus
+	stubService(fakeClientset, svc)
+
 	svc.ObjectMeta.SetAnnotations(map[string]string{
 		portConfigAnnotation: `{"protocol": "http"}`,
 	})
@@ -420,15 +439,17 @@ func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *
 
 	defer lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc)
 
-	lb.kubeClient = fake.NewSimpleClientset()
+	fakeClientset := fake.NewSimpleClientset()
+	lb.kubeClient = fakeClientset
 	addTLSSecret(t, lb.kubeClient)
 
 	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "lnodelb", svc, nodes)
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
-
 	svc.Status.LoadBalancer = *lbStatus
+
+	stubService(fakeClientset, svc)
 	svc.Spec.Ports = append(svc.Spec.Ports, extraPort)
 	svc.ObjectMeta.SetAnnotations(map[string]string{
 		annLinodePortConfigPrefix + "443": `{ "protocol": "https", "tls-secret-name": "tls-secret"}`,
@@ -470,6 +491,84 @@ func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *
 
 	if !reflect.DeepEqual(expectedPorts, observedPorts) {
 		t.Errorf("NodeBalancer ports mismatch: expected %v, got %v", expectedPorts, observedPorts)
+	}
+}
+
+func testUpdateLoadBalancerAddNodeBalancerID(t *testing.T, client *linodego.Client, fakeAPI *fakeAPI) {
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        randString(10),
+			UID:         "foobar123",
+			Annotations: map[string]string{},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     randString(10),
+					Protocol: "http",
+					Port:     int32(80),
+					NodePort: int32(8080),
+				},
+			},
+		},
+	}
+
+	nodes := []*v1.Node{
+		{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+		},
+	}
+
+	lb := &loadbalancers{client, "us-west", nil}
+	defer lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc)
+
+	fakeClientset := fake.NewSimpleClientset()
+	lb.kubeClient = fakeClientset
+
+	nodeBalancer, err := client.CreateNodeBalancer(context.TODO(), linodego.NodeBalancerCreateOptions{
+		Region: lb.zone,
+	})
+	if err != nil {
+		t.Fatalf("failed to create NodeBalancer: %s", err)
+	}
+
+	svc.Status.LoadBalancer = *makeLoadBalancerStatus(nodeBalancer)
+
+	newNodeBalancer, err := client.CreateNodeBalancer(context.TODO(), linodego.NodeBalancerCreateOptions{
+		Region: lb.zone,
+	})
+	if err != nil {
+		t.Fatalf("failed to create new NodeBalancer: %s", err)
+	}
+
+	stubService(fakeClientset, svc)
+	svc.ObjectMeta.SetAnnotations(map[string]string{
+		annLinodeNodeBalancerID: strconv.Itoa(newNodeBalancer.ID),
+	})
+	err = lb.UpdateLoadBalancer(context.TODO(), "lnodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
+	}
+
+	lbStatus, _, err := lb.GetLoadBalancer(context.TODO(), svc.ClusterName, svc)
+	if err != nil {
+		t.Errorf("GetLoadBalancer returned an error: %s", err)
+	}
+
+	expectedLBStatus := makeLoadBalancerStatus(newNodeBalancer)
+	if !reflect.DeepEqual(expectedLBStatus, lbStatus) {
+		t.Errorf("LoadBalancer status mismatch: expected %v, got %v", expectedLBStatus, lbStatus)
+	}
+
+	if !fakeAPI.didRequestOccur(http.MethodDelete, fmt.Sprintf("/nodebalancers/%d", nodeBalancer.ID), "") {
+		t.Errorf("expected old NodeBalancer to have been deleted")
 	}
 }
 
@@ -922,7 +1021,7 @@ func testEnsureLoadBalancerPreserveAnnotation(t *testing.T, client *linodego.Cli
 				t.Fatal(err)
 			}
 
-			svc.Status.LoadBalancer = *getLoadBalancerStatus(nb)
+			svc.Status.LoadBalancer = *makeLoadBalancerStatus(nb)
 			err = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc)
 
 			didDelete := fake.didRequestOccur(http.MethodDelete, fmt.Sprintf("/nodebalancers/%d", nb.ID), "")
@@ -1055,7 +1154,7 @@ func testEnsureExistingLoadBalancer(t *testing.T, client *linodego.Client, _ *fa
 		t.Fatal(err)
 	}
 
-	svc.Status.LoadBalancer = *getLoadBalancerStatus(nb)
+	svc.Status.LoadBalancer = *makeLoadBalancerStatus(nb)
 	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc) }()
 	getLBStatus, exists, err := lb.GetLoadBalancer(context.TODO(), "linodelb", svc)
 	if err != nil {
@@ -1142,6 +1241,59 @@ func testEnsureExistingLoadBalancer(t *testing.T, client *linodego.Client, _ *fa
 		})
 	}
 }
+
+func testEnsureNewLoadBalancerWithNodeBalancerID(t *testing.T, client *linodego.Client, _ *fakeAPI) {
+	lb := &loadbalancers{client, "us-west", nil}
+	nodeBalancer, err := client.CreateNodeBalancer(context.TODO(), linodego.NodeBalancerCreateOptions{
+		Region: lb.zone,
+	})
+	if err != nil {
+		t.Fatalf("failed to create NodeBalancer: %s", err)
+	}
+
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "testensure",
+			UID:  "foobar123",
+			Annotations: map[string]string{
+				annLinodeNodeBalancerID: strconv.Itoa(nodeBalancer.ID),
+			},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     "test",
+					Protocol: "TCP",
+					Port:     int32(8443),
+					NodePort: int32(30000),
+				},
+			},
+		},
+	}
+
+	nodes := []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node-1",
+			},
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+		},
+	}
+
+	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc) }()
+
+	if _, err = lb.EnsureLoadBalancer(context.TODO(), "lnodelb", svc, nodes); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func testEnsureNewLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1226,7 +1378,7 @@ func testGetLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	}
 	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc) }()
 
-	lbStatus := getLoadBalancerStatus(nb)
+	lbStatus := makeLoadBalancerStatus(nb)
 	svc.Status.LoadBalancer = *lbStatus
 
 	testcases := []struct {

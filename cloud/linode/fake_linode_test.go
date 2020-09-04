@@ -341,14 +341,17 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			ip := net.IPv4(byte(rand.Intn(100)), byte(rand.Intn(100)), byte(rand.Intn(100)), byte(rand.Intn(100))).String()
 			hostname := fmt.Sprintf("nb-%s.%s.linode.com", strings.Replace(ip, ".", "-", 4), strings.ToLower(nbco.Region))
 			nb := linodego.NodeBalancer{
-				ID:                 rand.Intn(9999),
-				Label:              nbco.Label,
-				Region:             nbco.Region,
-				ClientConnThrottle: *nbco.ClientConnThrottle,
-				IPv4:               &ip,
-				Hostname:           &hostname,
-				CreatedStr:         time.Now().Format("2006-01-02T15:04:05"),
-				UpdatedStr:         time.Now().Format("2006-01-02T15:04:05"),
+				ID:         rand.Intn(9999),
+				Label:      nbco.Label,
+				Region:     nbco.Region,
+				IPv4:       &ip,
+				Hostname:   &hostname,
+				CreatedStr: time.Now().Format("2006-01-02T15:04:05"),
+				UpdatedStr: time.Now().Format("2006-01-02T15:04:05"),
+			}
+
+			if nbco.ClientConnThrottle != nil {
+				nb.ClientConnThrottle = *nbco.ClientConnThrottle
 			}
 			f.nb[strconv.Itoa(nb.ID)] = &nb
 
