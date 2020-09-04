@@ -77,7 +77,8 @@ func (c *linodeCloud) Initialize(clientBuilder controller.ControllerClientBuilde
 
 	serviceController := newServiceController(c.loadbalancers.(*loadbalancers), serviceInformer)
 
-	// TODO: use the stop channel from Initialize from newer cloudprovider package.
+	// in future version of the cloudprovider package, we should use the stopCh provided to
+	// (cloudprovider.Interface).Initialize instead
 	forever := make(chan struct{})
 	go serviceController.Run(forever)
 }
