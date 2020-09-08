@@ -154,6 +154,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 			name: "Ensure New Load Balancer with NodeBalancerID",
 			f:    testEnsureNewLoadBalancerWithNodeBalancerID,
 		},
+		{
+			name: "getNodeBalancerForService - NodeBalancerID does not exist",
+			f:    testGetNodeBalancerForServiceIDDoesNotExist,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1239,6 +1243,43 @@ func testEnsureExistingLoadBalancer(t *testing.T, client *linodego.Client, _ *fa
 				t.Logf("actual: %v", err)
 			}
 		})
+	}
+}
+
+func testGetNodeBalancerForServiceIDDoesNotExist(t *testing.T, client *linodego.Client, _ *fakeAPI) {
+	lb := &loadbalancers{client, "us-west", nil}
+	bogusNodeBalancerID := "123456"
+
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test",
+			UID:  "foobar123",
+			Annotations: map[string]string{
+				annLinodeNodeBalancerID: bogusNodeBalancerID,
+			},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     "test",
+					Protocol: "TCP",
+					Port:     int32(8443),
+					NodePort: int32(30000),
+				},
+			},
+		},
+	}
+
+	_, err := lb.getNodeBalancerForService(context.TODO(), svc)
+	if err == nil {
+		t.Fatal("expected getNodeBalancerForService to return an error")
+	}
+
+	expectedErr := fmt.Sprintf("%s annotation points to a NodeBalancer that does not exist: LoadBalancer (%s) not found for service (%s)",
+		annLinodeNodeBalancerID, bogusNodeBalancerID, getServiceNn(svc))
+
+	if err.Error() != expectedErr {
+		t.Errorf("expected error to be '%s' but got '%s'", expectedErr, err)
 	}
 }
 

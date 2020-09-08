@@ -93,9 +93,7 @@ func (l *loadbalancers) getNodeBalancerForService(ctx context.Context, service *
 			return nb, nil
 
 		case lbNotFoundError:
-			// If the specified NodeBalancer does not exist, try to resolve the current
-			// one from the status.
-			klog.Warningf("could not find NodeBalancer from annotation on service (%s); attempting to find from status", getServiceNn(service))
+			return nil, fmt.Errorf("%s annotation points to a NodeBalancer that does not exist: %s", annLinodeNodeBalancerID, err)
 
 		default:
 			return nil, err
