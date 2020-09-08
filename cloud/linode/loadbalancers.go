@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -450,7 +451,11 @@ func (l *loadbalancers) getNodeBalancerByID(ctx context.Context, service *v1.Ser
 
 func (l *loadbalancers) createNodeBalancer(ctx context.Context, service *v1.Service, configs []*linodego.NodeBalancerConfigCreateOptions) (lb *linodego.NodeBalancer, err error) {
 	connThrottle := getConnectionThrottle(service)
+
+	unixNano := strconv.FormatInt(time.Now().UnixNano(), 16)
+	label := fmt.Sprintf("ccm-%s", unixNano[len(unixNano)-12:])
 	createOpts := linodego.NodeBalancerCreateOptions{
+		Label:              &label,
 		Region:             l.zone,
 		ClientConnThrottle: &connThrottle,
 		Configs:            configs,
