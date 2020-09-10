@@ -235,12 +235,14 @@ func testEnsureLoadBalancerDeprecated(t *testing.T, client *linodego.Client) {
 	lb := &loadbalancers{client, "us-west", nil}
 
 	configs := []*linodego.NodeBalancerConfigCreateOptions{}
-	_, err := lb.createNodeBalancer(context.TODO(), svc, configs)
+	nb, err := lb.createNodeBalancer(context.TODO(), svc, configs)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	svc.Status.LoadBalancer = *makeLoadBalancerStatus(nb)
 	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc) }()
-	nb, exists, err := lb.GetLoadBalancer(context.TODO(), "linodelb", svc)
+	lbStatus, exists, err := lb.GetLoadBalancer(context.TODO(), "linodelb", svc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +303,7 @@ func testEnsureLoadBalancerDeprecated(t *testing.T, client *linodego.Client) {
 				},
 			},
 			"linodelb",
-			nb.Ingress[0].IP,
+			lbStatus.Ingress[0].IP,
 			nil,
 		},
 	}
@@ -349,10 +351,13 @@ func testGetLoadBalancerDeprecated(t *testing.T, client *linodego.Client) {
 	}
 
 	configs := []*linodego.NodeBalancerConfigCreateOptions{}
-	_, err := lb.createNodeBalancer(context.TODO(), svc, configs)
+	nb, err := lb.createNodeBalancer(context.TODO(), svc, configs)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	lbStatus := makeLoadBalancerStatus(nb)
+	svc.Status.LoadBalancer = *lbStatus
 	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc) }()
 	testcases := []struct {
 		name        string

@@ -11,6 +11,7 @@ import (
 
 	"github.com/appscode/go/wait"
 	"github.com/codeskyblue/go-sh"
+	"github.com/linode/linodego"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	core "k8s.io/api/core/v1"
@@ -35,6 +36,7 @@ var _ = Describe("e2e tests", func() {
 		annLinodeHealthCheckTimeout   = "service.beta.kubernetes.io/linode-loadbalancer-check-timeout"
 		annLinodeHealthCheckAttempts  = "service.beta.kubernetes.io/linode-loadbalancer-check-attempts"
 		annLinodeHealthCheckPassive   = "service.beta.kubernetes.io/linode-loadbalancer-check-passive"
+		annLinodeNodeBalancerID       = "service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"
 	)
 
 	BeforeEach(func() {
@@ -92,6 +94,15 @@ var _ = Describe("e2e tests", func() {
 		Expect(err).NotTo(HaveOccurred())
 	}
 
+	var createNodeBalancer = func() int {
+		var nb *linodego.NodeBalancer
+		nb, err = getLinodeClient().CreateNodeBalancer(context.Background(), linodego.NodeBalancerCreateOptions{
+			Region: "eu-west",
+		})
+		Expect(err).NotTo(HaveOccurred())
+		return nb.ID
+	}
+
 	var getResponseFromSamePod = func(link string) {
 		var oldResp, newResp string
 		Eventually(func() string {
@@ -132,9 +143,25 @@ var _ = Describe("e2e tests", func() {
 		Expect(nb.ID).Should(Equal(nb.ID))
 	}
 
+	var checkNodeBalancerNotExists = func(id int) {
+		nb, err := getLinodeClient().GetNodeBalancer(context.Background(), id)
+		Expect(nb).To(BeNil())
+		Expect(err).ToNot(BeNil())
+
+		linodeErr, ok := err.(*linodego.Error)
+		Expect(ok).To(BeTrue())
+		Expect(linodeErr.Code).To(Equal(404))
+	}
+
 	type checkArgs struct {
 		checkType, path, body, interval, timeout, attempts, checkPassive, protocol string
 	}
+
+	var checkNodeBalancerID = func(service string, expectedID int) {
+		err := f.LoadBalancer.WaitForNodeBalancerReady(service, expectedID)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
 	var checkNodeBalancerConfig = func(args checkArgs) {
 		By("Getting NodeBalancer Configuration")
 		nbConfig, err := f.LoadBalancer.GetNodeBalancerConfig(framework.TestServerResourceName)
@@ -259,7 +286,7 @@ var _ = Describe("e2e tests", func() {
 					var counter1, counter2 int
 
 					By("Waiting for Response from the LoadBalancer url: " + eps[0])
-					err = wait.PollImmediate(framework.RetryInterval, framework.RetryTimout, func() (bool, error) {
+					err = wait.PollImmediate(framework.RetryInterval, framework.RetryTimeout, func() (bool, error) {
 						resp, err := sh.Command("curl", "--max-time", "5", "-s", eps[0]).Output()
 						if err != nil {
 							return false, nil
@@ -285,7 +312,7 @@ var _ = Describe("e2e tests", func() {
 		})
 	})
 
-	Describe("Test", func() {
+	FDescribe("Test", func() {
 		Context("LoadBalancer", func() {
 			Context("With single TLS port", func() {
 				var (
@@ -669,9 +696,153 @@ var _ = Describe("e2e tests", func() {
 				})
 			})
 
+			Context("Updated with NodeBalancerID", func() {
+				var (
+					pods         []string
+					labels       map[string]string
+					servicePorts []core.ServicePort
+
+					annotations = map[string]string{}
+				)
+				BeforeEach(func() {
+					pods = []string{"test-pod-1"}
+					ports := []core.ContainerPort{
+						{
+							Name:          "http-1",
+							ContainerPort: 8080,
+						},
+					}
+					servicePorts = []core.ServicePort{
+						{
+							Name:       "http-1",
+							Port:       80,
+							TargetPort: intstr.FromInt(8080),
+							Protocol:   "TCP",
+						},
+					}
+
+					labels = map[string]string{
+						"app": "test-loadbalancer-with-nodebalancer-id",
+					}
+
+					By("Creating Pod")
+					createPodWithLabel(pods, ports, framework.TestServerImage, labels, false)
+
+					By("Creating Service")
+					createServiceWithAnnotations(labels, annotations, servicePorts, false)
+				})
+
+				AfterEach(func() {
+					By("Deleting the Pods")
+					deletePods(pods)
+
+					By("Deleting the Service")
+					deleteService()
+				})
+
+				It("should use the specified NodeBalancer", func() {
+					By("Creating new NodeBalancer")
+					nbID := createNodeBalancer()
+					defer func() {
+						By("Deleting new NodeBalancer")
+						deleteNodeBalancer(nbID)
+					}()
+
+					By("Annotating service with new NodeBalancer ID")
+					annotations[annLinodeNodeBalancerID] = strconv.Itoa(nbID)
+					updateServiceWithAnnotations(labels, annotations, servicePorts, false)
+
+					By("Checking the NodeBalancer ID")
+					checkNodeBalancerID(framework.TestServerResourceName, nbID)
+				})
+			})
+
+			Context("Created with NodeBalancerID", func() {
+				var (
+					pods         []string
+					labels       map[string]string
+					annotations  map[string]string
+					servicePorts []core.ServicePort
+
+					nodeBalancerID int
+				)
+
+				BeforeEach(func() {
+					pods = []string{"test-pod-1"}
+					ports := []core.ContainerPort{
+						{
+							Name:          "http-1",
+							ContainerPort: 8080,
+						},
+					}
+					servicePorts = []core.ServicePort{
+						{
+							Name:       "http-1",
+							Port:       80,
+							TargetPort: intstr.FromInt(8080),
+							Protocol:   "TCP",
+						},
+					}
+
+					labels = map[string]string{
+						"app": "test-loadbalancer-with-nodebalancer-id",
+					}
+
+					By("Creating NodeBalancer")
+					nodeBalancerID = createNodeBalancer()
+
+					annotations = map[string]string{
+						annLinodeNodeBalancerID: strconv.Itoa(nodeBalancerID),
+					}
+
+					By("Creating Pod")
+					createPodWithLabel(pods, ports, framework.TestServerImage, labels, false)
+
+					By("Creating Service")
+					createServiceWithAnnotations(labels, annotations, servicePorts, false)
+				})
+
+				AfterEach(func() {
+					By("Deleting the NodeBalancer")
+					deleteNodeBalancer(nodeBalancerID)
+
+					By("Deleting the Pods")
+					deletePods(pods)
+
+					By("Deleting the Service")
+					deleteService()
+				})
+
+				It("should use the specified NodeBalancer", func() {
+					By("Checking the NodeBalancerID")
+					checkNodeBalancerID(framework.TestServerResourceName, nodeBalancerID)
+				})
+
+				It("should use the newly specified NodeBalancer ID", func() {
+					By("Creating new NodeBalancer")
+					nbID := createNodeBalancer()
+
+					By("Waiting for currenct NodeBalancer to be ready")
+					checkNodeBalancerID(framework.TestServerResourceName, nodeBalancerID)
+
+					By("Annotating service with new NodeBalancer ID")
+					annotations[annLinodeNodeBalancerID] = strconv.Itoa(nbID)
+					updateServiceWithAnnotations(labels, annotations, servicePorts, false)
+
+					By("Checking the NodeBalancer ID")
+					checkNodeBalancerID(framework.TestServerResourceName, nbID)
+
+					By("Checking old NodeBalancer was deleted")
+					checkNodeBalancerNotExists(nodeBalancerID)
+
+					nodeBalancerID = nbID
+				})
+			})
+
 			Context("With Preserve Annotation", func() {
 				var (
 					pods           []string
+					servicePorts   []core.ServicePort
 					labels         map[string]string
 					annotations    map[string]string
 					nodeBalancerID int
@@ -685,7 +856,7 @@ var _ = Describe("e2e tests", func() {
 							ContainerPort: 8080,
 						},
 					}
-					servicePorts := []core.ServicePort{
+					servicePorts = []core.ServicePort{
 						{
 							Name:       "http-1",
 							Port:       80,
@@ -725,6 +896,33 @@ var _ = Describe("e2e tests", func() {
 					deleteService()
 
 					By("Checking if the NodeBalancer exists")
+					checkNodeBalancerExists(nodeBalancerID)
+				})
+
+				It("should preserve the underlying nodebalancer after a new one is specified", func() {
+					defer func() {
+						By("Deleting the Pods")
+						deletePods(pods)
+
+						By("Deleting the Service")
+						deleteService()
+					}()
+
+					By("Creating new NodeBalancer")
+					newID := createNodeBalancer()
+					defer func() {
+						By("Deleting new NodeBalancer")
+						deleteNodeBalancer(newID)
+					}()
+
+					By("Annotating service with new NodeBalancer ID")
+					annotations[annLinodeNodeBalancerID] = strconv.Itoa(newID)
+					updateServiceWithAnnotations(labels, annotations, servicePorts, false)
+
+					By("Checking the service's NodeBalancer ID")
+					checkNodeBalancerID(framework.TestServerResourceName, newID)
+
+					By("Checking the old NodeBalancer exists")
 					checkNodeBalancerExists(nodeBalancerID)
 				})
 

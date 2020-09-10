@@ -232,7 +232,7 @@ var _ = Describe("CloudControllerManagerDeprecated", func() {
 					var counter1, counter2 int
 
 					By("Waiting for Response from the LoadBalancer url: " + eps[0])
-					err = wait.PollImmediate(framework.RetryInterval, framework.RetryTimout, func() (bool, error) {
+					err = wait.PollImmediate(framework.RetryInterval, framework.RetryTimeout, func() (bool, error) {
 						resp, err := sh.Command("curl", "--max-time", "5", "-s", eps[0]).Output()
 						if err != nil {
 							return false, nil

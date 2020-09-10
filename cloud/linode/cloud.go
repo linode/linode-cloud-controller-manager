@@ -7,6 +7,7 @@ import (
 
 	"github.com/linode/linodego"
 	"github.com/spf13/pflag"
+	"k8s.io/client-go/informers"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 )
@@ -70,6 +71,16 @@ func newCloud() (cloudprovider.Interface, error) {
 }
 
 func (c *linodeCloud) Initialize(clientBuilder controller.ControllerClientBuilder) {
+	kubeclient := clientBuilder.ClientOrDie("linode-shared-informers")
+	sharedInformer := informers.NewSharedInformerFactory(kubeclient, 0)
+	serviceInformer := sharedInformer.Core().V1().Services()
+
+	serviceController := newServiceController(c.loadbalancers.(*loadbalancers), serviceInformer)
+
+	// in future version of the cloudprovider package, we should use the stopCh provided to
+	// (cloudprovider.Interface).Initialize instead
+	forever := make(chan struct{})
+	go serviceController.Run(forever)
 }
 
 func (c *linodeCloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {

@@ -1,6 +1,12 @@
 export GO111MODULE=on
 IMG ?= linode/linode-cloud-controller-manager:latest
 
+REUSED_KUBECONFIG := test/ccm-linode-for-reuse.conf
+
+ifneq ("$(wildcard $(REUSED_KUBECONFIG))","")
+    CONTROL_PLANE_IP := $(shell grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}" $(REUSED_KUBECONFIG))
+endif
+
 imports: $(GOPATH)/bin/goimports
 	goimports -w test
 
@@ -30,3 +36,5 @@ install-terraform:
 	unzip terraform_0.11.13_linux_amd64.zip
 	sudo mv terraform /usr/local/bin/
 
+control-plane-ssh: $(REUSED_KUBECONFIG)
+	ssh core@$(CONTROL_PLANE_IP)
