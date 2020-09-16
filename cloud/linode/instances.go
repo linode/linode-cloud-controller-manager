@@ -210,7 +210,7 @@ func linodeByName(ctx context.Context, client *linodego.Client, nodeName types.N
 
 // serverIDFromProviderID returns a Linode ID from a providerID.
 //
-// The providerID can be seen on the the Kubernetes Node object. The expected
+// The providerID can be seen on the Kubernetes Node object. The expected
 // format is: linode://linodeID
 func linodeIDFromProviderID(providerID string) (string, error) {
 	if providerID == "" {
