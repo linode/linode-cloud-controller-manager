@@ -131,6 +131,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 			f:    testUpdateLoadBalancerAddNodeBalancerID,
 		},
 		{
+			name: "Update Load Balancer - Proxy Protocol",
+			f:    testUpdateLoadBalancerAddProxyProtocol,
+		},
+		{
 			name: "Build Load Balancer Request",
 			f:    testBuildLoadBalancerRequest,
 		},
@@ -495,6 +499,108 @@ func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *
 
 	if !reflect.DeepEqual(expectedPorts, observedPorts) {
 		t.Errorf("NodeBalancer ports mismatch: expected %v, got %v", expectedPorts, observedPorts)
+	}
+}
+
+func testUpdateLoadBalancerAddProxyProtocol(t *testing.T, client *linodego.Client, fakeAPI *fakeAPI) {
+	nodes := []*v1.Node{
+		{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+		},
+	}
+
+	lb := &loadbalancers{client, "us-west", nil}
+	fakeClientset := fake.NewSimpleClientset()
+	lb.kubeClient = fakeClientset
+
+	for _, tc := range []struct {
+		name                string
+		proxyProtocolConfig linodego.ConfigProxyProtocol
+		invalidErr          bool
+	}{
+		{
+			name:                "with invalid Proxy Protocol",
+			proxyProtocolConfig: "bogus",
+			invalidErr:          true,
+		},
+		{
+			name:                "with none",
+			proxyProtocolConfig: linodego.ProxyProtocolNone,
+		},
+		{
+			name:                "with v1",
+			proxyProtocolConfig: linodego.ProxyProtocolV1,
+		},
+		{
+			name:                "with v2",
+			proxyProtocolConfig: linodego.ProxyProtocolV2,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        randString(10),
+					UID:         "foobar123",
+					Annotations: map[string]string{},
+				},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
+						{
+							Name:     randString(10),
+							Protocol: "tcp",
+							Port:     int32(80),
+							NodePort: int32(8080),
+						},
+					},
+				},
+			}
+
+			defer lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc)
+			nodeBalancer, err := client.CreateNodeBalancer(context.TODO(), linodego.NodeBalancerCreateOptions{
+				Region: lb.zone,
+			})
+
+			if err != nil {
+				t.Fatalf("failed to create NodeBalancer: %s", err)
+			}
+
+			svc.Status.LoadBalancer = *makeLoadBalancerStatus(nodeBalancer)
+			svc.ObjectMeta.SetAnnotations(map[string]string{
+				annLinodeProxyProtocol: string(tc.proxyProtocolConfig),
+			})
+
+			stubService(fakeClientset, svc)
+			if err = lb.UpdateLoadBalancer(context.TODO(), "lnodelb", svc, nodes); err != nil {
+				expectedErrMessage := fmt.Sprintf("invalid NodeBalancer proxy protocol value '%s'", tc.proxyProtocolConfig)
+				if tc.invalidErr && err.Error() == expectedErrMessage {
+					return
+				}
+				t.Fatalf("UpdateLoadBalancer returned an unexpected error while updated annotations: %s", err)
+				return
+			}
+			if tc.invalidErr {
+				t.Fatal("expected UpdateLoadBalancer to return an error")
+			}
+
+			nodeBalancerConfigs, err := client.ListNodeBalancerConfigs(context.TODO(), nodeBalancer.ID, nil)
+			if err != nil {
+				t.Fatalf("failed to get NodeBalancer: %s", err)
+			}
+
+			for _, config := range nodeBalancerConfigs {
+				proxyProtocol := config.ProxyProtocol
+				if proxyProtocol != tc.proxyProtocolConfig {
+					t.Errorf("expected ProxyProtocol to be %s; got %s", tc.proxyProtocolConfig, proxyProtocol)
+				}
+			}
+		})
 	}
 }
 

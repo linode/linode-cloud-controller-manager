@@ -26,6 +26,7 @@ const (
 	// for Linode load balancers. Options are tcp, http and https. Defaults to tcp.
 	annLinodeDefaultProtocol  = "service.beta.kubernetes.io/linode-loadbalancer-default-protocol"
 	annLinodePortConfigPrefix = "service.beta.kubernetes.io/linode-loadbalancer-port-"
+	annLinodeProxyProtocol    = "service.beta.kubernetes.io/linode-loadbalancer-proxy-protocol"
 
 	annLinodeCheckPath       = "service.beta.kubernetes.io/linode-loadbalancer-check-path"
 	annLinodeCheckBody       = "service.beta.kubernetes.io/linode-loadbalancer-check-body"
@@ -525,6 +526,17 @@ func (l *loadbalancers) buildNodeBalancerConfig(service *v1.Service, port int) (
 		}
 	}
 	config.CheckPassive = checkPassive
+
+	proxyProtocol := linodego.ProxyProtocolNone
+	if pp, ok := service.Annotations[annLinodeProxyProtocol]; ok {
+		switch linodego.ConfigProxyProtocol(pp) {
+		case linodego.ProxyProtocolNone, linodego.ProxyProtocolV1, linodego.ProxyProtocolV2:
+			proxyProtocol = linodego.ConfigProxyProtocol(pp)
+		default:
+			return config, fmt.Errorf("invalid NodeBalancer proxy protocol value '%s'", pp)
+		}
+	}
+	config.ProxyProtocol = proxyProtocol
 
 	if portConfig.Protocol == linodego.ProtocolHTTPS {
 		if err = l.addTLSCert(service, &config, portConfig); err != nil {

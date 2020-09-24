@@ -26,6 +26,7 @@ var _ = Describe("e2e tests", func() {
 	)
 
 	const (
+		annLinodeProxyProtocol        = "service.beta.kubernetes.io/linode-loadbalancer-proxy-protocol"
 		annLinodeDefaultProtocol      = "service.beta.kubernetes.io/linode-loadbalancer-default-protocol"
 		annLinodePortConfigPrefix     = "service.beta.kubernetes.io/linode-loadbalancer-port-"
 		annLinodeLoadBalancerPreserve = "service.beta.kubernetes.io/linode-loadbalancer-preserve"
@@ -154,7 +155,8 @@ var _ = Describe("e2e tests", func() {
 	}
 
 	type checkArgs struct {
-		checkType, path, body, interval, timeout, attempts, checkPassive, protocol string
+		checkType, path, body, interval, timeout, attempts, checkPassive, protocol, proxyProtocol string
+		checkNodes                                                                                bool
 	}
 
 	var checkNodeBalancerID = func(service string, expectedID int) {
@@ -167,8 +169,10 @@ var _ = Describe("e2e tests", func() {
 		nbConfig, err := f.LoadBalancer.GetNodeBalancerConfig(framework.TestServerResourceName)
 		Expect(err).NotTo(HaveOccurred())
 
-		By("Checking Health Check Type")
-		Expect(string(nbConfig.Check) == args.checkType).Should(BeTrue())
+		if args.checkType != "" {
+			By("Checking Health Check Type")
+			Expect(string(nbConfig.Check) == args.checkType).Should(BeTrue())
+		}
 
 		if args.path != "" {
 			By("Checking Health Check Path")
@@ -217,7 +221,14 @@ var _ = Describe("e2e tests", func() {
 			Expect(string(nbConfig.Protocol) == args.protocol).Should(BeTrue())
 		}
 
-		checkNumberOfUpNodes(2)
+		if args.proxyProtocol != "" {
+			By("Checking for Proxy Protocol")
+			Expect(string(nbConfig.ProxyProtocol) == args.proxyProtocol).Should(BeTrue())
+		}
+
+		if args.checkNodes {
+			checkNumberOfUpNodes(2)
+		}
 	}
 
 	var addNewNode = func() {
@@ -377,6 +388,62 @@ var _ = Describe("e2e tests", func() {
 					By("Waiting for Response from the LoadBalancer url: " + eps[0])
 					err = framework.WaitForHTTPSResponse(eps[0], pods[0])
 					Expect(err).NotTo(HaveOccurred())
+				})
+			})
+
+			Context("With ProxyProtocol", func() {
+				var (
+					pods         []string
+					labels       map[string]string
+					servicePorts []core.ServicePort
+
+					annotations = map[string]string{}
+				)
+				BeforeEach(func() {
+					pods = []string{"test-pod-1"}
+					ports := []core.ContainerPort{
+						{
+							Name:          "http-1",
+							ContainerPort: 8080,
+						},
+					}
+					servicePorts = []core.ServicePort{
+						{
+							Name:       "http-1",
+							Port:       80,
+							TargetPort: intstr.FromInt(8080),
+							Protocol:   "TCP",
+						},
+					}
+
+					labels = map[string]string{
+						"app": "test-loadbalancer-with-proxyprotocol",
+					}
+
+					By("Creating Pod")
+					createPodWithLabel(pods, ports, framework.TestServerImage, labels, false)
+
+					By("Creating Service")
+					createServiceWithAnnotations(labels, annotations, servicePorts, false)
+				})
+
+				AfterEach(func() {
+					By("Deleting the Pods")
+					deletePods(pods)
+
+					By("Deleting the Service")
+					deleteService()
+				})
+
+				It("should update the NodeBalancer to use ProxyProtocol v2", func() {
+					proxyProtocolV2 := string(linodego.ProxyProtocolV2)
+
+					By("Annotating ProxyProtocol v2")
+					annotations[annLinodeProxyProtocol] = proxyProtocolV2
+					updateServiceWithAnnotations(labels, annotations, servicePorts, false)
+
+					By("Checking NodeBalancerConfig")
+					checkNodeBalancerConfig(checkArgs{proxyProtocol: proxyProtocolV2})
 				})
 			})
 
@@ -688,10 +755,11 @@ var _ = Describe("e2e tests", func() {
 				It("should successfully check the health of 2 nodes", func() {
 					By("Checking NodeBalancer Configurations")
 					checkNodeBalancerConfig(checkArgs{
-						checkType: checkType,
-						path:      path,
-						body:      body,
-						protocol:  protocol,
+						checkType:  checkType,
+						path:       path,
+						body:       body,
+						protocol:   protocol,
+						checkNodes: true,
 					})
 				})
 			})
@@ -1039,11 +1107,12 @@ var _ = Describe("e2e tests", func() {
 				It("should successfully check the health of 2 nodes", func() {
 					By("Checking NodeBalancer Configurations")
 					checkNodeBalancerConfig(checkArgs{
-						checkType: checkType,
-						interval:  interval,
-						timeout:   timeout,
-						attempts:  attempts,
-						protocol:  protocol,
+						checkType:  checkType,
+						interval:   interval,
+						timeout:    timeout,
+						attempts:   attempts,
+						protocol:   protocol,
+						checkNodes: true,
 					})
 				})
 			})
@@ -1102,6 +1171,7 @@ var _ = Describe("e2e tests", func() {
 					checkNodeBalancerConfig(checkArgs{
 						checkType:    checkType,
 						checkPassive: checkPassive,
+						checkNodes:   true,
 					})
 				})
 			})
@@ -1159,8 +1229,9 @@ var _ = Describe("e2e tests", func() {
 				It("should successfully check the health of 2 nodes", func() {
 					By("Checking NodeBalancer Configurations")
 					checkNodeBalancerConfig(checkArgs{
-						checkType: checkType,
-						path:      path,
+						checkType:  checkType,
+						path:       path,
+						checkNodes: true,
 					})
 				})
 			})

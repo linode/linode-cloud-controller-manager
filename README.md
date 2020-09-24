@@ -44,6 +44,7 @@ Annotation (Suffix) | Values | Default | Description
 ---|---|---|---
 `throttle` | `0`-`20` (`0` to disable) | `20` | Client Connection Throttle, which limits the number of subsequent new connections per second from the same client IP
 `default-protocol` | `tcp`, `http`, `https` | `tcp` | This annotation is used to specify the default protocol for Linode NodeBalancer.
+`proxy-protocol` | `none`, `v1`, `v2` | `none` | Specifies whether to use a version of Proxy Protocol on the underlying NodeBalancer
 `port-*` | json (e.g. `{ "tls-secret-name": "prod-app-tls", "protocol": "https"}`) | | Specifies the secret and protocol for a port corresponding secrets. The secret type should be `kubernetes.io/tls`. `*` is the port being configured, e.g. `linode-loadbalancer-port-443`
 `check-type` | `none`, `connection`, `http`, `http_body` | | The type of health check to perform against back-ends to ensure they are serving requests
 `check-path` | string | | The URL path to check on each back-end during health checks

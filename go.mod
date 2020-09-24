@@ -15,7 +15,6 @@ require (
 	github.com/coreos/etcd v3.3.18+incompatible // indirect
 	github.com/coreos/go-systemd v0.0.0-20161114122254-48702e0da86b // indirect
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
-	github.com/dnaeon/go-vcr v1.0.1 // indirect
 	github.com/docker/distribution v0.0.0-20170726174610-edc3ab29cdff // indirect
 	github.com/elazarl/go-bindata-assetfs v0.0.0-20150624150248-3dcc96556217 // indirect
 	github.com/emicklei/go-restful v0.0.0-20170410110728-ff4f55a20633 // indirect
@@ -38,7 +37,7 @@ require (
 	github.com/hashicorp/golang-lru v0.0.0-20160207214719-a0d98a5f2880 // indirect
 	github.com/imdario/mergo v0.3.5 // indirect
 	github.com/jonboulle/clockwork v0.1.0 // indirect
-	github.com/linode/linodego v0.11.0
+	github.com/linode/linodego v0.21.1
 	github.com/mailru/easyjson v0.0.0-20170624190925-2f5df55504eb // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/natefinch/lumberjack v2.0.0+incompatible // indirect
