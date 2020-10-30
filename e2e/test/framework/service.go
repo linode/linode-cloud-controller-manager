@@ -1,6 +1,7 @@
 package framework
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -40,20 +41,20 @@ func (i *lbInvocation) createOrUpdateService(selector, annotations map[string]st
 
 	service := i.kubeClient.CoreV1().Services(i.Namespace())
 	if isCreate {
-		_, err := service.Create(svc)
+		_, err := service.Create(context.TODO(), svc, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}
 	} else {
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			options := metav1.GetOptions{}
-			resource, err := service.Get(TestServerResourceName, options)
+			resource, err := service.Get(context.TODO(), TestServerResourceName, options)
 			if err != nil {
 				return err
 			}
 			svc.ObjectMeta.ResourceVersion = resource.ResourceVersion
 			svc.Spec.ClusterIP = resource.Spec.ClusterIP
-			_, err = service.Update(svc)
+			_, err = service.Update(context.TODO(), svc, metav1.UpdateOptions{})
 			return err
 		}); err != nil {
 			return err
@@ -82,7 +83,7 @@ func (i *lbInvocation) UpdateService(selector, annotations map[string]string, po
 }
 
 func (i *lbInvocation) DeleteService() error {
-	err := i.kubeClient.CoreV1().Services(i.Namespace()).Delete(TestServerResourceName, nil)
+	err := i.kubeClient.CoreV1().Services(i.Namespace()).Delete(context.TODO(), TestServerResourceName, metav1.DeleteOptions{})
 	return err
 }
 
@@ -90,7 +91,7 @@ func (i *lbInvocation) waitForServerReady() error {
 	var err error
 	var ep *core.Endpoints
 	for it := 0; it < MaxRetry; it++ {
-		ep, err = i.kubeClient.CoreV1().Endpoints(i.Namespace()).Get(TestServerResourceName, metav1.GetOptions{})
+		ep, err = i.kubeClient.CoreV1().Endpoints(i.Namespace()).Get(context.TODO(), TestServerResourceName, metav1.GetOptions{})
 		if err == nil {
 			if len(ep.Subsets) > 0 {
 				if len(ep.Subsets[0].Addresses) > 0 {
@@ -105,12 +106,12 @@ func (i *lbInvocation) waitForServerReady() error {
 }
 
 func (i *lbInvocation) deleteEvents() error {
-	return i.kubeClient.CoreV1().Events(i.Namespace()).DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: "involvedObject.kind=Service"})
+	return i.kubeClient.CoreV1().Events(i.Namespace()).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: "involvedObject.kind=Service"})
 }
 
 func (i *lbInvocation) waitForEnsured() error {
 	var timeoutSeconds int64 = 30
-	watcher, err := i.kubeClient.CoreV1().Events(i.Namespace()).Watch(metav1.ListOptions{
+	watcher, err := i.kubeClient.CoreV1().Events(i.Namespace()).Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "involvedObject.kind=Service",
 		Watch:          true,
 		TimeoutSeconds: &timeoutSeconds})
@@ -181,7 +182,7 @@ func (i *lbInvocation) GetServiceWithLoadBalancerStatus(name, namespace string) 
 		err error
 	)
 	err = wait.PollImmediate(2*time.Second, 20*time.Minute, func() (bool, error) {
-		svc, err = i.kubeClient.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
+		svc, err = i.kubeClient.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil || len(svc.Status.LoadBalancer.Ingress) == 0 { // retry
 			return false, nil
 		} else {

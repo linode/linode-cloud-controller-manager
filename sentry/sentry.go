@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/golang/glog"
+	"k8s.io/klog/v2"
 )
 
 var initialized bool
@@ -44,12 +44,12 @@ func SetHubOnContext(ctx context.Context) context.Context {
 // function also returns nil.
 func getHubFromContext(ctx context.Context) *sentry.Hub {
 	if !initialized {
-		glog.V(5).Info("getHubFromContext: Sentry not initialized")
+		klog.V(5).Info("getHubFromContext: Sentry not initialized")
 		return nil
 	}
 
 	if !sentry.HasHubOnContext(ctx) {
-		glog.Error("getHubFromContext: context is missing Sentry hub")
+		klog.Error("getHubFromContext: context is missing Sentry hub")
 		return nil
 	}
 

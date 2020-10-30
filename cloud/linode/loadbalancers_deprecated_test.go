@@ -90,7 +90,7 @@ func testBuildLoadBalancerRequestDeprecated(t *testing.T, client *linodego.Clien
 	}
 
 	lb := &loadbalancers{client, "us-west", nil}
-	nb, err := lb.buildLoadBalancerRequest(context.TODO(), svc, nodes)
+	nb, err := lb.buildLoadBalancerRequest(context.TODO(), "test", svc, nodes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +187,7 @@ func testEnsureLoadBalancerDeletedDeprecated(t *testing.T, client *linodego.Clie
 
 	lb := &loadbalancers{client, "us-west", nil}
 	configs := []*linodego.NodeBalancerConfigCreateOptions{}
-	_, err := lb.createNodeBalancer(context.TODO(), svc, configs)
+	_, err := lb.createNodeBalancer(context.TODO(), "test", svc, configs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +235,7 @@ func testEnsureLoadBalancerDeprecated(t *testing.T, client *linodego.Client) {
 	lb := &loadbalancers{client, "us-west", nil}
 
 	configs := []*linodego.NodeBalancerConfigCreateOptions{}
-	nb, err := lb.createNodeBalancer(context.TODO(), svc, configs)
+	nb, err := lb.createNodeBalancer(context.TODO(), "test", svc, configs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -351,7 +351,7 @@ func testGetLoadBalancerDeprecated(t *testing.T, client *linodego.Client) {
 	}
 
 	configs := []*linodego.NodeBalancerConfigCreateOptions{}
-	nb, err := lb.createNodeBalancer(context.TODO(), svc, configs)
+	nb, err := lb.createNodeBalancer(context.TODO(), "test", svc, configs)
 	if err != nil {
 		t.Fatal(err)
 	}

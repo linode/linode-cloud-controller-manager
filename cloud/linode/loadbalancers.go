@@ -14,8 +14,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog/v2"
 
 	"github.com/linode/linode-cloud-controller-manager/sentry"
 	"github.com/linode/linodego"
@@ -111,7 +111,7 @@ func (l *loadbalancers) getLatestServiceLoadBalancerStatus(ctx context.Context, 
 		return v1.LoadBalancerStatus{}, err
 	}
 
-	service, err = l.kubeClient.CoreV1().Services(service.Namespace).Get(service.Name, metav1.GetOptions{})
+	service, err = l.kubeClient.CoreV1().Services(service.Namespace).Get(ctx, service.Name, metav1.GetOptions{})
 	if err != nil {
 		return v1.LoadBalancerStatus{}, err
 	}
@@ -164,6 +164,14 @@ func (l *loadbalancers) cleanupOldNodeBalancer(ctx context.Context, service *v1.
 	return nil
 }
 
+// GetLoadBalancerName returns the name of the load balancer.
+//
+// GetLoadBalancer will not modify service.
+func (l *loadbalancers) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
+	unixNano := strconv.FormatInt(time.Now().UnixNano(), 16)
+	return fmt.Sprintf("ccm-%s", unixNano[len(unixNano)-12:])
+}
+
 // GetLoadBalancer returns the *v1.LoadBalancerStatus of service.
 //
 // GetLoadBalancer will not modify service.
@@ -203,7 +211,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	nb, err = l.getNodeBalancerForService(ctx, service)
 	switch err.(type) {
 	case lbNotFoundError:
-		if nb, err = l.buildLoadBalancerRequest(ctx, service, nodes); err != nil {
+		if nb, err = l.buildLoadBalancerRequest(ctx, clusterName, service, nodes); err != nil {
 			sentry.CaptureError(ctx, err)
 			return nil, err
 		}
@@ -269,7 +277,7 @@ func (l *loadbalancers) updateNodeBalancer(ctx context.Context, service *v1.Serv
 		}
 
 		// Construct a new config for this port
-		newNBCfg, err := l.buildNodeBalancerConfig(service, int(port.Port))
+		newNBCfg, err := l.buildNodeBalancerConfig(ctx, service, int(port.Port))
 		if err != nil {
 			sentry.CaptureError(ctx, err)
 			return err
@@ -453,11 +461,10 @@ func (l *loadbalancers) getNodeBalancerByID(ctx context.Context, service *v1.Ser
 	return nb, nil
 }
 
-func (l *loadbalancers) createNodeBalancer(ctx context.Context, service *v1.Service, configs []*linodego.NodeBalancerConfigCreateOptions) (lb *linodego.NodeBalancer, err error) {
+func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName string, service *v1.Service, configs []*linodego.NodeBalancerConfigCreateOptions) (lb *linodego.NodeBalancer, err error) {
 	connThrottle := getConnectionThrottle(service)
 
-	unixNano := strconv.FormatInt(time.Now().UnixNano(), 16)
-	label := fmt.Sprintf("ccm-%s", unixNano[len(unixNano)-12:])
+	label := l.GetLoadBalancerName(ctx, clusterName, service)
 	createOpts := linodego.NodeBalancerCreateOptions{
 		Label:              &label,
 		Region:             l.zone,
@@ -468,7 +475,7 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, service *v1.Serv
 }
 
 //nolint:funlen
-func (l *loadbalancers) buildNodeBalancerConfig(service *v1.Service, port int) (linodego.NodeBalancerConfig, error) {
+func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1.Service, port int) (linodego.NodeBalancerConfig, error) {
 	portConfig, err := getPortConfig(service, port)
 	if err != nil {
 		return linodego.NodeBalancerConfig{}, err
@@ -534,7 +541,7 @@ func (l *loadbalancers) buildNodeBalancerConfig(service *v1.Service, port int) (
 	config.CheckPassive = checkPassive
 
 	if portConfig.Protocol == linodego.ProtocolHTTPS {
-		if err = l.addTLSCert(service, &config, portConfig); err != nil {
+		if err = l.addTLSCert(ctx, service, &config, portConfig); err != nil {
 			return config, err
 		}
 	}
@@ -542,13 +549,13 @@ func (l *loadbalancers) buildNodeBalancerConfig(service *v1.Service, port int) (
 	return config, nil
 }
 
-func (l *loadbalancers) addTLSCert(service *v1.Service, nbConfig *linodego.NodeBalancerConfig, config portConfig) error {
+func (l *loadbalancers) addTLSCert(ctx context.Context, service *v1.Service, nbConfig *linodego.NodeBalancerConfig, config portConfig) error {
 	err := l.retrieveKubeClient()
 	if err != nil {
 		return err
 	}
 
-	nbConfig.SSLCert, nbConfig.SSLKey, err = getTLSCertInfo(l.kubeClient, service.Namespace, config)
+	nbConfig.SSLCert, nbConfig.SSLKey, err = getTLSCertInfo(ctx, l.kubeClient, service.Namespace, config)
 	if err != nil {
 		return err
 	}
@@ -557,7 +564,7 @@ func (l *loadbalancers) addTLSCert(service *v1.Service, nbConfig *linodego.NodeB
 
 // buildLoadBalancerRequest returns a linodego.NodeBalancer
 // requests for service across nodes.
-func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, service *v1.Service, nodes []*v1.Node) (*linodego.NodeBalancer, error) {
+func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*linodego.NodeBalancer, error) {
 	ports := service.Spec.Ports
 	configs := make([]*linodego.NodeBalancerConfigCreateOptions, 0, len(ports))
 
@@ -566,7 +573,7 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, service *v
 			return nil, fmt.Errorf("error creating NodeBalancer Config: ports with the UDP protocol are not supported")
 		}
 
-		config, err := l.buildNodeBalancerConfig(service, int(port.Port))
+		config, err := l.buildNodeBalancerConfig(ctx, service, int(port.Port))
 		if err != nil {
 			return nil, err
 		}
@@ -578,7 +585,7 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, service *v
 
 		configs = append(configs, &createOpt)
 	}
-	return l.createNodeBalancer(ctx, service, configs)
+	return l.createNodeBalancer(ctx, clusterName, service, configs)
 }
 
 func (l *loadbalancers) buildNodeBalancerNodeCreateOptions(node *v1.Node, nodePort int32) linodego.NodeBalancerNodeCreateOptions {
@@ -705,12 +712,12 @@ func getNodeInternalIP(node *v1.Node) string {
 	return ""
 }
 
-func getTLSCertInfo(kubeClient kubernetes.Interface, namespace string, config portConfig) (string, string, error) {
+func getTLSCertInfo(ctx context.Context, kubeClient kubernetes.Interface, namespace string, config portConfig) (string, string, error) {
 	if config.TLSSecretName == "" {
 		return "", "", fmt.Errorf("TLS secret name for port %v is not specified", config.Port)
 	}
 
-	secret, err := kubeClient.CoreV1().Secrets(namespace).Get(config.TLSSecretName, metav1.GetOptions{})
+	secret, err := kubeClient.CoreV1().Secrets(namespace).Get(ctx, config.TLSSecretName, metav1.GetOptions{})
 	if err != nil {
 		return "", "", err
 	}
