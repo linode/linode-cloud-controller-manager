@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
 )
 
 func (i *lbInvocation) createOrUpdateService(selector, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool, isCreate bool) error {
@@ -44,15 +45,17 @@ func (i *lbInvocation) createOrUpdateService(selector, annotations map[string]st
 			return err
 		}
 	} else {
-		options := metav1.GetOptions{}
-		resource, err := service.Get(TestServerResourceName, options)
-		if err != nil {
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			options := metav1.GetOptions{}
+			resource, err := service.Get(TestServerResourceName, options)
+			if err != nil {
+				return err
+			}
+			svc.ObjectMeta.ResourceVersion = resource.ResourceVersion
+			svc.Spec.ClusterIP = resource.Spec.ClusterIP
+			_, err = service.Update(svc)
 			return err
-		}
-		svc.ObjectMeta.ResourceVersion = resource.ResourceVersion
-		svc.Spec.ClusterIP = resource.Spec.ClusterIP
-		_, err = service.Update(svc)
-		if err != nil {
+		}); err != nil {
 			return err
 		}
 	}
