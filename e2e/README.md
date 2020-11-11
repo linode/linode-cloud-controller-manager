@@ -53,3 +53,12 @@ make test
 ```
 
 To save time on multiple runs by allowing the cluster to remain, use `make reuse-and-test`
+
+### Generating a new server certificate for testing
+
+Some of the tests require a secret containing a TLS certificate, for use in creating or updating a NodeBalancer config using TLS. A CA certificate and server certificate can be found in the `test/certificates` directory. The server certificate, used for TLS NodeBalancer configs, has an expiry of 4 years. You can use the following command to generate a new TLS certificate, using the existing CSR:
+
+```
+openssl x509 -req -in test/certificates/server.csr -CA test/certificates/ca.crt -CAkey test/certificates/ca.key -CAcreateserial -out test/certificates/server.crt -days 1440 -sha256 -extfile <(printf "subjectAltName=DNS:linode.test,DNS:www.linode.test")
+```
+Once a new cert is generated, you will need to replace the existing constants, "serverCert" and "serverKey", in test/framework/secret.go.
