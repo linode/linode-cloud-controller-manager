@@ -1,6 +1,8 @@
 package framework
 
 import (
+	"fmt"
+
 	"github.com/appscode/go/crypto/rand"
 	"github.com/linode/linodego"
 	"k8s.io/client-go/kubernetes"
@@ -29,6 +31,10 @@ type Framework struct {
 	linodeClient linodego.Client
 }
 
+func generateNamespaceName() string {
+	return rand.WithUniqSuffix("ccm")
+}
+
 func New(
 	restConfig *rest.Config,
 	kubeClient kubernetes.Interface,
@@ -40,7 +46,7 @@ func New(
 		linodeClient: linodeClient,
 
 		name:      "cloud-controller-manager",
-		namespace: rand.WithUniqSuffix("ccm"),
+		namespace: generateNamespaceName(),
 	}
 }
 
@@ -53,6 +59,18 @@ func (f *Framework) Invoke() *Invocation {
 		rootInvocation: r,
 		LoadBalancer:   &lbInvocation{rootInvocation: r},
 	}
+}
+
+func (f *Framework) Recycle() error {
+	if err := f.DeleteNamespace(); err != nil {
+		return fmt.Errorf("failed to delete namespace (%s)", f.namespace)
+	}
+
+	f.namespace = generateNamespaceName()
+	if err := f.CreateNamespace(); err != nil {
+		return fmt.Errorf("failed to create namespace (%s)", f.namespace)
+	}
+	return nil
 }
 
 type Invocation struct {

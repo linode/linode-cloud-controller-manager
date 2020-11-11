@@ -196,6 +196,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	sentry.SetTag(ctx, "service", service.Name)
 
 	var nb *linodego.NodeBalancer
+	serviceNn := getServiceNn(service)
 
 	nb, err = l.getNodeBalancerForService(ctx, service)
 	switch err.(type) {
@@ -204,6 +205,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 			sentry.CaptureError(ctx, err)
 			return nil, err
 		}
+		klog.Infof("created new NodeBalancer (%d) for service (%s)", nb.ID, serviceNn)
 
 	case nil:
 		if err = l.updateNodeBalancer(ctx, service, nodes, nb); err != nil {
@@ -216,6 +218,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 		return nil, err
 	}
 
+	klog.Infof("NodeBalancer (%d) has been ensured for service (%s)", nb.ID, serviceNn)
 	lbStatus = makeLoadBalancerStatus(nb)
 
 	if !l.shouldPreserveNodeBalancer(service) {

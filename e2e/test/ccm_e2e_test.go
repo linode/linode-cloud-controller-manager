@@ -128,6 +128,14 @@ var _ = Describe("e2e tests", func() {
 		}
 	}
 
+	var checkNumberOfWorkerNodes = func(numNodes int) {
+		Eventually(func() int {
+			workers, err = f.GetNodeList()
+			Expect(err).NotTo(HaveOccurred())
+			return len(workers)
+		}).Should(Equal(numNodes))
+	}
+
 	var checkNumberOfUpNodes = func(numNodes int) {
 		By("Checking the Number of Up Nodes")
 		Eventually(func() int {
@@ -325,6 +333,11 @@ var _ = Describe("e2e tests", func() {
 
 	FDescribe("Test", func() {
 		Context("LoadBalancer", func() {
+			AfterEach(func() {
+				err := root.Recycle()
+				Expect(err).NotTo(HaveOccurred())
+			})
+
 			Context("With single TLS port", func() {
 				var (
 					pods        []string
@@ -811,10 +824,6 @@ var _ = Describe("e2e tests", func() {
 				It("should use the specified NodeBalancer", func() {
 					By("Creating new NodeBalancer")
 					nbID := createNodeBalancer()
-					defer func() {
-						By("Deleting new NodeBalancer")
-						deleteNodeBalancer(nbID)
-					}()
 
 					By("Annotating service with new NodeBalancer ID")
 					annotations[annLinodeNodeBalancerID] = strconv.Itoa(nbID)
@@ -871,14 +880,14 @@ var _ = Describe("e2e tests", func() {
 				})
 
 				AfterEach(func() {
-					By("Deleting the NodeBalancer")
-					deleteNodeBalancer(nodeBalancerID)
-
 					By("Deleting the Pods")
 					deletePods(pods)
 
 					By("Deleting the Service")
 					deleteService()
+
+					err := root.Recycle()
+					Expect(err).NotTo(HaveOccurred())
 				})
 
 				It("should use the specified NodeBalancer", func() {
@@ -902,8 +911,6 @@ var _ = Describe("e2e tests", func() {
 
 					By("Checking old NodeBalancer was deleted")
 					checkNodeBalancerNotExists(nodeBalancerID)
-
-					nodeBalancerID = nbID
 				})
 			})
 
@@ -954,6 +961,9 @@ var _ = Describe("e2e tests", func() {
 				AfterEach(func() {
 					By("Deleting the NodeBalancer")
 					deleteNodeBalancer(nodeBalancerID)
+
+					err := root.Recycle()
+					Expect(err).NotTo(HaveOccurred())
 				})
 
 				It("should preserve the underlying nodebalancer after service deletion", func() {
@@ -1038,6 +1048,9 @@ var _ = Describe("e2e tests", func() {
 
 					By("Deleting the Newly Created Nodes")
 					deleteNewNode()
+
+					By("Waiting for the Node to be removed")
+					checkNumberOfWorkerNodes(2)
 				})
 
 				It("should reach the same pod every time it requests", func() {
