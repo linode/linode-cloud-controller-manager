@@ -2,6 +2,8 @@ module e2e_test
 
 go 1.12
 
+replace bitbucket.org/ww/goautoneg v0.0.0-20120707110453-75cd24fc2f2c => github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
+
 require (
 	github.com/appscode/go v0.0.0-20200323182826-54e98e09185a
 	github.com/appscode/go-notify v0.0.0-20180516083708-17078f08a5ba // indirect
