@@ -120,11 +120,13 @@ func (l *loadbalancers) getLatestServiceLoadBalancerStatus(ctx context.Context, 
 
 // getNodeBalancerByStatus attempts to get the NodeBalancer from the IPv4 specified in the
 // most recent LoadBalancer status.
-func (l *loadbalancers) getNodeBalancerByStatus(ctx context.Context, service *v1.Service) (*linodego.NodeBalancer, error) {
+func (l *loadbalancers) getNodeBalancerByStatus(ctx context.Context, service *v1.Service) (nb *linodego.NodeBalancer, err error) {
 	for _, ingress := range service.Status.LoadBalancer.Ingress {
-		ipv4 := ingress.IP
-		if nb, err := l.getNodeBalancerByIPv4(ctx, service, ipv4); err == nil {
-			return nb, err
+		if ingress.Hostname != "" {
+			return l.getNodeBalancerByHostname(ctx, service, ingress.Hostname)
+		}
+		if ingress.IP != "" {
+			return l.getNodeBalancerByIPv4(ctx, service, ingress.IP)
 		}
 	}
 	return nil, lbNotFoundError{serviceNn: getServiceNn(service)}
@@ -434,6 +436,20 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 
 	klog.Infof("successfully deleted NodeBalancer (%d) for service (%s)", nb.ID, serviceNn)
 	return nil
+}
+
+func (l *loadbalancers) getNodeBalancerByHostname(ctx context.Context, service *v1.Service, hostname string) (*linodego.NodeBalancer, error) {
+	lbs, err := l.client.ListNodeBalancers(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, lb := range lbs {
+		if *lb.Hostname == hostname {
+			klog.V(2).Infof("found NodeBalancer (%d) for service (%s) via hostname (%s)", lb.ID, getServiceNn(service), hostname)
+			return &lb, nil
+		}
+	}
+	return nil, lbNotFoundError{serviceNn: getServiceNn(service)}
 }
 
 func (l *loadbalancers) getNodeBalancerByIPv4(ctx context.Context, service *v1.Service, ipv4 string) (*linodego.NodeBalancer, error) {
@@ -756,7 +772,6 @@ func getConnectionThrottle(service *v1.Service) int {
 func makeLoadBalancerStatus(nb *linodego.NodeBalancer) *v1.LoadBalancerStatus {
 	return &v1.LoadBalancerStatus{
 		Ingress: []v1.LoadBalancerIngress{{
-			IP:       *nb.IPv4,
 			Hostname: *nb.Hostname,
 		}},
 	}
