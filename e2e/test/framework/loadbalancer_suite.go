@@ -56,6 +56,24 @@ func (i *lbInvocation) GetNodeBalancerConfig(svcName string) (*linodego.NodeBala
 	return &nbcList[0], nil
 }
 
+func (i *lbInvocation) GetNodeBalancerConfigForPort(svcName string, port int) (*linodego.NodeBalancerConfig, error) {
+	id, err := i.GetNodeBalancerID(svcName)
+	if err != nil {
+		return nil, err
+	}
+	nbConfigs, err := i.linodeClient.ListNodeBalancerConfigs(context.Background(), id, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, config := range nbConfigs {
+		if config.Port == port {
+			return &config, nil
+		}
+	}
+	return nil, fmt.Errorf("NodeBalancerConfig for port %d was not found", port)
+}
+
 func (i *lbInvocation) waitForLoadBalancerIP(svcName string) (string, error) {
 	var ip string
 	err := wait.PollImmediate(RetryInterval, RetryTimeout, func() (bool, error) {

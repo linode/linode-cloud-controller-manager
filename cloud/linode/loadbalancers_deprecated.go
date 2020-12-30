@@ -9,6 +9,7 @@ import (
 const (
 	annLinodeProtocolDeprecated        = "service.beta.kubernetes.io/linode-loadbalancer-protocol"
 	annLinodeLoadBalancerTLSDeprecated = "service.beta.kubernetes.io/linode-loadbalancer-tls"
+	annLinodeProxyProtocol             = "service.beta.kubernetes.io/linode-loadbalancer-proxy-protocol"
 )
 
 type tlsAnnotationDeprecated struct {
