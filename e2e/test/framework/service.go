@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/url"
 	"time"
 
 	"github.com/golang/glog"
@@ -149,9 +148,9 @@ func (i *lbInvocation) getLoadBalancerURLs() ([]string, error) {
 		return serverAddr, err
 	}
 
-	ips := make([]string, 0)
+	hostnames := make([]string, 0)
 	for _, ingress := range svc.Status.LoadBalancer.Ingress {
-		ips = append(ips, ingress.IP)
+		hostnames = append(hostnames, ingress.Hostname)
 	}
 
 	var ports []int32
@@ -164,12 +163,8 @@ func (i *lbInvocation) getLoadBalancerURLs() ([]string, error) {
 	}
 
 	for _, port := range ports {
-		for _, ip := range ips {
-			u, err := url.Parse(fmt.Sprintf("http://%s:%d", ip, port))
-			if err != nil {
-				return nil, err
-			}
-			serverAddr = append(serverAddr, u.String())
+		for _, hostname := range hostnames {
+			serverAddr = append(serverAddr, fmt.Sprintf("%s:%d", hostname, port))
 		}
 	}
 

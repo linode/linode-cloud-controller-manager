@@ -109,7 +109,7 @@ var _ = Describe("e2e tests", func() {
 	var getResponseFromSamePod = func(link string) {
 		var oldResp, newResp string
 		Eventually(func() string {
-			resp, err := http.Get(link)
+			resp, err := http.Get("http://" + link)
 			if err == nil {
 				byteData, _ := ioutil.ReadAll(resp.Body)
 				defer resp.Body.Close()

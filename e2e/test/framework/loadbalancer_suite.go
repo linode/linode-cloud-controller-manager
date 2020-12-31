@@ -15,7 +15,7 @@ func (i *lbInvocation) GetHTTPEndpoints() ([]string, error) {
 }
 
 func (i *lbInvocation) GetNodeBalancerID(svcName string) (int, error) {
-	ip, err := i.waitForLoadBalancerIP(svcName)
+	hostname, err := i.waitForLoadBalancerHostname(svcName)
 	if err != nil {
 		return -1, err
 	}
@@ -27,7 +27,7 @@ func (i *lbInvocation) GetNodeBalancerID(svcName string) (int, error) {
 	}
 
 	for _, nb := range nbList {
-		if *nb.IPv4 == ip {
+		if *nb.Hostname == hostname {
 			return nb.ID, nil
 		}
 	}
@@ -74,7 +74,7 @@ func (i *lbInvocation) GetNodeBalancerConfigForPort(svcName string, port int) (*
 	return nil, fmt.Errorf("NodeBalancerConfig for port %d was not found", port)
 }
 
-func (i *lbInvocation) waitForLoadBalancerIP(svcName string) (string, error) {
+func (i *lbInvocation) waitForLoadBalancerHostname(svcName string) (string, error) {
 	var ip string
 	err := wait.PollImmediate(RetryInterval, RetryTimeout, func() (bool, error) {
 		svc, err := i.kubeClient.CoreV1().Services(i.Namespace()).Get(context.TODO(), svcName, metav1.GetOptions{})
@@ -85,7 +85,7 @@ func (i *lbInvocation) waitForLoadBalancerIP(svcName string) (string, error) {
 		if svc.Status.LoadBalancer.Ingress == nil {
 			return false, nil
 		}
-		ip = svc.Status.LoadBalancer.Ingress[0].IP
+		ip = svc.Status.LoadBalancer.Ingress[0].Hostname
 		return true, nil
 	})
 

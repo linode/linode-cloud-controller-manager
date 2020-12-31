@@ -8,7 +8,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -142,13 +141,10 @@ func getHTTPSResponse(domain, ip, port string) (string, error) {
 
 func WaitForHTTPSResponse(link string, podName string) error {
 	return wait.PollImmediate(RetryInterval, RetryTimeout, func() (bool, error) {
-		u, err := url.Parse(link)
-		if err != nil {
-			return false, nil
-		}
-		ipPort := strings.Split(u.Host, ":")
+		hostPort := strings.Split(link, ":")
+		host, port := hostPort[0], hostPort[1]
 
-		resp, err := getHTTPSResponse(Domain, ipPort[0], ipPort[1])
+		resp, err := getHTTPSResponse(Domain, host, port)
 		if err != nil {
 			return false, nil
 		}
@@ -163,7 +159,7 @@ func WaitForHTTPSResponse(link string, podName string) error {
 }
 
 func getHTTPResponse(link string) (bool, string, error) {
-	resp, err := http.Get(link)
+	resp, err := http.Get("http://" + link)
 	if err != nil {
 		return false, "", err
 	}
@@ -173,7 +169,6 @@ func getHTTPResponse(link string) (bool, string, error) {
 	if err != nil {
 		return false, "", err
 	}
-
 	return resp.StatusCode == 200, string(bodyBytes), nil
 }
 
