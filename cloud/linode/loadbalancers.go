@@ -24,9 +24,9 @@ import (
 const (
 	// annLinodeDefaultProtocol is the annotation used to specify the default protocol
 	// for Linode load balancers. Options are tcp, http and https. Defaults to tcp.
-	annLinodeDefaultProtocol  = "service.beta.kubernetes.io/linode-loadbalancer-default-protocol"
-	annLinodePortConfigPrefix = "service.beta.kubernetes.io/linode-loadbalancer-port-"
-	annLinodeProxyProtocol    = "service.beta.kubernetes.io/linode-loadbalancer-proxy-protocol"
+	annLinodeDefaultProtocol      = "service.beta.kubernetes.io/linode-loadbalancer-default-protocol"
+	annLinodePortConfigPrefix     = "service.beta.kubernetes.io/linode-loadbalancer-port-"
+	annLinodeDefaultProxyProtocol = "service.beta.kubernetes.io/linode-loadbalancer-default-proxy-protocol"
 
 	annLinodeCheckPath       = "service.beta.kubernetes.io/linode-loadbalancer-check-path"
 	annLinodeCheckBody       = "service.beta.kubernetes.io/linode-loadbalancer-check-body"
@@ -68,11 +68,13 @@ type loadbalancers struct {
 type portConfigAnnotation struct {
 	TLSSecretName string `json:"tls-secret-name"`
 	Protocol      string `json:"protocol"`
+	ProxyProtocol string `json:"proxy-protocol"`
 }
 
 type portConfig struct {
 	TLSSecretName string
 	Protocol      linodego.ConfigProtocol
+	ProxyProtocol linodego.ConfigProxyProtocol
 	Port          int
 }
 
@@ -478,9 +480,10 @@ func (l *loadbalancers) buildNodeBalancerConfig(service *v1.Service, port int) (
 	}
 
 	config := linodego.NodeBalancerConfig{
-		Port:     port,
-		Protocol: portConfig.Protocol,
-		Check:    health,
+		Port:          port,
+		Protocol:      portConfig.Protocol,
+		ProxyProtocol: portConfig.ProxyProtocol,
+		Check:         health,
 	}
 
 	if health == linodego.CheckHTTP || health == linodego.CheckHTTPBody {
@@ -529,17 +532,6 @@ func (l *loadbalancers) buildNodeBalancerConfig(service *v1.Service, port int) (
 		}
 	}
 	config.CheckPassive = checkPassive
-
-	proxyProtocol := linodego.ProxyProtocolNone
-	if pp, ok := service.Annotations[annLinodeProxyProtocol]; ok {
-		switch linodego.ConfigProxyProtocol(pp) {
-		case linodego.ProxyProtocolNone, linodego.ProxyProtocolV1, linodego.ProxyProtocolV2:
-			proxyProtocol = linodego.ConfigProxyProtocol(pp)
-		default:
-			return config, fmt.Errorf("invalid NodeBalancer proxy protocol value '%s'", pp)
-		}
-	}
-	config.ProxyProtocol = proxyProtocol
 
 	if portConfig.Protocol == linodego.ProtocolHTTPS {
 		if err = l.addTLSCert(service, &config, portConfig); err != nil {
@@ -643,15 +635,35 @@ func getPortConfig(service *v1.Service, port int) (portConfig, error) {
 			protocol = "tcp"
 		}
 	}
-
 	protocol = strings.ToLower(protocol)
+
+	proxyProtocol := portConfigAnnotation.ProxyProtocol
+	if proxyProtocol == "" {
+		var ok bool
+		for _, ann := range []string{annLinodeDefaultProxyProtocol, annLinodeProxyProtocol} {
+			proxyProtocol, ok = service.Annotations[ann]
+			if ok {
+				break
+			} else {
+				proxyProtocol = string(linodego.ProxyProtocolNone)
+			}
+		}
+	}
 
 	if protocol != "tcp" && protocol != "http" && protocol != "https" {
 		return portConfig, fmt.Errorf("invalid protocol: %q specified", protocol)
 	}
 
+	switch proxyProtocol {
+	case string(linodego.ProxyProtocolNone), string(linodego.ProxyProtocolV1), string(linodego.ProxyProtocolV2):
+		break
+	default:
+		return portConfig, fmt.Errorf("invalid NodeBalancer proxy protocol value '%s'", proxyProtocol)
+	}
+
 	portConfig.Port = port
 	portConfig.Protocol = linodego.ConfigProtocol(protocol)
+	portConfig.ProxyProtocol = linodego.ConfigProxyProtocol(proxyProtocol)
 	portConfig.TLSSecretName = portConfigAnnotation.TLSSecretName
 
 	return portConfig, nil

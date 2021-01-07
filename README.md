@@ -44,8 +44,8 @@ Annotation (Suffix) | Values | Default | Description
 ---|---|---|---
 `throttle` | `0`-`20` (`0` to disable) | `20` | Client Connection Throttle, which limits the number of subsequent new connections per second from the same client IP
 `default-protocol` | `tcp`, `http`, `https` | `tcp` | This annotation is used to specify the default protocol for Linode NodeBalancer.
-`proxy-protocol` | `none`, `v1`, `v2` | `none` | Specifies whether to use a version of Proxy Protocol on the underlying NodeBalancer
-`port-*` | json (e.g. `{ "tls-secret-name": "prod-app-tls", "protocol": "https"}`) | | Specifies the secret and protocol for a port corresponding secrets. The secret type should be `kubernetes.io/tls`. `*` is the port being configured, e.g. `linode-loadbalancer-port-443`
+`default-proxy-protocol` | `none`, `v1`, `v2` | `none` | Specifies whether to use a version of Proxy Protocol on the underlying NodeBalancer.
+`port-*` | json (e.g. `{ "tls-secret-name": "prod-app-tls", "protocol": "https", "proxy-protocol": "v2"}`) | | Specifies port specific NodeBalancer configuration. See [Port Specific Configuration](#port-specific-configuration). `*` is the port being configured, e.g. `linode-loadbalancer-port-443`
 `check-type` | `none`, `connection`, `http`, `http_body` | | The type of health check to perform against back-ends to ensure they are serving requests
 `check-path` | string | | The URL path to check on each back-end during health checks
 `check-body` | string | | Text which must be present in the response body to pass the NodeBalancer health check
@@ -58,16 +58,27 @@ Annotation (Suffix) | Values | Default | Description
 
 #### Deprecated Annotations
 
-These annotations are deprecated, and will be removed Q3 2020.
+These annotations are deprecated, and will be removed in a future release.
 
-Annotation (Suffix) | Values | Default | Description
----|---|---|---
-`protocol` | `tcp`, `http`, `https` | `tcp` | This annotation is used to specify the default protocol for Linode NodeBalancer. For ports specified in the `linode-loadbalancer-tls-ports` annotation, this protocol is overwritten to `https`
-`tls` | json array (e.g. `[ { "tls-secret-name": "prod-app-tls", "port": 443}, {"tls-secret-name": "dev-app-tls", "port": 8443} ]`) | | Specifies TLS ports with their corresponding secrets, the secret type should be `kubernetes.io/tls
+Annotation (Suffix) | Values | Default | Description | Scheduled Removal
+---|---|---|---|---
+`protocol` | `tcp`, `http`, `https` | `tcp` | This annotation is used to specify the default protocol for Linode NodeBalancer. For ports specified in the `linode-loadbalancer-tls-ports` annotation, this protocol is overwritten to `https` | Q4 2020
+`proxy-protcol` | `none`, `v1`, `v2` | `none` | Specifies whether to use a version of Proxy Protocol on the underlying NodeBalancer | Q4 2021
+`tls` | json array (e.g. `[ { "tls-secret-name": "prod-app-tls", "port": 443}, {"tls-secret-name": "dev-app-tls", "port": 8443} ]`) | | Specifies TLS ports with their corresponding secrets, the secret type should be `kubernetes.io/tls | Q4 2020
 
 #### Annotation bool values
 
 For annotations with bool value types, `"1"`, `"t"`,  `"T"`, `"True"`, `"true"` and `"True"` are valid string representations of `true`. Any other values will be interpreted as false. For more details, see [strconv.ParseBool](https://golang.org/pkg/strconv/#ParseBool).
+
+#### Port Specific Configuration
+
+These configuration options can be specified via the `port-*` annotation, encoded in JSON.
+
+Key | Values | Default | Description
+---|---|---|---
+`protocol` | `tcp`, `http`, `https` | `tcp` | Specifies protocol of the NodeBalancer port. Overwrites `default-protocol`.
+`proxy-protocol` | `none`, `v1`, `v2` | `none` | Specifies whether to use a version of Proxy Protocol on the underlying NodeBalancer. Overwrites `default-proxy-protocol`.
+`tls-secret-name` | string | | Specifies a secret to use for TLS. The secret type should be `kubernetes.io/tls`.
 
 #### Example usage
 
@@ -128,10 +139,10 @@ spec:
 
 See more in the [examples directory](examples)
 
-## Why `stickiness` and `algorithm` annotations don't exit
+## Why `stickiness` and `algorithm` annotations don't exist
 
 As kube-proxy will simply double-hop the traffic to a random backend Pod anyway, it doesn't matter which backend Node traffic is forwarded-to for the sake of session stickiness.
-So these annotations are not necessary to implement session stickiness. 
+These annotations are not necessary to implement session stickiness, as kube-proxy will simply double-hop the packets to a random backend Pod. It would not make a difference to set a backend Node that would receive the network traffic in an attempt to set session stickiness.
 
 ## How to use sessionAffinity
 

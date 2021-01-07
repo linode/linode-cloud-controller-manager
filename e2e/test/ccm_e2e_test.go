@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"e2e_test/test/framework"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -27,6 +28,7 @@ var _ = Describe("e2e tests", func() {
 
 	const (
 		annLinodeProxyProtocol        = "service.beta.kubernetes.io/linode-loadbalancer-proxy-protocol"
+		annLinodeDefaultProxyProtocol = "service.beta.kubernetes.io/linode-loadbalancer-default-proxy-protocol"
 		annLinodeDefaultProtocol      = "service.beta.kubernetes.io/linode-loadbalancer-default-protocol"
 		annLinodePortConfigPrefix     = "service.beta.kubernetes.io/linode-loadbalancer-port-"
 		annLinodeLoadBalancerPreserve = "service.beta.kubernetes.io/linode-loadbalancer-preserve"
@@ -172,9 +174,9 @@ var _ = Describe("e2e tests", func() {
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	var checkNodeBalancerConfig = func(args checkArgs) {
-		By("Getting NodeBalancer Configuration")
-		nbConfig, err := f.LoadBalancer.GetNodeBalancerConfig(framework.TestServerResourceName)
+	var checkNodeBalancerConfigForPort = func(port int, args checkArgs) {
+		By("Getting NodeBalancer Configuration for port " + strconv.Itoa(port))
+		nbConfig, err := f.LoadBalancer.GetNodeBalancerConfigForPort(framework.TestServerResourceName, port)
 		Expect(err).NotTo(HaveOccurred())
 
 		if args.checkType != "" {
@@ -410,13 +412,19 @@ var _ = Describe("e2e tests", func() {
 					labels       map[string]string
 					servicePorts []core.ServicePort
 
-					annotations = map[string]string{}
+					proxyProtocolV1   = string(linodego.ProxyProtocolV1)
+					proxyProtocolV2   = string(linodego.ProxyProtocolV2)
+					proxyProtocolNone = string(linodego.ProxyProtocolNone)
 				)
 				BeforeEach(func() {
 					pods = []string{"test-pod-1"}
 					ports := []core.ContainerPort{
 						{
 							Name:          "http-1",
+							ContainerPort: 80,
+						},
+						{
+							Name:          "http-2",
 							ContainerPort: 8080,
 						},
 					}
@@ -424,6 +432,12 @@ var _ = Describe("e2e tests", func() {
 						{
 							Name:       "http-1",
 							Port:       80,
+							TargetPort: intstr.FromInt(80),
+							Protocol:   "TCP",
+						},
+						{
+							Name:       "http-2",
+							Port:       8080,
 							TargetPort: intstr.FromInt(8080),
 							Protocol:   "TCP",
 						},
@@ -437,7 +451,7 @@ var _ = Describe("e2e tests", func() {
 					createPodWithLabel(pods, ports, framework.TestServerImage, labels, false)
 
 					By("Creating Service")
-					createServiceWithAnnotations(labels, annotations, servicePorts, false)
+					createServiceWithAnnotations(labels, map[string]string{}, servicePorts, false)
 				})
 
 				AfterEach(func() {
@@ -448,15 +462,67 @@ var _ = Describe("e2e tests", func() {
 					deleteService()
 				})
 
-				It("should update the NodeBalancer to use ProxyProtocol v2", func() {
-					proxyProtocolV2 := string(linodego.ProxyProtocolV2)
+				It("can set proxy-protocol on each port", func() {
+					By("Annotating port 80 with v1 and 8080 with v2")
+					updateServiceWithAnnotations(labels, map[string]string{
+						annLinodePortConfigPrefix + "80":   fmt.Sprintf(`{"proxy-protocol": "%s"}`, proxyProtocolV1),
+						annLinodePortConfigPrefix + "8080": fmt.Sprintf(`{"proxy-protocol": "%s"}`, proxyProtocolV2),
+					}, servicePorts, false)
 
-					By("Annotating ProxyProtocol v2")
+					By("Checking NodeBalancerConfig for port 80 should have ProxyProtocol v1")
+					checkNodeBalancerConfigForPort(80, checkArgs{proxyProtocol: proxyProtocolV1})
+
+					By("Checking NodeBalancerConfig for port 8080 should have ProxyProtocol v2")
+					checkNodeBalancerConfigForPort(8080, checkArgs{proxyProtocol: proxyProtocolV2})
+				})
+
+				It("should override default proxy-protocol annotation when a port configuration is specified", func() {
+					By("Annotating a default version of ProxyProtocol v2 and v1 for port 8080")
+					updateServiceWithAnnotations(labels, map[string]string{
+						annLinodeDefaultProxyProtocol:      proxyProtocolV2,
+						annLinodePortConfigPrefix + "8080": fmt.Sprintf(`{"proxy-protocol": "%s"}`, proxyProtocolV1),
+					}, servicePorts, false)
+
+					By("Checking NodeBalancerConfig for port 80 should have the default ProxyProtocol v2")
+					checkNodeBalancerConfigForPort(80, checkArgs{proxyProtocol: proxyProtocolV2})
+
+					By("Checking NodeBalancerConfig for port 8080 should have ProxyProtocol v1")
+					checkNodeBalancerConfigForPort(8080, checkArgs{proxyProtocol: proxyProtocolV1})
+				})
+
+				It("port specific configuration should not effect other ports", func() {
+					By("Annotating ProxyProtocol v2 on port 8080")
+					updateServiceWithAnnotations(labels, map[string]string{
+						annLinodePortConfigPrefix + "8080": fmt.Sprintf(`{"proxy-protocol": "%s"}`, proxyProtocolV2),
+					}, servicePorts, false)
+
+					By("Checking NodeBalancerConfig for port 8080 should have ProxyProtocolv2")
+					checkNodeBalancerConfigForPort(8080, checkArgs{proxyProtocol: proxyProtocolV2})
+
+					By("Checking NodeBalancerConfig for port 80 should not have ProxyProtocol enabled")
+					checkNodeBalancerConfigForPort(80, checkArgs{proxyProtocol: proxyProtocolNone})
+				})
+
+				It("default annotations can be used to apply ProxyProtocol to all NodeBalancerConfigs", func() {
+					annotations := make(map[string]string)
+
+					By("By specifying ProxyProtocol v2 using the deprecated annotation " + annLinodeProxyProtocol)
 					annotations[annLinodeProxyProtocol] = proxyProtocolV2
 					updateServiceWithAnnotations(labels, annotations, servicePorts, false)
 
-					By("Checking NodeBalancerConfig")
-					checkNodeBalancerConfig(checkArgs{proxyProtocol: proxyProtocolV2})
+					By("Checking NodeBalancerConfig for port 80 should have default ProxyProtocol v2")
+					checkNodeBalancerConfigForPort(80, checkArgs{proxyProtocol: proxyProtocolV2})
+					By("Checking NodeBalancerConfig for port 8080 should have ProxyProtocol v2")
+					checkNodeBalancerConfigForPort(8080, checkArgs{proxyProtocol: proxyProtocolV2})
+
+					By("specifying ProxyProtocol v1 using the annotation " + annLinodeDefaultProtocol)
+					annotations[annLinodeDefaultProxyProtocol] = proxyProtocolV1
+					updateServiceWithAnnotations(labels, annotations, servicePorts, false)
+
+					By("Checking NodeBalancerConfig for port 80 should have default ProxyProtocol v1")
+					checkNodeBalancerConfigForPort(80, checkArgs{proxyProtocol: proxyProtocolV1})
+					By("Checking NodeBalancerConfig for port 8080 should have ProxyProtocol v1")
+					checkNodeBalancerConfigForPort(8080, checkArgs{proxyProtocol: proxyProtocolV1})
 				})
 			})
 
@@ -767,7 +833,7 @@ var _ = Describe("e2e tests", func() {
 
 				It("should successfully check the health of 2 nodes", func() {
 					By("Checking NodeBalancer Configurations")
-					checkNodeBalancerConfig(checkArgs{
+					checkNodeBalancerConfigForPort(80, checkArgs{
 						checkType:  checkType,
 						path:       path,
 						body:       body,
@@ -1119,7 +1185,7 @@ var _ = Describe("e2e tests", func() {
 
 				It("should successfully check the health of 2 nodes", func() {
 					By("Checking NodeBalancer Configurations")
-					checkNodeBalancerConfig(checkArgs{
+					checkNodeBalancerConfigForPort(80, checkArgs{
 						checkType:  checkType,
 						interval:   interval,
 						timeout:    timeout,
@@ -1181,7 +1247,7 @@ var _ = Describe("e2e tests", func() {
 
 				It("should successfully check the health of 2 nodes", func() {
 					By("Checking NodeBalancer Configurations")
-					checkNodeBalancerConfig(checkArgs{
+					checkNodeBalancerConfigForPort(80, checkArgs{
 						checkType:    checkType,
 						checkPassive: checkPassive,
 						checkNodes:   true,
@@ -1241,7 +1307,7 @@ var _ = Describe("e2e tests", func() {
 
 				It("should successfully check the health of 2 nodes", func() {
 					By("Checking NodeBalancer Configurations")
-					checkNodeBalancerConfig(checkArgs{
+					checkNodeBalancerConfigForPort(80, checkArgs{
 						checkType:  checkType,
 						path:       path,
 						checkNodes: true,

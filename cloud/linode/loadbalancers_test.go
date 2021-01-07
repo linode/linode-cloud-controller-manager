@@ -573,7 +573,7 @@ func testUpdateLoadBalancerAddProxyProtocol(t *testing.T, client *linodego.Clien
 
 			svc.Status.LoadBalancer = *makeLoadBalancerStatus(nodeBalancer)
 			svc.ObjectMeta.SetAnnotations(map[string]string{
-				annLinodeProxyProtocol: string(tc.proxyProtocolConfig),
+				annLinodeDefaultProxyProtocol: string(tc.proxyProtocolConfig),
 			})
 
 			stubService(fakeClientset, svc)
@@ -772,6 +772,60 @@ func Test_getPortConfig(t *testing.T) {
 		err                error
 	}{
 		{
+			"default no proxy protocol specified",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(10),
+					UID:  "abc123",
+				},
+			},
+			portConfig{Port: 443, Protocol: "tcp", ProxyProtocol: linodego.ProxyProtocolNone},
+			nil,
+		},
+		{
+			"default proxy protocol specified",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(10),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annLinodeDefaultProxyProtocol: string(linodego.ProxyProtocolV2),
+					},
+				},
+			},
+			portConfig{Port: 443, Protocol: "tcp", ProxyProtocol: linodego.ProxyProtocolV2},
+			nil,
+		},
+		{
+			"port specific proxy protocol specified",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(10),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annLinodeDefaultProxyProtocol:     string(linodego.ProxyProtocolV2),
+						annLinodePortConfigPrefix + "443": fmt.Sprintf(`{"proxy-protocol": "%s"}`, linodego.ProxyProtocolV1),
+					},
+				},
+			},
+			portConfig{Port: 443, Protocol: "tcp", ProxyProtocol: linodego.ProxyProtocolV1},
+			nil,
+		},
+		{
+			"default invalid proxy protocol",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(10),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annLinodeDefaultProxyProtocol: "invalid",
+					},
+				},
+			},
+			portConfig{},
+			fmt.Errorf("invalid NodeBalancer proxy protocol value '%s'", "invalid"),
+		},
+		{
 			"default no protocol specified",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -779,7 +833,7 @@ func Test_getPortConfig(t *testing.T) {
 					UID:  "abc123",
 				},
 			},
-			portConfig{Port: 443, Protocol: "tcp"},
+			portConfig{Port: 443, Protocol: "tcp", ProxyProtocol: linodego.ProxyProtocolNone},
 
 			nil,
 		},
@@ -794,7 +848,7 @@ func Test_getPortConfig(t *testing.T) {
 					},
 				},
 			},
-			portConfig{Port: 443, Protocol: "tcp"},
+			portConfig{Port: 443, Protocol: "tcp", ProxyProtocol: linodego.ProxyProtocolNone},
 			nil,
 		},
 		{
@@ -808,7 +862,7 @@ func Test_getPortConfig(t *testing.T) {
 					},
 				},
 			},
-			portConfig{Port: 443, Protocol: "http"},
+			portConfig{Port: 443, Protocol: "http", ProxyProtocol: linodego.ProxyProtocolNone},
 			nil,
 		},
 		{
@@ -837,7 +891,7 @@ func Test_getPortConfig(t *testing.T) {
 					},
 				},
 			},
-			portConfig{Port: 443, Protocol: "http"},
+			portConfig{Port: 443, Protocol: "http", ProxyProtocol: linodego.ProxyProtocolNone},
 			nil,
 		},
 		{
@@ -851,7 +905,7 @@ func Test_getPortConfig(t *testing.T) {
 					},
 				},
 			},
-			portConfig{Port: 443, Protocol: "http"},
+			portConfig{Port: 443, Protocol: "http", ProxyProtocol: linodego.ProxyProtocolNone},
 			nil,
 		},
 		{
