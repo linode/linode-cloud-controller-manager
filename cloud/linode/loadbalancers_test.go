@@ -1322,7 +1322,7 @@ func testEnsureExistingLoadBalancer(t *testing.T, client *linodego.Client, _ *fa
 	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc) }()
 	getLBStatus, exists, err := lb.GetLoadBalancer(context.TODO(), "linodelb", svc)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("failed to create nodebalancer: %s", err)
 	}
 	if !exists {
 		t.Fatal("Node balancer not found")
@@ -1728,7 +1728,6 @@ func Test_getTLSCertInfo(t *testing.T) {
 	testcases := []struct {
 		name       string
 		portConfig portConfig
-		namespace  string
 		cert       string
 		key        string
 		err        error
@@ -1739,20 +1738,18 @@ func Test_getTLSCertInfo(t *testing.T) {
 				TLSSecretName: "tls-secret",
 				Port:          8080,
 			},
-			namespace: "test",
-			cert:      testCert,
-			key:       testKey,
-			err:       nil,
+			cert: testCert,
+			key:  testKey,
+			err:  nil,
 		},
 		{
 			name: "Test unspecified Cert info",
 			portConfig: portConfig{
 				Port: 8080,
 			},
-			namespace: "test",
-			cert:      "",
-			key:       "",
-			err:       fmt.Errorf("TLS secret name for port 8080 is not specified"),
+			cert: "",
+			key:  "",
+			err:  fmt.Errorf("TLS secret name for port 8080 is not specified"),
 		},
 		{
 			name: "Test blank Cert info",
@@ -1760,10 +1757,9 @@ func Test_getTLSCertInfo(t *testing.T) {
 				TLSSecretName: "",
 				Port:          8080,
 			},
-			namespace: "test",
-			cert:      "",
-			key:       "",
-			err:       fmt.Errorf("TLS secret name for port 8080 is not specified"),
+			cert: "",
+			key:  "",
+			err:  fmt.Errorf("TLS secret name for port 8080 is not specified"),
 		},
 		{
 			name: "Test no secret found",
@@ -1771,9 +1767,8 @@ func Test_getTLSCertInfo(t *testing.T) {
 				TLSSecretName: "secret",
 				Port:          8080,
 			},
-			namespace: "test",
-			cert:      "",
-			key:       "",
+			cert: "",
+			key:  "",
 			err: errors.NewNotFound(schema.GroupResource{
 				Group:    "",
 				Resource: "secrets",
@@ -1783,7 +1778,7 @@ func Test_getTLSCertInfo(t *testing.T) {
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
-			cert, key, err := getTLSCertInfo(context.TODO(), kubeClient, test.namespace, test.portConfig)
+			cert, key, err := getTLSCertInfo(context.TODO(), kubeClient, "", test.portConfig)
 			if cert != test.cert {
 				t.Error("unexpected error")
 				t.Logf("expected: %v", test.cert)
@@ -1804,7 +1799,7 @@ func Test_getTLSCertInfo(t *testing.T) {
 }
 
 func addTLSSecret(t *testing.T, kubeClient kubernetes.Interface) {
-	_, err := kubeClient.CoreV1().Secrets("test").Create(context.TODO(), &v1.Secret{
+	_, err := kubeClient.CoreV1().Secrets("").Create(context.TODO(), &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tls-secret",
 		},
@@ -1816,6 +1811,6 @@ func addTLSSecret(t *testing.T, kubeClient kubernetes.Interface) {
 		Type:       "kubernetes.io/tls",
 	}, metav1.CreateOptions{})
 	if err != nil {
-		t.Error(err)
+		t.Fatalf("failed to add TLS secret: %s\n", err)
 	}
 }
