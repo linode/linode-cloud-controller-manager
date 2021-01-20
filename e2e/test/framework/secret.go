@@ -1,6 +1,8 @@
 package framework
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -103,12 +105,12 @@ func (i *lbInvocation) CreateTLSSecret(secretName string) (err error) {
 		Type: corev1.SecretTypeTLS,
 	}
 
-	_, err = i.kubeClient.CoreV1().Secrets(i.Namespace()).Create(secret)
+	_, err = i.kubeClient.CoreV1().Secrets(i.Namespace()).Create(context.TODO(), secret, metav1.CreateOptions{})
 
 	return err
 }
 
 func (i *lbInvocation) DeleteSecret(name string) error {
-	err := i.kubeClient.CoreV1().Secrets(i.Namespace()).Delete(name, nil)
+	err := i.kubeClient.CoreV1().Secrets(i.Namespace()).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	return err
 }

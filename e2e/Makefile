@@ -37,4 +37,4 @@ install-terraform:
 	sudo mv terraform /usr/local/bin/
 
 control-plane-ssh: $(REUSED_KUBECONFIG)
-	ssh core@$(CONTROL_PLANE_IP)
+	ssh root@$(CONTROL_PLANE_IP)

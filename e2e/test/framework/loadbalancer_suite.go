@@ -77,7 +77,7 @@ func (i *lbInvocation) GetNodeBalancerConfigForPort(svcName string, port int) (*
 func (i *lbInvocation) waitForLoadBalancerIP(svcName string) (string, error) {
 	var ip string
 	err := wait.PollImmediate(RetryInterval, RetryTimeout, func() (bool, error) {
-		svc, err := i.kubeClient.CoreV1().Services(i.Namespace()).Get(svcName, metav1.GetOptions{})
+		svc, err := i.kubeClient.CoreV1().Services(i.Namespace()).Get(context.TODO(), svcName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
