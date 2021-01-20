@@ -90,7 +90,7 @@ func testBuildLoadBalancerRequestDeprecated(t *testing.T, client *linodego.Clien
 	}
 
 	lb := &loadbalancers{client, "us-west", nil}
-	nb, err := lb.buildLoadBalancerRequest(context.TODO(), "test", svc, nodes)
+	nb, err := lb.buildLoadBalancerRequest(context.TODO(), "linodelb", svc, nodes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,11 +187,11 @@ func testEnsureLoadBalancerDeletedDeprecated(t *testing.T, client *linodego.Clie
 
 	lb := &loadbalancers{client, "us-west", nil}
 	configs := []*linodego.NodeBalancerConfigCreateOptions{}
-	_, err := lb.createNodeBalancer(context.TODO(), "test", svc, configs)
+	_, err := lb.createNodeBalancer(context.TODO(), "linodelb", svc, configs)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc) }()
+	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc) }()
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
@@ -235,13 +235,13 @@ func testEnsureLoadBalancerDeprecated(t *testing.T, client *linodego.Client) {
 	lb := &loadbalancers{client, "us-west", nil}
 
 	configs := []*linodego.NodeBalancerConfigCreateOptions{}
-	nb, err := lb.createNodeBalancer(context.TODO(), "test", svc, configs)
+	nb, err := lb.createNodeBalancer(context.TODO(), "linodelb", svc, configs)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	svc.Status.LoadBalancer = *makeLoadBalancerStatus(nb)
-	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc) }()
+	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc) }()
 	lbStatus, exists, err := lb.GetLoadBalancer(context.TODO(), "linodelb", svc)
 	if err != nil {
 		t.Fatal(err)
@@ -351,14 +351,14 @@ func testGetLoadBalancerDeprecated(t *testing.T, client *linodego.Client) {
 	}
 
 	configs := []*linodego.NodeBalancerConfigCreateOptions{}
-	nb, err := lb.createNodeBalancer(context.TODO(), "test", svc, configs)
+	nb, err := lb.createNodeBalancer(context.TODO(), "linodelb", svc, configs)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	lbStatus := makeLoadBalancerStatus(nb)
 	svc.Status.LoadBalancer = *lbStatus
-	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "lnodelb", svc) }()
+	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc) }()
 	testcases := []struct {
 		name        string
 		service     *v1.Service
