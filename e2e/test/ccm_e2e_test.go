@@ -27,19 +27,19 @@ var _ = Describe("e2e tests", func() {
 	)
 
 	const (
-		annLinodeProxyProtocol        = "service.beta.kubernetes.io/linode-loadbalancer-proxy-protocol"
-		annLinodeDefaultProxyProtocol = "service.beta.kubernetes.io/linode-loadbalancer-default-proxy-protocol"
-		annLinodeDefaultProtocol      = "service.beta.kubernetes.io/linode-loadbalancer-default-protocol"
-		annLinodePortConfigPrefix     = "service.beta.kubernetes.io/linode-loadbalancer-port-"
-		annLinodeLoadBalancerPreserve = "service.beta.kubernetes.io/linode-loadbalancer-preserve"
-		annLinodeHealthCheckType      = "service.beta.kubernetes.io/linode-loadbalancer-check-type"
-		annLinodeCheckBody            = "service.beta.kubernetes.io/linode-loadbalancer-check-body"
-		annLinodeCheckPath            = "service.beta.kubernetes.io/linode-loadbalancer-check-path"
-		annLinodeHealthCheckInterval  = "service.beta.kubernetes.io/linode-loadbalancer-check-interval"
-		annLinodeHealthCheckTimeout   = "service.beta.kubernetes.io/linode-loadbalancer-check-timeout"
-		annLinodeHealthCheckAttempts  = "service.beta.kubernetes.io/linode-loadbalancer-check-attempts"
-		annLinodeHealthCheckPassive   = "service.beta.kubernetes.io/linode-loadbalancer-check-passive"
-		annLinodeNodeBalancerID       = "service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"
+		annLinodeProxyProtocolDeprecated = "service.beta.kubernetes.io/linode-loadbalancer-proxy-protocol"
+		annLinodeDefaultProxyProtocol    = "service.beta.kubernetes.io/linode-loadbalancer-default-proxy-protocol"
+		annLinodeDefaultProtocol         = "service.beta.kubernetes.io/linode-loadbalancer-default-protocol"
+		annLinodePortConfigPrefix        = "service.beta.kubernetes.io/linode-loadbalancer-port-"
+		annLinodeLoadBalancerPreserve    = "service.beta.kubernetes.io/linode-loadbalancer-preserve"
+		annLinodeHealthCheckType         = "service.beta.kubernetes.io/linode-loadbalancer-check-type"
+		annLinodeCheckBody               = "service.beta.kubernetes.io/linode-loadbalancer-check-body"
+		annLinodeCheckPath               = "service.beta.kubernetes.io/linode-loadbalancer-check-path"
+		annLinodeHealthCheckInterval     = "service.beta.kubernetes.io/linode-loadbalancer-check-interval"
+		annLinodeHealthCheckTimeout      = "service.beta.kubernetes.io/linode-loadbalancer-check-timeout"
+		annLinodeHealthCheckAttempts     = "service.beta.kubernetes.io/linode-loadbalancer-check-attempts"
+		annLinodeHealthCheckPassive      = "service.beta.kubernetes.io/linode-loadbalancer-check-passive"
+		annLinodeNodeBalancerID          = "service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"
 	)
 
 	BeforeEach(func() {
@@ -506,8 +506,8 @@ var _ = Describe("e2e tests", func() {
 				It("default annotations can be used to apply ProxyProtocol to all NodeBalancerConfigs", func() {
 					annotations := make(map[string]string)
 
-					By("By specifying ProxyProtocol v2 using the deprecated annotation " + annLinodeProxyProtocol)
-					annotations[annLinodeProxyProtocol] = proxyProtocolV2
+					By("By specifying ProxyProtocol v2 using the deprecated annotation " + annLinodeProxyProtocolDeprecated)
+					annotations[annLinodeProxyProtocolDeprecated] = proxyProtocolV2
 					updateServiceWithAnnotations(labels, annotations, servicePorts, false)
 
 					By("Checking NodeBalancerConfig for port 80 should have default ProxyProtocol v2")

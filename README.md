@@ -62,9 +62,7 @@ These annotations are deprecated, and will be removed in a future release.
 
 Annotation (Suffix) | Values | Default | Description | Scheduled Removal
 ---|---|---|---|---
-`protocol` | `tcp`, `http`, `https` | `tcp` | This annotation is used to specify the default protocol for Linode NodeBalancer. For ports specified in the `linode-loadbalancer-tls-ports` annotation, this protocol is overwritten to `https` | Q4 2020
 `proxy-protcol` | `none`, `v1`, `v2` | `none` | Specifies whether to use a version of Proxy Protocol on the underlying NodeBalancer | Q4 2021
-`tls` | json array (e.g. `[ { "tls-secret-name": "prod-app-tls", "port": 443}, {"tls-secret-name": "dev-app-tls", "port": 8443} ]`) | | Specifies TLS ports with their corresponding secrets, the secret type should be `kubernetes.io/tls | Q4 2020
 
 #### Annotation bool values
 
