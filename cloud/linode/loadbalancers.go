@@ -647,7 +647,7 @@ func getPortConfig(service *v1.Service, port int) (portConfig, error) {
 	proxyProtocol := portConfigAnnotation.ProxyProtocol
 	if proxyProtocol == "" {
 		var ok bool
-		for _, ann := range []string{annLinodeDefaultProxyProtocol, annLinodeProxyProtocol} {
+		for _, ann := range []string{annLinodeDefaultProxyProtocol, annLinodeProxyProtocolDeprecated} {
 			proxyProtocol, ok = service.Annotations[ann]
 			if ok {
 				break
@@ -688,13 +688,14 @@ func getHealthCheckType(service *v1.Service) (linodego.ConfigCheck, error) {
 }
 
 func getPortConfigAnnotation(service *v1.Service, port int) (portConfigAnnotation, error) {
+	annotation := portConfigAnnotation{}
 	annotationKey := annLinodePortConfigPrefix + strconv.Itoa(port)
 	annotationJSON, ok := service.Annotations[annotationKey]
+
 	if !ok {
-		return tryDeprecatedTLSAnnotation(service, port)
+		return annotation, nil
 	}
 
-	annotation := portConfigAnnotation{}
 	err := json.Unmarshal([]byte(annotationJSON), &annotation)
 	if err != nil {
 		return annotation, err
