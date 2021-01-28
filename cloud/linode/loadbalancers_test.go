@@ -310,9 +310,9 @@ func testUpdateLoadBalancerAddAnnotation(t *testing.T, client *linodego.Client, 
 		t.Errorf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
 	}
 
-	nb, err := lb.getNodeBalancerByIPv4(context.TODO(), svc, lbStatus.Ingress[0].IP)
+	nb, err := lb.getNodeBalancerByStatus(context.TODO(), svc)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("failed to get NodeBalancer via status: %s", err)
 	}
 
 	if nb.ClientConnThrottle != 10 {
