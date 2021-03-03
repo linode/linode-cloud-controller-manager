@@ -14,24 +14,32 @@ func (i *lbInvocation) GetHTTPEndpoints() ([]string, error) {
 	return i.getLoadBalancerURLs()
 }
 
-func (i *lbInvocation) GetNodeBalancerID(svcName string) (int, error) {
+func (i *lbInvocation) GetNodeBalancer(svcName string) (*linodego.NodeBalancer, error) {
 	hostname, err := i.waitForLoadBalancerHostname(svcName)
 	if err != nil {
-		return -1, err
+		return nil, err
 	}
 
 	nbList, errListNodeBalancers := i.linodeClient.ListNodeBalancers(context.Background(), nil)
 
 	if errListNodeBalancers != nil {
-		return -1, errListNodeBalancers
+		return nil, errListNodeBalancers
 	}
 
 	for _, nb := range nbList {
 		if *nb.Hostname == hostname {
-			return nb.ID, nil
+			return &nb, nil
 		}
 	}
-	return -1, fmt.Errorf("no NodeBalancer Found for service %v", svcName)
+	return nil, fmt.Errorf("no NodeBalancer Found for service %v", svcName)
+}
+
+func (i *lbInvocation) GetNodeBalancerID(svcName string) (int, error) {
+	nb, err := i.GetNodeBalancer(svcName)
+	if err != nil {
+		return -1, err
+	}
+	return nb.ID, nil
 }
 
 func (i *lbInvocation) WaitForNodeBalancerReady(svcName string, expectedID int) error {
