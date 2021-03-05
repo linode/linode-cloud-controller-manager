@@ -40,6 +40,7 @@ var _ = Describe("e2e tests", func() {
 		annLinodeHealthCheckAttempts     = "service.beta.kubernetes.io/linode-loadbalancer-check-attempts"
 		annLinodeHealthCheckPassive      = "service.beta.kubernetes.io/linode-loadbalancer-check-passive"
 		annLinodeNodeBalancerID          = "service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"
+		annLinodeHostnameOnlyIngress     = "service.beta.kubernetes.io/linode-loadbalancer-hostname-only-ingress"
 	)
 
 	BeforeEach(func() {
@@ -172,6 +173,26 @@ var _ = Describe("e2e tests", func() {
 	var checkNodeBalancerID = func(service string, expectedID int) {
 		err := f.LoadBalancer.WaitForNodeBalancerReady(service, expectedID)
 		Expect(err).NotTo(HaveOccurred())
+	}
+
+	var checkLBStatus = func(service string, hasIP bool) {
+		Eventually(func() bool {
+			nb, err := f.LoadBalancer.GetNodeBalancer(service)
+			Expect(err).NotTo(HaveOccurred())
+
+			svc, err := f.LoadBalancer.GetServiceWithLoadBalancerStatus(service, f.LoadBalancer.Namespace())
+			Expect(err).NotTo(HaveOccurred())
+
+			ingress := svc.Status.LoadBalancer.Ingress[0]
+			Expect(nb.Hostname).ToNot(BeNil())
+			Expect(ingress.Hostname).Should(Equal(*nb.Hostname))
+
+			if hasIP {
+				return nb.IPv4 != nil && ingress.IP == *nb.IPv4
+			} else {
+				return ingress.IP == ""
+			}
+		}).Should(BeTrue())
 	}
 
 	var checkNodeBalancerConfigForPort = func(port int, args checkArgs) {
@@ -403,6 +424,72 @@ var _ = Describe("e2e tests", func() {
 					By("Waiting for Response from the LoadBalancer url: " + eps[0])
 					err = framework.WaitForHTTPSResponse(eps[0], pods[0])
 					Expect(err).NotTo(HaveOccurred())
+				})
+			})
+
+			Context("With Hostname only ingress", func() {
+				var (
+					pods         []string
+					labels       map[string]string
+					servicePorts []core.ServicePort
+
+					annotations = map[string]string{}
+				)
+
+				BeforeEach(func() {
+					pods = []string{"test-pod-1"}
+					ports := []core.ContainerPort{
+						{
+							Name:          "http-1",
+							ContainerPort: 80,
+						},
+					}
+					servicePorts = []core.ServicePort{
+						{
+							Name:       "http-1",
+							Port:       80,
+							TargetPort: intstr.FromInt(80),
+							Protocol:   "TCP",
+						},
+					}
+
+					labels = map[string]string{
+						"app": "test-loadbalancer-with-hostname-only-ingress",
+					}
+
+					By("Creating Pod")
+					createPodWithLabel(pods, ports, framework.TestServerImage, labels, false)
+
+					By("Creating Service")
+					createServiceWithAnnotations(labels, map[string]string{}, servicePorts, false)
+				})
+
+				AfterEach(func() {
+					By("Deleting the Pods")
+					deletePods(pods)
+
+					By("Deleting the Service")
+					deleteService()
+				})
+
+				It("can update service to only use Hostname in ingress", func() {
+					By("Checking LB Status has IP")
+					checkLBStatus(framework.TestServerResourceName, true)
+
+					By("Annotating service with " + annLinodeHostnameOnlyIngress)
+					updateServiceWithAnnotations(labels, map[string]string{
+						annLinodeHostnameOnlyIngress: "true",
+					}, servicePorts, false)
+
+					By("Checking LB Status does not have IP")
+					checkLBStatus(framework.TestServerResourceName, false)
+				})
+
+				annotations[annLinodeHostnameOnlyIngress] = "true"
+
+				It("can create a service that only uses Hostname in ingress", func() {
+					By("Creating a service annotated with " + annLinodeHostnameOnlyIngress)
+					checkLBStatus(framework.TestServerResourceName, true)
 				})
 			})
 

@@ -162,6 +162,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 			name: "getNodeBalancerForService - NodeBalancerID does not exist",
 			f:    testGetNodeBalancerForServiceIDDoesNotExist,
 		},
+		{
+			name: "makeLoadBalancerStatus",
+			f:    testMakeLoadBalancerStatus,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -571,7 +575,7 @@ func testUpdateLoadBalancerAddProxyProtocol(t *testing.T, client *linodego.Clien
 				t.Fatalf("failed to create NodeBalancer: %s", err)
 			}
 
-			svc.Status.LoadBalancer = *makeLoadBalancerStatus(nodeBalancer)
+			svc.Status.LoadBalancer = *makeLoadBalancerStatus(svc, nodeBalancer)
 			svc.ObjectMeta.SetAnnotations(map[string]string{
 				annLinodeDefaultProxyProtocol: string(tc.proxyProtocolConfig),
 			})
@@ -649,7 +653,7 @@ func testUpdateLoadBalancerAddNodeBalancerID(t *testing.T, client *linodego.Clie
 		t.Fatalf("failed to create NodeBalancer: %s", err)
 	}
 
-	svc.Status.LoadBalancer = *makeLoadBalancerStatus(nodeBalancer)
+	svc.Status.LoadBalancer = *makeLoadBalancerStatus(svc, nodeBalancer)
 
 	newNodeBalancer, err := client.CreateNodeBalancer(context.TODO(), linodego.NodeBalancerCreateOptions{
 		Region: lb.zone,
@@ -672,7 +676,7 @@ func testUpdateLoadBalancerAddNodeBalancerID(t *testing.T, client *linodego.Clie
 		t.Errorf("GetLoadBalancer returned an error: %s", err)
 	}
 
-	expectedLBStatus := makeLoadBalancerStatus(newNodeBalancer)
+	expectedLBStatus := makeLoadBalancerStatus(svc, newNodeBalancer)
 	if !reflect.DeepEqual(expectedLBStatus, lbStatus) {
 		t.Errorf("LoadBalancer status mismatch: expected %v, got %v", expectedLBStatus, lbStatus)
 	}
@@ -1185,7 +1189,7 @@ func testEnsureLoadBalancerPreserveAnnotation(t *testing.T, client *linodego.Cli
 				t.Fatal(err)
 			}
 
-			svc.Status.LoadBalancer = *makeLoadBalancerStatus(nb)
+			svc.Status.LoadBalancer = *makeLoadBalancerStatus(svc, nb)
 			err = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
 
 			didDelete := fake.didRequestOccur(http.MethodDelete, fmt.Sprintf("/nodebalancers/%d", nb.ID), "")
@@ -1318,7 +1322,7 @@ func testEnsureExistingLoadBalancer(t *testing.T, client *linodego.Client, _ *fa
 		t.Fatal(err)
 	}
 
-	svc.Status.LoadBalancer = *makeLoadBalancerStatus(nb)
+	svc.Status.LoadBalancer = *makeLoadBalancerStatus(svc, nb)
 	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc) }()
 	getLBStatus, exists, err := lb.GetLoadBalancer(context.TODO(), "linodelb", svc)
 	if err != nil {
@@ -1403,6 +1407,40 @@ func testEnsureExistingLoadBalancer(t *testing.T, client *linodego.Client, _ *fa
 				t.Logf("actual: %v", err)
 			}
 		})
+	}
+}
+
+func testMakeLoadBalancerStatus(t *testing.T, client *linodego.Client, _ *fakeAPI) {
+	ipv4 := "192.168.0.1"
+	hostname := "nb-192-168-0-1.newark.nodebalancer.linode.com"
+	nb := &linodego.NodeBalancer{
+		IPv4:     &ipv4,
+		Hostname: &hostname,
+	}
+
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test",
+			Annotations: make(map[string]string, 1),
+		},
+	}
+
+	expectedStatus := &v1.LoadBalancerStatus{
+		Ingress: []v1.LoadBalancerIngress{{
+			Hostname: hostname,
+			IP:       ipv4,
+		}},
+	}
+	status := makeLoadBalancerStatus(svc, nb)
+	if !reflect.DeepEqual(status, expectedStatus) {
+		t.Errorf("expected status for basic service to be %#v; got %#v", expectedStatus, status)
+	}
+
+	svc.Annotations[annLinodeHostnameOnlyIngress] = "true"
+	expectedStatus.Ingress[0] = v1.LoadBalancerIngress{Hostname: hostname}
+	status = makeLoadBalancerStatus(svc, nb)
+	if !reflect.DeepEqual(status, expectedStatus) {
+		t.Errorf("expected status for %q annotated service to be %#v; got %#v", annLinodeHostnameOnlyIngress, expectedStatus, status)
 	}
 }
 
@@ -1579,7 +1617,7 @@ func testGetLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	}
 	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc) }()
 
-	lbStatus := makeLoadBalancerStatus(nb)
+	lbStatus := makeLoadBalancerStatus(svc, nb)
 	svc.Status.LoadBalancer = *lbStatus
 
 	testcases := []struct {

@@ -44,6 +44,8 @@ const (
 
 	annLinodeLoadBalancerPreserve = "service.beta.kubernetes.io/linode-loadbalancer-preserve"
 	annLinodeNodeBalancerID       = "service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"
+
+	annLinodeHostnameOnlyIngress = "service.beta.kubernetes.io/linode-loadbalancer-hostname-only-ingress"
 )
 
 type lbNotFoundError struct {
@@ -122,11 +124,11 @@ func (l *loadbalancers) getLatestServiceLoadBalancerStatus(ctx context.Context, 
 // most recent LoadBalancer status.
 func (l *loadbalancers) getNodeBalancerByStatus(ctx context.Context, service *v1.Service) (nb *linodego.NodeBalancer, err error) {
 	for _, ingress := range service.Status.LoadBalancer.Ingress {
-		if ingress.Hostname != "" {
-			return l.getNodeBalancerByHostname(ctx, service, ingress.Hostname)
-		}
 		if ingress.IP != "" {
 			return l.getNodeBalancerByIPv4(ctx, service, ingress.IP)
+		}
+		if ingress.Hostname != "" {
+			return l.getNodeBalancerByHostname(ctx, service, ingress.Hostname)
 		}
 	}
 	return nil, lbNotFoundError{serviceNn: getServiceNn(service)}
@@ -195,7 +197,7 @@ func (l *loadbalancers) GetLoadBalancer(ctx context.Context, clusterName string,
 		return nil, false, err
 	}
 
-	return makeLoadBalancerStatus(nb), true, nil
+	return makeLoadBalancerStatus(service, nb), true, nil
 }
 
 // EnsureLoadBalancer ensures that the cluster is running a load balancer for
@@ -231,7 +233,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	}
 
 	klog.Infof("NodeBalancer (%d) has been ensured for service (%s)", nb.ID, serviceNn)
-	lbStatus = makeLoadBalancerStatus(nb)
+	lbStatus = makeLoadBalancerStatus(service, nb)
 
 	if !l.shouldPreserveNodeBalancer(service) {
 		if err := l.cleanupOldNodeBalancer(ctx, service); err != nil {
@@ -383,12 +385,7 @@ func (l *loadbalancers) deleteUnusedConfigs(ctx context.Context, nbConfigs []lin
 // shouldPreserveNodeBalancer determines whether a NodeBalancer should be deleted based on the
 // service's preserve annotation.
 func (l *loadbalancers) shouldPreserveNodeBalancer(service *v1.Service) bool {
-	preserveRaw, ok := getServiceAnnotation(service, annLinodeLoadBalancerPreserve)
-	if !ok {
-		return false
-	}
-	preserve, err := strconv.ParseBool(preserveRaw)
-	return err == nil && preserve
+	return getServiceBoolAnnotation(service, annLinodeLoadBalancerPreserve)
 }
 
 // EnsureLoadBalancerDeleted deletes the specified loadbalancer if it exists.
@@ -769,11 +766,16 @@ func getConnectionThrottle(service *v1.Service) int {
 	return connThrottle
 }
 
-func makeLoadBalancerStatus(nb *linodego.NodeBalancer) *v1.LoadBalancerStatus {
+func makeLoadBalancerStatus(service *v1.Service, nb *linodego.NodeBalancer) *v1.LoadBalancerStatus {
+	ingress := v1.LoadBalancerIngress{
+		Hostname: *nb.Hostname,
+	}
+	if !getServiceBoolAnnotation(service, annLinodeHostnameOnlyIngress) {
+		ingress.IP = *nb.IPv4
+	}
+
 	return &v1.LoadBalancerStatus{
-		Ingress: []v1.LoadBalancerIngress{{
-			Hostname: *nb.Hostname,
-		}},
+		Ingress: []v1.LoadBalancerIngress{ingress},
 	}
 }
 
@@ -788,4 +790,13 @@ func getServiceAnnotation(service *v1.Service, name string) (string, bool) {
 	}
 	val, ok := service.Annotations[name]
 	return val, ok
+}
+
+func getServiceBoolAnnotation(service *v1.Service, name string) bool {
+	value, ok := getServiceAnnotation(service, name)
+	if !ok {
+		return false
+	}
+	boolValue, err := strconv.ParseBool(value)
+	return err == nil && boolValue
 }
