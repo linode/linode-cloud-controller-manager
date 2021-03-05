@@ -124,11 +124,11 @@ func (l *loadbalancers) getLatestServiceLoadBalancerStatus(ctx context.Context, 
 // most recent LoadBalancer status.
 func (l *loadbalancers) getNodeBalancerByStatus(ctx context.Context, service *v1.Service) (nb *linodego.NodeBalancer, err error) {
 	for _, ingress := range service.Status.LoadBalancer.Ingress {
-		if ingress.Hostname != "" {
-			return l.getNodeBalancerByHostname(ctx, service, ingress.Hostname)
-		}
 		if ingress.IP != "" {
 			return l.getNodeBalancerByIPv4(ctx, service, ingress.IP)
+		}
+		if ingress.Hostname != "" {
+			return l.getNodeBalancerByHostname(ctx, service, ingress.Hostname)
 		}
 	}
 	return nil, lbNotFoundError{serviceNn: getServiceNn(service)}
