@@ -1,0 +1,22 @@
+name: Test
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v2
+      - name: lint
+        run: |
+          make vet
+          docker run --rm -v $(pwd):/var/work:ro -w /var/work golangci/golangci-lint:v1.27.0 golangci-lint run -v --timeout=5m
+      - name: smoke test
+        run: make docker-build
+      - name: unit test
+        run: make test
