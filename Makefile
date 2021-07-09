@@ -16,6 +16,12 @@ $(GOPATH)/bin/goimports:
 $(GOPATH)/bin/ginkgo:
 	GO111MODULE=off go get -u github.com/onsi/ginkgo/ginkgo
 
+.PHONY: tools
+tools:
+	GO111MODULE=off go get github.com/lawrencewoodman/roveralls
+	GO111MODULE=off go get github.com/mattn/goveralls
+	wget -O - -q https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $GOPATH/bin v1.27.0
+
 .PHONY: vet
 # lint the codebase
 vet:

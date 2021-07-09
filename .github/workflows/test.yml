@@ -1,0 +1,23 @@
+name: Test
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: golang:1.15.12
+      env:
+        GOPATH: /__w/woodpecker/go/
+    steps:
+    - uses: actions/checkout@v2
+    - run: make tools
+    - name: Lint
+      run: golangci-lint run
+    - name: Smoke test
+      run: make && make docker-build
+    - name: Run unit tests
+      run: make test
+    - name: Update coverage
+      env:
+        COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: sleep 20 && roveralls -ignore e2e && goveralls -coverprofile=roveralls.coverprofile -service=github
