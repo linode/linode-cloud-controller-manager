@@ -34,6 +34,12 @@ Tips for a faster merge:
  * make sure your commits are atomic, [addressing one change per commit](https://chris.beams.io/posts/git-commit/). 
  * add tests!
 
+## Cutting Releases
+
+Everytime a commit is merged into master, a new patch release is [automatically drafted](https://github.com/linode/linode-cloud-controller-manager/actions/workflows/release-drafter.yml) with a changelog. You can modify (tag name, changelog, title, etc.) and publish the release via the [releases page](https://github.com/linode/linode-cloud-controller-manager/releases).
+
+When a release is published, the [release workflow](https://github.com/linode/linode-cloud-controller-manager/actions/workflows/docker-hub.yml) builds and pushes the docker image to Dockerhub.
+
 ## Code of Conduct
 
 This project follows the [Linode Community Code of Conduct](https://www.linode.com/community/questions/conduct). 
