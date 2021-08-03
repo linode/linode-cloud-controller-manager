@@ -15,15 +15,44 @@ metadata:
   name: ccm-linode
   namespace: kube-system
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ccm-linode-clusterrole
+rules:
+- apiGroups: [""]
+  resources: ["endpoints"]
+  verbs: ["get", "watch", "list", "update", "create"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "watch", "list", "update", "delete", "patch"]
+- apiGroups: [""]
+  resources: ["nodes/status"]
+  verbs: ["get", "watch", "list", "update", "delete", "patch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["get", "watch", "list", "update", "create", "patch"]
+- apiGroups: [""]
+  resources: ["persistentvolumes"]
+  verbs: ["get", "watch", "list", "update"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "watch", "list"]
+- apiGroups: [""]
+  resources: ["services/status"]
+  verbs: ["get", "watch", "list", "update", "patch"]
+---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: system:ccm-linode
+  name: ccm-linode-clusterrolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  # TODO: make these permissions more fine-grained
-  name: cluster-admin
+  name: ccm-linode-clusterrole
 subjects:
 - kind: ServiceAccount
   name: ccm-linode
