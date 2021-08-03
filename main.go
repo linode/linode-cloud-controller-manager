@@ -69,6 +69,28 @@ func main() {
 	// Add Linode-specific flags
 	command.Flags().BoolVar(&linode.Options.LinodeGoDebug, "linodego-debug", false, "enables debug output for the LinodeAPI wrapper")
 
+	// Set static flags
+	command.Flags().VisitAll(func(fl *pflag.Flag) {
+		var err error
+		switch fl.Name {
+		case "cloud-provider":
+			err = fl.Value.Set(linode.ProviderName)
+		case
+			// Prevent reaching out to an authentication-related ConfigMap that
+			// we do not need, and thus do not intend to create RBAC permissions
+			// for. See also
+			// https://github.com/linode/linode-cloud-controller-manager/issues/91
+			// and https://github.com/kubernetes/cloud-provider/issues/29.
+			"authentication-skip-lookup":
+			err = fl.Value.Set("true")
+		}
+
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to set flag %q: %s\n", fl.Name, err)
+			os.Exit(1)
+		}
+	})
+
 	// Make the Linode-specific CCM bits aware of the kubeconfig flag
 	linode.Options.KubeconfigFlag = command.Flags().Lookup("kubeconfig")
 	if linode.Options.KubeconfigFlag == nil {
