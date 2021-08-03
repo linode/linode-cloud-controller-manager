@@ -101,7 +101,6 @@ spec:
           imagePullPolicy: Always
           name: ccm-linode
           args:
-          - --cloud-provider=linode
           - --leader-elect-resource-lock=endpoints
           - --v=3
           - --port=0
