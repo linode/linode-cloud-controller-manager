@@ -68,7 +68,6 @@ run: build
 	dist/linode-cloud-controller-manager \
 		--logtostderr=true \
 		--stderrthreshold=INFO \
-		--cloud-provider=linode \
 		--kubeconfig=${KUBECONFIG}
 
 .PHONY: run-debug
@@ -77,7 +76,6 @@ run-debug: build
 	dist/linode-cloud-controller-manager \
 		--logtostderr=true \
 		--stderrthreshold=INFO \
-		--cloud-provider=linode \
 		--kubeconfig=${KUBECONFIG} \
 		--linodego-debug
 
