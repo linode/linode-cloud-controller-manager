@@ -3,17 +3,16 @@ package linode
 import (
 	"context"
 
-	"github.com/linode/linodego"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 )
 
 type zones struct {
-	client *linodego.Client
+	client LinodeClient
 	region string
 }
 
-func newZones(client *linodego.Client, zone string) cloudprovider.Zones {
+func newZones(client LinodeClient, zone string) cloudprovider.Zones {
 	return zones{client, zone}
 }
 
@@ -22,7 +21,7 @@ func (z zones) GetZone(_ context.Context) (cloudprovider.Zone, error) {
 }
 
 func (z zones) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
-	id, err := linodeIDFromProviderID(providerID)
+	id, err := parseProviderID(providerID)
 	if err != nil {
 		return cloudprovider.Zone{}, err
 	}
