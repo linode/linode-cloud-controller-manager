@@ -5,10 +5,12 @@ go 1.15
 require (
 	github.com/appscode/go v0.0.0-20200323182826-54e98e09185a
 	github.com/getsentry/sentry-go v0.4.0
+	github.com/golang/mock v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.1.0 // indirect
 	github.com/linode/linodego v0.21.1
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/pflag v1.0.5
+	github.com/stretchr/testify v1.7.0
 	go.uber.org/zap v1.13.0 // indirect
 	k8s.io/api v0.19.2
 	k8s.io/apimachinery v0.19.2
