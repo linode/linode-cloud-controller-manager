@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/linode/linodego"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -21,6 +22,16 @@ func TestInstanceExistsByProviderID(t *testing.T) {
 
 	client := NewMockLinodeClient(ctrl)
 	instances := newInstances(client)
+
+	t.Run("should propagate generic api error", func(t *testing.T) {
+		providerID := providerIDPrefix + "123"
+		expectedErr := errors.New("some error")
+		client.EXPECT().GetInstance(gomock.Any(), 123).Times(1).Return(nil, expectedErr)
+
+		exists, err := instances.InstanceExistsByProviderID(ctx, providerID)
+		assert.ErrorIs(t, err, expectedErr)
+		assert.False(t, exists)
+	})
 
 	t.Run("should return false if linode does not exist", func(t *testing.T) {
 		providerID := providerIDPrefix + "123"

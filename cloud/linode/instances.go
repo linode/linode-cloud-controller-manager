@@ -3,6 +3,7 @@ package linode
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strconv"
 
 	"github.com/linode/linode-cloud-controller-manager/sentry"
@@ -163,13 +164,15 @@ func (i *instances) InstanceExistsByProviderID(ctx context.Context, providerID s
 	sentry.SetTag(ctx, "linode_id", strconv.Itoa(id))
 
 	_, err = linodeByID(ctx, i.client, id)
-	if err == nil {
-		return true, nil
+	if err != nil {
+		if apiError, ok := err.(*linodego.Error); ok && apiError.Code == http.StatusNotFound {
+			return false, nil
+		}
+		sentry.CaptureError(ctx, err)
+		return false, err
 	}
 
-	sentry.CaptureError(ctx, err)
-
-	return false, nil
+	return true, nil
 }
 
 func (i *instances) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
