@@ -16,6 +16,10 @@ $(GOPATH)/bin/goimports:
 $(GOPATH)/bin/ginkgo:
 	GO111MODULE=off go get -u github.com/onsi/ginkgo/ginkgo
 
+.PHONY: codegen
+codegen:
+	go generate ./...
+
 .PHONY: vet
 # lint the codebase
 vet:
@@ -29,18 +33,18 @@ fmt: vet $(GOPATH)/bin/goimports
 
 .PHONY: test
 # we say code is not worth testing unless it's formatted
-test: $(GOPATH)/bin/ginkgo fmt
+test: $(GOPATH)/bin/ginkgo fmt codegen
 	ginkgo -r --v --progress --trace --cover --skipPackage=test $(TEST_ARGS)
 
 .PHONY: build-linux
-build-linux:
+build-linux: codegen
 	echo "cross compiling linode-cloud-controller-manager for linux/amd64" && \
 		GOOS=linux GOARCH=amd64 \
 		CGO_ENABLED=0 \
 		go build -o dist/linode-cloud-controller-manager-linux-amd64 .
 
 .PHONY: build
-build:
+build: codegen
 	echo "compiling linode-cloud-controller-manager" && \
 		CGO_ENABLED=0 \
 		go build -o dist/linode-cloud-controller-manager .

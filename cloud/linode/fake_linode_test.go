@@ -18,12 +18,10 @@ import (
 )
 
 type fakeAPI struct {
-	t        *testing.T
-	instance *linodego.Instance
-	ips      []*linodego.InstanceIP
-	nb       map[string]*linodego.NodeBalancer
-	nbc      map[string]*linodego.NodeBalancerConfig
-	nbn      map[string]*linodego.NodeBalancerNode
+	t   *testing.T
+	nb  map[string]*linodego.NodeBalancer
+	nbc map[string]*linodego.NodeBalancerConfig
+	nbn map[string]*linodego.NodeBalancerNode
 
 	requests map[fakeRequest]struct{}
 }
@@ -40,42 +38,8 @@ type filterStruct struct {
 }
 
 func newFake(t *testing.T) *fakeAPI {
-	publicIP := net.ParseIP("45.79.101.25")
-	privateIP := net.ParseIP("192.168.133.65")
-	instanceName := "test-instance"
-	region := "us-east"
 	return &fakeAPI{
-		t: t,
-		instance: &linodego.Instance{
-			Label:      instanceName,
-			Region:     region,
-			Image:      "linode/ubuntu16.04lts",
-			Type:       "g6-standard-2",
-			Group:      "Linode-Group",
-			ID:         123,
-			Status:     "running",
-			Hypervisor: "kvm",
-			IPv4: []*net.IP{
-				&publicIP,
-				&privateIP,
-			},
-		},
-		ips: []*linodego.InstanceIP{
-			{
-				Address:  publicIP.String(),
-				Public:   true,
-				LinodeID: 123,
-				Type:     "ipv4",
-				Region:   region,
-			},
-			{
-				Address:  privateIP.String(),
-				Public:   false,
-				LinodeID: 123,
-				Type:     "ipv4",
-				Region:   region,
-			},
-		},
+		t:        t,
 		nb:       make(map[string]*linodego.NodeBalancer),
 		nbc:      make(map[string]*linodego.NodeBalancerConfig),
 		nbn:      make(map[string]*linodego.NodeBalancerNode),
@@ -112,62 +76,6 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		whichAPI := strings.Split(urlPath[1:], "/")
 		switch whichAPI[0] {
-		case "linode":
-			switch whichAPI[1] {
-			case "instances":
-				rx, _ := regexp.Compile("/linode/instances/[0-9]+/ips")
-				if rx.MatchString(urlPath) {
-					resp := linodego.InstanceIPAddressResponse{
-						IPv4: &linodego.InstanceIPv4Response{
-							Public:  []*linodego.InstanceIP{f.ips[0]},
-							Private: []*linodego.InstanceIP{f.ips[1]},
-						},
-					}
-					rr, _ := json.Marshal(resp)
-					_, _ = w.Write(rr)
-					return
-				}
-
-				rx, _ = regexp.Compile("/linode/instances/[0-9]+")
-				if rx.MatchString(urlPath) {
-					id := filepath.Base(urlPath)
-					if id == strconv.Itoa(f.instance.ID) {
-						rr, _ := json.Marshal(&f.instance)
-						_, _ = w.Write(rr)
-					}
-					return
-				}
-
-				rx, _ = regexp.Compile("/linode/instances")
-				if rx.MatchString(urlPath) {
-					res := 0
-					data := []linodego.Instance{}
-					filter := r.Header.Get("X-Filter")
-					if filter == "" {
-						data = append(data, *f.instance)
-					} else {
-						var fs filterStruct
-						err := json.Unmarshal([]byte(filter), &fs)
-						if err != nil {
-							f.t.Fatal(err)
-						}
-						if fs.Label == f.instance.Label {
-							data = append(data, *f.instance)
-						}
-					}
-					resp := linodego.InstancesPagedResponse{
-						PageOptions: &linodego.PageOptions{
-							Page:    1,
-							Pages:   1,
-							Results: res,
-						},
-						Data: data,
-					}
-					rr, _ := json.Marshal(resp)
-					_, _ = w.Write(rr)
-					return
-				}
-			}
 		case "nodebalancers":
 			rx, _ := regexp.Compile("/nodebalancers/[0-9]+/configs/[0-9]+/nodes/[0-9]+")
 			if rx.MatchString(urlPath) {

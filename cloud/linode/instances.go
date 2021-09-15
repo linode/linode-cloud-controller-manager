@@ -2,26 +2,31 @@ package linode
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"net/http"
 	"strconv"
-	"strings"
 
-	"github.com/linode/linode-cloud-controller-manager/cloud"
 	"github.com/linode/linode-cloud-controller-manager/sentry"
 	"github.com/linode/linodego"
-	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 )
 
 type instances struct {
-	client *linodego.Client
+	client LinodeClient
 }
 
-func newInstances(client *linodego.Client) cloudprovider.Instances {
+func newInstances(client LinodeClient) cloudprovider.Instances {
 	return &instances{client}
+}
+
+type instanceNoIPAddressesError struct {
+	id int
+}
+
+func (e instanceNoIPAddressesError) Error() string {
+	return fmt.Sprintf("instance %d has no IP addresses", e.id)
 }
 
 func (i *instances) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error) {
@@ -47,7 +52,7 @@ func (i *instances) NodeAddressesByProviderID(ctx context.Context, providerID st
 	ctx = sentry.SetHubOnContext(ctx)
 	sentry.SetTag(ctx, "provider_id", providerID)
 
-	id, err := linodeIDFromProviderID(providerID)
+	id, err := parseProviderID(providerID)
 	if err != nil {
 		sentry.CaptureError(ctx, err)
 		return nil, err
@@ -78,7 +83,7 @@ func (i *instances) nodeAddresses(ctx context.Context, linode *linodego.Instance
 	}
 
 	if (len(ips.IPv4.Public) == 0) && (len(ips.IPv4.Private) == 0) {
-		return nil, fmt.Errorf("instance has no IP addresses")
+		return nil, instanceNoIPAddressesError{linode.ID}
 	}
 
 	if len(ips.IPv4.Public) > 0 {
@@ -122,13 +127,13 @@ func (i *instances) InstanceTypeByProviderID(ctx context.Context, providerID str
 	ctx = sentry.SetHubOnContext(ctx)
 	sentry.SetTag(ctx, "provider_id", providerID)
 
-	id, err := linodeIDFromProviderID(providerID)
+	id, err := parseProviderID(providerID)
 	if err != nil {
 		sentry.CaptureError(ctx, err)
 		return "", err
 	}
 
-	sentry.SetTag(ctx, "linode_id", id)
+	sentry.SetTag(ctx, "linode_id", strconv.Itoa(id))
 
 	linode, err := linodeByID(ctx, i.client, id)
 	if err != nil {
@@ -139,7 +144,7 @@ func (i *instances) InstanceTypeByProviderID(ctx context.Context, providerID str
 }
 
 func (i *instances) AddSSHKeyToAllInstances(_ context.Context, user string, keyData []byte) error {
-	return cloud.ErrNotImplemented
+	return cloudprovider.NotImplemented
 }
 
 func (i *instances) CurrentNodeName(_ context.Context, hostname string) (types.NodeName, error) {
@@ -150,81 +155,26 @@ func (i *instances) InstanceExistsByProviderID(ctx context.Context, providerID s
 	ctx = sentry.SetHubOnContext(ctx)
 	sentry.SetTag(ctx, "provider_id", providerID)
 
-	id, err := linodeIDFromProviderID(providerID)
+	id, err := parseProviderID(providerID)
 	if err != nil {
 		sentry.CaptureError(ctx, err)
 		return false, err
 	}
 
-	sentry.SetTag(ctx, "linode_id", id)
+	sentry.SetTag(ctx, "linode_id", strconv.Itoa(id))
 
 	_, err = linodeByID(ctx, i.client, id)
-	if err == nil {
-		return true, nil
+	if err != nil {
+		if apiError, ok := err.(*linodego.Error); ok && apiError.Code == http.StatusNotFound {
+			return false, nil
+		}
+		sentry.CaptureError(ctx, err)
+		return false, err
 	}
 
-	sentry.CaptureError(ctx, err)
-
-	return false, nil
+	return true, nil
 }
 
 func (i *instances) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
 	return false, cloudprovider.NotImplemented
-}
-
-func linodeByID(ctx context.Context, client *linodego.Client, id string) (*linodego.Instance, error) {
-	linodeID, err := strconv.Atoi(id)
-	if err != nil {
-		return nil, err
-	}
-
-	instance, err := client.GetInstance(ctx, linodeID)
-	if err != nil {
-		return nil, err
-	}
-	if instance == nil {
-		return nil, fmt.Errorf("linode not found with id %v", linodeID)
-	}
-	return instance, nil
-}
-
-func linodeByName(ctx context.Context, client *linodego.Client, nodeName types.NodeName) (*linodego.Instance, error) {
-	jsonFilter, err := json.Marshal(map[string]string{"label": string(nodeName)})
-	if err != nil {
-		return nil, err
-	}
-
-	linodes, err := client.ListInstances(ctx, linodego.NewListOptions(0, string(jsonFilter)))
-	if err != nil {
-		return nil, err
-	}
-
-	if len(linodes) == 0 {
-		return nil, cloudprovider.InstanceNotFound
-	} else if len(linodes) > 1 {
-		return nil, errors.New(fmt.Sprintf("Multiple instances found with name %v", nodeName))
-	}
-
-	return &linodes[0], nil
-}
-
-// serverIDFromProviderID returns a Linode ID from a providerID.
-//
-// The providerID can be seen on the Kubernetes Node object. The expected
-// format is: linode://linodeID
-func linodeIDFromProviderID(providerID string) (string, error) {
-	if providerID == "" {
-		return "", errors.New("providerID cannot be empty string")
-	}
-
-	split := strings.Split(providerID, "://")
-	if len(split) != 2 {
-		return "", fmt.Errorf("unexpected providerID format: %s, format should be: linode://12345", providerID)
-	}
-
-	if split[0] != ProviderName {
-		return "", fmt.Errorf("provider scheme from providerID should be 'linode://', %s", providerID)
-	}
-
-	return split[1], nil
 }
