@@ -1,7 +1,7 @@
 # Kubernetes Cloud Controller Manager for Linode
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/linode/linode-cloud-controller-manager)](https://goreportcard.com/report/github.com/linode/linode-cloud-controller-manager)
-[![Build Status](https://travis-ci.com/linode/linode-cloud-controller-manager.svg?branch=master)](https://travis-ci.com/linode/linode-cloud-controller-manager)
+[![Test](https://github.com/linode/linode-cloud-controller-manager/actions/workflows/test.yml/badge.svg)](https://github.com/linode/linode-cloud-controller-manager/actions/workflows/test.yml)
 [![Coverage Status](https://coveralls.io/repos/github/linode/linode-cloud-controller-manager/badge.svg?branch=master)](https://coveralls.io/github/linode/linode-cloud-controller-manager?branch=master)
 [![Docker Pulls](https://img.shields.io/docker/pulls/linode/linode-cloud-controller-manager.svg)](https://hub.docker.com/r/linode/linode-cloud-controller-manager/)
 <!-- [![Slack](http://slack.kubernetes.io/badge.svg)](http://slack.kubernetes.io/#linode) -->
