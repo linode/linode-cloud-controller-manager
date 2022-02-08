@@ -10,12 +10,6 @@ clean:
 	go clean .
 	rm -r dist/*
 
-$(GOPATH)/bin/goimports:
-	GO111MODULE=off go get golang.org/x/tools/cmd/goimports
-
-$(GOPATH)/bin/ginkgo:
-	GO111MODULE=off go get -u github.com/onsi/ginkgo/ginkgo
-
 .PHONY: codegen
 codegen:
 	go generate ./...
@@ -37,8 +31,8 @@ fmt: vet $(GOPATH)/bin/goimports
 
 .PHONY: test
 # we say code is not worth testing unless it's formatted
-test: $(GOPATH)/bin/ginkgo fmt codegen
-	ginkgo -r --v --progress --trace --cover --skipPackage=test $(TEST_ARGS)
+test: fmt codegen
+	go test -v -cover ./cloud/... $(TEST_ARGS)
 
 .PHONY: build-linux
 build-linux: codegen
