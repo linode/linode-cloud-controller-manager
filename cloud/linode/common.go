@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/linode/linodego"
-	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 )
@@ -47,7 +46,7 @@ func linodeByName(ctx context.Context, client Client, nodeName types.NodeName) (
 	if len(linodes) == 0 {
 		return nil, cloudprovider.InstanceNotFound
 	} else if len(linodes) > 1 {
-		return nil, errors.New(fmt.Sprintf("Multiple instances found with name %v", nodeName))
+		return nil, fmt.Errorf("Multiple instances found with name %v", nodeName)
 	}
 
 	return &linodes[0], nil

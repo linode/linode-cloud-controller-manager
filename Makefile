@@ -14,20 +14,14 @@ clean:
 codegen:
 	go generate ./...
 
-.PHONY: vet
-# lint the codebase
-vet:
-	go vet . ./cloud/...
-
+.PHONY: lint
 lint:
 	docker run --rm -v "$(shell pwd):/var/work:ro" -w /var/work \
-		golangci/golangci-lint:v1.27.0 golangci-lint run -v --timeout=5m
+		golangci/golangci-lint:v1.44.0 golangci-lint run -v --timeout=5m
 
 .PHONY: fmt
-# goimports runs a go fmt
-# we say code is not worth formatting unless it's linted
-fmt: vet $(GOPATH)/bin/goimports
-	goimports -w *.go cloud
+fmt:
+	go fmt ./...
 
 .PHONY: test
 # we say code is not worth testing unless it's formatted
