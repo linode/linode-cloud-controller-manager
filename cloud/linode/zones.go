@@ -8,11 +8,11 @@ import (
 )
 
 type zones struct {
-	client LinodeClient
+	client Client
 	region string
 }
 
-func newZones(client LinodeClient, zone string) cloudprovider.Zones {
+func newZones(client Client, zone string) cloudprovider.Zones {
 	return zones{client, zone}
 }
 

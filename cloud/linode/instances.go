@@ -14,10 +14,10 @@ import (
 )
 
 type instances struct {
-	client LinodeClient
+	client Client
 }
 
-func newInstances(client LinodeClient) cloudprovider.Instances {
+func newInstances(client Client) cloudprovider.Instances {
 	return &instances{client}
 }
 

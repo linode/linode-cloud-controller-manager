@@ -27,7 +27,7 @@ func TestGetZoneByProviderID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	client := NewMockLinodeClient(ctrl)
+	client := NewMockClient(ctrl)
 	zones := newZones(client, "us-east")
 
 	t.Run("fail when providerID is malformed", func(t *testing.T) {
@@ -68,7 +68,7 @@ func TestGetZoneByNodeName(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	client := NewMockLinodeClient(ctrl)
+	client := NewMockClient(ctrl)
 	zones := newZones(client, "us-east")
 
 	t.Run("fail on api error", func(t *testing.T) {

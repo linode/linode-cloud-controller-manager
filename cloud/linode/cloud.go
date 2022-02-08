@@ -27,7 +27,7 @@ var Options struct {
 }
 
 type linodeCloud struct {
-	client        LinodeClient
+	client        Client
 	instances     cloudprovider.Instances
 	zones         cloudprovider.Zones
 	loadbalancers cloudprovider.LoadBalancer
