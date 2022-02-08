@@ -248,17 +248,16 @@ Use the following Make targets to build and run a local binary
 $ make build
 $ make run
 # You can also run the binary directly to pass additional args
-$ dist/linode-cloud-controller-manager run
+$ dist/linode-cloud-controller-manager
 ```
 
 #### Dependency management
 
-Linode Cloud Controller Manager uses [Dep](https://github.com/golang/dep) to
-manage dependencies. Dependencies are already checked in the `vendor` folder.
+Linode Cloud Controller Manager uses [Go Modules](https://blog.golang.org/using-go-modules) to manage dependencies.
 If you want to update/add dependencies, run:
 
 ```bash
-dep ensure
+go mod tidy
 ```
 
 #### Building Docker images
