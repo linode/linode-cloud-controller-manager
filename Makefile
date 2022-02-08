@@ -25,6 +25,10 @@ codegen:
 vet:
 	go vet . ./cloud/...
 
+lint:
+	docker run --rm -v "$(shell pwd):/var/work:ro" -w /var/work \
+		golangci/golangci-lint:v1.27.0 golangci-lint run -v --timeout=5m
+
 .PHONY: fmt
 # goimports runs a go fmt
 # we say code is not worth formatting unless it's linted
@@ -82,4 +86,5 @@ run-debug: build
 		--stderrthreshold=INFO \
 		--kubeconfig=${KUBECONFIG} \
 		--linodego-debug
+
 
