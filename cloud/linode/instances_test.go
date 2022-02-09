@@ -20,7 +20,7 @@ func TestInstanceExistsByProviderID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	client := NewMockLinodeClient(ctrl)
+	client := NewMockClient(ctrl)
 	instances := newInstances(client)
 
 	t.Run("should propagate generic api error", func(t *testing.T) {
@@ -64,7 +64,7 @@ func TestNodeAddresses(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	client := NewMockLinodeClient(ctrl)
+	client := NewMockClient(ctrl)
 	instances := newInstances(client)
 
 	t.Run("errors when linode does not exist", func(t *testing.T) {
@@ -136,7 +136,7 @@ func TestNodeAddressesByProviderID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	client := NewMockLinodeClient(ctrl)
+	client := NewMockClient(ctrl)
 	instances := newInstances(client)
 
 	t.Run("fails on malformed providerID", func(t *testing.T) {
@@ -207,7 +207,7 @@ func TestInstanceID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	client := NewMockLinodeClient(ctrl)
+	client := NewMockClient(ctrl)
 	instances := newInstances(client)
 
 	t.Run("fails when instance not found", func(t *testing.T) {
@@ -239,7 +239,7 @@ func TestInstanceType(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	client := NewMockLinodeClient(ctrl)
+	client := NewMockClient(ctrl)
 	instances := newInstances(client)
 
 	t.Run("fails when instance not found", func(t *testing.T) {
@@ -272,7 +272,7 @@ func TestInstanceTypeByProviderID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	client := NewMockLinodeClient(ctrl)
+	client := NewMockClient(ctrl)
 	instances := newInstances(client)
 
 	t.Run("fails when instance not found", func(t *testing.T) {

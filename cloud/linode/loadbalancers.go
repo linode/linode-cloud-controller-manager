@@ -61,7 +61,7 @@ func (e lbNotFoundError) Error() string {
 }
 
 type loadbalancers struct {
-	client LinodeClient
+	client Client
 	zone   string
 
 	kubeClient kubernetes.Interface
@@ -81,7 +81,7 @@ type portConfig struct {
 }
 
 // newLoadbalancers returns a cloudprovider.LoadBalancer whose concrete type is a *loadbalancer.
-func newLoadbalancers(client LinodeClient, zone string) cloudprovider.LoadBalancer {
+func newLoadbalancers(client Client, zone string) cloudprovider.LoadBalancer {
 	return &loadbalancers{client: client, zone: zone}
 }
 

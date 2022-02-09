@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/linode/linodego"
-	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 )
@@ -38,7 +37,7 @@ func linodeFilterListOptions(targetLabel string) *linodego.ListOptions {
 	return linodego.NewListOptions(0, jsonFilter)
 }
 
-func linodeByName(ctx context.Context, client LinodeClient, nodeName types.NodeName) (*linodego.Instance, error) {
+func linodeByName(ctx context.Context, client Client, nodeName types.NodeName) (*linodego.Instance, error) {
 	linodes, err := client.ListInstances(ctx, linodeFilterListOptions(string(nodeName)))
 	if err != nil {
 		return nil, err
@@ -47,13 +46,13 @@ func linodeByName(ctx context.Context, client LinodeClient, nodeName types.NodeN
 	if len(linodes) == 0 {
 		return nil, cloudprovider.InstanceNotFound
 	} else if len(linodes) > 1 {
-		return nil, errors.New(fmt.Sprintf("Multiple instances found with name %v", nodeName))
+		return nil, fmt.Errorf("Multiple instances found with name %v", nodeName)
 	}
 
 	return &linodes[0], nil
 }
 
-func linodeByID(ctx context.Context, client LinodeClient, id int) (*linodego.Instance, error) {
+func linodeByID(ctx context.Context, client Client, id int) (*linodego.Instance, error) {
 	instance, err := client.GetInstance(ctx, id)
 	if err != nil {
 		return nil, err

@@ -1,6 +1,6 @@
 package linode
 
-//go:generate go run github.com/golang/mock/mockgen -destination mock_client_test.go -package linode github.com/linode/linode-cloud-controller-manager/cloud/linode LinodeClient
+//go:generate go run github.com/golang/mock/mockgen -destination mock_client_test.go -package linode github.com/linode/linode-cloud-controller-manager/cloud/linode Client
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/linode/linodego"
 )
 
-type LinodeClient interface {
+type Client interface {
 	GetInstance(context.Context, int) (*linodego.Instance, error)
 	ListInstances(context.Context, *linodego.ListOptions) ([]linodego.Instance, error)
 	GetInstanceIPAddresses(context.Context, int) (*linodego.InstanceIPAddressResponse, error)
@@ -25,5 +25,5 @@ type LinodeClient interface {
 	RebuildNodeBalancerConfig(context.Context, int, int, linodego.NodeBalancerConfigRebuildOptions) (*linodego.NodeBalancerConfig, error)
 }
 
-// linodego.Client implements LinodeClient
-var _ LinodeClient = (*linodego.Client)(nil)
+// linodego.Client implements Client
+var _ Client = (*linodego.Client)(nil)
