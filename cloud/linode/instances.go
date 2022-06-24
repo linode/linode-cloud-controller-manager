@@ -176,5 +176,29 @@ func (i *instances) InstanceExistsByProviderID(ctx context.Context, providerID s
 }
 
 func (i *instances) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
+	ctx = sentry.SetHubOnContext(ctx)
+	sentry.SetTag(ctx, "provider_id", providerID)
+
+	id, err := parseProviderID(providerID)
+	if err != nil {
+		sentry.CaptureError(ctx, err)
+		return false, err
+	}
+
+	sentry.SetTag(ctx, "linode_id", strconv.Itoa(id))
+
+	instance, err := linodeByID(ctx, i.client, id)
+	if err != nil {
+		sentry.CaptureError(ctx, err)
+		return false, err
+	}
+
+	// An instance is considered to be "shutdown" when it is
+	// in the process of shutting down, or already offline.
+	if instance.Status == linodego.InstanceOffline ||
+		instance.Status == linodego.InstanceShuttingDown {
+		return true, nil
+	}
+
+	return false, nil
 }

@@ -314,7 +314,56 @@ func TestAddSSHKeyToAllInstances(t *testing.T) {
 }
 
 func TestInstanceShutdownByProviderID(t *testing.T) {
-	instances := newInstances(nil)
-	_, err := instances.InstanceShutdownByProviderID(context.TODO(), providerIDPrefix+"12345")
-	assert.ErrorIs(t, err, cloudprovider.NotImplemented)
+	ctx := context.TODO()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := NewMockClient(ctrl)
+	instances := newInstances(client)
+
+	t.Run("fails when instance not found", func(t *testing.T) {
+		id := 12345
+		providerID := providerIDPrefix + strconv.Itoa(id)
+		client.EXPECT().GetInstance(gomock.Any(), id).Times(1).Return(nil, linodego.Error{Code: http.StatusNotFound})
+		shutdown, err := instances.InstanceShutdownByProviderID(ctx, providerID)
+
+		assert.Error(t, err)
+		assert.False(t, shutdown)
+	})
+
+	t.Run("returns true when instance is shut down", func(t *testing.T) {
+		id := 12345
+		providerID := providerIDPrefix + strconv.Itoa(id)
+		client.EXPECT().GetInstance(gomock.Any(), id).Times(1).Return(&linodego.Instance{
+			ID: id, Label: "offline-linode", Status: linodego.InstanceOffline,
+		}, nil)
+		shutdown, err := instances.InstanceShutdownByProviderID(ctx, providerID)
+
+		assert.NoError(t, err)
+		assert.True(t, shutdown)
+	})
+
+	t.Run("returns true when instance is shutting down", func(t *testing.T) {
+		id := 12345
+		providerID := providerIDPrefix + strconv.Itoa(id)
+		client.EXPECT().GetInstance(gomock.Any(), id).Times(1).Return(&linodego.Instance{
+			ID: id, Label: "shutting-down-linode", Status: linodego.InstanceShuttingDown,
+		}, nil)
+		shutdown, err := instances.InstanceShutdownByProviderID(ctx, providerID)
+
+		assert.NoError(t, err)
+		assert.True(t, shutdown)
+	})
+
+	t.Run("returns false when instance is running", func(t *testing.T) {
+		id := 12345
+		providerID := providerIDPrefix + strconv.Itoa(id)
+		client.EXPECT().GetInstance(gomock.Any(), id).Times(1).Return(&linodego.Instance{
+			ID: id, Label: "running-linode", Status: linodego.InstanceRunning,
+		}, nil)
+		shutdown, err := instances.InstanceShutdownByProviderID(ctx, providerID)
+
+		assert.NoError(t, err)
+		assert.False(t, shutdown)
+	})
 }
