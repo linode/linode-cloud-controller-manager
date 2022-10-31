@@ -3,22 +3,18 @@ package test
 import (
 	"e2e_test/test/framework"
 	"flag"
-	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/linode/linodego"
-	"golang.org/x/oauth2"
 
 	"github.com/appscode/go/crypto/rand"
-	"github.com/onsi/ginkgo/reporters"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
@@ -26,6 +22,8 @@ var (
 	useExisting = false
 	reuse       = false
 	clusterName string
+	region      = "us-east"
+	k8s_version string
 )
 
 func init() {
@@ -33,7 +31,10 @@ func init() {
 	flag.StringVar(&framework.ApiToken, "api-token", os.Getenv("LINODE_API_TOKEN"), "linode api token")
 	flag.BoolVar(&reuse, "reuse", reuse, "Create a cluster and continue to use it")
 	flag.BoolVar(&useExisting, "use-existing", useExisting, "Use an existing kubernetes cluster")
-	flag.StringVar(&framework.KubeConfigFile, "kubeconfig", filepath.Join(homedir.HomeDir(), ".kube/config"), "To use existing cluster provide kubeconfig file")
+	flag.StringVar(&framework.KubeConfigFile, "kubeconfig", os.Getenv("TEST_KUBECONFIG"), "To use existing cluster provide kubeconfig file")
+	flag.StringVar(&region, "region", region, "Region to create load balancers")
+	flag.StringVar(&k8s_version, "k8s_version", k8s_version, "k8s_version for child cluster")
+
 }
 
 const (
@@ -47,23 +48,13 @@ var (
 func TestE2e(t *testing.T) {
 	RegisterFailHandler(Fail)
 	SetDefaultEventuallyTimeout(TIMEOUT)
-
-	junitReporter := reporters.NewJUnitReporter("junit.xml")
-	RunSpecsWithDefaultAndCustomReporters(t, "e2e Suite", []Reporter{junitReporter})
+	RunSpecs(t, "e2e Suite")
 
 }
 
 var getLinodeClient = func() *linodego.Client {
-	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: framework.ApiToken})
-
-	oauth2Client := &http.Client{
-		Transport: &oauth2.Transport{
-			Source: tokenSource,
-		},
-	}
-
-	linodeClient := linodego.NewClient(oauth2Client)
-
+	linodeClient := linodego.NewClient(nil)
+	linodeClient.SetToken(framework.ApiToken)
 	return &linodeClient
 }
 
@@ -86,7 +77,7 @@ var _ = BeforeSuite(func() {
 	}
 
 	if !useExisting {
-		err := framework.CreateCluster(clusterName)
+		err := framework.CreateCluster(clusterName, region, k8s_version)
 		Expect(err).NotTo(HaveOccurred())
 		framework.KubeConfigFile = kubeConfigFile
 	}

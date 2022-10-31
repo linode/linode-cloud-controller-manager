@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/appscode/go/wait"
 	"github.com/golang/glog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -139,23 +138,15 @@ func getHTTPSResponse(domain, ip, port string) (string, error) {
 	return bodyString, nil
 }
 
-func WaitForHTTPSResponse(link string, podName string) error {
-	return wait.PollImmediate(RetryInterval, RetryTimeout, func() (bool, error) {
-		hostPort := strings.Split(link, ":")
-		host, port := hostPort[0], hostPort[1]
+func WaitForHTTPSResponse(link string) (string, error) {
+	hostPort := strings.Split(link, ":")
+	host, port := hostPort[0], hostPort[1]
 
-		resp, err := getHTTPSResponse(Domain, host, port)
-		if err != nil {
-			return false, nil
-		}
-
-		if strings.Contains(resp, podName) {
-			log.Println("Got response from " + podName + " using url " + link)
-			return true, nil
-		}
-
-		return false, nil
-	})
+	resp, err := getHTTPSResponse(Domain, host, port)
+	if err != nil {
+		return "", err
+	}
+	return string(resp), nil
 }
 
 func getHTTPResponse(link string) (bool, string, error) {
@@ -172,17 +163,13 @@ func getHTTPResponse(link string) (bool, string, error) {
 	return resp.StatusCode == 200, string(bodyBytes), nil
 }
 
-func WaitForHTTPResponse(link string, podName string) error {
-	return wait.PollImmediate(RetryInterval, RetryTimeout, func() (bool, error) {
-		ok, _, err := getHTTPResponse(link)
-		if err != nil {
-			return false, nil
-		}
-		if ok {
-			log.Println("Got response from " + podName + " using url " + link)
-			return true, nil
-		}
-
-		return false, nil
-	})
+func WaitForHTTPResponse(link string) (string, error) {
+	ok, resp, err := getHTTPResponse(link)
+	if err != nil {
+		return "", err
+	}
+	if ok {
+		return resp, nil
+	}
+	return "", nil
 }
