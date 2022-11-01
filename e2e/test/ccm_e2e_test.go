@@ -23,8 +23,8 @@ func EnsuredService() types.GomegaMatcher {
 			if !ok {
 				return "", fmt.Errorf("failed to poll event")
 			}
-			return event.Message, nil
-		}, Equal("Ensured load balancer")),
+			return event.Reason, nil
+		}, Equal("EnsuredLoadBalancer")),
 	)
 }
 
