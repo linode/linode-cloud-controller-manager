@@ -8,7 +8,7 @@ export LINODE_API_TOKEN="$1"
 export CLUSTER_NAME="$2"
 export IMAGE="$3"
 export REGION="$4"
-export K8S_VERSION="$4"
+export K8S_VERSION="$5"
 
 cat > cluster.tf <<EOF
 variable "nodes" {
