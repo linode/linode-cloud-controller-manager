@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ccm-linode
+  labels:
+    app: ccm-linode
+  namespace: {{ required ".Values.namespace required" .Values.namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: ccm-linode
+  template:
+    metadata:
+      labels:
+        app: ccm-linode
+    spec:
+      serviceAccountName: ccm-linode
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations:
+{{ toYaml .Values.tolerations | indent 8 }}
+      {{- end }}
+      hostNetwork: true
+      containers:
+        - image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          name: ccm-linode
+          args:
+            - --leader-elect-resource-lock=endpoints
+            - --v=3
+            - --port=0
+            - --secure-port=10253
+          volumeMounts:
+            - mountPath: /etc/kubernetes
+              name: k8s
+          env:
+            - name: LINODE_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ccm-linode
+                  key: apiToken
+            - name: LINODE_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: ccm-linode
+                  key: region
+      volumes:
+        - name: k8s
+          hostPath:
+            path: /etc/kubernetes

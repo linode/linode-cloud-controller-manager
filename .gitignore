@@ -36,3 +36,5 @@ coverage.txt
 *.coverprofile
 
 junit.xml
+
+.DS_Store
