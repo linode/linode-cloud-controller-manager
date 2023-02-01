@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ccm-linode
+  namespace: {{ required ".Values.namespace required" .Values.namespace }}
+stringData:
+  apiToken: {{ required ".Values.apiToken required" .Values.apiToken }}
+  region: {{ required ".Values.region required" .Values.region }}
+type: Opaque

@@ -1,0 +1,29 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ccm-linode-clusterrole
+rules:
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "watch", "list", "update", "create"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "watch", "list", "update", "delete", "patch"]
+  - apiGroups: [""]
+    resources: ["nodes/status"]
+    verbs: ["get", "watch", "list", "update", "delete", "patch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "watch", "list", "update", "create", "patch"]
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "watch", "list", "update"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "watch", "list"]
+  - apiGroups: [""]
+    resources: ["services/status"]
+    verbs: ["get", "watch", "list", "update", "patch"]

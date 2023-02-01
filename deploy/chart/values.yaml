@@ -1,0 +1,39 @@
+# apiToken [Required] - Must be a Linode APIv4 Personal Access Token with all permissions. (https://cloud.linode.com/profile/tokens) 
+apiToken: ""
+
+# region [Required] - Must be a Linode region. (https://api.linode.com/v4/regions)
+region: ""
+
+# node-role.kubernetes.io/master - if set true, it deploys the svc on the master node
+nodeSelector:
+  # The CCM will only run on a Node labelled as a master, you may want to change this
+  node-role.kubernetes.io/master: ""
+
+# Image repository must be 'linode/linode-cloud-controller-manager'. The tag can be changed/set to various ccm versions.
+# The pullPolicy is set to Always but can be changed when it is not required to always pull the new image
+image:
+  repository: linode/linode-cloud-controller-manager
+  tag: latest
+  pullPolicy: Always
+
+# Default namespace is "kube-system" but it can be set to another namespace
+namespace: "kube-system"
+
+# Set of default tolerations
+tolerations: 
+ # The CCM can run on Nodes tainted as masters
+  - key: "node-role.kubernetes.io/master"
+    effect: "NoSchedule"
+  # The CCM is a "critical addon"
+  - key: "CriticalAddonsOnly"
+    operator: "Exists"
+  # This taint is set on all Nodes when an external CCM is used
+  - key: node.cloudprovider.kubernetes.io/uninitialized
+    value: "true"
+    effect: NoSchedule
+  - key: node.kubernetes.io/not-ready
+    operator: Exists
+    effect: NoSchedule
+  - key: node.kubernetes.io/unreachable
+    operator: Exists
+    effect: NoSchedule

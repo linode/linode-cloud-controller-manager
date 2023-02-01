@@ -1,0 +1,12 @@
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ccm-linode-clusterrolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ccm-linode-clusterrole
+subjects:
+  - kind: ServiceAccount
+    name: ccm-linode
+    namespace: {{ required ".Values.namespace required" .Values.namespace }}

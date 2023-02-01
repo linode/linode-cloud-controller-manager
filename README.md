@@ -194,6 +194,49 @@ This will create a file `ccm-linode.yaml` which you can use to deploy the CCM.
 
 Note: Your kubelets, controller-manager, and apiserver must be started with `--cloud-provider=external` as noted in the following documentation.
 
+## Deployment Through Helm Chart
+
+Use the helm chart located under './deploy/chart'. This dir has the manifest for Linode CCM. There are two arguments required.
+
+The first argument must be a Linode APIv4 [Personal Access Token](https://cloud.linode.com/profile/tokens) with all permissions.
+
+The second argument must be a Linode [region](https://api.linode.com/v4/regions).
+
+### To deploy CCM run the following helm command once you are in the ccm root dir:
+```sh
+git clone https://github.com/linode/linode-cloud-controller-manager.git
+
+cd linode-cloud-controller-manager
+
+helm install linode-ccm ./deploy/chart --set apiToken=$LINODE_API_TOKEN,region=$REGION
+```
+_See [helm install](https://helm.sh/docs/helm/helm_install/) for command documentation._
+
+### To uninstall linode-ccm from kubernetes cluster. Run the following command:
+```sh
+
+helm uninstall linode-ccm
+
+```
+_See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall/) for command documentation._
+
+### To upgrade when new changes are made to the helm chart. Run the following command:
+```sh
+
+helm upgrade linode-ccm ./deploy/chart --install
+
+```
+_See [helm upgrade](https://helm.sh/docs/helm/helm_upgrade/) for command documentation._
+
+### Configurations
+
+There are other variables that can be set to a different value. For list of all the modifiable variables/values, take a look at './deploy/chart/values.yaml'. 
+
+Values can be set/overrided by using the '--set var=value,...' flag or by passing in a custom-values.yaml using '-f custom-values.yaml'.
+
+Recommendation: Use custom-values.yaml to override the variables to avoid any errors with template rendering
+
+
 ### Upstream Documentation Including Deployment Instructions
 
 [Kubernetes Cloud Controller Manager](https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/).
