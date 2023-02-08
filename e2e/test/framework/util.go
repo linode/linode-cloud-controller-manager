@@ -173,3 +173,11 @@ func WaitForHTTPResponse(link string) (string, error) {
 	}
 	return "", nil
 }
+
+func GetResponseFromCurl(endpoint string) string {
+	resp, err := exec.Command("curl", "--max-time", "5", "-s", endpoint).Output()
+	if err != nil {
+		return ""
+	}
+	return string(resp)
+}

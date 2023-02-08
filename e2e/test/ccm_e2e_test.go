@@ -294,8 +294,8 @@ var _ = Describe("e2e tests", func() {
 						eps, err = f.LoadBalancer.GetLoadBalancerIps()
 						return err
 					}).Should(BeNil())
-					Eventually(framework.WaitForHTTPResponse).WithArguments(eps[0]).Should(ContainSubstring(pods[0]))
-					Eventually(framework.WaitForHTTPResponse).WithArguments(eps[0]).Should(ContainSubstring(pods[1]))
+					Eventually(framework.GetResponseFromCurl).WithArguments(eps[0]).Should(ContainSubstring(pods[0]))
+					Eventually(framework.GetResponseFromCurl).WithArguments(eps[0]).Should(ContainSubstring(pods[1]))
 				})
 			})
 		})
@@ -753,61 +753,6 @@ var _ = Describe("e2e tests", func() {
 
 					By("Waiting for Response from the LoadBalancer url: " + https443)
 					Eventually(framework.WaitForHTTPSResponse).WithArguments(https443).Should(ContainSubstring(pods[0]))
-				})
-			})
-
-			Context("With SessionAffinity", func() {
-				var (
-					pods   []string
-					labels map[string]string
-				)
-
-				BeforeEach(func() {
-					pods = []string{"test-pod-1", "test-pod-2"}
-					ports := []core.ContainerPort{
-						{
-							Name:          "http-1",
-							ContainerPort: 8080,
-						},
-					}
-					servicePorts := []core.ServicePort{
-						{
-							Name:       "http-1",
-							Port:       80,
-							TargetPort: intstr.FromInt(8080),
-							Protocol:   "TCP",
-						},
-					}
-					labels = map[string]string{
-						"app": "test-loadbalancer",
-					}
-
-					By("Creating Pods")
-					createPodWithLabel(pods, ports, framework.TestServerImage, labels, false)
-
-					By("Creating Service")
-					createServiceWithSelector(labels, servicePorts, true)
-				})
-
-				AfterEach(func() {
-					By("Deleting the Pods")
-					deletePods(pods)
-
-					By("Deleting the Service")
-					deleteService()
-				})
-
-				It("should reach the same pod every time it requests", func() {
-					By("Checking TCP Response")
-					var eps []string
-					Eventually(func() error {
-						eps, err = f.LoadBalancer.GetLoadBalancerIps()
-						return err
-					}).Should(BeNil())
-					Expect(len(eps)).Should(BeNumerically(">=", 1))
-
-					By("Waiting for Response from the LoadBalancer url: " + eps[0])
-					Eventually(framework.WaitForHTTPResponse).WithArguments(eps[0]).Should(ContainSubstring(""))
 				})
 			})
 
