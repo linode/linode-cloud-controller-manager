@@ -7,8 +7,14 @@ set -o nounset
 export LINODE_API_TOKEN="$1"
 export CLUSTER_NAME="$2"
 export IMAGE="$3"
-export REGION="$4"
-export K8S_VERSION="$5"
+export K8S_VERSION="$4"
+
+if [[ -z "$5" ]]
+then
+  export REGION="eu-west"
+else
+  export REGION="$5"
+fi
 
 cat > cluster.tf <<EOF
 variable "nodes" {
