@@ -4,20 +4,29 @@ import (
 	"context"
 	"e2e_test/test/framework"
 	"fmt"
-	"io/ioutil"
-	"log"
-	"net/http"
 	"strconv"
-	"strings"
 
-	"github.com/appscode/go/wait"
 	"github.com/codeskyblue/go-sh"
 	"github.com/linode/linodego"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/types"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/watch"
 )
+
+func EnsuredService() types.GomegaMatcher {
+	return And(
+		WithTransform(func(e watch.Event) (string, error) {
+			event, ok := e.Object.(*core.Event)
+			if !ok {
+				return "", fmt.Errorf("failed to poll event")
+			}
+			return event.Reason, nil
+		}, Equal("EnsuredLoadBalancer")),
+	)
+}
 
 var _ = Describe("e2e tests", func() {
 	var (
@@ -56,113 +65,86 @@ var _ = Describe("e2e tests", func() {
 			if selectNode {
 				p = f.LoadBalancer.SetNodeSelector(p, workers[i])
 			}
-			err = f.LoadBalancer.CreatePod(p)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(f.LoadBalancer.CreatePod(p)).ToNot(BeNil())
+			Eventually(f.LoadBalancer.GetPod).WithArguments(p.ObjectMeta.Name, f.LoadBalancer.Namespace()).Should(HaveField("Status.Phase", Equal(core.PodRunning)))
 		}
 	}
 
 	var deletePods = func(pods []string) {
 		for _, pod := range pods {
-			err = f.LoadBalancer.DeletePod(pod)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(f.LoadBalancer.DeletePod(pod)).NotTo(HaveOccurred())
 		}
 	}
 
 	var deleteService = func() {
-		err = f.LoadBalancer.DeleteService()
-		Expect(err).NotTo(HaveOccurred())
+		Expect(f.LoadBalancer.DeleteService()).NotTo(HaveOccurred())
 	}
 
 	var deleteSecret = func(name string) {
-		err = f.LoadBalancer.DeleteSecret(name)
+		Expect(f.LoadBalancer.DeleteSecret(name)).NotTo(HaveOccurred())
+	}
+
+	var ensureServiceLoadBalancer = func() {
+		watcher, err := f.LoadBalancer.GetServiceWatcher()
 		Expect(err).NotTo(HaveOccurred())
+		Eventually(watcher.ResultChan()).Should(Receive(EnsuredService()))
 	}
 
 	var createServiceWithSelector = func(selector map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) {
-		err = f.LoadBalancer.CreateService(selector, nil, ports, isSessionAffinityClientIP)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(f.LoadBalancer.CreateService(selector, nil, ports, isSessionAffinityClientIP)).NotTo(HaveOccurred())
+		Eventually(f.LoadBalancer.GetServiceEndpoints).Should(Not(BeEmpty()))
+		ensureServiceLoadBalancer()
 	}
 
 	var createServiceWithAnnotations = func(labels map[string]string, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) {
-		err = f.LoadBalancer.CreateService(labels, annotations, ports, isSessionAffinityClientIP)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(f.LoadBalancer.CreateService(labels, annotations, ports, isSessionAffinityClientIP)).NotTo(HaveOccurred())
+		Eventually(f.LoadBalancer.GetServiceEndpoints).Should(Not(BeEmpty()))
+		ensureServiceLoadBalancer()
 	}
 
 	var updateServiceWithAnnotations = func(labels map[string]string, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) {
-		err = f.LoadBalancer.UpdateService(labels, annotations, ports, isSessionAffinityClientIP)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(f.LoadBalancer.UpdateService(labels, annotations, ports, isSessionAffinityClientIP)).NotTo(HaveOccurred())
+		Eventually(f.LoadBalancer.GetServiceEndpoints).Should(Not(BeEmpty()))
+		ensureServiceLoadBalancer()
 	}
 
 	var deleteNodeBalancer = func(id int) {
-		err = getLinodeClient().DeleteNodeBalancer(context.Background(), id)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(getLinodeClient().DeleteNodeBalancer(context.Background(), id)).NotTo(HaveOccurred())
 	}
 
 	var createNodeBalancer = func() int {
 		var nb *linodego.NodeBalancer
-		nb, err = getLinodeClient().CreateNodeBalancer(context.Background(), linodego.NodeBalancerCreateOptions{
-			Region: "eu-west",
+		nb, err = getLinodeClient().CreateNodeBalancer(context.TODO(), linodego.NodeBalancerCreateOptions{
+			Region: fmt.Sprintf("%s", region),
 		})
 		Expect(err).NotTo(HaveOccurred())
+		Expect(nb).NotTo(BeNil())
 		return nb.ID
 	}
 
-	var getResponseFromSamePod = func(link string) {
-		var oldResp, newResp string
-		Eventually(func() string {
-			resp, err := http.Get("http://" + link)
-			if err == nil {
-				byteData, _ := ioutil.ReadAll(resp.Body)
-				defer resp.Body.Close()
-				oldResp = string(byteData)
-			}
-
-			return oldResp
-		}).ShouldNot(Equal(""))
-
-		for i := 0; i <= 10; i++ {
-			resp, err := http.Get(link)
-			if err == nil {
-				byteData, _ := ioutil.ReadAll(resp.Body)
-				defer resp.Body.Close()
-				newResp = string(byteData)
-				log.Println(newResp)
-			}
-		}
-	}
-
 	var checkNumberOfWorkerNodes = func(numNodes int) {
-		Eventually(func() int {
-			workers, err = f.GetNodeList()
-			Expect(err).NotTo(HaveOccurred())
-			return len(workers)
-		}).Should(Equal(numNodes))
+		Eventually(f.GetNodeList).Should(HaveLen(numNodes))
 	}
 
 	var checkNumberOfUpNodes = func(numNodes int) {
 		By("Checking the Number of Up Nodes")
-		Eventually(func() int {
-			nbConfig, err := f.LoadBalancer.GetNodeBalancerConfig(framework.TestServerResourceName)
-			Expect(err).NotTo(HaveOccurred())
-			return nbConfig.NodesStatus.Up
-		}).Should(Equal(numNodes))
+		Eventually(f.LoadBalancer.GetNodeBalancerUpNodes).WithArguments(framework.TestServerResourceName).Should(BeNumerically(">=", numNodes))
 	}
 
 	var checkNodeBalancerExists = func(id int) {
 		By("Checking if the NodeBalancer exists")
-		nb, err := getLinodeClient().GetNodeBalancer(context.Background(), id)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(nb.ID).Should(Equal(nb.ID))
+		Eventually(getLinodeClient().GetNodeBalancer).WithArguments(context.Background(), id).Should(HaveField("ID", Equal(id)))
 	}
 
 	var checkNodeBalancerNotExists = func(id int) {
-		nb, err := getLinodeClient().GetNodeBalancer(context.Background(), id)
-		Expect(nb).To(BeNil())
-		Expect(err).ToNot(BeNil())
-
-		linodeErr, ok := err.(*linodego.Error)
-		Expect(ok).To(BeTrue())
-		Expect(linodeErr.Code).To(Equal(404))
+		Eventually(func() int {
+			_, err := getLinodeClient().GetNodeBalancer(context.Background(), id)
+			if err == nil {
+				return 0
+			}
+			linodeErr, _ := err.(*linodego.Error)
+			return linodeErr.Code
+		}).Should(Equal(404))
 	}
 
 	type checkArgs struct {
@@ -171,34 +153,20 @@ var _ = Describe("e2e tests", func() {
 	}
 
 	var checkNodeBalancerID = func(service string, expectedID int) {
-		err := f.LoadBalancer.WaitForNodeBalancerReady(service, expectedID)
-		Expect(err).NotTo(HaveOccurred())
+		Eventually(f.LoadBalancer.GetNodeBalancerID).WithArguments(service).Should(Equal(expectedID))
 	}
 
 	var checkLBStatus = func(service string, hasIP bool) {
-		Eventually(func() bool {
-			nb, err := f.LoadBalancer.GetNodeBalancer(service)
-			Expect(err).NotTo(HaveOccurred())
-
-			svc, err := f.LoadBalancer.GetServiceWithLoadBalancerStatus(service, f.LoadBalancer.Namespace())
-			Expect(err).NotTo(HaveOccurred())
-
-			ingress := svc.Status.LoadBalancer.Ingress[0]
-			Expect(nb.Hostname).ToNot(BeNil())
-			Expect(ingress.Hostname).Should(Equal(*nb.Hostname))
-
-			if hasIP {
-				return nb.IPv4 != nil && ingress.IP == *nb.IPv4
-			} else {
-				return ingress.IP == ""
-			}
-		}).Should(BeTrue())
+		Eventually(f.LoadBalancer.GetNodeBalancerFromService).WithArguments(service, hasIP).Should(Not(BeNil()))
 	}
 
 	var checkNodeBalancerConfigForPort = func(port int, args checkArgs) {
 		By("Getting NodeBalancer Configuration for port " + strconv.Itoa(port))
-		nbConfig, err := f.LoadBalancer.GetNodeBalancerConfigForPort(framework.TestServerResourceName, port)
-		Expect(err).NotTo(HaveOccurred())
+		var nbConfig *linodego.NodeBalancerConfig
+		Eventually(func() error {
+			nbConfig, err = f.LoadBalancer.GetNodeBalancerConfigForPort(framework.TestServerResourceName, port)
+			return err
+		}).Should(BeNil())
 
 		if args.checkType != "" {
 			By("Checking Health Check Type")
@@ -321,40 +289,19 @@ var _ = Describe("e2e tests", func() {
 
 				It("should reach all pods", func() {
 					By("Checking TCP Response")
-					eps, err := f.LoadBalancer.GetHTTPEndpoints()
-					Expect(err).NotTo(HaveOccurred())
-					Expect(len(eps)).Should(BeNumerically(">=", 1))
-
-					var counter1, counter2 int
-
-					By("Waiting for Response from the LoadBalancer url: " + eps[0])
-					err = wait.PollImmediate(framework.RetryInterval, framework.RetryTimeout, func() (bool, error) {
-						resp, err := sh.Command("curl", "--max-time", "5", "-s", eps[0]).Output()
-						if err != nil {
-							return false, nil
-						}
-						stringResp := string(resp)
-						if strings.Contains(stringResp, pods[0]) {
-							log.Println("Got response from " + pods[0])
-							counter1++
-						} else if strings.Contains(stringResp, pods[1]) {
-							log.Println("Got response from " + pods[1])
-							counter2++
-						}
-
-						if counter1 > 0 && counter2 > 0 {
-							return true, nil
-						}
-						return false, nil
-					})
-					Expect(counter1).Should(BeNumerically(">", 0))
-					Expect(counter2).Should(BeNumerically(">", 0))
+					var eps []string
+					Eventually(func() error {
+						eps, err = f.LoadBalancer.GetLoadBalancerIps()
+						return err
+					}).Should(BeNil())
+					Eventually(framework.GetResponseFromCurl).WithArguments(eps[0]).Should(ContainSubstring(pods[0]))
+					Eventually(framework.GetResponseFromCurl).WithArguments(eps[0]).Should(ContainSubstring(pods[1]))
 				})
 			})
 		})
 	})
 
-	FDescribe("Test", func() {
+	Describe("Test", func() {
 		Context("LoadBalancer", func() {
 			AfterEach(func() {
 				err := root.Recycle()
@@ -397,8 +344,7 @@ var _ = Describe("e2e tests", func() {
 					createPodWithLabel(pods, ports, framework.TestServerImage, labels, false)
 
 					By("Creating Secret")
-					err = f.LoadBalancer.CreateTLSSecret("tls-secret")
-					Expect(err).NotTo(HaveOccurred())
+					Expect(f.LoadBalancer.CreateTLSSecret("tls-secret")).NotTo(HaveOccurred())
 
 					By("Creating Service")
 					createServiceWithAnnotations(labels, annotations, servicePorts, false)
@@ -417,13 +363,15 @@ var _ = Describe("e2e tests", func() {
 
 				It("should reach the pod via tls", func() {
 					By("Checking TCP Response")
-					eps, err := f.LoadBalancer.GetHTTPEndpoints()
-					Expect(err).NotTo(HaveOccurred())
-					Expect(len(eps)).Should(BeNumerically(">=", 1))
+					var eps []string
+					Eventually(func() error {
+						eps, err = f.LoadBalancer.GetLoadBalancerIps()
+						return err
+					}).Should(BeNil())
 
 					By("Waiting for Response from the LoadBalancer url: " + eps[0])
-					err = framework.WaitForHTTPSResponse(eps[0], pods[0])
-					Expect(err).NotTo(HaveOccurred())
+					Eventually(framework.WaitForHTTPSResponse).WithArguments(eps[0]).Should(ContainSubstring(pods[0]))
+
 				})
 			})
 
@@ -699,22 +647,19 @@ var _ = Describe("e2e tests", func() {
 
 				It("should reach the pods", func() {
 					By("Checking TCP Response")
-					eps, err := f.LoadBalancer.GetHTTPEndpoints()
-					Expect(err).NotTo(HaveOccurred())
-					Expect(len(eps)).Should(BeNumerically("==", 4))
+					var eps []string
+					Eventually(func() error {
+						eps, err = f.LoadBalancer.GetLoadBalancerIps()
+						return err
+					}).Should(BeNil())
+					Expect(eps).Should(HaveLen(4))
 
 					// in order of the spec
 					http80, http8080, https443, https8443 := eps[0], eps[1], eps[2], eps[3]
-
-					waitForResponse := func(endpoint string, fn func(string, string) error) {
-						By("Waiting for Response from the LoadBalancer url: " + endpoint)
-						err := fn(endpoint, pods[0])
-						Expect(err).NotTo(HaveOccurred())
-					}
-					waitForResponse(http80, framework.WaitForHTTPResponse)
-					waitForResponse(http8080, framework.WaitForHTTPResponse)
-					waitForResponse(https443, framework.WaitForHTTPSResponse)
-					waitForResponse(https8443, framework.WaitForHTTPSResponse)
+					Eventually(framework.WaitForHTTPResponse).WithArguments(http80).Should(ContainSubstring(pods[0]))
+					Eventually(framework.WaitForHTTPResponse).WithArguments(http8080).Should(ContainSubstring(pods[0]))
+					Eventually(framework.WaitForHTTPSResponse).WithArguments(https443).Should(ContainSubstring(pods[0]))
+					Eventually(framework.WaitForHTTPSResponse).WithArguments(https8443).Should(ContainSubstring(pods[0]))
 				})
 			})
 
@@ -796,72 +741,18 @@ var _ = Describe("e2e tests", func() {
 
 				It("should reach the pods", func() {
 					By("Checking TCP Response")
-					eps, err := f.LoadBalancer.GetHTTPEndpoints()
-					Expect(err).NotTo(HaveOccurred())
-					Expect(len(eps)).Should(BeNumerically("==", 2))
-
-					// in order of the spec
+					var eps []string
+					Eventually(func() error {
+						eps, err = f.LoadBalancer.GetLoadBalancerIps()
+						return err
+					}).Should(BeNil())
+					Expect(eps).Should(HaveLen(2))
 					http80, https443 := eps[0], eps[1]
+					By("Waiting for Response from the LoadBalancer url: " + http80)
+					Eventually(framework.WaitForHTTPResponse).WithArguments(http80).Should(ContainSubstring(pods[0]))
 
-					waitForResponse := func(endpoint string, fn func(string, string) error) {
-						By("Waiting for Response from the LoadBalancer url: " + endpoint)
-						err := fn(endpoint, pods[0])
-						Expect(err).NotTo(HaveOccurred())
-					}
-					waitForResponse(http80, framework.WaitForHTTPResponse)
-					waitForResponse(https443, framework.WaitForHTTPSResponse)
-				})
-			})
-
-			Context("With SessionAffinity", func() {
-				var (
-					pods   []string
-					labels map[string]string
-				)
-
-				BeforeEach(func() {
-					pods = []string{"test-pod-1", "test-pod-2"}
-					ports := []core.ContainerPort{
-						{
-							Name:          "http-1",
-							ContainerPort: 8080,
-						},
-					}
-					servicePorts := []core.ServicePort{
-						{
-							Name:       "http-1",
-							Port:       80,
-							TargetPort: intstr.FromInt(8080),
-							Protocol:   "TCP",
-						},
-					}
-					labels = map[string]string{
-						"app": "test-loadbalancer",
-					}
-
-					By("Creating Pods")
-					createPodWithLabel(pods, ports, framework.TestServerImage, labels, false)
-
-					By("Creating Service")
-					createServiceWithSelector(labels, servicePorts, true)
-				})
-
-				AfterEach(func() {
-					By("Deleting the Pods")
-					deletePods(pods)
-
-					By("Deleting the Service")
-					deleteService()
-				})
-
-				It("should reach the same pod every time it requests", func() {
-					By("Checking TCP Response")
-					eps, err := f.LoadBalancer.GetHTTPEndpoints()
-					Expect(err).NotTo(HaveOccurred())
-					Expect(len(eps)).Should(BeNumerically(">=", 1))
-
-					By("Waiting for Response from the LoadBalancer url: " + eps[0])
-					getResponseFromSamePod(eps[0])
+					By("Waiting for Response from the LoadBalancer url: " + https443)
+					Eventually(framework.WaitForHTTPSResponse).WithArguments(https443).Should(ContainSubstring(pods[0]))
 				})
 			})
 

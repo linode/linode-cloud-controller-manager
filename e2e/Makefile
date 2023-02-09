@@ -16,7 +16,7 @@ reuse-and-test: SUITE_ARGS='--reuse'
 
 test reuse-and-test: $(GOPATH)/bin/ginkgo check-token
 	go list -m; \
-	ginkgo -r --v --progress --trace --cover $(TEST_ARGS) -- --v=3 --image=${IMG} $(SUITE_ARGS); \
+	ginkgo -r --v --progress --trace --cover $(TEST_ARGS) -- --v=3 --image=${IMG} $(SUITE_ARGS)
 
 clean: check-token
 	cd test; \

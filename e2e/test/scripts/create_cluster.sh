@@ -7,7 +7,14 @@ set -o nounset
 export LINODE_API_TOKEN="$1"
 export CLUSTER_NAME="$2"
 export IMAGE="$3"
+export K8S_VERSION="$4"
 
+if [[ -z "$5" ]]
+then
+  export REGION="eu-west"
+else
+  export REGION="$5"
+fi
 
 cat > cluster.tf <<EOF
 variable "nodes" {
@@ -16,10 +23,10 @@ variable "nodes" {
 
 module "k8s" {
   source       = "git::https://github.com/linode/terraform-linode-k8s.git"
-  k8s_version  = "v1.18.13"
+  k8s_version  = "${K8S_VERSION}"
   linode_token = "${LINODE_API_TOKEN}"
   ccm_image    = "${IMAGE}"
-  region       = "eu-west"
+  region       = "${REGION}"
   cluster_name = "${CLUSTER_NAME}"
   nodes        = var.nodes
 }

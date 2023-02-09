@@ -5,7 +5,6 @@ import (
 
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 func (i *lbInvocation) GetPodObject(podName, image string, ports []core.ContainerPort, labels map[string]string) *core.Pod {
@@ -44,13 +43,8 @@ func (i *lbInvocation) SetNodeSelector(pod *core.Pod, nodeName string) *core.Pod
 	return pod
 }
 
-func (i *lbInvocation) CreatePod(pod *core.Pod) error {
-	pod, err := i.kubeClient.CoreV1().Pods(i.Namespace()).Create(context.TODO(), pod, metav1.CreateOptions{})
-	if err != nil {
-		return err
-	}
-	return i.WaitForReady(pod.ObjectMeta)
-
+func (i *lbInvocation) CreatePod(pod *core.Pod) (*core.Pod, error) {
+	return i.kubeClient.CoreV1().Pods(i.Namespace()).Create(context.TODO(), pod, metav1.CreateOptions{})
 }
 
 func (i *lbInvocation) DeletePod(name string) error {
@@ -59,17 +53,4 @@ func (i *lbInvocation) DeletePod(name string) error {
 
 func (i *lbInvocation) GetPod(name, ns string) (*core.Pod, error) {
 	return i.kubeClient.CoreV1().Pods(ns).Get(context.TODO(), name, metav1.GetOptions{})
-}
-
-func (i *lbInvocation) WaitForReady(meta metav1.ObjectMeta) error {
-	return wait.PollImmediate(RetryInterval, RetryTimeout, func() (bool, error) {
-		pod, err := i.kubeClient.CoreV1().Pods(i.Namespace()).Get(context.TODO(), meta.Name, metav1.GetOptions{})
-		if pod == nil || err != nil {
-			return false, nil
-		}
-		if pod.Status.Phase == core.PodRunning {
-			return true, nil
-		}
-		return false, nil
-	})
 }

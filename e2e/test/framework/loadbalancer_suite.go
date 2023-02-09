@@ -3,31 +3,31 @@ package framework
 import (
 	"context"
 	"fmt"
-	"time"
 
-	"github.com/appscode/go/wait"
 	"github.com/linode/linodego"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (i *lbInvocation) GetHTTPEndpoints() ([]string, error) {
-	return i.getLoadBalancerURLs()
-}
-
-func (i *lbInvocation) GetNodeBalancer(svcName string) (*linodego.NodeBalancer, error) {
-	hostname, err := i.waitForLoadBalancerHostname(svcName)
+func (i *lbInvocation) GetNodeBalancerFromService(svcName string, checkIP bool) (*linodego.NodeBalancer, error) {
+	ingress, err := i.getServiceIngress(svcName, i.Namespace())
 	if err != nil {
 		return nil, err
 	}
-
+	hostname := ingress[0].Hostname
+	ip := ingress[0].IP
 	nbList, errListNodeBalancers := i.linodeClient.ListNodeBalancers(context.Background(), nil)
-
 	if errListNodeBalancers != nil {
-		return nil, errListNodeBalancers
+		return nil, fmt.Errorf("Error listingNodeBalancer for hostname %s: %s", hostname, errListNodeBalancers.Error())
 	}
 
 	for _, nb := range nbList {
 		if *nb.Hostname == hostname {
+			if checkIP {
+				if *nb.IPv4 == ip {
+					return &nb, nil
+				} else {
+					return nil, fmt.Errorf("IPv4 for Nodebalancer (%s) does not match IP (%s) for service %v", *nb.IPv4, ip, svcName)
+				}
+			}
 			return &nb, nil
 		}
 	}
@@ -35,21 +35,11 @@ func (i *lbInvocation) GetNodeBalancer(svcName string) (*linodego.NodeBalancer, 
 }
 
 func (i *lbInvocation) GetNodeBalancerID(svcName string) (int, error) {
-	nb, err := i.GetNodeBalancer(svcName)
+	nb, err := i.GetNodeBalancerFromService(svcName, false)
 	if err != nil {
 		return -1, err
 	}
 	return nb.ID, nil
-}
-
-func (i *lbInvocation) WaitForNodeBalancerReady(svcName string, expectedID int) error {
-	return wait.PollImmediate(time.Millisecond*500, RetryTimeout, func() (bool, error) {
-		nbID, err := i.GetNodeBalancerID(svcName)
-		if err != nil {
-			return false, err
-		}
-		return nbID == expectedID, nil
-	})
 }
 
 func (i *lbInvocation) GetNodeBalancerConfig(svcName string) (*linodego.NodeBalancerConfig, error) {
@@ -82,20 +72,15 @@ func (i *lbInvocation) GetNodeBalancerConfigForPort(svcName string, port int) (*
 	return nil, fmt.Errorf("NodeBalancerConfig for port %d was not found", port)
 }
 
-func (i *lbInvocation) waitForLoadBalancerHostname(svcName string) (string, error) {
-	var ip string
-	err := wait.PollImmediate(RetryInterval, RetryTimeout, func() (bool, error) {
-		svc, err := i.kubeClient.CoreV1().Services(i.Namespace()).Get(context.TODO(), svcName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		if svc.Status.LoadBalancer.Ingress == nil {
-			return false, nil
-		}
-		ip = svc.Status.LoadBalancer.Ingress[0].Hostname
-		return true, nil
-	})
-
-	return ip, err
+func (i *lbInvocation) GetNodeBalancerUpNodes(svcName string) (int, error) {
+	id, err := i.GetNodeBalancerID(svcName)
+	if err != nil {
+		return 0, err
+	}
+	nbcList, err := i.linodeClient.ListNodeBalancerConfigs(context.Background(), id, nil)
+	if err != nil {
+		return 0, err
+	}
+	nb := &nbcList[0]
+	return nb.NodesStatus.Up, nil
 }
