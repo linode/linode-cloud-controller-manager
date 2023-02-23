@@ -681,7 +681,7 @@ func testUpdateLoadBalancerAddNodeBalancerID(t *testing.T, client *linodego.Clie
 		t.Errorf("LoadBalancer status mismatch: expected %v, got %v", expectedLBStatus, lbStatus)
 	}
 
-	if !fakeAPI.didRequestOccur(http.MethodDelete, fmt.Sprintf("/nodebalancers/%d", nodeBalancer.ID), "") {
+	if !fakeAPI.didRequestOccur(http.MethodDelete, fmt.Sprintf("/v4/nodebalancers/%d", nodeBalancer.ID), "") {
 		t.Errorf("expected old NodeBalancer to have been deleted")
 	}
 }
@@ -1192,7 +1192,7 @@ func testEnsureLoadBalancerPreserveAnnotation(t *testing.T, client *linodego.Cli
 			svc.Status.LoadBalancer = *makeLoadBalancerStatus(svc, nb)
 			err = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
 
-			didDelete := fake.didRequestOccur(http.MethodDelete, fmt.Sprintf("/nodebalancers/%d", nb.ID), "")
+			didDelete := fake.didRequestOccur(http.MethodDelete, fmt.Sprintf("/v4/nodebalancers/%d", nb.ID), "")
 			if didDelete && !test.deleted {
 				t.Fatal("load balancer was unexpectedly deleted")
 			} else if !didDelete && test.deleted {
