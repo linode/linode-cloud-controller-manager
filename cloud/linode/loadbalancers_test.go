@@ -300,7 +300,7 @@ func testUpdateLoadBalancerAddAnnotation(t *testing.T, client *linodego.Client, 
 
 	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
 	if err != nil {
-		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
+		t.Fatalf("EnsureLoadBalancer returned an error: %s", err)
 	}
 	svc.Status.LoadBalancer = *lbStatus
 
@@ -311,7 +311,7 @@ func testUpdateLoadBalancerAddAnnotation(t *testing.T, client *linodego.Client, 
 
 	err = lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, nodes)
 	if err != nil {
-		t.Errorf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
+		t.Fatalf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
 	}
 
 	nb, err := lb.getNodeBalancerByStatus(context.TODO(), svc)
@@ -368,7 +368,7 @@ func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Clie
 
 	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
 	if err != nil {
-		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
+		t.Fatalf("EnsureLoadBalancer returned an error: %s", err)
 	}
 	svc.Status.LoadBalancer = *lbStatus
 	stubService(fakeClientset, svc)
@@ -379,17 +379,17 @@ func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Clie
 
 	err = lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, nodes)
 	if err != nil {
-		t.Errorf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
+		t.Fatalf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
 	}
 
 	nb, err := lb.getNodeBalancerByStatus(context.TODO(), svc)
 	if err != nil {
-		t.Errorf("failed to get NodeBalancer by status: %v", err)
+		t.Fatalf("failed to get NodeBalancer by status: %v", err)
 	}
 
 	cfgs, errConfigs := client.ListNodeBalancerConfigs(context.TODO(), nb.ID, nil)
 	if errConfigs != nil {
-		t.Errorf("error getting NodeBalancer configs: %v", errConfigs)
+		t.Fatalf("error getting NodeBalancer configs: %v", errConfigs)
 	}
 
 	expectedPortConfigs := map[int]string{
@@ -402,7 +402,7 @@ func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Clie
 	}
 
 	if !reflect.DeepEqual(expectedPortConfigs, observedPortConfigs) {
-		t.Errorf("NodeBalancer port mismatch: expected %v, got %v", expectedPortConfigs, observedPortConfigs)
+		t.Fatalf("NodeBalancer port mismatch: expected %v, got %v", expectedPortConfigs, observedPortConfigs)
 	}
 }
 
@@ -457,7 +457,7 @@ func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *
 
 	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
 	if err != nil {
-		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
+		t.Fatalf("EnsureLoadBalancer returned an error: %s", err)
 	}
 	svc.Status.LoadBalancer = *lbStatus
 
@@ -468,17 +468,17 @@ func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *
 	})
 	err = lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, nodes)
 	if err != nil {
-		t.Errorf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
+		t.Fatalf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
 	}
 
 	nb, err := lb.getNodeBalancerByStatus(context.TODO(), svc)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	cfgs, errConfigs := client.ListNodeBalancerConfigs(context.TODO(), nb.ID, nil)
 	if errConfigs != nil {
-		t.Errorf("error getting NodeBalancer configs: %v", errConfigs)
+		t.Fatalf("error getting NodeBalancer configs: %v", errConfigs)
 	}
 
 	expectedPorts := map[int]struct{}{
@@ -491,7 +491,7 @@ func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *
 	for _, cfg := range cfgs {
 		nodes, errNodes := client.ListNodeBalancerNodes(context.TODO(), nb.ID, cfg.ID, nil)
 		if errNodes != nil {
-			t.Errorf("error getting NodeBalancer nodes: %v", errNodes)
+			t.Fatalf("error getting NodeBalancer nodes: %v", errNodes)
 		}
 
 		if len(nodes) == 0 {
@@ -668,12 +668,12 @@ func testUpdateLoadBalancerAddNodeBalancerID(t *testing.T, client *linodego.Clie
 	})
 	err = lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, nodes)
 	if err != nil {
-		t.Errorf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
+		t.Fatalf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
 	}
 
 	lbStatus, _, err := lb.GetLoadBalancer(context.TODO(), svc.ClusterName, svc)
 	if err != nil {
-		t.Errorf("GetLoadBalancer returned an error: %s", err)
+		t.Fatalf("GetLoadBalancer returned an error: %s", err)
 	}
 
 	expectedLBStatus := makeLoadBalancerStatus(svc, newNodeBalancer)
