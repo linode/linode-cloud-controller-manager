@@ -210,9 +210,30 @@ func (i *instances) InstanceShutdownByProviderID(ctx context.Context, providerID
 	return false, nil
 }
 
-// TODO(PR): move code from instancesv1 over here
 func (i *instances) InstanceExists(ctx context.Context, node *v1.Node) (bool, error) {
-	return false, nil // TODO(PR): fix
+	providerID := node.Spec.ProviderID
+
+	ctx = sentry.SetHubOnContext(ctx)
+	sentry.SetTag(ctx, "provider_id", providerID)
+
+	id, err := parseProviderID(providerID)
+	if err != nil {
+		sentry.CaptureError(ctx, err)
+		return false, err
+	}
+
+	sentry.SetTag(ctx, "linode_id", strconv.Itoa(id))
+
+	_, err = linodeByID(ctx, i.client, id)
+	if err != nil {
+		if apiError, ok := err.(*linodego.Error); ok && apiError.Code == http.StatusNotFound {
+			return false, nil
+		}
+		sentry.CaptureError(ctx, err)
+		return false, err
+	}
+
+	return true, nil
 }
 
 func (i *instances) InstanceShutdown(ctx context.Context, node *v1.Node) (bool, error) {

@@ -24,28 +24,34 @@ func TestInstanceExistsByProviderID(t *testing.T) {
 	instances := newInstances(client)
 
 	t.Run("should propagate generic api error", func(t *testing.T) {
-		providerID := providerIDPrefix + "123"
+		node := &v1.Node{Spec: v1.NodeSpec{
+			ProviderID: providerIDPrefix + "123",
+		}}
 		expectedErr := errors.New("some error")
 		client.EXPECT().GetInstance(gomock.Any(), 123).Times(1).Return(nil, expectedErr)
 
-		exists, err := instances.InstanceExistsByProviderID(ctx, providerID)
+		exists, err := instances.InstanceExists(ctx, node)
 		assert.ErrorIs(t, err, expectedErr)
 		assert.False(t, exists)
 	})
 
 	t.Run("should return false if linode does not exist", func(t *testing.T) {
-		providerID := providerIDPrefix + "123"
+		node := &v1.Node{Spec: v1.NodeSpec{
+			ProviderID: providerIDPrefix + "123",
+		}}
 		client.EXPECT().GetInstance(gomock.Any(), 123).Times(1).Return(nil, &linodego.Error{
 			Code: http.StatusNotFound,
 		})
 
-		exists, err := instances.InstanceExistsByProviderID(ctx, providerID)
+		exists, err := instances.InstanceExists(ctx, node)
 		assert.NoError(t, err)
 		assert.False(t, exists)
 	})
 
 	t.Run("should return true if linode exists", func(t *testing.T) {
-		providerID := providerIDPrefix + "123"
+		node := &v1.Node{Spec: v1.NodeSpec{
+			ProviderID: providerIDPrefix + "123",
+		}}
 		client.EXPECT().GetInstance(gomock.Any(), 123).Times(1).Return(&linodego.Instance{
 			ID:     123,
 			Label:  "mock",
@@ -53,7 +59,7 @@ func TestInstanceExistsByProviderID(t *testing.T) {
 			Type:   "g6-standard-2",
 		}, nil)
 
-		exists, err := instances.InstanceExistsByProviderID(ctx, providerID)
+		exists, err := instances.InstanceExists(ctx, node)
 		assert.NoError(t, err)
 		assert.True(t, exists)
 	})
