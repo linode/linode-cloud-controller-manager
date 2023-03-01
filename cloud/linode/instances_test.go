@@ -349,3 +349,121 @@ func TestInstanceShutdownByProviderID(t *testing.T) {
 		assert.False(t, shutdown)
 	})
 }
+
+// TODO: consider folding all of these tests into the InstanceMetadata tests above
+// they have the same setup, we're just testing different properties
+func TestMetadataRegion(t *testing.T) {
+	ctx := context.TODO()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := NewMockClient(ctrl)
+	instances := newInstances(client)
+
+	t.Run("Test region retrieval", func(t *testing.T) {
+		id := 123
+		region := "us-east"
+		node := nodeWithProviderID(providerIDPrefix + strconv.Itoa(id))
+		client.EXPECT().GetInstance(gomock.Any(), 123).Times(1).Return(&linodego.Instance{
+			ID:     123,
+			Label:  "mock",
+			Region: region,
+			Type:   "g6-standard-2",
+		}, nil)
+		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), id).Times(1).Return(&linodego.InstanceIPAddressResponse{
+			IPv4: &linodego.InstanceIPv4Response{Public: []*linodego.InstanceIP{{Address: "1.2.3.4"}}},
+			IPv6: &linodego.InstanceIPv6Response{},
+		}, nil)
+		meta, err := instances.InstanceMetadata(ctx, node)
+
+		assert.NoError(t, err)
+		assert.Equal(t, region, meta.Region)
+		assert.Empty(t, meta.Zone)
+	})
+}
+
+func TestGetZoneByProviderID(t *testing.T) {
+	ctx := context.TODO()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := NewMockClient(ctrl)
+	instances := newInstances(client)
+
+	t.Run("fail when providerID is malformed", func(t *testing.T) {
+		providerID := "bogus://123"
+		node := nodeWithProviderID(providerID)
+		meta, err := instances.InstanceMetadata(ctx, node)
+
+		assert.Error(t, err, invalidProviderIDError{providerID}.Error())
+		assert.Nil(t, meta)
+	})
+
+	t.Run("fail on api error", func(t *testing.T) {
+		id := 29182
+		providerID := providerIDPrefix + strconv.Itoa(id)
+		node := nodeWithProviderID(providerID)
+		getErr := &linodego.Error{Code: http.StatusServiceUnavailable}
+		client.EXPECT().GetInstance(gomock.Any(), id).Times(1).Return(nil, getErr)
+		meta, err := instances.InstanceMetadata(ctx, node)
+
+		assert.ErrorIs(t, err, getErr)
+		assert.Nil(t, meta)
+	})
+
+	t.Run("get region when linode exists", func(t *testing.T) {
+		id := 29818
+		region := "eu-west"
+		providerID := providerIDPrefix + strconv.Itoa(id)
+		node := nodeWithProviderID(providerID)
+		client.EXPECT().GetInstance(gomock.Any(), id).Times(1).Return(&linodego.Instance{
+			ID: id, Region: region,
+		}, nil)
+		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), id).Times(1).Return(&linodego.InstanceIPAddressResponse{
+			IPv4: &linodego.InstanceIPv4Response{Public: []*linodego.InstanceIP{{Address: "1.2.3.4"}}},
+			IPv6: &linodego.InstanceIPv6Response{},
+		}, nil)
+		meta, err := instances.InstanceMetadata(ctx, node)
+
+		assert.NoError(t, err)
+		assert.Equal(t, meta.Region, region)
+	})
+}
+
+func TestGetZoneByNodeName(t *testing.T) {
+	ctx := context.TODO()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := NewMockClient(ctrl)
+	instances := newInstances(client)
+
+	t.Run("fail on api error", func(t *testing.T) {
+		name := "a-very-nice-linode"
+		node := nodeWithName(name)
+		listErr := &linodego.Error{Code: http.StatusInternalServerError}
+		client.EXPECT().ListInstances(gomock.Any(), linodeFilterListOptions(name)).Times(1).Return(nil, listErr)
+
+		meta, err := instances.InstanceMetadata(ctx, node)
+		assert.ErrorIs(t, err, listErr)
+		assert.Nil(t, meta)
+	})
+
+	t.Run("get region when linode exists", func(t *testing.T) {
+		name := "some-linode"
+		id := 291828
+		node := nodeWithName(name)
+		region := "eu-west"
+		client.EXPECT().ListInstances(gomock.Any(), linodeFilterListOptions(name)).Times(1).Return([]linodego.Instance{
+			{ID: id, Label: name, Region: region},
+		}, nil)
+		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), id).Times(1).Return(&linodego.InstanceIPAddressResponse{
+			IPv4: &linodego.InstanceIPv4Response{Public: []*linodego.InstanceIP{{Address: "1.2.3.4"}}},
+			IPv6: &linodego.InstanceIPv6Response{},
+		}, nil)
+		meta, err := instances.InstanceMetadata(ctx, node)
+
+		assert.NoError(t, err)
+		assert.Equal(t, region, meta.Region)
+	})
+}
