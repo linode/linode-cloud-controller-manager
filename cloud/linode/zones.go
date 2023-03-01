@@ -7,6 +7,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 )
 
+// TODO(PR): move this to instancesv2; move tests to instances_test
 type zones struct {
 	client Client
 	region string

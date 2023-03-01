@@ -17,7 +17,14 @@ type instances struct {
 	client Client
 }
 
-func newInstances(client Client) cloudprovider.Instances {
+// TODO(PR): providing both APIs to keep the tests green and to enable
+// gradual migration
+type hybridInstances interface {
+	cloudprovider.Instances
+	cloudprovider.InstancesV2
+}
+
+func newInstances(client Client) hybridInstances {
 	return &instances{client}
 }
 
@@ -201,4 +208,17 @@ func (i *instances) InstanceShutdownByProviderID(ctx context.Context, providerID
 	}
 
 	return false, nil
+}
+
+// TODO(PR): move code from instancesv1 over here
+func (i *instances) InstanceExists(ctx context.Context, node *v1.Node) (bool, error) {
+	return false, nil // TODO(PR): fix
+}
+
+func (i *instances) InstanceShutdown(ctx context.Context, node *v1.Node) (bool, error) {
+	return false, nil // TODO(PR): fix
+}
+
+func (i *instances) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
+	return nil, nil
 }
