@@ -267,5 +267,31 @@ func (i *instances) InstanceShutdown(ctx context.Context, node *v1.Node) (bool, 
 }
 
 func (i *instances) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
-	return nil, nil
+	providerID := node.Spec.ProviderID
+
+	// TODO(okokes): should we at all times rely on providerID or should we include
+	// lookups by node name as well?
+	id, err := parseProviderID(providerID)
+	if err != nil {
+		return nil, err
+	}
+
+	linode, err := linodeByID(ctx, i.client, id)
+	if err != nil {
+		return nil, err
+	}
+
+	addresses, err := i.nodeAddresses(ctx, linode)
+	if err != nil {
+		return nil, err
+	}
+
+	// note that Zone is omitted as it's not a thing in Linode
+	meta := &cloudprovider.InstanceMetadata{
+		ProviderID:    providerID,
+		NodeAddresses: addresses,
+		Region:        linode.Region,
+	}
+
+	return meta, nil
 }
