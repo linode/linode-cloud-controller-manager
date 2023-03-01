@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strconv"
 
-	"github.com/linode/linode-cloud-controller-manager/sentry"
 	"github.com/linode/linodego"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -55,26 +53,27 @@ func (i *instances) nodeAddresses(ctx context.Context, linode *linodego.Instance
 	return addresses, nil
 }
 
-func (i *instances) InstanceExists(ctx context.Context, node *v1.Node) (bool, error) {
+func (i *instances) lookupLinode(ctx context.Context, node *v1.Node) (*linodego.Instance, error) {
 	providerID := node.Spec.ProviderID
+	nodeName := types.NodeName(node.Name)
 
-	ctx = sentry.SetHubOnContext(ctx)
-	sentry.SetTag(ctx, "provider_id", providerID)
+	if providerID != "" {
+		id, err := parseProviderID(providerID)
+		if err != nil {
+			return nil, err
+		}
 
-	id, err := parseProviderID(providerID)
-	if err != nil {
-		sentry.CaptureError(ctx, err)
-		return false, err
+		return linodeByID(ctx, i.client, id)
 	}
 
-	sentry.SetTag(ctx, "linode_id", strconv.Itoa(id))
+	return linodeByName(ctx, i.client, nodeName)
+}
 
-	_, err = linodeByID(ctx, i.client, id)
-	if err != nil {
+func (i *instances) InstanceExists(ctx context.Context, node *v1.Node) (bool, error) {
+	if _, err := i.lookupLinode(ctx, node); err != nil {
 		if apiError, ok := err.(*linodego.Error); ok && apiError.Code == http.StatusNotFound {
 			return false, nil
 		}
-		sentry.CaptureError(ctx, err)
 		return false, err
 	}
 
@@ -82,22 +81,8 @@ func (i *instances) InstanceExists(ctx context.Context, node *v1.Node) (bool, er
 }
 
 func (i *instances) InstanceShutdown(ctx context.Context, node *v1.Node) (bool, error) {
-	providerID := node.Spec.ProviderID
-
-	ctx = sentry.SetHubOnContext(ctx)
-	sentry.SetTag(ctx, "provider_id", providerID)
-
-	id, err := parseProviderID(providerID)
+	instance, err := i.lookupLinode(ctx, node)
 	if err != nil {
-		sentry.CaptureError(ctx, err)
-		return false, err
-	}
-
-	sentry.SetTag(ctx, "linode_id", strconv.Itoa(id))
-
-	instance, err := linodeByID(ctx, i.client, id)
-	if err != nil {
-		sentry.CaptureError(ctx, err)
 		return false, err
 	}
 
@@ -112,29 +97,9 @@ func (i *instances) InstanceShutdown(ctx context.Context, node *v1.Node) (bool, 
 }
 
 func (i *instances) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
-	var (
-		providerID = node.Spec.ProviderID
-		nodeName   = types.NodeName(node.Name)
-		linode     *linodego.Instance
-		err        error
-	)
-
-	// TODO(okokes): abstract this away and reuse it in our other methods here
-	if providerID != "" {
-		id, err := parseProviderID(providerID)
-		if err != nil {
-			return nil, err
-		}
-
-		linode, err = linodeByID(ctx, i.client, id)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		linode, err = linodeByName(ctx, i.client, nodeName)
-		if err != nil {
-			return nil, err
-		}
+	linode, err := i.lookupLinode(ctx, node)
+	if err != nil {
+		return nil, err
 	}
 
 	addresses, err := i.nodeAddresses(ctx, linode)
@@ -144,7 +109,7 @@ func (i *instances) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloud
 
 	// note that Zone is omitted as it's not a thing in Linode
 	meta := &cloudprovider.InstanceMetadata{
-		ProviderID:    providerID,
+		ProviderID:    node.Spec.ProviderID, // TODO(okokes): this is circular... should we instead set it to a known prefix + linode.ID?
 		NodeAddresses: addresses,
 		InstanceType:  linode.Type,
 		Region:        linode.Region,

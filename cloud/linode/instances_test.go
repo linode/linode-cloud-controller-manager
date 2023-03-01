@@ -2,13 +2,13 @@ package linode
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 	"testing"
 
 	"github.com/golang/mock/gomock"
 	"github.com/linode/linodego"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,7 +25,7 @@ func nodeWithName(name string) *v1.Node {
 	return &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}}
 }
 
-func TestInstanceExistsByProviderID(t *testing.T) {
+func TestInstanceExists(t *testing.T) {
 	ctx := context.TODO()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -43,7 +43,7 @@ func TestInstanceExistsByProviderID(t *testing.T) {
 		assert.False(t, exists)
 	})
 
-	t.Run("should return false if linode does not exist", func(t *testing.T) {
+	t.Run("should return false if linode does not exist (by providerID)", func(t *testing.T) {
 		node := nodeWithProviderID(providerIDPrefix + "123")
 		client.EXPECT().GetInstance(gomock.Any(), 123).Times(1).Return(nil, &linodego.Error{
 			Code: http.StatusNotFound,
@@ -54,13 +54,40 @@ func TestInstanceExistsByProviderID(t *testing.T) {
 		assert.False(t, exists)
 	})
 
-	t.Run("should return true if linode exists", func(t *testing.T) {
+	t.Run("should return false if linode does not exist (by name)", func(t *testing.T) {
+		name := "some-name"
+		node := nodeWithName(name)
+		notFound := &linodego.Error{
+			Code: http.StatusNotFound,
+		}
+		filter := linodeFilterListOptions(name)
+		client.EXPECT().ListInstances(gomock.Any(), filter).Times(1).Return(nil, notFound)
+
+		exists, err := instances.InstanceExists(ctx, node)
+		assert.NoError(t, err)
+		assert.False(t, exists)
+	})
+
+	t.Run("should return true if linode exists (by provider)", func(t *testing.T) {
 		node := nodeWithProviderID(providerIDPrefix + "123")
 		client.EXPECT().GetInstance(gomock.Any(), 123).Times(1).Return(&linodego.Instance{
 			ID:     123,
 			Label:  "mock",
 			Region: "us-east",
 			Type:   "g6-standard-2",
+		}, nil)
+
+		exists, err := instances.InstanceExists(ctx, node)
+		assert.NoError(t, err)
+		assert.True(t, exists)
+	})
+
+	t.Run("should return true if linode exists (by name)", func(t *testing.T) {
+		name := "some-name"
+		node := nodeWithName(name)
+
+		client.EXPECT().ListInstances(gomock.Any(), linodeFilterListOptions(name)).Times(1).Return([]linodego.Instance{
+			{ID: 123, Label: name},
 		}, nil)
 
 		exists, err := instances.InstanceExists(ctx, node)
