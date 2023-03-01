@@ -237,7 +237,33 @@ func (i *instances) InstanceExists(ctx context.Context, node *v1.Node) (bool, er
 }
 
 func (i *instances) InstanceShutdown(ctx context.Context, node *v1.Node) (bool, error) {
-	return false, nil // TODO(PR): fix
+	providerID := node.Spec.ProviderID
+
+	ctx = sentry.SetHubOnContext(ctx)
+	sentry.SetTag(ctx, "provider_id", providerID)
+
+	id, err := parseProviderID(providerID)
+	if err != nil {
+		sentry.CaptureError(ctx, err)
+		return false, err
+	}
+
+	sentry.SetTag(ctx, "linode_id", strconv.Itoa(id))
+
+	instance, err := linodeByID(ctx, i.client, id)
+	if err != nil {
+		sentry.CaptureError(ctx, err)
+		return false, err
+	}
+
+	// An instance is considered to be "shutdown" when it is
+	// in the process of shutting down, or already offline.
+	if instance.Status == linodego.InstanceOffline ||
+		instance.Status == linodego.InstanceShuttingDown {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (i *instances) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {

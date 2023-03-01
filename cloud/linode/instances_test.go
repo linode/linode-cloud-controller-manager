@@ -15,6 +15,12 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 )
 
+func nodeWithProviderID(providerID string) *v1.Node {
+	return &v1.Node{Spec: v1.NodeSpec{
+		ProviderID: providerID,
+	}}
+}
+
 func TestInstanceExistsByProviderID(t *testing.T) {
 	ctx := context.TODO()
 	ctrl := gomock.NewController(t)
@@ -24,9 +30,7 @@ func TestInstanceExistsByProviderID(t *testing.T) {
 	instances := newInstances(client)
 
 	t.Run("should propagate generic api error", func(t *testing.T) {
-		node := &v1.Node{Spec: v1.NodeSpec{
-			ProviderID: providerIDPrefix + "123",
-		}}
+		node := nodeWithProviderID(providerIDPrefix + "123")
 		expectedErr := errors.New("some error")
 		client.EXPECT().GetInstance(gomock.Any(), 123).Times(1).Return(nil, expectedErr)
 
@@ -36,9 +40,7 @@ func TestInstanceExistsByProviderID(t *testing.T) {
 	})
 
 	t.Run("should return false if linode does not exist", func(t *testing.T) {
-		node := &v1.Node{Spec: v1.NodeSpec{
-			ProviderID: providerIDPrefix + "123",
-		}}
+		node := nodeWithProviderID(providerIDPrefix + "123")
 		client.EXPECT().GetInstance(gomock.Any(), 123).Times(1).Return(nil, &linodego.Error{
 			Code: http.StatusNotFound,
 		})
@@ -49,9 +51,7 @@ func TestInstanceExistsByProviderID(t *testing.T) {
 	})
 
 	t.Run("should return true if linode exists", func(t *testing.T) {
-		node := &v1.Node{Spec: v1.NodeSpec{
-			ProviderID: providerIDPrefix + "123",
-		}}
+		node := nodeWithProviderID(providerIDPrefix + "123")
 		client.EXPECT().GetInstance(gomock.Any(), 123).Times(1).Return(&linodego.Instance{
 			ID:     123,
 			Label:  "mock",
@@ -329,9 +329,9 @@ func TestInstanceShutdownByProviderID(t *testing.T) {
 
 	t.Run("fails when instance not found", func(t *testing.T) {
 		id := 12345
-		providerID := providerIDPrefix + strconv.Itoa(id)
+		node := nodeWithProviderID(providerIDPrefix + strconv.Itoa(id))
 		client.EXPECT().GetInstance(gomock.Any(), id).Times(1).Return(nil, linodego.Error{Code: http.StatusNotFound})
-		shutdown, err := instances.InstanceShutdownByProviderID(ctx, providerID)
+		shutdown, err := instances.InstanceShutdown(ctx, node)
 
 		assert.Error(t, err)
 		assert.False(t, shutdown)
@@ -339,11 +339,11 @@ func TestInstanceShutdownByProviderID(t *testing.T) {
 
 	t.Run("returns true when instance is shut down", func(t *testing.T) {
 		id := 12345
-		providerID := providerIDPrefix + strconv.Itoa(id)
+		node := nodeWithProviderID(providerIDPrefix + strconv.Itoa(id))
 		client.EXPECT().GetInstance(gomock.Any(), id).Times(1).Return(&linodego.Instance{
 			ID: id, Label: "offline-linode", Status: linodego.InstanceOffline,
 		}, nil)
-		shutdown, err := instances.InstanceShutdownByProviderID(ctx, providerID)
+		shutdown, err := instances.InstanceShutdown(ctx, node)
 
 		assert.NoError(t, err)
 		assert.True(t, shutdown)
@@ -351,11 +351,11 @@ func TestInstanceShutdownByProviderID(t *testing.T) {
 
 	t.Run("returns true when instance is shutting down", func(t *testing.T) {
 		id := 12345
-		providerID := providerIDPrefix + strconv.Itoa(id)
+		node := nodeWithProviderID(providerIDPrefix + strconv.Itoa(id))
 		client.EXPECT().GetInstance(gomock.Any(), id).Times(1).Return(&linodego.Instance{
 			ID: id, Label: "shutting-down-linode", Status: linodego.InstanceShuttingDown,
 		}, nil)
-		shutdown, err := instances.InstanceShutdownByProviderID(ctx, providerID)
+		shutdown, err := instances.InstanceShutdown(ctx, node)
 
 		assert.NoError(t, err)
 		assert.True(t, shutdown)
@@ -363,11 +363,11 @@ func TestInstanceShutdownByProviderID(t *testing.T) {
 
 	t.Run("returns false when instance is running", func(t *testing.T) {
 		id := 12345
-		providerID := providerIDPrefix + strconv.Itoa(id)
+		node := nodeWithProviderID(providerIDPrefix + strconv.Itoa(id))
 		client.EXPECT().GetInstance(gomock.Any(), id).Times(1).Return(&linodego.Instance{
 			ID: id, Label: "running-linode", Status: linodego.InstanceRunning,
 		}, nil)
-		shutdown, err := instances.InstanceShutdownByProviderID(ctx, providerID)
+		shutdown, err := instances.InstanceShutdown(ctx, node)
 
 		assert.NoError(t, err)
 		assert.False(t, shutdown)
