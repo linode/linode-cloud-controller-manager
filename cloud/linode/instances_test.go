@@ -144,6 +144,7 @@ func TestMetadataRetrieval(t *testing.T) {
 
 		meta, err := instances.InstanceMetadata(ctx, node)
 		assert.NoError(t, err)
+		assert.Equal(t, providerIDPrefix+strconv.Itoa(id), meta.ProviderID)
 		assert.Equal(t, region, meta.Region)
 		assert.Equal(t, linodeType, meta.InstanceType)
 		assert.Equal(t, meta.NodeAddresses, []v1.NodeAddress{

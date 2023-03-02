@@ -92,7 +92,7 @@ func (i *instances) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloud
 
 	// note that Zone is omitted as it's not a thing in Linode
 	meta := &cloudprovider.InstanceMetadata{
-		ProviderID:    node.Spec.ProviderID, // TODO(okokes): this is circular... should we instead set it to a known prefix + linode.ID?
+		ProviderID:    fmt.Sprintf("%v%v", providerIDPrefix, linode.ID),
 		NodeAddresses: addresses,
 		InstanceType:  linode.Type,
 		Region:        linode.Region,
