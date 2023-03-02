@@ -3,6 +3,7 @@ package linode
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"strconv"
 	"testing"
@@ -135,12 +136,6 @@ func TestMetadataRetrieval(t *testing.T) {
 		client.EXPECT().ListInstances(gomock.Any(), filter).Times(1).Return([]linodego.Instance{
 			{ID: id, Label: name},
 		}, nil)
-		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), id).Times(1).Return(&linodego.InstanceIPAddressResponse{
-			IPv4: &linodego.InstanceIPv4Response{
-				Public:  []*linodego.InstanceIP{},
-				Private: []*linodego.InstanceIP{},
-			},
-		}, nil)
 
 		meta, err := instances.InstanceMetadata(ctx, node)
 		assert.Error(t, err, instanceNoIPAddressesError{id})
@@ -151,19 +146,13 @@ func TestMetadataRetrieval(t *testing.T) {
 		id := 123
 		name := "mock-instance"
 		node := nodeWithName(name)
-		publicIPv4 := "45.76.101.25"
-		privateIPv4 := "192.168.133.65"
+		publicIPv4 := net.ParseIP("45.76.101.25")
+		privateIPv4 := net.ParseIP("192.168.133.65")
 		linodeType := "g6-standard-1"
 		region := "us-east"
 		filter := linodeFilterListOptions(name)
 		client.EXPECT().ListInstances(gomock.Any(), filter).Times(1).Return([]linodego.Instance{
-			{ID: id, Label: name, Type: linodeType, Region: region},
-		}, nil)
-		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), id).Times(1).Return(&linodego.InstanceIPAddressResponse{
-			IPv4: &linodego.InstanceIPv4Response{
-				Public:  []*linodego.InstanceIP{{Address: publicIPv4}},
-				Private: []*linodego.InstanceIP{{Address: privateIPv4}},
-			},
+			{ID: id, Label: name, Type: linodeType, Region: region, IPv4: []*net.IP{&publicIPv4, &privateIPv4}},
 		}, nil)
 
 		meta, err := instances.InstanceMetadata(ctx, node)
@@ -177,11 +166,11 @@ func TestMetadataRetrieval(t *testing.T) {
 			},
 			{
 				Type:    v1.NodeExternalIP,
-				Address: publicIPv4,
+				Address: publicIPv4.String(),
 			},
 			{
 				Type:    v1.NodeInternalIP,
-				Address: privateIPv4,
+				Address: privateIPv4.String(),
 			},
 		})
 	})
@@ -191,18 +180,12 @@ func TestMetadataRetrieval(t *testing.T) {
 		name := "my-instance"
 		providerID := providerIDPrefix + strconv.Itoa(id)
 		node := nodeWithProviderID(providerID)
-		publicIPv4 := "32.74.121.25"
-		privateIPv4 := "192.168.121.42"
+		publicIPv4 := net.ParseIP("32.74.121.25")
+		privateIPv4 := net.ParseIP("192.168.121.42")
 		linodeType := "g6-standard-1"
 		region := "us-east"
 		client.EXPECT().GetInstance(gomock.Any(), id).Times(1).Return(&linodego.Instance{
-			ID: id, Label: name, Type: linodeType, Region: region,
-		}, nil)
-		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), id).Times(1).Return(&linodego.InstanceIPAddressResponse{
-			IPv4: &linodego.InstanceIPv4Response{
-				Public:  []*linodego.InstanceIP{{Address: publicIPv4}},
-				Private: []*linodego.InstanceIP{{Address: privateIPv4}},
-			},
+			ID: id, Label: name, Type: linodeType, Region: region, IPv4: []*net.IP{&publicIPv4, &privateIPv4},
 		}, nil)
 
 		meta, err := instances.InstanceMetadata(ctx, node)
@@ -217,11 +200,11 @@ func TestMetadataRetrieval(t *testing.T) {
 			},
 			{
 				Type:    v1.NodeExternalIP,
-				Address: publicIPv4,
+				Address: publicIPv4.String(),
 			},
 			{
 				Type:    v1.NodeInternalIP,
-				Address: privateIPv4,
+				Address: privateIPv4.String(),
 			},
 		})
 	})

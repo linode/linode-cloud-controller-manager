@@ -27,32 +27,6 @@ func (e instanceNoIPAddressesError) Error() string {
 	return fmt.Sprintf("instance %d has no IP addresses", e.id)
 }
 
-func (i *instances) nodeAddresses(ctx context.Context, linode *linodego.Instance) ([]v1.NodeAddress, error) {
-	var addresses []v1.NodeAddress
-	addresses = append(addresses, v1.NodeAddress{Type: v1.NodeHostName, Address: linode.Label})
-
-	ips, err := i.client.GetInstanceIPAddresses(ctx, linode.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	if (len(ips.IPv4.Public) == 0) && (len(ips.IPv4.Private) == 0) {
-		return nil, instanceNoIPAddressesError{linode.ID}
-	}
-
-	if len(ips.IPv4.Public) > 0 {
-		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeExternalIP, Address: ips.IPv4.Public[0].Address})
-	}
-	// Allow Nodes to not have an ExternalIP, if this proves problematic this will be reverted
-
-	if len(ips.IPv4.Private) > 0 {
-		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: ips.IPv4.Private[0].Address})
-	}
-	// Allow Nodes to not have an InternalIP, if this proves problematic this will be reverted
-
-	return addresses, nil
-}
-
 func (i *instances) lookupLinode(ctx context.Context, node *v1.Node) (*linodego.Instance, error) {
 	providerID := node.Spec.ProviderID
 	nodeName := types.NodeName(node.Name)
@@ -102,9 +76,18 @@ func (i *instances) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloud
 		return nil, err
 	}
 
-	addresses, err := i.nodeAddresses(ctx, linode)
-	if err != nil {
-		return nil, err
+	if len(linode.IPv4) == 0 {
+		return nil, instanceNoIPAddressesError{linode.ID}
+	}
+
+	addresses := []v1.NodeAddress{{Type: v1.NodeHostName, Address: linode.Label}}
+
+	for _, ip := range linode.IPv4 {
+		ipType := v1.NodeExternalIP
+		if ip.IsPrivate() {
+			ipType = v1.NodeInternalIP
+		}
+		addresses = append(addresses, v1.NodeAddress{Type: ipType, Address: ip.String()})
 	}
 
 	// note that Zone is omitted as it's not a thing in Linode
