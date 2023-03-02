@@ -3,6 +3,7 @@ package linode
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"strconv"
@@ -128,20 +129,6 @@ func TestMetadataRetrieval(t *testing.T) {
 		assert.Nil(t, meta)
 	})
 
-	t.Run("errors when linode does not have any ips", func(t *testing.T) {
-		id := 29392
-		name := "an-instance"
-		node := nodeWithName(name)
-		filter := linodeFilterListOptions(name)
-		client.EXPECT().ListInstances(gomock.Any(), filter).Times(1).Return([]linodego.Instance{
-			{ID: id, Label: name},
-		}, nil)
-
-		meta, err := instances.InstanceMetadata(ctx, node)
-		assert.Error(t, err, instanceNoIPAddressesError{id})
-		assert.Nil(t, meta)
-	})
-
 	t.Run("should return data when linode is found (by name)", func(t *testing.T) {
 		id := 123
 		name := "mock-instance"
@@ -175,39 +162,60 @@ func TestMetadataRetrieval(t *testing.T) {
 		})
 	})
 
-	t.Run("should return addresses when linode is found (by provider)", func(t *testing.T) {
-		id := 192910
-		name := "my-instance"
-		providerID := providerIDPrefix + strconv.Itoa(id)
-		node := nodeWithProviderID(providerID)
-		publicIPv4 := net.ParseIP("32.74.121.25")
-		privateIPv4 := net.ParseIP("192.168.121.42")
-		linodeType := "g6-standard-1"
-		region := "us-east"
-		client.EXPECT().GetInstance(gomock.Any(), id).Times(1).Return(&linodego.Instance{
-			ID: id, Label: name, Type: linodeType, Region: region, IPv4: []*net.IP{&publicIPv4, &privateIPv4},
-		}, nil)
+	ipTests := []struct {
+		name            string
+		inputIPs        []string
+		outputAddresses []v1.NodeAddress
+		expectedErr     error
+	}{
+		{"no IPs", nil, nil, instanceNoIPAddressesError{192910}},
+		{"one public, one private", []string{"32.74.121.25", "192.168.121.42"},
+			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "32.74.121.25"}, {Type: v1.NodeInternalIP, Address: "192.168.121.42"}}, nil},
+		{"one public, no private", []string{"32.74.121.25"},
+			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "32.74.121.25"}}, nil},
+		{"one private, no public", []string{"192.168.121.42"},
+			[]v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "192.168.121.42"}}, nil},
+		{"two public addresses", []string{"32.74.121.25", "32.74.121.22"},
+			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "32.74.121.25"}, {Type: v1.NodeExternalIP, Address: "32.74.121.22"}}, nil},
+		{"two private addresses", []string{"192.168.121.42", "10.0.2.15"},
+			[]v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "192.168.121.42"}, {Type: v1.NodeInternalIP, Address: "10.0.2.15"}}, nil},
+	}
 
-		meta, err := instances.InstanceMetadata(ctx, node)
+	for _, test := range ipTests {
+		t.Run(fmt.Sprintf("addresses are retrieved - %s", test.name), func(t *testing.T) {
+			id := 192910
+			name := "my-instance"
+			providerID := providerIDPrefix + strconv.Itoa(id)
+			node := nodeWithProviderID(providerID)
 
-		assert.NoError(t, err)
-		assert.Equal(t, region, meta.Region)
-		assert.Equal(t, linodeType, meta.InstanceType)
-		assert.Equal(t, meta.NodeAddresses, []v1.NodeAddress{
-			{
-				Type:    v1.NodeHostName,
-				Address: name,
-			},
-			{
-				Type:    v1.NodeExternalIP,
-				Address: publicIPv4.String(),
-			},
-			{
-				Type:    v1.NodeInternalIP,
-				Address: privateIPv4.String(),
-			},
+			ips := make([]*net.IP, 0, len(test.inputIPs))
+			for _, ip := range test.inputIPs {
+				parsed := net.ParseIP(ip)
+				if parsed == nil {
+					t.Fatalf("cannot parse %v as an ipv4", ip)
+				}
+				ips = append(ips, &parsed)
+			}
+
+			linodeType := "g6-standard-1"
+			region := "us-east"
+			client.EXPECT().GetInstance(gomock.Any(), id).Times(1).Return(&linodego.Instance{
+				ID: id, Label: name, Type: linodeType, Region: region, IPv4: ips,
+			}, nil)
+
+			meta, err := instances.InstanceMetadata(ctx, node)
+
+			assert.Equal(t, err, test.expectedErr)
+			if test.expectedErr == nil {
+				assert.Equal(t, region, meta.Region)
+				assert.Equal(t, linodeType, meta.InstanceType)
+				addresses := append([]v1.NodeAddress{
+					{Type: v1.NodeHostName, Address: name},
+				}, test.outputAddresses...)
+				assert.Equal(t, meta.NodeAddresses, addresses)
+			}
 		})
-	})
+	}
 }
 
 func TestMalformedProviders(t *testing.T) {
