@@ -140,6 +140,16 @@ func (l *loadbalancers) getNodeBalancerByStatus(ctx context.Context, service *v1
 // LoadBalancer status; if they are different (because of an updated NodeBalancerID
 // annotation), the old one is deleted.
 func (l *loadbalancers) cleanupOldNodeBalancer(ctx context.Context, service *v1.Service) error {
+	// unless there's an annotation, we can never get a past and current NB to differ,
+	// because they're looked up the same way
+	// TODO(okokes): just copy pasted from elsewhere, encapsulate it somehow
+	rawID, _ := getServiceAnnotation(service, annLinodeNodeBalancerID)
+	id, idErr := strconv.Atoi(rawID)
+	hasIDAnn := idErr == nil && id != 0
+	if !hasIDAnn {
+		return nil
+	}
+
 	previousNB, err := l.getNodeBalancerByStatus(ctx, service)
 	switch err.(type) {
 	case nil:

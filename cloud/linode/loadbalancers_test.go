@@ -166,6 +166,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 			name: "makeLoadBalancerStatus",
 			f:    testMakeLoadBalancerStatus,
 		},
+		{
+			name: "Cleanup does not all the API unless Service annotated",
+			f:    testCleanupDoesntCall,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1442,6 +1446,50 @@ func testMakeLoadBalancerStatus(t *testing.T, client *linodego.Client, _ *fakeAP
 	if !reflect.DeepEqual(status, expectedStatus) {
 		t.Errorf("expected status for %q annotated service to be %#v; got %#v", annLinodeHostnameOnlyIngress, expectedStatus, status)
 	}
+}
+
+func testCleanupDoesntCall(t *testing.T, client *linodego.Client, fakeAPI *fakeAPI) {
+	ipv4 := "192.168.0.1"
+	hostname := "nb-192-168-0-1.newark.nodebalancer.linode.com"
+	nb := &linodego.NodeBalancer{
+		IPv4:     &ipv4,
+		Hostname: &hostname,
+	}
+
+	svc := &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test"}}
+	svcAnn := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test",
+			Annotations: map[string]string{annLinodeNodeBalancerID: "12345"},
+		},
+	}
+	svc.Status.LoadBalancer = *makeLoadBalancerStatus(svc, nb)
+	svcAnn.Status.LoadBalancer = *makeLoadBalancerStatus(svc, nb)
+	lb := &loadbalancers{client, "us-west", nil}
+
+	t.Run("non-annotated service shouldn't call the API during cleanup", func(t *testing.T) {
+		if err := lb.cleanupOldNodeBalancer(context.TODO(), svc); err != nil {
+			t.Fatal(err)
+		}
+		if len(fakeAPI.requests) != 0 {
+			t.Fatalf("unexpected API calls: %v", fakeAPI.requests)
+		}
+	})
+
+	// TODO(okokes): note that we're polluting fakeAPI between these subtests (not an issue per-se here, but not ideal)
+	t.Run("annotated service calls the API to load said NB", func(t *testing.T) {
+		if err := lb.cleanupOldNodeBalancer(context.TODO(), svcAnn); err != nil {
+			t.Fatal(err)
+		}
+		if len(fakeAPI.requests) != 1 {
+			t.Fatalf("unexpected API calls: %v", fakeAPI.requests)
+		}
+		// TODO(okokes): we need to change this to `/v4/nodebalancer` once we upgrade to linodego v1
+		if !fakeAPI.didRequestOccur("GET", "/nodebalancers", "") {
+			t.Fatalf("unexpected API calls: %v", fakeAPI.requests)
+		}
+		// TODO(okokes): check for DELETE on the old NB
+	})
 }
 
 func testGetNodeBalancerForServiceIDDoesNotExist(t *testing.T, client *linodego.Client, _ *fakeAPI) {
