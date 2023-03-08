@@ -644,12 +644,20 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 	return l.createNodeBalancer(ctx, clusterName, service, configs)
 }
 
+func trimString(s string, maxLen int) string {
+	if len(s) > maxLen {
+		return s[:maxLen]
+	}
+	return s
+}
+
 func (l *loadbalancers) buildNodeBalancerNodeCreateOptions(node *v1.Node, nodePort int32) linodego.NodeBalancerNodeCreateOptions {
 	return linodego.NodeBalancerNodeCreateOptions{
 		Address: fmt.Sprintf("%v:%v", getNodePrivateIP(node), nodePort),
-		Label:   node.Name,
-		Mode:    "accept",
-		Weight:  100,
+		// NodeBalancer backends must be 3-32 chars in length
+		Label:  trimString(node.Name, 32),
+		Mode:   "accept",
+		Weight: 100,
 	}
 }
 
