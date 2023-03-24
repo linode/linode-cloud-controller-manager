@@ -32,11 +32,6 @@ type fakeRequest struct {
 	Method string
 }
 
-type filterStruct struct {
-	Label string `json:"label,omitempty"`
-	NbID  string `json:"nodebalancer_id,omitempty"`
-}
-
 func newFake(t *testing.T) *fakeAPI {
 	return &fakeAPI{
 		t:        t,
@@ -156,13 +151,13 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						data = append(data, *n)
 					}
 				} else {
-					var fs filterStruct
+					var fs map[string]string
 					err := json.Unmarshal([]byte(filter), &fs)
 					if err != nil {
 						f.t.Fatal(err)
 					}
 					for _, n := range f.nbc {
-						if strconv.Itoa(n.NodeBalancerID) == fs.NbID {
+						if strconv.Itoa(n.NodeBalancerID) == fs["nodebalancer_id"] {
 							data = append(data, *n)
 						}
 					}
@@ -209,13 +204,14 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						data = append(data, *n)
 					}
 				} else {
-					var fs filterStruct
+					var fs map[string]string
 					err := json.Unmarshal([]byte(filter), &fs)
 					if err != nil {
 						f.t.Fatal(err)
 					}
 					for _, n := range f.nb {
-						if *n.Label == fs.Label {
+						if (n.Label != nil && fs["label"] != "" && *n.Label == fs["label"]) ||
+							(fs["ipv4"] != "" && n.IPv4 != nil && *n.IPv4 == fs["ipv4"]) {
 							data = append(data, *n)
 						}
 					}
