@@ -28,8 +28,7 @@ var Options struct {
 
 type linodeCloud struct {
 	client        Client
-	instances     cloudprovider.Instances
-	zones         cloudprovider.Zones
+	instances     cloudprovider.InstancesV2
 	loadbalancers cloudprovider.LoadBalancer
 }
 
@@ -64,7 +63,6 @@ func newCloud() (cloudprovider.Interface, error) {
 	return &linodeCloud{
 		client:        &linodeClient,
 		instances:     newInstances(&linodeClient),
-		zones:         newZones(&linodeClient, region),
 		loadbalancers: newLoadbalancers(&linodeClient, region),
 	}, nil
 }
@@ -83,15 +81,15 @@ func (c *linodeCloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 }
 
 func (c *linodeCloud) Instances() (cloudprovider.Instances, bool) {
-	return c.instances, true
-}
-
-func (c *linodeCloud) InstancesV2() (cloudprovider.InstancesV2, bool) {
 	return nil, false
 }
 
+func (c *linodeCloud) InstancesV2() (cloudprovider.InstancesV2, bool) {
+	return c.instances, true
+}
+
 func (c *linodeCloud) Zones() (cloudprovider.Zones, bool) {
-	return c.zones, true
+	return nil, false
 }
 
 func (c *linodeCloud) Clusters() (cloudprovider.Clusters, bool) {
