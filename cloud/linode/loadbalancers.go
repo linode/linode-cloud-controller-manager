@@ -450,17 +450,16 @@ func (l *loadbalancers) getNodeBalancerByHostname(ctx context.Context, service *
 }
 
 func (l *loadbalancers) getNodeBalancerByIPv4(ctx context.Context, service *v1.Service, ipv4 string) (*linodego.NodeBalancer, error) {
-	lbs, err := l.client.ListNodeBalancers(ctx, nil)
+	filter := fmt.Sprintf(`{"ipv4": "%v"}`, ipv4)
+	lbs, err := l.client.ListNodeBalancers(ctx, &linodego.ListOptions{Filter: filter})
 	if err != nil {
 		return nil, err
 	}
-	for _, lb := range lbs {
-		if *lb.IPv4 == ipv4 {
-			klog.V(2).Infof("found NodeBalancer (%d) for service (%s) via IPv4 (%s)", lb.ID, getServiceNn(service), ipv4)
-			return &lb, nil
-		}
+	if len(lbs) == 0 {
+		return nil, lbNotFoundError{serviceNn: getServiceNn(service)}
 	}
-	return nil, lbNotFoundError{serviceNn: getServiceNn(service)}
+	klog.V(2).Infof("found NodeBalancer (%d) for service (%s) via IPv4 (%s)", lbs[0].ID, getServiceNn(service), ipv4)
+	return &lbs[0], nil
 }
 
 func (l *loadbalancers) getNodeBalancerByID(ctx context.Context, service *v1.Service, id int) (*linodego.NodeBalancer, error) {
