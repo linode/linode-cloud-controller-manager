@@ -167,7 +167,7 @@ func TestCCMLoadBalancers(t *testing.T) {
 			f:    testMakeLoadBalancerStatus,
 		},
 		{
-			name: "Cleanup does not all the API unless Service annotated",
+			name: "Cleanup does not call the API unless Service annotated",
 			f:    testCleanupDoesntCall,
 		},
 	}
@@ -1467,6 +1467,7 @@ func testCleanupDoesntCall(t *testing.T, client *linodego.Client, fakeAPI *fakeA
 	svcAnn.Status.LoadBalancer = *makeLoadBalancerStatus(svc, nb)
 	lb := &loadbalancers{client, "us-west", nil}
 
+	fakeAPI.Reset()
 	t.Run("non-annotated service shouldn't call the API during cleanup", func(t *testing.T) {
 		if err := lb.cleanupOldNodeBalancer(context.TODO(), svc); err != nil {
 			t.Fatal(err)
@@ -1476,7 +1477,7 @@ func testCleanupDoesntCall(t *testing.T, client *linodego.Client, fakeAPI *fakeA
 		}
 	})
 
-	// TODO(okokes): note that we're polluting fakeAPI between these subtests (not an issue per-se here, but not ideal)
+	fakeAPI.Reset()
 	t.Run("annotated service calls the API to load said NB", func(t *testing.T) {
 		if err := lb.cleanupOldNodeBalancer(context.TODO(), svcAnn); err != nil {
 			t.Fatal(err)

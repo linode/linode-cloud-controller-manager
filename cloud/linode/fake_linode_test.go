@@ -42,6 +42,10 @@ func newFake(t *testing.T) *fakeAPI {
 	}
 }
 
+func (f *fakeAPI) Reset() {
+	*f = *newFake(f.t)
+}
+
 func (f *fakeAPI) recordRequest(r *http.Request) {
 	bodyBytes, _ := ioutil.ReadAll(r.Body)
 	r.Body.Close()
