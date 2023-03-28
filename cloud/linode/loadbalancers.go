@@ -142,11 +142,7 @@ func (l *loadbalancers) getNodeBalancerByStatus(ctx context.Context, service *v1
 func (l *loadbalancers) cleanupOldNodeBalancer(ctx context.Context, service *v1.Service) error {
 	// unless there's an annotation, we can never get a past and current NB to differ,
 	// because they're looked up the same way
-	// TODO(okokes): just copy pasted from elsewhere, encapsulate it somehow
-	rawID, _ := getServiceAnnotation(service, annLinodeNodeBalancerID)
-	id, idErr := strconv.Atoi(rawID)
-	hasIDAnn := idErr == nil && id != 0
-	if !hasIDAnn {
+	if _, ok := getServiceAnnotation(service, annLinodeNodeBalancerID); !ok {
 		return nil
 	}
 
