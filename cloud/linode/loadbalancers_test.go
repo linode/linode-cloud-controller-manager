@@ -1449,25 +1449,28 @@ func testMakeLoadBalancerStatus(t *testing.T, client *linodego.Client, _ *fakeAP
 }
 
 func testCleanupDoesntCall(t *testing.T, client *linodego.Client, fakeAPI *fakeAPI) {
-	ipv4 := "192.168.0.1"
-	hostname := "nb-192-168-0-1.newark.nodebalancer.linode.com"
-	nb := &linodego.NodeBalancer{
-		IPv4:     &ipv4,
-		Hostname: &hostname,
+	region := "us-west"
+	nb1, err := client.CreateNodeBalancer(context.TODO(), linodego.NodeBalancerCreateOptions{Region: region})
+	if err != nil {
+		t.Fatal(err)
+	}
+	nb2, err := client.CreateNodeBalancer(context.TODO(), linodego.NodeBalancerCreateOptions{Region: region})
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	svc := &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test"}}
 	svcAnn := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "test",
-			Annotations: map[string]string{annLinodeNodeBalancerID: "12345"},
+			Annotations: map[string]string{annLinodeNodeBalancerID: strconv.Itoa(nb2.ID)},
 		},
 	}
-	svc.Status.LoadBalancer = *makeLoadBalancerStatus(svc, nb)
-	svcAnn.Status.LoadBalancer = *makeLoadBalancerStatus(svc, nb)
-	lb := &loadbalancers{client, "us-west", nil}
+	svc.Status.LoadBalancer = *makeLoadBalancerStatus(svc, nb1)
+	svcAnn.Status.LoadBalancer = *makeLoadBalancerStatus(svcAnn, nb1)
+	lb := &loadbalancers{client, region, nil}
 
-	fakeAPI.Reset()
+	fakeAPI.ResetRequests()
 	t.Run("non-annotated service shouldn't call the API during cleanup", func(t *testing.T) {
 		if err := lb.cleanupOldNodeBalancer(context.TODO(), svc); err != nil {
 			t.Fatal(err)
@@ -1477,19 +1480,19 @@ func testCleanupDoesntCall(t *testing.T, client *linodego.Client, fakeAPI *fakeA
 		}
 	})
 
-	fakeAPI.Reset()
+	fakeAPI.ResetRequests()
 	t.Run("annotated service calls the API to load said NB", func(t *testing.T) {
 		if err := lb.cleanupOldNodeBalancer(context.TODO(), svcAnn); err != nil {
 			t.Fatal(err)
 		}
-		if len(fakeAPI.requests) != 1 {
-			t.Fatalf("unexpected API calls: %v", fakeAPI.requests)
+		expectedRequests := map[fakeRequest]struct{}{
+			{Path: "/nodebalancers", Body: "", Method: "GET"}:                            {},
+			{Path: fmt.Sprintf("/nodebalancers/%v", nb2.ID), Body: "", Method: "GET"}:    {},
+			{Path: fmt.Sprintf("/nodebalancers/%v", nb1.ID), Body: "", Method: "DELETE"}: {},
 		}
-		// TODO(okokes): we need to change this to `/v4/nodebalancer` once we upgrade to linodego v1
-		if !fakeAPI.didRequestOccur("GET", "/nodebalancers", "") {
-			t.Fatalf("unexpected API calls: %v", fakeAPI.requests)
+		if !reflect.DeepEqual(fakeAPI.requests, expectedRequests) {
+			t.Fatalf("expected requests %#v, got %#v instead", expectedRequests, fakeAPI.requests)
 		}
-		// TODO(okokes): check for DELETE on the old NB
 	})
 }
 

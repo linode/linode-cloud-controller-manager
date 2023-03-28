@@ -42,8 +42,8 @@ func newFake(t *testing.T) *fakeAPI {
 	}
 }
 
-func (f *fakeAPI) Reset() {
-	*f = *newFake(f.t)
+func (f *fakeAPI) ResetRequests() {
+	f.requests = make(map[fakeRequest]struct{})
 }
 
 func (f *fakeAPI) recordRequest(r *http.Request) {
