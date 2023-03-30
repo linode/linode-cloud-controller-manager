@@ -166,6 +166,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 			name: "makeLoadBalancerStatus",
 			f:    testMakeLoadBalancerStatus,
 		},
+		{
+			name: "Cleanup does not call the API unless Service annotated",
+			f:    testCleanupDoesntCall,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1442,6 +1446,54 @@ func testMakeLoadBalancerStatus(t *testing.T, client *linodego.Client, _ *fakeAP
 	if !reflect.DeepEqual(status, expectedStatus) {
 		t.Errorf("expected status for %q annotated service to be %#v; got %#v", annLinodeHostnameOnlyIngress, expectedStatus, status)
 	}
+}
+
+func testCleanupDoesntCall(t *testing.T, client *linodego.Client, fakeAPI *fakeAPI) {
+	region := "us-west"
+	nb1, err := client.CreateNodeBalancer(context.TODO(), linodego.NodeBalancerCreateOptions{Region: region})
+	if err != nil {
+		t.Fatal(err)
+	}
+	nb2, err := client.CreateNodeBalancer(context.TODO(), linodego.NodeBalancerCreateOptions{Region: region})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	svc := &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test"}}
+	svcAnn := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test",
+			Annotations: map[string]string{annLinodeNodeBalancerID: strconv.Itoa(nb2.ID)},
+		},
+	}
+	svc.Status.LoadBalancer = *makeLoadBalancerStatus(svc, nb1)
+	svcAnn.Status.LoadBalancer = *makeLoadBalancerStatus(svcAnn, nb1)
+	lb := &loadbalancers{client, region, nil}
+
+	fakeAPI.ResetRequests()
+	t.Run("non-annotated service shouldn't call the API during cleanup", func(t *testing.T) {
+		if err := lb.cleanupOldNodeBalancer(context.TODO(), svc); err != nil {
+			t.Fatal(err)
+		}
+		if len(fakeAPI.requests) != 0 {
+			t.Fatalf("unexpected API calls: %v", fakeAPI.requests)
+		}
+	})
+
+	fakeAPI.ResetRequests()
+	t.Run("annotated service calls the API to load said NB", func(t *testing.T) {
+		if err := lb.cleanupOldNodeBalancer(context.TODO(), svcAnn); err != nil {
+			t.Fatal(err)
+		}
+		expectedRequests := map[fakeRequest]struct{}{
+			{Path: "/nodebalancers", Body: "", Method: "GET"}:                            {},
+			{Path: fmt.Sprintf("/nodebalancers/%v", nb2.ID), Body: "", Method: "GET"}:    {},
+			{Path: fmt.Sprintf("/nodebalancers/%v", nb1.ID), Body: "", Method: "DELETE"}: {},
+		}
+		if !reflect.DeepEqual(fakeAPI.requests, expectedRequests) {
+			t.Fatalf("expected requests %#v, got %#v instead", expectedRequests, fakeAPI.requests)
+		}
+	})
 }
 
 func testGetNodeBalancerForServiceIDDoesNotExist(t *testing.T, client *linodego.Client, _ *fakeAPI) {
