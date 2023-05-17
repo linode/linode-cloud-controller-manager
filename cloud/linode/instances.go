@@ -87,7 +87,9 @@ func (i *instances) linodeByID(id int) (*linodego.Instance, error) {
 }
 
 func (i *instances) lookupLinode(ctx context.Context, node *v1.Node) (*linodego.Instance, error) {
-	i.nodeCache.refresh(ctx, i.client)
+	if err := i.nodeCache.refresh(ctx, i.client); err != nil {
+		return nil, err
+	}
 
 	providerID := node.Spec.ProviderID
 	nodeName := types.NodeName(node.Name)
