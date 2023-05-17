@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"net/http"
 	"strconv"
 	"testing"
 
@@ -47,10 +46,7 @@ func TestInstanceExists(t *testing.T) {
 		instances := newInstances(client)
 		name := "some-name"
 		node := nodeWithName(name)
-		notFound := &linodego.Error{
-			Code: http.StatusNotFound,
-		}
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return(nil, notFound)
+		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
 
 		exists, err := instances.InstanceExists(ctx, node)
 		assert.NoError(t, err)
