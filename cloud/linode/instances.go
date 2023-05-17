@@ -29,11 +29,11 @@ func (nc *nodeCache) refresh(ctx context.Context, client Client) error {
 		return nil
 	}
 
-	nc.nodes = make(map[int]*linodego.Instance)
 	instances, err := client.ListInstances(ctx, nil)
 	if err != nil {
 		return err
 	}
+	nc.nodes = make(map[int]*linodego.Instance)
 	for _, instance := range instances {
 		instance := instance
 		nc.nodes[instance.ID] = &instance
