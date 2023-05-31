@@ -3,6 +3,7 @@ package linode
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -52,9 +53,17 @@ type instances struct {
 }
 
 func newInstances(client Client) cloudprovider.InstancesV2 {
+	var timeout int
+	if raw, ok := os.LookupEnv("LINODE_INSTANCE_CACHE_TTL"); ok {
+		timeout, _ = strconv.Atoi(raw)
+	}
+	if timeout == 0 {
+		timeout = 15
+	}
+
 	return &instances{client, &nodeCache{
 		nodes: make(map[int]*linodego.Instance),
-		ttl:   15 * time.Second,
+		ttl:   time.Duration(timeout) * time.Second,
 	}}
 }
 
