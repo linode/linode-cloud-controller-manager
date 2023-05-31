@@ -21,7 +21,9 @@ type nodeCache struct {
 	ttl        time.Duration
 }
 
-func (nc *nodeCache) refresh(ctx context.Context, client Client) error {
+// refreshInstances conditionally loads all instances from the Linode API and caches them.
+// It does not refresh if the last update happened less than `nodeCache.ttl` ago.
+func (nc *nodeCache) refreshInstances(ctx context.Context, client Client) error {
 	nc.Lock()
 	defer nc.Unlock()
 
@@ -52,7 +54,7 @@ type instances struct {
 func newInstances(client Client) cloudprovider.InstancesV2 {
 	return &instances{client, &nodeCache{
 		nodes: make(map[int]*linodego.Instance),
-		ttl:   90 * time.Second,
+		ttl:   15 * time.Second,
 	}}
 }
 
@@ -87,7 +89,7 @@ func (i *instances) linodeByID(id int) (*linodego.Instance, error) {
 }
 
 func (i *instances) lookupLinode(ctx context.Context, node *v1.Node) (*linodego.Instance, error) {
-	if err := i.nodeCache.refresh(ctx, i.client); err != nil {
+	if err := i.nodeCache.refreshInstances(ctx, i.client); err != nil {
 		return nil, err
 	}
 
