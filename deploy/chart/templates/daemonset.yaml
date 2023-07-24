@@ -47,6 +47,7 @@ spec:
                 secretKeyRef:
                   name: ccm-linode
                   key: region
+            {{- toYaml .Values.env | nindent 12 }}
       volumes:
         - name: k8s
           hostPath:

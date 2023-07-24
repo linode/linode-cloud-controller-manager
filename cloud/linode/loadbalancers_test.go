@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"strconv"
 	"testing"
@@ -165,6 +166,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 		{
 			name: "makeLoadBalancerStatus",
 			f:    testMakeLoadBalancerStatus,
+		},
+		{
+			name: "makeLoadBalancerStatusEnvVar",
+			f:    testMakeLoadBalancerStatusEnvVar,
 		},
 		{
 			name: "Cleanup does not call the API unless Service annotated",
@@ -1446,6 +1451,55 @@ func testMakeLoadBalancerStatus(t *testing.T, client *linodego.Client, _ *fakeAP
 	if !reflect.DeepEqual(status, expectedStatus) {
 		t.Errorf("expected status for %q annotated service to be %#v; got %#v", annLinodeHostnameOnlyIngress, expectedStatus, status)
 	}
+}
+
+func testMakeLoadBalancerStatusEnvVar(t *testing.T, client *linodego.Client, _ *fakeAPI) {
+	ipv4 := "192.168.0.1"
+	hostname := "nb-192-168-0-1.newark.nodebalancer.linode.com"
+	nb := &linodego.NodeBalancer{
+		IPv4:     &ipv4,
+		Hostname: &hostname,
+	}
+
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test",
+			Annotations: make(map[string]string, 1),
+		},
+	}
+
+	expectedStatus := &v1.LoadBalancerStatus{
+		Ingress: []v1.LoadBalancerIngress{{
+			Hostname: hostname,
+			IP:       ipv4,
+		}},
+	}
+	status := makeLoadBalancerStatus(svc, nb)
+	if !reflect.DeepEqual(status, expectedStatus) {
+		t.Errorf("expected status for basic service to be %#v; got %#v", expectedStatus, status)
+	}
+
+	os.Setenv("LINODE_HOSTNAME_ONLY_INGRESS", "true")
+	expectedStatus.Ingress[0] = v1.LoadBalancerIngress{Hostname: hostname}
+	status = makeLoadBalancerStatus(svc, nb)
+	if !reflect.DeepEqual(status, expectedStatus) {
+		t.Errorf("expected status for %q annotated service to be %#v; got %#v", annLinodeHostnameOnlyIngress, expectedStatus, status)
+	}
+
+	os.Setenv("LINODE_HOSTNAME_ONLY_INGRESS", "false")
+	expectedStatus.Ingress[0] = v1.LoadBalancerIngress{Hostname: hostname}
+	status = makeLoadBalancerStatus(svc, nb)
+	if reflect.DeepEqual(status, expectedStatus) {
+		t.Errorf("expected status for %q annotated service to be %#v; got %#v", annLinodeHostnameOnlyIngress, expectedStatus, status)
+	}
+
+	os.Setenv("LINODE_HOSTNAME_ONLY_INGRESS", "banana")
+	expectedStatus.Ingress[0] = v1.LoadBalancerIngress{Hostname: hostname}
+	status = makeLoadBalancerStatus(svc, nb)
+	if reflect.DeepEqual(status, expectedStatus) {
+		t.Errorf("expected status for %q annotated service to be %#v; got %#v", annLinodeHostnameOnlyIngress, expectedStatus, status)
+	}
+	os.Unsetenv("LINODE_HOSTNAME_ONLY_INGRESS")
 }
 
 func testCleanupDoesntCall(t *testing.T, client *linodego.Client, fakeAPI *fakeAPI) {

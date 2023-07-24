@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -776,12 +777,24 @@ func makeLoadBalancerStatus(service *v1.Service, nb *linodego.NodeBalancer) *v1.
 		Hostname: *nb.Hostname,
 	}
 	if !getServiceBoolAnnotation(service, annLinodeHostnameOnlyIngress) {
-		ingress.IP = *nb.IPv4
+		if val := envBoolOptions("LINODE_HOSTNAME_ONLY_INGRESS"); val {
+			klog.Infof("LINODE_HOSTNAME_ONLY_INGRESS:  (%v)", val)
+		} else {
+			ingress.IP = *nb.IPv4
+		}
 	}
-
 	return &v1.LoadBalancerStatus{
 		Ingress: []v1.LoadBalancerIngress{ingress},
 	}
+}
+
+// Checks for a truth value in an environment variable
+func envBoolOptions(o string) bool {
+	boolValue, err := strconv.ParseBool(os.Getenv(o))
+	if err != nil {
+		return false
+	}
+	return boolValue
 }
 
 // getServiceNn returns the services namespaced name.

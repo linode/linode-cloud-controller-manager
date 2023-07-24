@@ -1,4 +1,4 @@
-# apiToken [Required] - Must be a Linode APIv4 Personal Access Token with all permissions. (https://cloud.linode.com/profile/tokens) 
+# apiToken [Required] - Must be a Linode APIv4 Personal Access Token with all permissions. (https://cloud.linode.com/profile/tokens)
 apiToken: ""
 
 # region [Required] - Must be a Linode region. (https://api.linode.com/v4/regions)
@@ -20,7 +20,7 @@ image:
 namespace: "kube-system"
 
 # Set of default tolerations
-tolerations: 
+tolerations:
  # The CCM can run on Nodes tainted as masters
   - key: "node-role.kubernetes.io/master"
     effect: "NoSchedule"
@@ -37,3 +37,9 @@ tolerations:
   - key: node.kubernetes.io/unreachable
     operator: Exists
     effect: NoSchedule
+# This section adds the ability to pass environment variables to adjust CCM defaults
+# https://github.com/linode/linode-cloud-controller-manager/blob/master/cloud/linode/loadbalancers.go
+# LINODE_HOSTNAME_ONLY_INGRESS type bool is supported
+# env:
+  # - name: EXAMPLE_ENV_VAR
+  #   value: "true"
