@@ -230,7 +230,7 @@ _See [helm upgrade](https://helm.sh/docs/helm/helm_upgrade/) for command documen
 
 ### Configurations
 
-There are other variables that can be set to a different value. For list of all the modifiable variables/values, take a look at './deploy/chart/values.yaml'. 
+There are other variables that can be set to a different value. For list of all the modifiable variables/values, take a look at './deploy/chart/values.yaml'.
 
 Values can be set/overrided by using the '--set var=value,...' flag or by passing in a custom-values.yaml using '-f custom-values.yaml'.
 
