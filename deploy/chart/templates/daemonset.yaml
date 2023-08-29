@@ -40,13 +40,13 @@ spec:
             - name: LINODE_API_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: ccm-linode
-                  key: apiToken
+                  name: {{ .Values.secretRef.name | default "ccm-linode"}}
+                  key: {{ .Values.secretRef.apiTokenRef | default "apiToken"}}
             - name: LINODE_REGION
               valueFrom:
                 secretKeyRef:
-                  name: ccm-linode
-                  key: region
+                  name: {{ .Values.secretRef.name | default "ccm-linode"}}
+                  key: {{ .Values.secretRef.regionRef | default "region"}}
             {{- toYaml .Values.env | nindent 12 }}
       volumes:
         - name: k8s

@@ -1,3 +1,4 @@
+{{- if not .Values.secretRef }}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -7,3 +8,4 @@ stringData:
   apiToken: {{ required ".Values.apiToken required" .Values.apiToken }}
   region: {{ required ".Values.region required" .Values.region }}
 type: Opaque
+{{- end }}
