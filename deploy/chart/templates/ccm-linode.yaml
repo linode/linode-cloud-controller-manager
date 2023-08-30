@@ -9,3 +9,4 @@ stringData:
   region: {{ required ".Values.region required" .Values.region }}
 type: Opaque
 {{- end }}
+
