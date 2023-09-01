@@ -1,8 +1,14 @@
-# apiToken [Required] - Must be a Linode APIv4 Personal Access Token with all permissions. (https://cloud.linode.com/profile/tokens)
+# apiToken [Required if secretRef is not set] - Must be a Linode APIv4 Personal Access Token with all permissions. (https://cloud.linode.com/profile/tokens)
 apiToken: ""
 
-# region [Required] - Must be a Linode region. (https://api.linode.com/v4/regions)
+# region [Required if secretRef is not set] - Must be a Linode region. (https://api.linode.com/v4/regions)
 region: ""
+
+# Set these values if your APIToken and region are already present in a k8s secret.
+# secretRef:
+#   name: "linode-ccm"
+#   apiTokenRef: "apiToken"
+#   regionRef: "region"
 
 # node-role.kubernetes.io/master - if set true, it deploys the svc on the master node
 nodeSelector:

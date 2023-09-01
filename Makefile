@@ -74,5 +74,33 @@ run-debug: build
 		--stderrthreshold=INFO \
 		--kubeconfig=${KUBECONFIG} \
 		--linodego-debug
+# Set the host's OS. Only linux and darwin supported for now
+HOSTOS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
+ifeq ($(filter darwin linux,$(HOSTOS)),)
+$(error build only supported on linux and darwin host currently)
+endif
 
+HELM_VERSION ?= v3.9.1
+TOOLS_HOST_DIR ?= .tmp/tools
+HELM := $(TOOLS_HOST_DIR)/helm-$(HELM_VERSION)
 
+.PHONY: $(HELM)
+$(HELM):
+	@echo installing helm $(HELM_VERSION)
+	@mkdir -p $(TOOLS_HOST_DIR)/tmp-helm
+	@curl -fsSL https://get.helm.sh/helm-$(HELM_VERSION)-$(HOSTOS)-amd64.tar.gz | tar -xz -C $(TOOLS_HOST_DIR)/tmp-helm
+	@mv $(TOOLS_HOST_DIR)/tmp-helm/$(HOSTOS)-amd64/helm $(HELM)
+	@rm -fr $(TOOLS_HOST_DIR)/tmp-helm
+	@echo installing helm $(HELM_VERSION)
+
+.PHONY: helm-lint
+helm-lint: $(HELM)
+#Verify lint works when region and apiToken are passed, and when it is passed as reference.
+	@$(HELM) lint deploy/chart --set apiToken="apiToken",region="us-east"
+	@$(HELM) lint deploy/chart --set secretRef.apiTokenRef="apiToken",secretRef.name="api",secretRef.regionRef="us-east"
+
+.PHONY: helm-template
+helm-template: $(HELM)
+#Verify template works when region and apiToken are passed, and when it is passed as reference.
+	@$(HELM) template foo deploy/chart --set apiToken="apiToken",region="us-east" > /dev/null
+	@$(HELM) template foo deploy/chart --set secretRef.apiTokenRef="apiToken",secretRef.name="api",secretRef.regionRef="us-east" > /dev/null
