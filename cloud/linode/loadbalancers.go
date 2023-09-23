@@ -47,6 +47,10 @@ const (
 	annLinodeNodeBalancerID       = "service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"
 
 	annLinodeHostnameOnlyIngress = "service.beta.kubernetes.io/linode-loadbalancer-hostname-only-ingress"
+
+	// annLinodeCloudFirewallId is the annotion specifying the id of the cloud firewall to attach the
+	// nodebalancer to.
+	annLinodeCloudFirewallId = "service.beta.kubernetes.io/linode-loadbalancer-firewall-id"
 )
 
 type lbNotFoundError struct {
@@ -480,7 +484,7 @@ func (l *loadbalancers) getNodeBalancerByID(ctx context.Context, service *v1.Ser
 	return nb, nil
 }
 
-func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName string, service *v1.Service, configs []*linodego.NodeBalancerConfigCreateOptions) (lb *linodego.NodeBalancer, err error) {
+func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName string, service *v1.Service, configs []*linodego.NodeBalancerConfigCreateOptions, firewallId int) (lb *linodego.NodeBalancer, err error) {
 	connThrottle := getConnectionThrottle(service)
 
 	label := l.GetLoadBalancerName(ctx, clusterName, service)
@@ -489,6 +493,7 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 		Region:             l.zone,
 		ClientConnThrottle: &connThrottle,
 		Configs:            configs,
+		FirewallID:         firewallId,
 	}
 	return l.client.CreateNodeBalancer(ctx, createOpts)
 }
@@ -604,7 +609,16 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 
 		configs = append(configs, &createOpt)
 	}
-	return l.createNodeBalancer(ctx, clusterName, service, configs)
+
+	var firewallId int
+	var err error
+	if fwid, ok := service.Annotations[annLinodeCloudFirewallId]; ok {
+		if firewallId, err = strconv.Atoi(fwid); err != nil {
+			return nil, err
+		}
+	}
+
+	return l.createNodeBalancer(ctx, clusterName, service, configs, firewallId)
 }
 
 func (l *loadbalancers) buildNodeBalancerNodeCreateOptions(node *v1.Node, nodePort int32) linodego.NodeBalancerNodeCreateOptions {
