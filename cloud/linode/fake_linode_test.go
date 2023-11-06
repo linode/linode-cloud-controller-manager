@@ -251,6 +251,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				Region:   nbco.Region,
 				IPv4:     &ip,
 				Hostname: &hostname,
+				Tags:     nbco.Tags,
 			}
 
 			if nbco.ClientConnThrottle != nil {
@@ -560,6 +561,9 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 				if nbuo.Label != nil {
 					nb.Label = nbuo.Label
+				}
+				if nbuo.Tags != nil {
+					nb.Tags = *nbuo.Tags
 				}
 
 				f.nb[strconv.Itoa(nb.ID)] = nb
