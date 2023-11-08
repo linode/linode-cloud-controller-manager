@@ -228,7 +228,9 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	}
 
 	lb := &loadbalancers{client, "us-west", nil}
-	var nodes []*v1.Node
+	nodes := []*v1.Node{
+		{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}},
+	}
 	nb, err := lb.buildLoadBalancerRequest(context.TODO(), "linodelb", svc, nodes)
 	if err != nil {
 		t.Fatal(err)

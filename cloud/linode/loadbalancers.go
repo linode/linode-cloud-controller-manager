@@ -3,6 +3,7 @@ package linode
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -50,7 +51,7 @@ const (
 )
 
 var (
-	errNoNodesAvailable = fmt.Errorf("no nodes available for nodebalancer")
+	errNoNodesAvailable = errors.New("no nodes available for nodebalancer")
 )
 
 type lbNotFoundError struct {
@@ -216,9 +217,6 @@ func (l *loadbalancers) GetLoadBalancer(ctx context.Context, clusterName string,
 //
 // EnsureLoadBalancer will not modify service or nodes.
 func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (lbStatus *v1.LoadBalancerStatus, err error) {
-	if len(nodes) == 0 {
-		return nil, fmt.Errorf("%w: cluster %s, service %s", errNoNodesAvailable, clusterName, getServiceNn(service))
-	}
 	ctx = sentry.SetHubOnContext(ctx)
 	sentry.SetTag(ctx, "cluster_name", clusterName)
 	sentry.SetTag(ctx, "service", service.Name)
@@ -261,6 +259,10 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 
 //nolint:funlen
 func (l *loadbalancers) updateNodeBalancer(ctx context.Context, service *v1.Service, nodes []*v1.Node, nb *linodego.NodeBalancer) (err error) {
+	if len(nodes) == 0 {
+		return fmt.Errorf("%w: service %s", errNoNodesAvailable, getServiceNn(service))
+	}
+
 	connThrottle := getConnectionThrottle(service)
 	if connThrottle != nb.ClientConnThrottle {
 		update := nb.GetUpdateOptions()
@@ -349,9 +351,6 @@ func (l *loadbalancers) updateNodeBalancer(ctx context.Context, service *v1.Serv
 
 // UpdateLoadBalancer updates the NodeBalancer to have configs that match the Service's ports
 func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (err error) {
-	if len(nodes) == 0 {
-		return fmt.Errorf("%w: cluster %s, service %s", errNoNodesAvailable, clusterName, getServiceNn(service))
-	}
 	ctx = sentry.SetHubOnContext(ctx)
 	sentry.SetTag(ctx, "cluster_name", clusterName)
 	sentry.SetTag(ctx, "service", service.Name)
@@ -594,6 +593,9 @@ func (l *loadbalancers) addTLSCert(ctx context.Context, service *v1.Service, nbC
 // buildLoadBalancerRequest returns a linodego.NodeBalancer
 // requests for service across nodes.
 func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*linodego.NodeBalancer, error) {
+	if len(nodes) == 0 {
+		return nil, fmt.Errorf("%w: cluster %s, service %s", errNoNodesAvailable, clusterName, getServiceNn(service))
+	}
 	ports := service.Spec.Ports
 	configs := make([]*linodego.NodeBalancerConfigCreateOptions, 0, len(ports))
 
