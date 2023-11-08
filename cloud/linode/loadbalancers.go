@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -47,6 +48,7 @@ const (
 	annLinodeNodeBalancerID       = "service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"
 
 	annLinodeHostnameOnlyIngress = "service.beta.kubernetes.io/linode-loadbalancer-hostname-only-ingress"
+	annLinodeLoadBalancerTags    = "service.beta.kubernetes.io/linode-loadbalancer-tags"
 )
 
 type lbNotFoundError struct {
@@ -259,6 +261,17 @@ func (l *loadbalancers) updateNodeBalancer(ctx context.Context, service *v1.Serv
 		update := nb.GetUpdateOptions()
 		update.ClientConnThrottle = &connThrottle
 
+		nb, err = l.client.UpdateNodeBalancer(ctx, nb.ID, update)
+		if err != nil {
+			sentry.CaptureError(ctx, err)
+			return err
+		}
+	}
+
+	tags := l.getLoadbalancerTags(ctx, service)
+	if !reflect.DeepEqual(nb.Tags, tags) {
+		update := nb.GetUpdateOptions()
+		update.Tags = &tags
 		nb, err = l.client.UpdateNodeBalancer(ctx, nb.ID, update)
 		if err != nil {
 			sentry.CaptureError(ctx, err)
@@ -480,15 +493,25 @@ func (l *loadbalancers) getNodeBalancerByID(ctx context.Context, service *v1.Ser
 	return nb, nil
 }
 
+func (l *loadbalancers) getLoadbalancerTags(ctx context.Context, service *v1.Service) []string {
+	tagStr, ok := getServiceAnnotation(service, annLinodeLoadBalancerTags)
+	if ok {
+		return strings.Split(tagStr, ",")
+	}
+	return []string{}
+}
+
 func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName string, service *v1.Service, configs []*linodego.NodeBalancerConfigCreateOptions) (lb *linodego.NodeBalancer, err error) {
 	connThrottle := getConnectionThrottle(service)
 
 	label := l.GetLoadBalancerName(ctx, clusterName, service)
+	tags := l.getLoadbalancerTags(ctx, service)
 	createOpts := linodego.NodeBalancerCreateOptions{
 		Label:              &label,
 		Region:             l.zone,
 		ClientConnThrottle: &connThrottle,
 		Configs:            configs,
+		Tags:               tags,
 	}
 	return l.client.CreateNodeBalancer(ctx, createOpts)
 }

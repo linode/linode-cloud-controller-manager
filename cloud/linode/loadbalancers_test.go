@@ -8,6 +8,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/linode/linodego"
@@ -128,6 +129,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 			f:    testUpdateLoadBalancerAddTLSPort,
 		},
 		{
+			name: "Update Load Balancer - Add Tags",
+			f:    testUpdateLoadBalancerAddTags,
+		},
+		{
 			name: "Update Load Balancer - Specify NodeBalancerID",
 			f:    testUpdateLoadBalancerAddNodeBalancerID,
 		},
@@ -201,7 +206,8 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 			Name: randString(10),
 			UID:  "foobar123",
 			Annotations: map[string]string{
-				annLinodeThrottle: "15",
+				annLinodeThrottle:         "15",
+				annLinodeLoadBalancerTags: "fake,test,yolo",
 			},
 		},
 		Spec: v1.ServiceSpec{
@@ -262,6 +268,13 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 		t.Error("unexpected ClientConnThrottle")
 		t.Logf("expected: %v", 15)
 		t.Logf("actual: %v", nb.ClientConnThrottle)
+	}
+
+	expectedTags := []string{"fake", "test", "yolo"}
+	if !reflect.DeepEqual(nb.Tags, expectedTags) {
+		t.Error("unexpected Tags")
+		t.Logf("expected: %v", expectedTags)
+		t.Logf("actual: %v", nb.Tags)
 	}
 
 	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc) }()
@@ -412,6 +425,74 @@ func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Clie
 
 	if !reflect.DeepEqual(expectedPortConfigs, observedPortConfigs) {
 		t.Errorf("NodeBalancer port mismatch: expected %v, got %v", expectedPortConfigs, observedPortConfigs)
+	}
+}
+
+func testUpdateLoadBalancerAddTags(t *testing.T, client *linodego.Client, _ *fakeAPI) {
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        randString(10),
+			UID:         "foobar123",
+			Annotations: map[string]string{},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     randString(10),
+					Protocol: "TCP",
+					Port:     int32(80),
+					NodePort: int32(30000),
+				},
+			},
+		},
+	}
+
+	nodes := []*v1.Node{
+		&v1.Node{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+		},
+	}
+
+	lb := &loadbalancers{client, "us-west", nil}
+	fakeClientset := fake.NewSimpleClientset()
+	lb.kubeClient = fakeClientset
+
+	defer lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+
+	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
+	}
+	svc.Status.LoadBalancer = *lbStatus
+	stubService(fakeClientset, svc)
+
+	testTags := "test,new,tags"
+	svc.ObjectMeta.SetAnnotations(map[string]string{
+		annLinodeLoadBalancerTags: testTags,
+	})
+
+	err = lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Fatalf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
+	}
+
+	nb, err := lb.getNodeBalancerByStatus(context.TODO(), svc)
+	if err != nil {
+		t.Fatalf("failed to get NodeBalancer by status: %v", err)
+	}
+
+	expectedTags := strings.Split(testTags, ",")
+	observedTags := nb.Tags
+
+	if !reflect.DeepEqual(expectedTags, observedTags) {
+		t.Errorf("NodeBalancer tags mismatch: expected %v, got %v", expectedTags, observedTags)
 	}
 }
 
