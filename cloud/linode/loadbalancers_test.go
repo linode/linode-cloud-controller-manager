@@ -2,6 +2,7 @@ package linode
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -174,6 +175,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 		{
 			name: "Cleanup does not call the API unless Service annotated",
 			f:    testCleanupDoesntCall,
+		},
+		{
+			name: "Update Load Balancer - No Nodes",
+			f:    testUpdateLoadBalancerNoNodes,
 		},
 	}
 
@@ -1548,6 +1553,55 @@ func testCleanupDoesntCall(t *testing.T, client *linodego.Client, fakeAPI *fakeA
 			t.Fatalf("expected requests %#v, got %#v instead", expectedRequests, fakeAPI.requests)
 		}
 	})
+}
+
+func testUpdateLoadBalancerNoNodes(t *testing.T, client *linodego.Client, _ *fakeAPI) {
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        randString(10),
+			UID:         "foobar123",
+			Annotations: map[string]string{},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     randString(10),
+					Protocol: "http",
+					Port:     int32(80),
+					NodePort: int32(8080),
+				},
+			},
+		},
+	}
+
+	lb := &loadbalancers{client, "us-west", nil}
+	defer lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+
+	fakeClientset := fake.NewSimpleClientset()
+	lb.kubeClient = fakeClientset
+
+	nodeBalancer, err := client.CreateNodeBalancer(context.TODO(), linodego.NodeBalancerCreateOptions{
+		Region: lb.zone,
+	})
+	if err != nil {
+		t.Fatalf("failed to create NodeBalancer: %s", err)
+	}
+	svc.Status.LoadBalancer = *makeLoadBalancerStatus(svc, nodeBalancer)
+	stubService(fakeClientset, svc)
+	svc.ObjectMeta.SetAnnotations(map[string]string{
+		annLinodeNodeBalancerID: strconv.Itoa(nodeBalancer.ID),
+	})
+
+	// setup done, test ensure/update
+	nodes := []*v1.Node{}
+
+	if _, err = lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes); !stderrors.Is(err, errNoNodesAvailable) {
+		t.Errorf("EnsureLoadBalancer should return %v, got %v", errNoNodesAvailable, err)
+	}
+
+	if err := lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, nodes); !stderrors.Is(err, errNoNodesAvailable) {
+		t.Errorf("UpdateLoadBalancer should return %v, got %v", errNoNodesAvailable, err)
+	}
 }
 
 func testGetNodeBalancerForServiceIDDoesNotExist(t *testing.T, client *linodego.Client, _ *fakeAPI) {
