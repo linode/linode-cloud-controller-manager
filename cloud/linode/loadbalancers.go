@@ -3,6 +3,7 @@ package linode
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -49,6 +50,10 @@ const (
 
 	annLinodeHostnameOnlyIngress = "service.beta.kubernetes.io/linode-loadbalancer-hostname-only-ingress"
 	annLinodeLoadBalancerTags    = "service.beta.kubernetes.io/linode-loadbalancer-tags"
+)
+
+var (
+	errNoNodesAvailable = errors.New("no nodes available for nodebalancer")
 )
 
 type lbNotFoundError struct {
@@ -256,6 +261,10 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 
 //nolint:funlen
 func (l *loadbalancers) updateNodeBalancer(ctx context.Context, service *v1.Service, nodes []*v1.Node, nb *linodego.NodeBalancer) (err error) {
+	if len(nodes) == 0 {
+		return fmt.Errorf("%w: service %s", errNoNodesAvailable, getServiceNn(service))
+	}
+
 	connThrottle := getConnectionThrottle(service)
 	if connThrottle != nb.ClientConnThrottle {
 		update := nb.GetUpdateOptions()
@@ -607,6 +616,9 @@ func (l *loadbalancers) addTLSCert(ctx context.Context, service *v1.Service, nbC
 // buildLoadBalancerRequest returns a linodego.NodeBalancer
 // requests for service across nodes.
 func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*linodego.NodeBalancer, error) {
+	if len(nodes) == 0 {
+		return nil, fmt.Errorf("%w: cluster %s, service %s", errNoNodesAvailable, clusterName, getServiceNn(service))
+	}
 	ports := service.Spec.Ports
 	configs := make([]*linodego.NodeBalancerConfigCreateOptions, 0, len(ports))
 
