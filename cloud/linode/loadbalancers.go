@@ -50,7 +50,7 @@ const (
 
 	annLinodeHostnameOnlyIngress = "service.beta.kubernetes.io/linode-loadbalancer-hostname-only-ingress"
 	annLinodeLoadBalancerTags    = "service.beta.kubernetes.io/linode-loadbalancer-tags"
-	annLinodeCloudFirewallId     = "service.beta.kubernetes.io/linode-loadbalancer-firewall-id"
+	annLinodeCloudFirewallID     = "service.beta.kubernetes.io/linode-loadbalancer-firewall-id"
 )
 
 var (
@@ -511,18 +511,39 @@ func (l *loadbalancers) getLoadbalancerTags(ctx context.Context, service *v1.Ser
 	return []string{}
 }
 
-func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName string, service *v1.Service, configs []*linodego.NodeBalancerConfigCreateOptions, firewallId int) (lb *linodego.NodeBalancer, err error) {
+func (l *loadbalancers) getLoadbalancerFirewallID(service *v1.Service) (int, error) {
+	fwid, ok := getServiceAnnotation(service, annLinodeCloudFirewallID)
+	if !ok {
+		return -1, nil
+	}
+
+	firewallID, err := strconv.Atoi(fwid)
+	if err != nil {
+		return -1, err
+	}
+	return firewallID, nil
+}
+
+func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName string, service *v1.Service, configs []*linodego.NodeBalancerConfigCreateOptions) (lb *linodego.NodeBalancer, err error) {
 	connThrottle := getConnectionThrottle(service)
 
 	label := l.GetLoadBalancerName(ctx, clusterName, service)
 	tags := l.getLoadbalancerTags(ctx, service)
+	firewallID, err := l.getLoadbalancerFirewallID(service)
+	if err != nil {
+		return nil, err
+	}
+
 	createOpts := linodego.NodeBalancerCreateOptions{
 		Label:              &label,
 		Region:             l.zone,
 		ClientConnThrottle: &connThrottle,
 		Configs:            configs,
 		Tags:               tags,
-		FirewallID:         firewallId,
+	}
+
+	if firewallID != -1 {
+		createOpts.FirewallID = firewallID
 	}
 	return l.client.CreateNodeBalancer(ctx, createOpts)
 }
@@ -642,14 +663,7 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 		configs = append(configs, &createOpt)
 	}
 
-	var firewallId int
-	var err error
-	if fwid, ok := service.Annotations[annLinodeCloudFirewallId]; ok {
-		if firewallId, err = strconv.Atoi(fwid); err != nil {
-			return nil, err
-		}
-	}
-	return l.createNodeBalancer(ctx, clusterName, service, configs, firewallId)
+	return l.createNodeBalancer(ctx, clusterName, service, configs)
 }
 
 func (l *loadbalancers) buildNodeBalancerNodeCreateOptions(node *v1.Node, nodePort int32) linodego.NodeBalancerNodeCreateOptions {
