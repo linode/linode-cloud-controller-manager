@@ -57,6 +57,7 @@ Annotation (Suffix) | Values | Default | Description
 `nodebalancer-id` | string | | The ID of the NodeBalancer to front the service. When not specified, a new NodeBalancer will be created. This can be configured on service creation or patching
 `hostname-only-ingress` | [bool](#annotation-bool-values) | `false` | When `true`, the LoadBalancerStatus for the service will only contain the Hostname. This is useful for bypassing kube-proxy's rerouting of in-cluster requests originally intended for the external LoadBalancer to the service's constituent pod IPs.
 `tags` | string | | A comma seperated list of tags to be applied to the createad NodeBalancer instance
+`firewall-id` | string | | The Firewall ID that's applied to the NodeBalancer instance.
 
 #### Deprecated Annotations
 

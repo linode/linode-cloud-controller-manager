@@ -662,7 +662,6 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 
 		configs = append(configs, &createOpt)
 	}
-
 	return l.createNodeBalancer(ctx, clusterName, service, configs)
 }
 
