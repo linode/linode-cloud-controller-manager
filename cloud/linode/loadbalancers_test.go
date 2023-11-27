@@ -1281,7 +1281,7 @@ func testEnsureLoadBalancerPreserveAnnotation(t *testing.T, client *linodego.Cli
 				Spec: testServiceSpec,
 			}
 
-			nb, err := lb.createNodeBalancer(context.TODO(), "linodelb", svc, []*linodego.NodeBalancerConfigCreateOptions{})
+			nb, err := lb.createNodeBalancer(context.TODO(), "linodelb", svc, []*linodego.NodeBalancerConfigCreateOptions{}, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1363,7 +1363,7 @@ func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client, fake *
 
 	lb := &loadbalancers{client, "us-west", nil}
 	configs := []*linodego.NodeBalancerConfigCreateOptions{}
-	_, err := lb.createNodeBalancer(context.TODO(), "linodelb", svc, configs)
+	_, err := lb.createNodeBalancer(context.TODO(), "linodelb", svc, configs, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1414,7 +1414,7 @@ func testEnsureExistingLoadBalancer(t *testing.T, client *linodego.Client, _ *fa
 	addTLSSecret(t, lb.kubeClient)
 
 	configs := []*linodego.NodeBalancerConfigCreateOptions{}
-	nb, err := lb.createNodeBalancer(context.TODO(), "linodelb", svc, configs)
+	nb, err := lb.createNodeBalancer(context.TODO(), "linodelb", svc, configs, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1854,7 +1854,7 @@ func testGetLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	}
 
 	configs := []*linodego.NodeBalancerConfigCreateOptions{}
-	nb, err := lb.createNodeBalancer(context.TODO(), "linodelb", svc, configs)
+	nb, err := lb.createNodeBalancer(context.TODO(), "linodelb", svc, configs, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

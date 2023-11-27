@@ -17,6 +17,8 @@ import (
 	"github.com/linode/linodego"
 )
 
+const apiVersion = "v4"
+
 type fakeAPI struct {
 	t   *testing.T
 	nb  map[string]*linodego.NodeBalancer
@@ -46,12 +48,12 @@ func (f *fakeAPI) ResetRequests() {
 	f.requests = make(map[fakeRequest]struct{})
 }
 
-func (f *fakeAPI) recordRequest(r *http.Request) {
+func (f *fakeAPI) recordRequest(r *http.Request, urlPath string) {
 	bodyBytes, _ := ioutil.ReadAll(r.Body)
 	r.Body.Close()
 	r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 	f.requests[fakeRequest{
-		Path:   r.URL.Path,
+		Path:   urlPath,
 		Method: r.Method,
 		Body:   string(bodyBytes),
 	}] = struct{}{}
@@ -67,10 +69,16 @@ func (f *fakeAPI) didRequestOccur(method, path, body string) bool {
 }
 
 func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	f.recordRequest(r)
-
 	w.Header().Set("Content-Type", "application/json")
 	urlPath := r.URL.Path
+
+	if !strings.HasPrefix(urlPath, "/"+apiVersion) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	urlPath = strings.TrimPrefix(urlPath, "/"+apiVersion)
+	f.recordRequest(r, urlPath)
+
 	switch r.Method {
 	case "GET":
 		whichAPI := strings.Split(urlPath[1:], "/")
@@ -99,7 +107,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			rx, _ = regexp.Compile("/nodebalancers/[0-9]+/configs/[0-9]+/nodes")
 			if rx.MatchString(urlPath) {
 				res := 0
-				parts := strings.Split(r.URL.Path[1:], "/")
+				parts := strings.Split(urlPath[1:], "/")
 				nbcID, err := strconv.Atoi(parts[3])
 				if err != nil {
 					f.t.Fatal(err)
@@ -236,7 +244,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case "POST":
-		tp := filepath.Base(r.URL.Path)
+		tp := filepath.Base(urlPath)
 		if tp == "nodebalancers" {
 			nbco := linodego.NodeBalancerCreateOptions{}
 			if err := json.NewDecoder(r.Body).Decode(&nbco); err != nil {
@@ -313,7 +321,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 
 		} else if tp == "rebuild" {
-			parts := strings.Split(r.URL.Path[1:], "/")
+			parts := strings.Split(urlPath[1:], "/")
 			nbcco := new(linodego.NodeBalancerConfigRebuildOptions)
 			if err := json.NewDecoder(r.Body).Decode(nbcco); err != nil {
 				f.t.Fatal(err)
@@ -382,7 +390,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(resp)
 			return
 		} else if tp == "configs" {
-			parts := strings.Split(r.URL.Path[1:], "/")
+			parts := strings.Split(urlPath[1:], "/")
 			nbcco := new(linodego.NodeBalancerConfigCreateOptions)
 			if err := json.NewDecoder(r.Body).Decode(nbcco); err != nil {
 				f.t.Fatal(err)
@@ -422,7 +430,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(resp)
 			return
 		} else if tp == "nodes" {
-			parts := strings.Split(r.URL.Path[1:], "/")
+			parts := strings.Split(urlPath[1:], "/")
 			nbnco := new(linodego.NodeBalancerNodeCreateOptions)
 			if err := json.NewDecoder(r.Body).Decode(nbnco); err != nil {
 				f.t.Fatal(err)
@@ -454,14 +462,14 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case "DELETE":
-		idRaw := filepath.Base(r.URL.Path)
+		idRaw := filepath.Base(urlPath)
 		id, err := strconv.Atoi(idRaw)
 		if err != nil {
 			f.t.Fatal(err)
 		}
-		if strings.Contains(r.URL.Path, "nodes") {
+		if strings.Contains(urlPath, "nodes") {
 			delete(f.nbn, idRaw)
-		} else if strings.Contains(r.URL.Path, "configs") {
+		} else if strings.Contains(urlPath, "configs") {
 			delete(f.nbc, idRaw)
 
 			for k, n := range f.nbn {
@@ -469,7 +477,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					delete(f.nbn, k)
 				}
 			}
-		} else if strings.Contains(r.URL.Path, "nodebalancers") {
+		} else if strings.Contains(urlPath, "nodebalancers") {
 			delete(f.nb, idRaw)
 
 			for k, c := range f.nbc {
@@ -485,10 +493,10 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	case "PUT":
-		if strings.Contains(r.URL.Path, "nodes") {
+		if strings.Contains(urlPath, "nodes") {
 			f.t.Fatal("PUT ...nodes is not supported by the mock API")
-		} else if strings.Contains(r.URL.Path, "configs") {
-			parts := strings.Split(r.URL.Path[1:], "/")
+		} else if strings.Contains(urlPath, "configs") {
+			parts := strings.Split(urlPath[1:], "/")
 			nbcco := new(linodego.NodeBalancerConfigUpdateOptions)
 			if err := json.NewDecoder(r.Body).Decode(nbcco); err != nil {
 				f.t.Fatal(err)
@@ -545,8 +553,8 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			_, _ = w.Write(resp)
 			return
-		} else if strings.Contains(r.URL.Path, "nodebalancer") {
-			parts := strings.Split(r.URL.Path[1:], "/")
+		} else if strings.Contains(urlPath, "nodebalancer") {
+			parts := strings.Split(urlPath[1:], "/")
 			nbuo := new(linodego.NodeBalancerUpdateOptions)
 			if err := json.NewDecoder(r.Body).Decode(nbuo); err != nil {
 				f.t.Fatal(err)
