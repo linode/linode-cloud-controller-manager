@@ -2114,3 +2114,45 @@ func addTLSSecret(t *testing.T, kubeClient kubernetes.Interface) {
 		t.Fatalf("failed to add TLS secret: %s\n", err)
 	}
 }
+
+func Test_LoadbalNodeNameCoercion(t *testing.T) {
+	type testCase struct {
+		nodeName       string
+		padding        string
+		expectedOutput string
+	}
+	testCases := []testCase{
+		{
+			nodeName:       "n",
+			padding:        "z",
+			expectedOutput: "zzn",
+		},
+		{
+			nodeName:       "n",
+			padding:        "node-",
+			expectedOutput: "node-n",
+		},
+		{
+			nodeName:       "n",
+			padding:        "",
+			expectedOutput: "xxn",
+		},
+		{
+			nodeName:       "infra-logging-controlplane-3-atl1-us-prod",
+			padding:        "node-",
+			expectedOutput: "infra-logging-controlplane-3-atl",
+		},
+		{
+			nodeName:       "node1",
+			padding:        "node-",
+			expectedOutput: "node1",
+		},
+	}
+
+	for _, tc := range testCases {
+		if out := coerceString(tc.nodeName, 3, 32, tc.padding); out != tc.expectedOutput {
+			t.Fatalf("Expected loadbal backend name to be %s (got: %s)", tc.expectedOutput, out)
+		}
+	}
+
+}
