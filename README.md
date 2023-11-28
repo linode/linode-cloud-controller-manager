@@ -38,7 +38,10 @@ Kubernetes Services of type `LoadBalancer` will be served through a [Linode Node
 
 The Linode CCM accepts several annotations which affect the properties of the underlying NodeBalancer deployment.
 
-All of the service annotation names listed below have been shortened for readability.  Each annotation **MUST** be prefixed with `service.beta.kubernetes.io/linode-loadbalancer-`.  The values, such as `http`, are case-sensitive.
+All of the Service annotation names listed below have been shortened for readability.  The values, such as `http`, are case-sensitive.
+
+Each *Service* annotation **MUST** be prefixed with:<br />
+**`service.beta.kubernetes.io/linode-loadbalancer-`**
 
 Annotation (Suffix) | Values | Default | Description
 ---|---|---|---
@@ -80,7 +83,23 @@ Key | Values | Default | Description
 `proxy-protocol` | `none`, `v1`, `v2` | `none` | Specifies whether to use a version of Proxy Protocol on the underlying NodeBalancer. Overwrites `default-proxy-protocol`.
 `tls-secret-name` | string | | Specifies a secret to use for TLS. The secret type should be `kubernetes.io/tls`.
 
-#### Example usage
+### Nodes
+
+Kubernetes Nodes can be configured with the following annotations.
+
+Each *Node* annotation **MUST** be prefixed with:<br />
+**`node.k8s.linode.com/`**
+
+Key | Values | Default | Description
+---|---|---|---
+`private-ip` | `IPv4` | `none` | Specifies the Linode Private IP overriding default detection of the Node InternalIP.<br />When using a [VLAN] or [VPC], the Node InternalIP may not be a Linode Private IP as [required for NodeBalancers] and should be specified.
+
+
+[required for NodeBalancers]: https://www.linode.com/docs/api/nodebalancers/#nodebalancer-create__request-body-schema
+[VLAN]: https://www.linode.com/products/vlan/
+[VPC]: https://www.linode.com/blog/linode/new-betas-coming-to-green-light/
+
+### Example usage
 
 ```yaml
 kind: Service
