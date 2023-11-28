@@ -51,6 +51,8 @@ const (
 	annLinodeHostnameOnlyIngress = "service.beta.kubernetes.io/linode-loadbalancer-hostname-only-ingress"
 	annLinodeLoadBalancerTags    = "service.beta.kubernetes.io/linode-loadbalancer-tags"
 	annLinodeCloudFirewallID     = "service.beta.kubernetes.io/linode-loadbalancer-firewall-id"
+
+	annLinodeNodePrivateIP = "node.k8s.linode.com/private-ip"
 )
 
 var (
@@ -511,28 +513,11 @@ func (l *loadbalancers) getLoadbalancerTags(ctx context.Context, service *v1.Ser
 	return []string{}
 }
 
-func (l *loadbalancers) getLoadbalancerFirewallID(service *v1.Service) (int, error) {
-	fwid, ok := getServiceAnnotation(service, annLinodeCloudFirewallID)
-	if !ok {
-		return -1, nil
-	}
-
-	firewallID, err := strconv.Atoi(fwid)
-	if err != nil {
-		return -1, err
-	}
-	return firewallID, nil
-}
-
 func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName string, service *v1.Service, configs []*linodego.NodeBalancerConfigCreateOptions) (lb *linodego.NodeBalancer, err error) {
 	connThrottle := getConnectionThrottle(service)
 
 	label := l.GetLoadBalancerName(ctx, clusterName, service)
 	tags := l.getLoadbalancerTags(ctx, service)
-	firewallID, err := l.getLoadbalancerFirewallID(service)
-	if err != nil {
-		return nil, err
-	}
 
 	createOpts := linodego.NodeBalancerCreateOptions{
 		Label:              &label,
@@ -542,7 +527,12 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 		Tags:               tags,
 	}
 
-	if firewallID != -1 {
+	fwid, ok := getServiceAnnotation(service, annLinodeCloudFirewallID)
+	if ok {
+		firewallID, err := strconv.Atoi(fwid)
+		if err != nil {
+			return nil, err
+		}
 		createOpts.FirewallID = firewallID
 	}
 	return l.client.CreateNodeBalancer(ctx, createOpts)
@@ -667,7 +657,7 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 
 func (l *loadbalancers) buildNodeBalancerNodeCreateOptions(node *v1.Node, nodePort int32) linodego.NodeBalancerNodeCreateOptions {
 	return linodego.NodeBalancerNodeCreateOptions{
-		Address: fmt.Sprintf("%v:%v", getNodeInternalIP(node), nodePort),
+		Address: fmt.Sprintf("%v:%v", getNodePrivateIP(node), nodePort),
 		Label:   node.Name,
 		Mode:    "accept",
 		Weight:  100,
@@ -781,7 +771,15 @@ func getPortConfigAnnotation(service *v1.Service, port int) (portConfigAnnotatio
 	return annotation, nil
 }
 
-func getNodeInternalIP(node *v1.Node) string {
+// getNodePrivateIP should provide the Linode Private IP the NodeBalance
+// will communicate with. When using a VLAN or VPC for the Kubernetes cluster
+// network, this will not be the NodeInternalIP, so this prefers an annotation
+// cluster operators may specify in such a situation.
+func getNodePrivateIP(node *v1.Node) string {
+	if address, exists := node.Annotations[annLinodeNodePrivateIP]; exists {
+		return address
+	}
+
 	for _, addr := range node.Status.Addresses {
 		if addr.Type == v1.NodeInternalIP {
 			return addr.Address

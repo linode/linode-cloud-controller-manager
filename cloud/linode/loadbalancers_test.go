@@ -114,8 +114,16 @@ func TestCCMLoadBalancers(t *testing.T) {
 			f:    testGetLoadBalancer,
 		},
 		{
-			name: "Create Load Balancer",
-			f:    testCreateNodeBalancer,
+			name: "Create Load Balancer Without Firewall",
+			f:    testCreateNodeBalancerWithOutFirewall,
+		},
+		{
+			name: "Create Load Balancer With Valid Firewall ID",
+			f:    testCreateNodeBalancerWithFirewall,
+		},
+		{
+			name: "Create Load Balancer With Invalid Firewall ID",
+			f:    testCreateNodeBalancerWithInvalidFirewall,
 		},
 		{
 			name: "Update Load Balancer - Add Annotation",
@@ -205,7 +213,7 @@ func stubService(fake *fake.Clientset, service *v1.Service) {
 	fake.CoreV1().Services("").Create(context.TODO(), service, metav1.CreateOptions{})
 }
 
-func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
+func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, firewallID *string) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: randString(10),
@@ -233,11 +241,24 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 		},
 	}
 
+	var errExpected error
+	if firewallID != nil {
+		svc.Annotations[annLinodeCloudFirewallID] = *firewallID
+		_, errExpected = strconv.Atoi(*firewallID)
+	}
+
 	lb := &loadbalancers{client, "us-west", nil}
 	nodes := []*v1.Node{
 		{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}},
 	}
 	nb, err := lb.buildLoadBalancerRequest(context.TODO(), "linodelb", svc, nodes)
+	if errExpected != nil {
+		if err == nil || err.Error() != errExpected.Error() {
+			t.Fatalf("expected %s got %s", errExpected.Error(), err.Error())
+		} else {
+			return
+		}
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,6 +306,20 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	}
 
 	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc) }()
+}
+
+func testCreateNodeBalancerWithOutFirewall(t *testing.T, client *linodego.Client, f *fakeAPI) {
+	testCreateNodeBalancer(t, client, f, nil)
+}
+
+func testCreateNodeBalancerWithFirewall(t *testing.T, client *linodego.Client, f *fakeAPI) {
+	firewallID := "123"
+	testCreateNodeBalancer(t, client, f, &firewallID)
+}
+
+func testCreateNodeBalancerWithInvalidFirewall(t *testing.T, client *linodego.Client, f *fakeAPI) {
+	firewallID := "qwerty"
+	testCreateNodeBalancer(t, client, f, &firewallID)
 }
 
 func testUpdateLoadBalancerAddAnnotation(t *testing.T, client *linodego.Client, _ *fakeAPI) {
@@ -1112,7 +1147,7 @@ func Test_getHealthCheckType(t *testing.T) {
 	}
 }
 
-func Test_getNodeInternalIP(t *testing.T) {
+func Test_getNodePrivateIP(t *testing.T) {
 	testcases := []struct {
 		name    string
 		node    *v1.Node
@@ -1146,11 +1181,30 @@ func Test_getNodeInternalIP(t *testing.T) {
 			},
 			"",
 		},
+		{
+			"node internal ip annotation present",
+			&v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annLinodeNodePrivateIP: "192.168.42.42",
+					},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.1.1",
+						},
+					},
+				},
+			},
+			"192.168.42.42",
+		},
 	}
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
-			ip := getNodeInternalIP(test.node)
+			ip := getNodePrivateIP(test.node)
 			if ip != test.address {
 				t.Error("unexpected certificate")
 				t.Logf("expected: %q", test.address)
