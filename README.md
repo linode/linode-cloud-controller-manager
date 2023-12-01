@@ -8,7 +8,6 @@
 [![Twitter](https://img.shields.io/twitter/follow/linode.svg?style=social&logo=twitter&label=Follow)](https://twitter.com/intent/follow?screen_name=linode)
 
 ## The purpose of the CCM
-
 The Linode Cloud Controller Manager (CCM) creates a fully supported
 Kubernetes experience on Linode.
 
@@ -25,17 +24,14 @@ allowing pods to be appropriately rescheduled.
 failure domains.
 
 ## Kubernetes Supported Versions
-
 Kubernetes 1.9+
 
 ## Usage
 
 ### LoadBalancer Services
-
 Kubernetes Services of type `LoadBalancer` will be served through a [Linode NodeBalancer](https://www.linode.com/nodebalancers) which the Cloud Controller Manager will provision on demand.  For general feature and usage notes, refer to the [Getting Started with Linode NodeBalancers](https://www.linode.com/docs/platform/nodebalancer/getting-started-with-nodebalancers/) guide.
 
 #### Annotations
-
 The Linode CCM accepts several annotations which affect the properties of the underlying NodeBalancer deployment.
 
 All of the Service annotation names listed below have been shortened for readability.  The values, such as `http`, are case-sensitive.
@@ -63,7 +59,6 @@ Annotation (Suffix) | Values | Default | Description
 `firewall-id` | string | | The Firewall ID that's applied to the NodeBalancer instance.
 
 #### Deprecated Annotations
-
 These annotations are deprecated, and will be removed in a future release.
 
 Annotation (Suffix) | Values | Default | Description | Scheduled Removal
@@ -71,11 +66,9 @@ Annotation (Suffix) | Values | Default | Description | Scheduled Removal
 `proxy-protcol` | `none`, `v1`, `v2` | `none` | Specifies whether to use a version of Proxy Protocol on the underlying NodeBalancer | Q4 2021
 
 #### Annotation bool values
-
 For annotations with bool value types, `"1"`, `"t"`,  `"T"`, `"True"`, `"true"` and `"True"` are valid string representations of `true`. Any other values will be interpreted as false. For more details, see [strconv.ParseBool](https://golang.org/pkg/strconv/#ParseBool).
 
 #### Port Specific Configuration
-
 These configuration options can be specified via the `port-*` annotation, encoded in JSON.
 
 Key | Values | Default | Description
@@ -85,7 +78,6 @@ Key | Values | Default | Description
 `tls-secret-name` | string | | Specifies a secret to use for TLS. The secret type should be `kubernetes.io/tls`.
 
 ### Nodes
-
 Kubernetes Nodes can be configured with the following annotations.
 
 Each *Node* annotation **MUST** be prefixed with:<br />
@@ -101,7 +93,6 @@ Key | Values | Default | Description
 [VPC]: https://www.linode.com/blog/linode/new-betas-coming-to-green-light/
 
 ### Example usage
-
 ```yaml
 kind: Service
 apiVersion: v1
@@ -160,12 +151,10 @@ spec:
 See more in the [examples directory](examples)
 
 ## Why `stickiness` and `algorithm` annotations don't exist
-
 As kube-proxy will simply double-hop the traffic to a random backend Pod anyway, it doesn't matter which backend Node traffic is forwarded-to for the sake of session stickiness.
 These annotations are not necessary to implement session stickiness, as kube-proxy will simply double-hop the packets to a random backend Pod. It would not make a difference to set a backend Node that would receive the network traffic in an attempt to set session stickiness.
 
 ## How to use sessionAffinity
-
 In Kubernetes, sessionAffinity refers to a mechanism that allows a client always to be redirected to the same pod when the client hits a service.
 
 To enable sessionAffinity `service.spec.sessionAffinity` field must be set to `ClientIP` as the following service yaml:
@@ -194,7 +183,6 @@ sessionAffinityConfig:
 ```
 
 ## Generating a Manifest for Deployment
-
 Use the script located at `./deploy/generate-manifest.sh` to generate a self-contained deployment manifest for the Linode CCM. Two arguments are required.
 
 The first argument must be a Linode APIv4 Personal Access Token with all permissions.
@@ -216,7 +204,6 @@ This will create a file `ccm-linode.yaml` which you can use to deploy the CCM.
 Note: Your kubelets, controller-manager, and apiserver must be started with `--cloud-provider=external` as noted in the following documentation.
 
 ## Deployment Through Helm Chart
-
 Use the helm chart located under './deploy/chart'. This dir has the manifest for Linode CCM. There are two arguments required.
 
 The first argument must be a Linode APIv4 [Personal Access Token](https://cloud.linode.com/profile/tokens) with all permissions.
@@ -225,43 +212,39 @@ The second argument must be a Linode [region](https://api.linode.com/v4/regions)
 
 ### To deploy CCM run the following helm command once you are in the ccm root dir:
 ```sh
-git clone https://github.com/linode/linode-cloud-controller-manager.git
-
-cd linode-cloud-controller-manager
-
-helm install linode-ccm ./deploy/chart --set apiToken=$LINODE_API_TOKEN,region=$REGION
+export VERSION=v0.3.22
+export LINODE_API_TOKEN=<linodeapitoken>
+export REGION=<linoderegion>
+helm install linode-ccm --set apiToken=$LINODE_API_TOKEN,region=$REGION https://github.com/linode/linode-cloud-controller-manager/releases/download/$VERSION/helm-chart-$VERSION.tgz
 ```
 _See [helm install](https://helm.sh/docs/helm/helm_install/) for command documentation._
 
 ### To uninstall linode-ccm from kubernetes cluster. Run the following command:
 ```sh
-
 helm uninstall linode-ccm
-
 ```
 _See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall/) for command documentation._
 
 ### To upgrade when new changes are made to the helm chart. Run the following command:
 ```sh
+export VERSION=v0.3.22
+export LINODE_API_TOKEN=<linodeapitoken>
+export REGION=<linoderegion>
 
-helm upgrade linode-ccm ./deploy/chart --install
-
+helm upgrade linode-ccm --install --set apiToken=$LINODE_API_TOKEN,region=$REGION https://github.com/linode/linode-cloud-controller-manager/releases/download/$VERSION/helm-chart-$VERSION.tgz
 ```
 _See [helm upgrade](https://helm.sh/docs/helm/helm_upgrade/) for command documentation._
 
 ### Configurations
-
 There are other variables that can be set to a different value. For list of all the modifiable variables/values, take a look at './deploy/chart/values.yaml'.
 
 Values can be set/overrided by using the '--set var=value,...' flag or by passing in a custom-values.yaml using '-f custom-values.yaml'.
 
 Recommendation: Use custom-values.yaml to override the variables to avoid any errors with template rendering
 
-
 ### Upstream Documentation Including Deployment Instructions
 
 [Kubernetes Cloud Controller Manager](https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/).
-
 
 ## Upstream Developer Documentation
 
@@ -297,7 +280,6 @@ cd $(go env GOPATH)/src/github.com/linode/linode-cloud-controller-manager
 ```
 
 #### Install Dev tools
-
 To install various dev tools for Pharm Controller Manager, run the following command:
 
 ```bash
@@ -305,7 +287,6 @@ To install various dev tools for Pharm Controller Manager, run the following com
 ```
 
 #### Build Binary
-
 Use the following Make targets to build and run a local binary
 
 ```bash
@@ -316,7 +297,6 @@ $ dist/linode-cloud-controller-manager
 ```
 
 #### Dependency management
-
 Linode Cloud Controller Manager uses [Go Modules](https://blog.golang.org/using-go-modules) to manage dependencies.
 If you want to update/add dependencies, run:
 
@@ -325,7 +305,6 @@ go mod tidy
 ```
 
 #### Building Docker images
-
 To build and push a Docker image, use the following make targets.
 
 ```bash
@@ -344,9 +323,7 @@ docker run -ti linode/linode-cloud-controller-manager:canary
 ```
 
 ## Contribution Guidelines
-
 Want to improve the linode-cloud-controller-manager? Please start [here](.github/CONTRIBUTING.md).
 
 ## Join the Kubernetes Community
-
 For general help or discussion, join us in #linode on the [Kubernetes Slack](https://kubernetes.slack.com/messages/CD4B15LUR/details/). To sign up, use the [Kubernetes Slack inviter](http://slack.kubernetes.io/).
