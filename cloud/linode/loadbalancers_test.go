@@ -213,7 +213,7 @@ func stubService(fake *fake.Clientset, service *v1.Service) {
 	fake.CoreV1().Services("").Create(context.TODO(), service, metav1.CreateOptions{})
 }
 
-func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, firewallID *string) {
+func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, firewallID *string) error {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: randString(10),
@@ -241,10 +241,8 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, f
 		},
 	}
 
-	var errExpected error
 	if firewallID != nil {
 		svc.Annotations[annLinodeCloudFirewallID] = *firewallID
-		_, errExpected = strconv.Atoi(*firewallID)
 	}
 
 	lb := &loadbalancers{client, "us-west", nil}
@@ -252,16 +250,10 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, f
 		{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}},
 	}
 	nb, err := lb.buildLoadBalancerRequest(context.TODO(), "linodelb", svc, nodes)
-	if errExpected != nil {
-		if err == nil || err.Error() != errExpected.Error() {
-			t.Fatalf("expected %s got %s", errExpected.Error(), err.Error())
-		} else {
-			return
-		}
-	}
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
+
 	if nb.Region != lb.zone {
 		t.Error("unexpected nodebalancer region")
 		t.Logf("expected: %s", lb.zone)
@@ -270,7 +262,7 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, f
 
 	configs, err := client.ListNodeBalancerConfigs(context.TODO(), nb.ID, nil)
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 
 	if len(configs) != len(svc.Spec.Ports) {
@@ -279,17 +271,9 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, f
 		t.Logf("actual: %v", len(configs))
 	}
 
-	if !reflect.DeepEqual(err, nil) {
-		t.Error("unexpected error")
-		t.Logf("expected: %v", nil)
-		t.Logf("actual: %v", err)
-	}
-
 	nb, err = client.GetNodeBalancer(context.TODO(), nb.ID)
-	if !reflect.DeepEqual(err, nil) {
-		t.Error("unexpected error")
-		t.Logf("expected: %v", nil)
-		t.Logf("actual: %v", err)
+	if err != nil {
+		return err
 	}
 
 	if nb.ClientConnThrottle != 15 {
@@ -306,20 +290,37 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, f
 	}
 
 	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc) }()
+	return nil
 }
 
 func testCreateNodeBalancerWithOutFirewall(t *testing.T, client *linodego.Client, f *fakeAPI) {
-	testCreateNodeBalancer(t, client, f, nil)
+	err := testCreateNodeBalancer(t, client, f, nil)
+	if !reflect.DeepEqual(err, nil) {
+		t.Error("unexpected error")
+		t.Logf("expected: %v", nil)
+		t.Logf("actual: %v", err)
+	}
 }
 
 func testCreateNodeBalancerWithFirewall(t *testing.T, client *linodego.Client, f *fakeAPI) {
 	firewallID := "123"
-	testCreateNodeBalancer(t, client, f, &firewallID)
+	err := testCreateNodeBalancer(t, client, f, &firewallID)
+	if !reflect.DeepEqual(err, nil) {
+		t.Error("unexpected error")
+		t.Logf("expected: %v", nil)
+		t.Logf("actual: %v", err)
+	}
 }
 
 func testCreateNodeBalancerWithInvalidFirewall(t *testing.T, client *linodego.Client, f *fakeAPI) {
 	firewallID := "qwerty"
-	testCreateNodeBalancer(t, client, f, &firewallID)
+	expectedError := "strconv.Atoi: parsing \"qwerty\": invalid syntax"
+	err := testCreateNodeBalancer(t, client, f, &firewallID)
+	if !reflect.DeepEqual(err.Error(), expectedError) {
+		t.Error("unexpected error")
+		t.Logf("expected: %s", expectedError)
+		t.Logf("actual: %v", err)
+	}
 }
 
 func testUpdateLoadBalancerAddAnnotation(t *testing.T, client *linodego.Client, _ *fakeAPI) {
