@@ -238,7 +238,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 		klog.Infof("created new NodeBalancer (%d) for service (%s)", nb.ID, serviceNn)
 
 	case nil:
-		if err = l.updateNodeBalancer(ctx, service, nodes, nb); err != nil {
+		if err = l.updateNodeBalancer(ctx, clusterName, service, nodes, nb); err != nil {
 			sentry.CaptureError(ctx, err)
 			return nil, err
 		}
@@ -262,7 +262,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 }
 
 //nolint:funlen
-func (l *loadbalancers) updateNodeBalancer(ctx context.Context, service *v1.Service, nodes []*v1.Node, nb *linodego.NodeBalancer) (err error) {
+func (l *loadbalancers) updateNodeBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node, nb *linodego.NodeBalancer) (err error) {
 	if len(nodes) == 0 {
 		return fmt.Errorf("%w: service %s", errNoNodesAvailable, getServiceNn(service))
 	}
@@ -279,7 +279,7 @@ func (l *loadbalancers) updateNodeBalancer(ctx context.Context, service *v1.Serv
 		}
 	}
 
-	tags := l.getLoadBalancerTags(ctx, service)
+	tags := l.getLoadBalancerTags(ctx, clusterName, service)
 	if !reflect.DeepEqual(nb.Tags, tags) {
 		update := nb.GetUpdateOptions()
 		update.Tags = &tags
@@ -391,7 +391,7 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 		}
 	}
 
-	return l.updateNodeBalancer(ctx, serviceWithStatus, nodes, nb)
+	return l.updateNodeBalancer(ctx, clusterName, serviceWithStatus, nodes, nb)
 }
 
 // Delete any NodeBalancer configs for ports that no longer exist on the Service
@@ -504,19 +504,20 @@ func (l *loadbalancers) getNodeBalancerByID(ctx context.Context, service *v1.Ser
 	return nb, nil
 }
 
-func (l *loadbalancers) getLoadBalancerTags(_ context.Context, service *v1.Service) []string {
+func (l *loadbalancers) getLoadBalancerTags(_ context.Context, clusterName string, service *v1.Service) []string {
+	tags := []string{clusterName}
 	tagStr, ok := getServiceAnnotation(service, annLinodeLoadBalancerTags)
 	if ok {
-		return strings.Split(tagStr, ",")
+		return append(tags, strings.Split(tagStr, ",")...)
 	}
-	return []string{}
+	return tags
 }
 
 func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName string, service *v1.Service, configs []*linodego.NodeBalancerConfigCreateOptions) (lb *linodego.NodeBalancer, err error) {
 	connThrottle := getConnectionThrottle(service)
 
 	label := l.GetLoadBalancerName(ctx, clusterName, service)
-	tags := l.getLoadBalancerTags(ctx, service)
+	tags := l.getLoadBalancerTags(ctx, clusterName, service)
 	createOpts := linodego.NodeBalancerCreateOptions{
 		Label:              &label,
 		Region:             l.zone,

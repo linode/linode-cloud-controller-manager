@@ -277,7 +277,7 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 		t.Logf("actual: %v", nb.ClientConnThrottle)
 	}
 
-	expectedTags := []string{"fake", "test", "yolo"}
+	expectedTags := []string{"linodelb", "fake", "test", "yolo"}
 	if !reflect.DeepEqual(nb.Tags, expectedTags) {
 		t.Error("unexpected Tags")
 		t.Logf("expected: %v", expectedTags)
@@ -470,10 +470,11 @@ func testUpdateLoadBalancerAddTags(t *testing.T, client *linodego.Client, _ *fak
 	lb := &loadbalancers{client, "us-west", nil}
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
+	clusterName := "linodelb"
 
-	defer lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+	defer lb.EnsureLoadBalancerDeleted(context.TODO(), clusterName, svc)
 
-	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), clusterName, svc, nodes)
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
@@ -485,7 +486,7 @@ func testUpdateLoadBalancerAddTags(t *testing.T, client *linodego.Client, _ *fak
 		annLinodeLoadBalancerTags: testTags,
 	})
 
-	err = lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	err = lb.UpdateLoadBalancer(context.TODO(), clusterName, svc, nodes)
 	if err != nil {
 		t.Fatalf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
 	}
@@ -495,7 +496,7 @@ func testUpdateLoadBalancerAddTags(t *testing.T, client *linodego.Client, _ *fak
 		t.Fatalf("failed to get NodeBalancer by status: %v", err)
 	}
 
-	expectedTags := strings.Split(testTags, ",")
+	expectedTags := append([]string{clusterName}, strings.Split(testTags, ",")...)
 	observedTags := nb.Tags
 
 	if !reflect.DeepEqual(expectedTags, observedTags) {
