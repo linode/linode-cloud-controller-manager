@@ -104,7 +104,7 @@ func (c *linodeCloud) ProviderName() string {
 	return ProviderName
 }
 
-func (c *linodeCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
+func (c *linodeCloud) ScrubDNS(_, _ []string) (nsOut, srchOut []string) {
 	return nil, nil
 }
 

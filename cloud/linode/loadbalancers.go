@@ -187,7 +187,7 @@ func (l *loadbalancers) cleanupOldNodeBalancer(ctx context.Context, service *v1.
 // GetLoadBalancerName returns the name of the load balancer.
 //
 // GetLoadBalancer will not modify service.
-func (l *loadbalancers) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
+func (l *loadbalancers) GetLoadBalancerName(_ context.Context, _ string, _ *v1.Service) string {
 	unixNano := strconv.FormatInt(time.Now().UnixNano(), 16)
 	return fmt.Sprintf("ccm-%s", unixNano[len(unixNano)-12:])
 }
@@ -279,7 +279,7 @@ func (l *loadbalancers) updateNodeBalancer(ctx context.Context, service *v1.Serv
 		}
 	}
 
-	tags := l.getLoadbalancerTags(ctx, service)
+	tags := l.getLoadBalancerTags(ctx, service)
 	if !reflect.DeepEqual(nb.Tags, tags) {
 		update := nb.GetUpdateOptions()
 		update.Tags = &tags
@@ -504,7 +504,7 @@ func (l *loadbalancers) getNodeBalancerByID(ctx context.Context, service *v1.Ser
 	return nb, nil
 }
 
-func (l *loadbalancers) getLoadbalancerTags(ctx context.Context, service *v1.Service) []string {
+func (l *loadbalancers) getLoadBalancerTags(_ context.Context, service *v1.Service) []string {
 	tagStr, ok := getServiceAnnotation(service, annLinodeLoadBalancerTags)
 	if ok {
 		return strings.Split(tagStr, ",")
@@ -516,7 +516,7 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 	connThrottle := getConnectionThrottle(service)
 
 	label := l.GetLoadBalancerName(ctx, clusterName, service)
-	tags := l.getLoadbalancerTags(ctx, service)
+	tags := l.getLoadBalancerTags(ctx, service)
 	createOpts := linodego.NodeBalancerCreateOptions{
 		Label:              &label,
 		Region:             l.zone,
@@ -706,23 +706,20 @@ func getPortConfig(service *v1.Service, port int) (portConfig, error) {
 	}
 	protocol := portConfigAnnotation.Protocol
 	if protocol == "" {
-		var ok bool
-		protocol, ok = service.Annotations[annLinodeDefaultProtocol]
-		if !ok {
-			protocol = "tcp"
+		protocol = "tcp"
+		if p, ok := service.Annotations[annLinodeDefaultProtocol]; ok {
+			protocol = p
 		}
 	}
 	protocol = strings.ToLower(protocol)
 
 	proxyProtocol := portConfigAnnotation.ProxyProtocol
 	if proxyProtocol == "" {
-		var ok bool
+		proxyProtocol = string(linodego.ProxyProtocolNone)
 		for _, ann := range []string{annLinodeDefaultProxyProtocol, annLinodeProxyProtocolDeprecated} {
-			proxyProtocol, ok = service.Annotations[ann]
-			if ok {
+			if pp, ok := service.Annotations[ann]; ok {
+				proxyProtocol = pp
 				break
-			} else {
-				proxyProtocol = string(linodego.ProxyProtocolNone)
 			}
 		}
 	}
