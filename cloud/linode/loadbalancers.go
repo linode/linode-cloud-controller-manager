@@ -432,7 +432,7 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 	serviceNn := getServiceNn(service)
 
 	if len(service.Status.LoadBalancer.Ingress) == 0 {
-		klog.Infof("short-circuting deletion of NodeBalancer for service(%s) as LoadBalancer ingress is not present", serviceNn)
+		klog.Infof("short-circuiting deletion of NodeBalancer for service(%s) as LoadBalancer ingress is not present", serviceNn)
 		return nil
 	}
 
@@ -442,7 +442,7 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 		break
 
 	case lbNotFoundError:
-		klog.Infof("short-circuting deletion for NodeBalancer for service (%s) as one does not exist: %s", serviceNn, err)
+		klog.Infof("short-circuiting deletion for NodeBalancer for service (%s) as one does not exist: %s", serviceNn, err)
 		return nil
 
 	default:
@@ -452,7 +452,7 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 	}
 
 	if l.shouldPreserveNodeBalancer(service) {
-		klog.Infof("short-circuting deletion of NodeBalancer (%d) for service (%s) as annotated with %s", nb.ID, serviceNn, annLinodeLoadBalancerPreserve)
+		klog.Infof("short-circuiting deletion of NodeBalancer (%d) for service (%s) as annotated with %s", nb.ID, serviceNn, annLinodeLoadBalancerPreserve)
 		return nil
 	}
 
