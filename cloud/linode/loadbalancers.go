@@ -50,6 +50,7 @@ const (
 
 	annLinodeHostnameOnlyIngress = "service.beta.kubernetes.io/linode-loadbalancer-hostname-only-ingress"
 	annLinodeLoadBalancerTags    = "service.beta.kubernetes.io/linode-loadbalancer-tags"
+	annLinodeCloudFirewallID     = "service.beta.kubernetes.io/linode-loadbalancer-firewall-id"
 
 	annLinodeNodePrivateIP = "node.k8s.linode.com/private-ip"
 )
@@ -523,6 +524,15 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 		ClientConnThrottle: &connThrottle,
 		Configs:            configs,
 		Tags:               tags,
+	}
+
+	fwid, ok := getServiceAnnotation(service, annLinodeCloudFirewallID)
+	if ok {
+		firewallID, err := strconv.Atoi(fwid)
+		if err != nil {
+			return nil, err
+		}
+		createOpts.FirewallID = firewallID
 	}
 	return l.client.CreateNodeBalancer(ctx, createOpts)
 }
