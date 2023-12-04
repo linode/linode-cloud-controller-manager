@@ -187,7 +187,7 @@ func (l *loadbalancers) cleanupOldNodeBalancer(ctx context.Context, service *v1.
 // GetLoadBalancerName returns the name of the load balancer.
 //
 // GetLoadBalancer will not modify service.
-func (l *loadbalancers) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
+func (l *loadbalancers) GetLoadBalancerName(_ context.Context, _ string, _ *v1.Service) string {
 	unixNano := strconv.FormatInt(time.Now().UnixNano(), 16)
 	return fmt.Sprintf("ccm-%s", unixNano[len(unixNano)-12:])
 }
@@ -279,7 +279,7 @@ func (l *loadbalancers) updateNodeBalancer(ctx context.Context, service *v1.Serv
 		}
 	}
 
-	tags := l.getLoadbalancerTags(ctx, service)
+	tags := l.getLoadBalancerTags(ctx, service)
 	if !reflect.DeepEqual(nb.Tags, tags) {
 		update := nb.GetUpdateOptions()
 		update.Tags = &tags
@@ -432,7 +432,7 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 	serviceNn := getServiceNn(service)
 
 	if len(service.Status.LoadBalancer.Ingress) == 0 {
-		klog.Infof("short-circuting deletion of NodeBalancer for service(%s) as LoadBalancer ingress is not present", serviceNn)
+		klog.Infof("short-circuiting deletion of NodeBalancer for service(%s) as LoadBalancer ingress is not present", serviceNn)
 		return nil
 	}
 
@@ -442,7 +442,7 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 		break
 
 	case lbNotFoundError:
-		klog.Infof("short-circuting deletion for NodeBalancer for service (%s) as one does not exist: %s", serviceNn, err)
+		klog.Infof("short-circuiting deletion for NodeBalancer for service (%s) as one does not exist: %s", serviceNn, err)
 		return nil
 
 	default:
@@ -452,7 +452,7 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 	}
 
 	if l.shouldPreserveNodeBalancer(service) {
-		klog.Infof("short-circuting deletion of NodeBalancer (%d) for service (%s) as annotated with %s", nb.ID, serviceNn, annLinodeLoadBalancerPreserve)
+		klog.Infof("short-circuiting deletion of NodeBalancer (%d) for service (%s) as annotated with %s", nb.ID, serviceNn, annLinodeLoadBalancerPreserve)
 		return nil
 	}
 
@@ -504,7 +504,7 @@ func (l *loadbalancers) getNodeBalancerByID(ctx context.Context, service *v1.Ser
 	return nb, nil
 }
 
-func (l *loadbalancers) getLoadbalancerTags(ctx context.Context, service *v1.Service) []string {
+func (l *loadbalancers) getLoadBalancerTags(_ context.Context, service *v1.Service) []string {
 	tagStr, ok := getServiceAnnotation(service, annLinodeLoadBalancerTags)
 	if ok {
 		return strings.Split(tagStr, ",")
@@ -516,7 +516,7 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 	connThrottle := getConnectionThrottle(service)
 
 	label := l.GetLoadBalancerName(ctx, clusterName, service)
-	tags := l.getLoadbalancerTags(ctx, service)
+	tags := l.getLoadBalancerTags(ctx, service)
 	createOpts := linodego.NodeBalancerCreateOptions{
 		Label:              &label,
 		Region:             l.zone,
@@ -644,12 +644,26 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 	return l.createNodeBalancer(ctx, clusterName, service, configs)
 }
 
+func coerceString(s string, minLen, maxLen int, padding string) string {
+	if len(padding) == 0 {
+		padding = "x"
+	}
+	if len(s) > maxLen {
+		return s[:maxLen]
+	} else if len(s) < minLen {
+		return coerceString(fmt.Sprintf("%s%s", padding, s), minLen, maxLen, padding)
+	}
+	return s
+}
+
 func (l *loadbalancers) buildNodeBalancerNodeCreateOptions(node *v1.Node, nodePort int32) linodego.NodeBalancerNodeCreateOptions {
 	return linodego.NodeBalancerNodeCreateOptions{
 		Address: fmt.Sprintf("%v:%v", getNodePrivateIP(node), nodePort),
-		Label:   node.Name,
-		Mode:    "accept",
-		Weight:  100,
+		// NodeBalancer backends must be 3-32 chars in length
+		// If < 3 chars, pad node name with "node-" prefix
+		Label:  coerceString(node.Name, 3, 32, "node-"),
+		Mode:   "accept",
+		Weight: 100,
 	}
 }
 
@@ -692,23 +706,20 @@ func getPortConfig(service *v1.Service, port int) (portConfig, error) {
 	}
 	protocol := portConfigAnnotation.Protocol
 	if protocol == "" {
-		var ok bool
-		protocol, ok = service.Annotations[annLinodeDefaultProtocol]
-		if !ok {
-			protocol = "tcp"
+		protocol = "tcp"
+		if p, ok := service.Annotations[annLinodeDefaultProtocol]; ok {
+			protocol = p
 		}
 	}
 	protocol = strings.ToLower(protocol)
 
 	proxyProtocol := portConfigAnnotation.ProxyProtocol
 	if proxyProtocol == "" {
-		var ok bool
+		proxyProtocol = string(linodego.ProxyProtocolNone)
 		for _, ann := range []string{annLinodeDefaultProxyProtocol, annLinodeProxyProtocolDeprecated} {
-			proxyProtocol, ok = service.Annotations[ann]
-			if ok {
+			if pp, ok := service.Annotations[ann]; ok {
+				proxyProtocol = pp
 				break
-			} else {
-				proxyProtocol = string(linodego.ProxyProtocolNone)
 			}
 		}
 	}

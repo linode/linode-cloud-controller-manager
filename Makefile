@@ -17,7 +17,7 @@ codegen:
 .PHONY: lint
 lint:
 	docker run --rm -v "$(shell pwd):/var/work:ro" -w /var/work \
-		golangci/golangci-lint:v1.44.0 golangci-lint run -v --timeout=5m
+		golangci/golangci-lint:v1.55.2 golangci-lint run -v --timeout=5m
 
 .PHONY: fmt
 fmt:
