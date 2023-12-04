@@ -312,7 +312,7 @@ func testCreateNodeBalancerWithInvalidFirewall(t *testing.T, client *linodego.Cl
 	firewallID := "qwerty"
 	expectedError := "strconv.Atoi: parsing \"qwerty\": invalid syntax"
 	err := testCreateNodeBalancer(t, client, f, &firewallID)
-	if !reflect.DeepEqual(err.Error(), expectedError) {
+	if err.Error() != expectedError {
 		t.Fatalf("expected a %s error, got %v", expectedError, err)
 	}
 }
