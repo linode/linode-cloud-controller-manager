@@ -295,20 +295,16 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, f
 
 func testCreateNodeBalancerWithOutFirewall(t *testing.T, client *linodego.Client, f *fakeAPI) {
 	err := testCreateNodeBalancer(t, client, f, nil)
-	if !reflect.DeepEqual(err, nil) {
-		t.Error("unexpected error")
-		t.Logf("expected: %v", nil)
-		t.Logf("actual: %v", err)
+	if err != nil {
+		t.Fatalf("expected a nil error, got %v", err)
 	}
 }
 
 func testCreateNodeBalancerWithFirewall(t *testing.T, client *linodego.Client, f *fakeAPI) {
 	firewallID := "123"
 	err := testCreateNodeBalancer(t, client, f, &firewallID)
-	if !reflect.DeepEqual(err, nil) {
-		t.Error("unexpected error")
-		t.Logf("expected: %v", nil)
-		t.Logf("actual: %v", err)
+	if err != nil {
+		t.Fatalf("expected a nil error, got %v", err)
 	}
 }
 
@@ -317,9 +313,7 @@ func testCreateNodeBalancerWithInvalidFirewall(t *testing.T, client *linodego.Cl
 	expectedError := "strconv.Atoi: parsing \"qwerty\": invalid syntax"
 	err := testCreateNodeBalancer(t, client, f, &firewallID)
 	if !reflect.DeepEqual(err.Error(), expectedError) {
-		t.Error("unexpected error")
-		t.Logf("expected: %s", expectedError)
-		t.Logf("actual: %v", err)
+		t.Fatalf("expected a %s error, got %v", expectedError, err)
 	}
 }
 
@@ -2149,4 +2143,46 @@ func addTLSSecret(t *testing.T, kubeClient kubernetes.Interface) {
 	if err != nil {
 		t.Fatalf("failed to add TLS secret: %s\n", err)
 	}
+}
+
+func Test_LoadbalNodeNameCoercion(t *testing.T) {
+	type testCase struct {
+		nodeName       string
+		padding        string
+		expectedOutput string
+	}
+	testCases := []testCase{
+		{
+			nodeName:       "n",
+			padding:        "z",
+			expectedOutput: "zzn",
+		},
+		{
+			nodeName:       "n",
+			padding:        "node-",
+			expectedOutput: "node-n",
+		},
+		{
+			nodeName:       "n",
+			padding:        "",
+			expectedOutput: "xxn",
+		},
+		{
+			nodeName:       "infra-logging-controlplane-3-atl1-us-prod",
+			padding:        "node-",
+			expectedOutput: "infra-logging-controlplane-3-atl",
+		},
+		{
+			nodeName:       "node1",
+			padding:        "node-",
+			expectedOutput: "node1",
+		},
+	}
+
+	for _, tc := range testCases {
+		if out := coerceString(tc.nodeName, 3, 32, tc.padding); out != tc.expectedOutput {
+			t.Fatalf("Expected loadbal backend name to be %s (got: %s)", tc.expectedOutput, out)
+		}
+	}
+
 }
