@@ -262,6 +262,93 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	return lbStatus, nil
 }
 
+func (l *loadbalancers) getNodeBalancerDeviceId(ctx context.Context, firewallID, nbID, page int) (int, bool, error) {
+	devices, err := l.client.ListFirewallDevices(ctx, firewallID, &linodego.ListOptions{PageSize: 500, PageOptions: &linodego.PageOptions{Page: page}})
+	if err != nil {
+		return 0, false, err
+	}
+
+	if len(devices) == 0 {
+		return 0, false, nil
+	}
+
+	for _, device := range devices {
+		if device.Entity.ID == nbID {
+			return device.ID, false, nil
+		}
+	}
+
+	return l.getNodeBalancerDeviceId(ctx, firewallID, nbID, page+1)
+}
+
+func (l *loadbalancers) updateNodeBalancerFirewall(ctx context.Context, service *v1.Service, nb *linodego.NodeBalancer) error {
+	fmt.Println("Came in here to update firewall")
+	var newFirewallID, existingFirewallID int
+	var err error
+	fwid, ok := getServiceAnnotation(service, annLinodeCloudFirewallID)
+	fmt.Println("Came in here to update firewall 2")
+	if ok {
+		newFirewallID, err = strconv.Atoi(fwid)
+		fmt.Println("Came in here to update firewall 3")
+		if err != nil {
+			fmt.Println("Came in here to update firewall 4")
+			return err
+		}
+		fmt.Println("Came in here to update firewall 5")
+	}
+
+	fmt.Print("newFirewallID:", newFirewallID)
+
+	// get the attached firewall
+	firewalls, err := l.client.ListNodeBalancerFirewalls(ctx, nb.ID, &linodego.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	if !ok && len(firewalls) == 0 {
+		return nil
+	}
+
+	if len(firewalls) != 0 {
+		existingFirewallID = firewalls[0].ID
+	}
+
+	fmt.Print("existingFirewallID:", existingFirewallID)
+
+	if existingFirewallID != newFirewallID {
+		// remove the existing firewall
+
+		fmt.Println("difference occured...")
+		if existingFirewallID != 0 {
+
+			deviceID, deviceExists, err := l.getNodeBalancerDeviceId(ctx, existingFirewallID, nb.ID, 1)
+			if err != nil {
+				return err
+			}
+
+			if !deviceExists {
+				return fmt.Errorf("Error in fetching attached nodeBalancer device")
+			}
+
+			err = l.client.DeleteFirewallDevice(ctx, existingFirewallID, deviceID)
+			if err != nil {
+				return err
+			}
+			fmt.Print("deleted old device...")
+		}
+
+		// attach new firewall if ID != 0
+		if newFirewallID != 0 {
+			_, err = l.client.CreateFirewallDevice(ctx, newFirewallID, linodego.FirewallDeviceCreateOptions{})
+			if err != nil {
+				return err
+			}
+			fmt.Print("attached old device...")
+		}
+	}
+	return nil
+}
+
 //nolint:funlen
 func (l *loadbalancers) updateNodeBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node, nb *linodego.NodeBalancer) (err error) {
 	if len(nodes) == 0 {
@@ -272,7 +359,6 @@ func (l *loadbalancers) updateNodeBalancer(ctx context.Context, clusterName stri
 	if connThrottle != nb.ClientConnThrottle {
 		update := nb.GetUpdateOptions()
 		update.ClientConnThrottle = &connThrottle
-
 		nb, err = l.client.UpdateNodeBalancer(ctx, nb.ID, update)
 		if err != nil {
 			sentry.CaptureError(ctx, err)
@@ -289,6 +375,12 @@ func (l *loadbalancers) updateNodeBalancer(ctx context.Context, clusterName stri
 			sentry.CaptureError(ctx, err)
 			return err
 		}
+	}
+
+	// update node-balancer firewall
+	err = l.updateNodeBalancerFirewall(ctx, service, nb)
+	if err != nil {
+		return err
 	}
 
 	// Get all of the NodeBalancer's configs
