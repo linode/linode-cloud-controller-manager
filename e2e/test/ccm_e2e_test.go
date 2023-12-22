@@ -4,9 +4,9 @@ import (
 	"context"
 	"e2e_test/test/framework"
 	"fmt"
+	"os/exec"
 	"strconv"
 
-	"github.com/codeskyblue/go-sh"
 	"github.com/linode/linodego"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -231,12 +231,12 @@ var _ = Describe("e2e tests", func() {
 	}
 
 	var addNewNode = func() {
-		_, err := sh.Command("terraform", "apply", "-var", "nodes=3", "-auto-approve").Output()
+		err := exec.Command("terraform", "apply", "-var", "nodes=3", "-auto-approve").Run()
 		Expect(err).NotTo(HaveOccurred())
 	}
 
 	var deleteNewNode = func() {
-		_, err := sh.Command("terraform", "apply", "-var", "nodes=2", "-auto-approve").Output()
+		err := exec.Command("terraform", "apply", "-var", "nodes=2", "-auto-approve").Run()
 		Expect(err).NotTo(HaveOccurred())
 	}
 
