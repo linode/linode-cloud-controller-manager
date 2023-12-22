@@ -28,10 +28,9 @@ linters:
     - tenv
     - unconvert
     - wastedassign
-    # enable once we're ready for a more involved refactor:
-    # - unparam # lots of unused function arguments
-    # - gofumpt # can be autofixed, it'd just produce a large diff
-    # - nosprintfhostport # nit
-    # - musttag # needs testing
-    # - exhaustive # needs careful refactors to satisfy
-    # - nilnil # needs testing
+    - unparam
+    - gofumpt
+    - nosprintfhostport
+    - musttag
+    - exhaustive
+    - nilnil

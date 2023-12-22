@@ -2,11 +2,16 @@ package test
 
 import (
 	"context"
-	"e2e_test/test/framework"
 	"fmt"
 	"os/exec"
 	"strconv"
 
+<<<<<<< HEAD
+=======
+	"e2e_test/test/framework"
+
+	"github.com/codeskyblue/go-sh"
+>>>>>>> d1f9e07 (round 2: stricter linting)
 	"github.com/linode/linodego"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -59,7 +64,7 @@ var _ = Describe("e2e tests", func() {
 		Expect(len(workers)).Should(BeNumerically(">=", 2))
 	})
 
-	var createPodWithLabel = func(pods []string, ports []core.ContainerPort, image string, labels map[string]string, selectNode bool) {
+	createPodWithLabel := func(pods []string, ports []core.ContainerPort, image string, labels map[string]string, selectNode bool) {
 		for i, pod := range pods {
 			p := f.LoadBalancer.GetPodObject(pod, image, ports, labels)
 			if selectNode {
@@ -70,49 +75,49 @@ var _ = Describe("e2e tests", func() {
 		}
 	}
 
-	var deletePods = func(pods []string) {
+	deletePods := func(pods []string) {
 		for _, pod := range pods {
 			Expect(f.LoadBalancer.DeletePod(pod)).NotTo(HaveOccurred())
 		}
 	}
 
-	var deleteService = func() {
+	deleteService := func() {
 		Expect(f.LoadBalancer.DeleteService()).NotTo(HaveOccurred())
 	}
 
-	var deleteSecret = func(name string) {
+	deleteSecret := func(name string) {
 		Expect(f.LoadBalancer.DeleteSecret(name)).NotTo(HaveOccurred())
 	}
 
-	var ensureServiceLoadBalancer = func() {
+	ensureServiceLoadBalancer := func() {
 		watcher, err := f.LoadBalancer.GetServiceWatcher()
 		Expect(err).NotTo(HaveOccurred())
 		Eventually(watcher.ResultChan()).Should(Receive(EnsuredService()))
 	}
 
-	var createServiceWithSelector = func(selector map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) {
+	createServiceWithSelector := func(selector map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) {
 		Expect(f.LoadBalancer.CreateService(selector, nil, ports, isSessionAffinityClientIP)).NotTo(HaveOccurred())
 		Eventually(f.LoadBalancer.GetServiceEndpoints).Should(Not(BeEmpty()))
 		ensureServiceLoadBalancer()
 	}
 
-	var createServiceWithAnnotations = func(labels map[string]string, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) {
+	createServiceWithAnnotations := func(labels map[string]string, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) {
 		Expect(f.LoadBalancer.CreateService(labels, annotations, ports, isSessionAffinityClientIP)).NotTo(HaveOccurred())
 		Eventually(f.LoadBalancer.GetServiceEndpoints).Should(Not(BeEmpty()))
 		ensureServiceLoadBalancer()
 	}
 
-	var updateServiceWithAnnotations = func(labels map[string]string, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) {
+	updateServiceWithAnnotations := func(labels map[string]string, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) {
 		Expect(f.LoadBalancer.UpdateService(labels, annotations, ports, isSessionAffinityClientIP)).NotTo(HaveOccurred())
 		Eventually(f.LoadBalancer.GetServiceEndpoints).Should(Not(BeEmpty()))
 		ensureServiceLoadBalancer()
 	}
 
-	var deleteNodeBalancer = func(id int) {
+	deleteNodeBalancer := func(id int) {
 		Expect(getLinodeClient().DeleteNodeBalancer(context.Background(), id)).NotTo(HaveOccurred())
 	}
 
-	var createNodeBalancer = func() int {
+	createNodeBalancer := func() int {
 		var nb *linodego.NodeBalancer
 		nb, err = getLinodeClient().CreateNodeBalancer(context.TODO(), linodego.NodeBalancerCreateOptions{
 			Region: fmt.Sprintf("%s", region),
@@ -122,21 +127,21 @@ var _ = Describe("e2e tests", func() {
 		return nb.ID
 	}
 
-	var checkNumberOfWorkerNodes = func(numNodes int) {
+	checkNumberOfWorkerNodes := func(numNodes int) {
 		Eventually(f.GetNodeList).Should(HaveLen(numNodes))
 	}
 
-	var checkNumberOfUpNodes = func(numNodes int) {
+	checkNumberOfUpNodes := func(numNodes int) {
 		By("Checking the Number of Up Nodes")
 		Eventually(f.LoadBalancer.GetNodeBalancerUpNodes).WithArguments(framework.TestServerResourceName).Should(BeNumerically(">=", numNodes))
 	}
 
-	var checkNodeBalancerExists = func(id int) {
+	checkNodeBalancerExists := func(id int) {
 		By("Checking if the NodeBalancer exists")
 		Eventually(getLinodeClient().GetNodeBalancer).WithArguments(context.Background(), id).Should(HaveField("ID", Equal(id)))
 	}
 
-	var checkNodeBalancerNotExists = func(id int) {
+	checkNodeBalancerNotExists := func(id int) {
 		Eventually(func() int {
 			_, err := getLinodeClient().GetNodeBalancer(context.Background(), id)
 			if err == nil {
@@ -152,15 +157,15 @@ var _ = Describe("e2e tests", func() {
 		checkNodes                                                                                bool
 	}
 
-	var checkNodeBalancerID = func(service string, expectedID int) {
+	checkNodeBalancerID := func(service string, expectedID int) {
 		Eventually(f.LoadBalancer.GetNodeBalancerID).WithArguments(service).Should(Equal(expectedID))
 	}
 
-	var checkLBStatus = func(service string, hasIP bool) {
+	checkLBStatus := func(service string, hasIP bool) {
 		Eventually(f.LoadBalancer.GetNodeBalancerFromService).WithArguments(service, hasIP).Should(Not(BeNil()))
 	}
 
-	var checkNodeBalancerConfigForPort = func(port int, args checkArgs) {
+	checkNodeBalancerConfigForPort := func(port int, args checkArgs) {
 		By("Getting NodeBalancer Configuration for port " + strconv.Itoa(port))
 		var nbConfig *linodego.NodeBalancerConfig
 		Eventually(func() error {
@@ -230,17 +235,17 @@ var _ = Describe("e2e tests", func() {
 		}
 	}
 
-	var addNewNode = func() {
+	addNewNode := func() {
 		err := exec.Command("terraform", "apply", "-var", "nodes=3", "-auto-approve").Run()
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	var deleteNewNode = func() {
+	deleteNewNode := func() {
 		err := exec.Command("terraform", "apply", "-var", "nodes=2", "-auto-approve").Run()
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	var waitForNodeAddition = func() {
+	waitForNodeAddition := func() {
 		checkNumberOfUpNodes(3)
 	}
 
@@ -371,7 +376,6 @@ var _ = Describe("e2e tests", func() {
 
 					By("Waiting for Response from the LoadBalancer url: " + eps[0])
 					Eventually(framework.WaitForHTTPSResponse).WithArguments(eps[0]).Should(ContainSubstring(pods[0]))
-
 				})
 			})
 
@@ -1047,7 +1051,6 @@ var _ = Describe("e2e tests", func() {
 					By("Checking the old NodeBalancer exists")
 					checkNodeBalancerExists(nodeBalancerID)
 				})
-
 			})
 
 			Context("With Node Addition", func() {

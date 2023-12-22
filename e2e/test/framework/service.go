@@ -62,7 +62,8 @@ func (i *lbInvocation) GetServiceWatcher() (watch.Interface, error) {
 	watcher, err := i.kubeClient.CoreV1().Events(i.Namespace()).Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "involvedObject.kind=Service",
 		Watch:          true,
-		TimeoutSeconds: &timeoutSeconds})
+		TimeoutSeconds: &timeoutSeconds,
+	})
 	if err != nil {
 		return nil, err
 	}

@@ -52,6 +52,7 @@ pCLzKBQTXQmeIWJue3/GcA8RLzcGtaTtQTJcAwNZp4V6exA869uDwFzbZA/z9jHJ
 mmccdLY3hP1Ozwikm5Pecysk+bdx9rbzHbA6xLz8fp5oJYUbyyaqnWLdTZvubpur
 2/6vm/KHkJHqFcF/LtIxgaZFnGYR
 -----END CERTIFICATE-----`
+
 const testKey string = `-----BEGIN RSA PRIVATE KEY-----
 MIIJKAIBAAKCAgEA1QLQpK2vzg8uczV1Ni4S2Tgc5Ny59vqkwfK20m/mhjEIAlo3
 kAj1Bc+omlQUjoaVLWgOmNF71FCCFeyj8iKEP16gQ/XOQdwcnJvpNdOGh9q3FfmM
@@ -216,7 +217,7 @@ func stubService(fake *fake.Clientset, service *v1.Service) {
 func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, firewallID *string) error {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: randString(10),
+			Name: randString(),
 			UID:  "foobar123",
 			Annotations: map[string]string{
 				annLinodeThrottle:         "15",
@@ -226,13 +227,13 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, f
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
 				{
-					Name:     randString(10),
+					Name:     randString(),
 					Protocol: "TCP",
 					Port:     int32(80),
 					NodePort: int32(30000),
 				},
 				{
-					Name:     randString(10),
+					Name:     randString(),
 					Protocol: "TCP",
 					Port:     int32(8080),
 					NodePort: int32(30001),
@@ -320,7 +321,7 @@ func testCreateNodeBalancerWithInvalidFirewall(t *testing.T, client *linodego.Cl
 func testUpdateLoadBalancerAddAnnotation(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: randString(10),
+			Name: randString(),
 			UID:  "foobar123",
 			Annotations: map[string]string{
 				annLinodeThrottle: "15",
@@ -329,7 +330,7 @@ func testUpdateLoadBalancerAddAnnotation(t *testing.T, client *linodego.Client, 
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
 				{
-					Name:     randString(10),
+					Name:     randString(),
 					Protocol: "TCP",
 					Port:     int32(80),
 					NodePort: int32(30000),
@@ -392,14 +393,14 @@ func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Clie
 	portConfigAnnotation := fmt.Sprintf("%s%d", annLinodePortConfigPrefix, targetTestPort)
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        randString(10),
+			Name:        randString(),
 			UID:         "foobar123",
 			Annotations: map[string]string{},
 		},
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
 				{
-					Name:     randString(10),
+					Name:     randString(),
 					Protocol: "TCP",
 					Port:     int32(80),
 					NodePort: int32(30000),
@@ -472,14 +473,14 @@ func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Clie
 func testUpdateLoadBalancerAddTags(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        randString(10),
+			Name:        randString(),
 			UID:         "foobar123",
 			Annotations: map[string]string{},
 		},
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
 				{
-					Name:     randString(10),
+					Name:     randString(),
 					Protocol: "TCP",
 					Port:     int32(80),
 					NodePort: int32(30000),
@@ -543,7 +544,7 @@ func testUpdateLoadBalancerAddTags(t *testing.T, client *linodego.Client, _ *fak
 func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: randString(10),
+			Name: randString(),
 			UID:  "foobar123",
 			Annotations: map[string]string{
 				annLinodeThrottle: "15",
@@ -552,7 +553,7 @@ func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
 				{
-					Name:     randString(10),
+					Name:     randString(),
 					Protocol: "TCP",
 					Port:     int32(80),
 					NodePort: int32(30000),
@@ -575,7 +576,7 @@ func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *
 	}
 
 	extraPort := v1.ServicePort{
-		Name:     randString(10),
+		Name:     randString(),
 		Protocol: "TCP",
 		Port:     int32(443),
 		NodePort: int32(30001),
@@ -686,14 +687,14 @@ func testUpdateLoadBalancerAddProxyProtocol(t *testing.T, client *linodego.Clien
 		t.Run(tc.name, func(t *testing.T) {
 			svc := &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        randString(10),
+					Name:        randString(),
 					UID:         "foobar123",
 					Annotations: map[string]string{},
 				},
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{
 						{
-							Name:     randString(10),
+							Name:     randString(),
 							Protocol: "tcp",
 							Port:     int32(80),
 							NodePort: int32(8080),
@@ -708,7 +709,6 @@ func testUpdateLoadBalancerAddProxyProtocol(t *testing.T, client *linodego.Clien
 			nodeBalancer, err := client.CreateNodeBalancer(context.TODO(), linodego.NodeBalancerCreateOptions{
 				Region: lb.zone,
 			})
-
 			if err != nil {
 				t.Fatalf("failed to create NodeBalancer: %s", err)
 			}
@@ -749,14 +749,14 @@ func testUpdateLoadBalancerAddProxyProtocol(t *testing.T, client *linodego.Clien
 func testUpdateLoadBalancerAddNodeBalancerID(t *testing.T, client *linodego.Client, fakeAPI *fakeAPI) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        randString(10),
+			Name:        randString(),
 			UID:         "foobar123",
 			Annotations: map[string]string{},
 		},
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
 				{
-					Name:     randString(10),
+					Name:     randString(),
 					Protocol: "http",
 					Port:     int32(80),
 					NodePort: int32(8080),
@@ -836,7 +836,7 @@ func Test_getConnectionThrottle(t *testing.T) {
 			"throttle not specified",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        randString(10),
+					Name:        randString(),
 					UID:         "abc123",
 					Annotations: map[string]string{},
 				},
@@ -847,7 +847,7 @@ func Test_getConnectionThrottle(t *testing.T) {
 			"throttle value is a string",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: randString(10),
+					Name: randString(),
 					UID:  "abc123",
 					Annotations: map[string]string{
 						annLinodeThrottle: "foo",
@@ -860,7 +860,7 @@ func Test_getConnectionThrottle(t *testing.T) {
 			"throttle value is less than 0",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: randString(10),
+					Name: randString(),
 					UID:  "abc123",
 					Annotations: map[string]string{
 						annLinodeThrottle: "-123",
@@ -873,7 +873,7 @@ func Test_getConnectionThrottle(t *testing.T) {
 			"throttle value is valid",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: randString(10),
+					Name: randString(),
 					UID:  "abc123",
 					Annotations: map[string]string{
 						annLinodeThrottle: "1",
@@ -886,7 +886,7 @@ func Test_getConnectionThrottle(t *testing.T) {
 			"throttle value is too high",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: randString(10),
+					Name: randString(),
 					UID:  "abc123",
 					Annotations: map[string]string{
 						annLinodeThrottle: "21",
@@ -919,7 +919,7 @@ func Test_getPortConfig(t *testing.T) {
 			"default no proxy protocol specified",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: randString(10),
+					Name: randString(),
 					UID:  "abc123",
 				},
 			},
@@ -930,7 +930,7 @@ func Test_getPortConfig(t *testing.T) {
 			"default proxy protocol specified",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: randString(10),
+					Name: randString(),
 					UID:  "abc123",
 					Annotations: map[string]string{
 						annLinodeDefaultProxyProtocol: string(linodego.ProxyProtocolV2),
@@ -944,7 +944,7 @@ func Test_getPortConfig(t *testing.T) {
 			"port specific proxy protocol specified",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: randString(10),
+					Name: randString(),
 					UID:  "abc123",
 					Annotations: map[string]string{
 						annLinodeDefaultProxyProtocol:     string(linodego.ProxyProtocolV2),
@@ -959,7 +959,7 @@ func Test_getPortConfig(t *testing.T) {
 			"default invalid proxy protocol",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: randString(10),
+					Name: randString(),
 					UID:  "abc123",
 					Annotations: map[string]string{
 						annLinodeDefaultProxyProtocol: "invalid",
@@ -973,7 +973,7 @@ func Test_getPortConfig(t *testing.T) {
 			"default no protocol specified",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: randString(10),
+					Name: randString(),
 					UID:  "abc123",
 				},
 			},
@@ -985,7 +985,7 @@ func Test_getPortConfig(t *testing.T) {
 			"default tcp protocol specified",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: randString(10),
+					Name: randString(),
 					UID:  "abc123",
 					Annotations: map[string]string{
 						annLinodeDefaultProtocol: "tcp",
@@ -999,7 +999,7 @@ func Test_getPortConfig(t *testing.T) {
 			"default capitalized protocol specified",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: randString(10),
+					Name: randString(),
 					UID:  "abc123",
 					Annotations: map[string]string{
 						annLinodeDefaultProtocol: "HTTP",
@@ -1013,7 +1013,7 @@ func Test_getPortConfig(t *testing.T) {
 			"default invalid protocol",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: randString(10),
+					Name: randString(),
 					UID:  "abc123",
 					Annotations: map[string]string{
 						annLinodeDefaultProtocol: "invalid",
@@ -1027,7 +1027,7 @@ func Test_getPortConfig(t *testing.T) {
 			"port config falls back to default",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: randString(10),
+					Name: randString(),
 					UID:  "abc123",
 					Annotations: map[string]string{
 						annLinodeDefaultProtocol:          "http",
@@ -1042,7 +1042,7 @@ func Test_getPortConfig(t *testing.T) {
 			"port config capitalized protocol",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: randString(10),
+					Name: randString(),
 					UID:  "abc123",
 					Annotations: map[string]string{
 						annLinodePortConfigPrefix + "443": `{ "protocol": "HTTp" }`,
@@ -1056,7 +1056,7 @@ func Test_getPortConfig(t *testing.T) {
 			"port config invalid protocol",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: randString(10),
+					Name: randString(),
 					UID:  "abc123",
 					Annotations: map[string]string{
 						annLinodePortConfigPrefix + "443": `{ "protocol": "invalid" }`,
@@ -1099,7 +1099,7 @@ func Test_getHealthCheckType(t *testing.T) {
 			"no type specified",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        randString(10),
+					Name:        randString(),
 					UID:         "abc123",
 					Annotations: map[string]string{},
 				},
@@ -1220,7 +1220,6 @@ func Test_getNodePrivateIP(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func testBuildLoadBalancerRequest(t *testing.T, client *linodego.Client, _ *fakeAPI) {
@@ -1294,7 +1293,6 @@ func testBuildLoadBalancerRequest(t *testing.T, client *linodego.Client, _ *fake
 		t.Logf("expected: %v", len(nodes))
 		t.Logf("actual: %v", len(nbNodes))
 	}
-
 }
 
 func testEnsureLoadBalancerPreserveAnnotation(t *testing.T, client *linodego.Client, fake *fakeAPI) {
@@ -1335,7 +1333,7 @@ func testEnsureLoadBalancerPreserveAnnotation(t *testing.T, client *linodego.Cli
 			svc := &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "test",
-					UID:         types.UID("foobar" + randString(10)),
+					UID:         types.UID("foobar" + randString()),
 					Annotations: test.annotations,
 				},
 				Spec: testServiceSpec,
@@ -1701,14 +1699,14 @@ func testCleanupDoesntCall(t *testing.T, client *linodego.Client, fakeAPI *fakeA
 func testUpdateLoadBalancerNoNodes(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        randString(10),
+			Name:        randString(),
 			UID:         "foobar123",
 			Annotations: map[string]string{},
 		},
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
 				{
-					Name:     randString(10),
+					Name:     randString(),
 					Protocol: "http",
 					Port:     int32(80),
 					NodePort: int32(8080),
@@ -1969,7 +1967,6 @@ func testGetLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
-
 			_, found, err := lb.GetLoadBalancer(context.TODO(), test.clusterName, test.service)
 			if found != test.found {
 				t.Error("unexpected error")
@@ -2197,5 +2194,4 @@ func Test_LoadbalNodeNameCoercion(t *testing.T) {
 			t.Fatalf("Expected loadbal backend name to be %s (got: %s)", tc.expectedOutput, out)
 		}
 	}
-
 }

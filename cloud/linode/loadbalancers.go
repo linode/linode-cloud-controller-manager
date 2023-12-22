@@ -55,9 +55,7 @@ const (
 	annLinodeNodePrivateIP = "node.k8s.linode.com/private-ip"
 )
 
-var (
-	errNoNodesAvailable = errors.New("no nodes available for nodebalancer")
-)
+var errNoNodesAvailable = errors.New("no nodes available for nodebalancer")
 
 type lbNotFoundError struct {
 	serviceNn      string

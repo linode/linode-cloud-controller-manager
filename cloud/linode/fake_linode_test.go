@@ -240,7 +240,6 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				_, _ = w.Write(rr)
 				return
 			}
-
 		}
 
 	case "POST":
@@ -596,9 +595,9 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func randString(n int) string {
+func randString() string {
 	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	b := make([]byte, n)
+	b := make([]byte, 10)
 	for i := range b {
 		b[i] = letterBytes[rand.Intn(len(letterBytes))]
 	}
