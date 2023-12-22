@@ -71,7 +71,6 @@ func runCommand(cmd string, args ...string) error {
 	c := exec.Command(cmd, args...)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
-	c.Env = append(c.Env, append(os.Environ())...)
 	glog.Infof("Running command %q\n", cmd)
 	return c.Run()
 }
@@ -146,7 +145,7 @@ func WaitForHTTPSResponse(link string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(resp), nil
+	return resp, nil
 }
 
 func getHTTPResponse(link string) (bool, string, error) {

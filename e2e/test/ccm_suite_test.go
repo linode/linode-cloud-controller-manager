@@ -1,13 +1,12 @@
 package test
 
 import (
+	"e2e_test/test/framework"
 	"flag"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
-
-	"e2e_test/test/framework"
 
 	"github.com/linode/linodego"
 

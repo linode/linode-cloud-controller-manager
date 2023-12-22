@@ -2,16 +2,13 @@ package test
 
 import (
 	"context"
+	"e2e_test/test/framework"
 	"fmt"
 	"os/exec"
 	"strconv"
 
-<<<<<<< HEAD
-=======
 	"e2e_test/test/framework"
 
-	"github.com/codeskyblue/go-sh"
->>>>>>> d1f9e07 (round 2: stricter linting)
 	"github.com/linode/linodego"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -101,13 +98,13 @@ var _ = Describe("e2e tests", func() {
 		ensureServiceLoadBalancer()
 	}
 
-	createServiceWithAnnotations := func(labels map[string]string, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) {
+	createServiceWithAnnotations := func(labels, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) {
 		Expect(f.LoadBalancer.CreateService(labels, annotations, ports, isSessionAffinityClientIP)).NotTo(HaveOccurred())
 		Eventually(f.LoadBalancer.GetServiceEndpoints).Should(Not(BeEmpty()))
 		ensureServiceLoadBalancer()
 	}
 
-	updateServiceWithAnnotations := func(labels map[string]string, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) {
+	updateServiceWithAnnotations := func(labels, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) {
 		Expect(f.LoadBalancer.UpdateService(labels, annotations, ports, isSessionAffinityClientIP)).NotTo(HaveOccurred())
 		Eventually(f.LoadBalancer.GetServiceEndpoints).Should(Not(BeEmpty()))
 		ensureServiceLoadBalancer()
@@ -120,7 +117,7 @@ var _ = Describe("e2e tests", func() {
 	createNodeBalancer := func() int {
 		var nb *linodego.NodeBalancer
 		nb, err = getLinodeClient().CreateNodeBalancer(context.TODO(), linodego.NodeBalancerCreateOptions{
-			Region: fmt.Sprintf("%s", region),
+			Region: region,
 		})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(nb).NotTo(BeNil())

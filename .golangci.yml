@@ -13,7 +13,7 @@ linters:
     - typecheck
     - unused
     # cherry picked from https://golangci-lint.run/usage/linters/
-    - ginkgolinter
+    # - ginkgolinter # to be enabled once #158 is merged
     - bodyclose
     - exportloopref
     - gocheckcompilerdirectives
