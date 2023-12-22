@@ -547,7 +547,7 @@ func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1
 
 	health, err := getHealthCheckType(service)
 	if err != nil {
-		return linodego.NodeBalancerConfig{}, nil
+		return linodego.NodeBalancerConfig{}, err
 	}
 
 	config := linodego.NodeBalancerConfig{

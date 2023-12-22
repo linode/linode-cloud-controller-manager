@@ -210,7 +210,7 @@ func TestCCMLoadBalancers(t *testing.T) {
 }
 
 func stubService(fake *fake.Clientset, service *v1.Service) {
-	fake.CoreV1().Services("").Create(context.TODO(), service, metav1.CreateOptions{})
+	_, _ = fake.CoreV1().Services("").Create(context.TODO(), service, metav1.CreateOptions{})
 }
 
 func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, firewallID *string) error {
@@ -355,7 +355,9 @@ func testUpdateLoadBalancerAddAnnotation(t *testing.T, client *linodego.Client, 
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
 
-	defer lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+	defer func() {
+		_ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+	}()
 
 	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
 	if err != nil {
@@ -407,7 +409,7 @@ func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Clie
 	}
 
 	nodes := []*v1.Node{
-		&v1.Node{
+		{
 			Status: v1.NodeStatus{
 				Addresses: []v1.NodeAddress{
 					{
@@ -423,7 +425,9 @@ func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Clie
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
 
-	defer lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+	defer func() {
+		_ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+	}()
 
 	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
 	if err != nil {
@@ -457,7 +461,7 @@ func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Clie
 	observedPortConfigs := make(map[int]string)
 
 	for _, cfg := range cfgs {
-		observedPortConfigs[int(cfg.Port)] = string(cfg.Protocol)
+		observedPortConfigs[cfg.Port] = string(cfg.Protocol)
 	}
 
 	if !reflect.DeepEqual(expectedPortConfigs, observedPortConfigs) {
@@ -485,7 +489,7 @@ func testUpdateLoadBalancerAddTags(t *testing.T, client *linodego.Client, _ *fak
 	}
 
 	nodes := []*v1.Node{
-		&v1.Node{
+		{
 			Status: v1.NodeStatus{
 				Addresses: []v1.NodeAddress{
 					{
@@ -502,7 +506,9 @@ func testUpdateLoadBalancerAddTags(t *testing.T, client *linodego.Client, _ *fak
 	lb.kubeClient = fakeClientset
 	clusterName := "linodelb"
 
-	defer lb.EnsureLoadBalancerDeleted(context.TODO(), clusterName, svc)
+	defer func() {
+		_ = lb.EnsureLoadBalancerDeleted(context.TODO(), clusterName, svc)
+	}()
 
 	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), clusterName, svc, nodes)
 	if err != nil {
@@ -556,7 +562,7 @@ func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *
 	}
 
 	nodes := []*v1.Node{
-		&v1.Node{
+		{
 			Status: v1.NodeStatus{
 				Addresses: []v1.NodeAddress{
 					{
@@ -577,7 +583,9 @@ func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *
 
 	lb := &loadbalancers{client, "us-west", nil}
 
-	defer lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+	defer func() {
+		_ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+	}()
 
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
@@ -610,8 +618,8 @@ func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *
 	}
 
 	expectedPorts := map[int]struct{}{
-		80:  struct{}{},
-		443: struct{}{},
+		80:  {},
+		443: {},
 	}
 
 	observedPorts := make(map[int]struct{})
@@ -626,7 +634,7 @@ func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *
 			t.Errorf("no nodes found for port %d", cfg.Port)
 		}
 
-		observedPorts[int(cfg.Port)] = struct{}{}
+		observedPorts[cfg.Port] = struct{}{}
 	}
 
 	if !reflect.DeepEqual(expectedPorts, observedPorts) {
@@ -694,7 +702,9 @@ func testUpdateLoadBalancerAddProxyProtocol(t *testing.T, client *linodego.Clien
 				},
 			}
 
-			defer lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+			defer func() {
+				_ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+			}()
 			nodeBalancer, err := client.CreateNodeBalancer(context.TODO(), linodego.NodeBalancerCreateOptions{
 				Region: lb.zone,
 			})
@@ -769,7 +779,9 @@ func testUpdateLoadBalancerAddNodeBalancerID(t *testing.T, client *linodego.Clie
 	}
 
 	lb := &loadbalancers{client, "us-west", nil}
-	defer lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+	defer func() {
+		_ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+	}()
 
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
@@ -1255,11 +1267,6 @@ func testBuildLoadBalancerRequest(t *testing.T, client *linodego.Client, _ *fake
 		t.Fatal(err)
 	}
 
-	if nb == nil {
-		t.Error("unexpected nodeID")
-		t.Logf("expected: != \"\"")
-		t.Logf("actual: %v", lb)
-	}
 	if !reflect.DeepEqual(err, err) {
 		t.Error("unexpected error")
 		t.Logf("expected: %v", nil)
@@ -1277,7 +1284,10 @@ func testBuildLoadBalancerRequest(t *testing.T, client *linodego.Client, _ *fake
 		t.Logf("actual: %v", len(configs))
 	}
 
-	nbNodes, _ := client.ListNodeBalancerNodes(context.TODO(), nb.ID, configs[0].ID, nil)
+	nbNodes, err := client.ListNodeBalancerNodes(context.TODO(), nb.ID, configs[0].ID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if len(nbNodes) != len(nodes) {
 		t.Error("unexpected nodebalancer nodes count")
@@ -1617,21 +1627,21 @@ func testMakeLoadBalancerStatusEnvVar(t *testing.T, client *linodego.Client, _ *
 		t.Errorf("expected status for basic service to be %#v; got %#v", expectedStatus, status)
 	}
 
-	os.Setenv("LINODE_HOSTNAME_ONLY_INGRESS", "true")
+	t.Setenv("LINODE_HOSTNAME_ONLY_INGRESS", "true")
 	expectedStatus.Ingress[0] = v1.LoadBalancerIngress{Hostname: hostname}
 	status = makeLoadBalancerStatus(svc, nb)
 	if !reflect.DeepEqual(status, expectedStatus) {
 		t.Errorf("expected status for %q annotated service to be %#v; got %#v", annLinodeHostnameOnlyIngress, expectedStatus, status)
 	}
 
-	os.Setenv("LINODE_HOSTNAME_ONLY_INGRESS", "false")
+	t.Setenv("LINODE_HOSTNAME_ONLY_INGRESS", "false")
 	expectedStatus.Ingress[0] = v1.LoadBalancerIngress{Hostname: hostname}
 	status = makeLoadBalancerStatus(svc, nb)
 	if reflect.DeepEqual(status, expectedStatus) {
 		t.Errorf("expected status for %q annotated service to be %#v; got %#v", annLinodeHostnameOnlyIngress, expectedStatus, status)
 	}
 
-	os.Setenv("LINODE_HOSTNAME_ONLY_INGRESS", "banana")
+	t.Setenv("LINODE_HOSTNAME_ONLY_INGRESS", "banana")
 	expectedStatus.Ingress[0] = v1.LoadBalancerIngress{Hostname: hostname}
 	status = makeLoadBalancerStatus(svc, nb)
 	if reflect.DeepEqual(status, expectedStatus) {
@@ -1708,7 +1718,9 @@ func testUpdateLoadBalancerNoNodes(t *testing.T, client *linodego.Client, _ *fak
 	}
 
 	lb := &loadbalancers{client, "us-west", nil}
-	defer lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+	defer func() {
+		_ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+	}()
 
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
