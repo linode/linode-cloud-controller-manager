@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"net"
 	"net/http"
@@ -49,9 +49,9 @@ func (f *fakeAPI) ResetRequests() {
 }
 
 func (f *fakeAPI) recordRequest(r *http.Request, urlPath string) {
-	bodyBytes, _ := ioutil.ReadAll(r.Body)
+	bodyBytes, _ := io.ReadAll(r.Body)
 	r.Body.Close()
-	r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 	f.requests[fakeRequest{
 		Path:   urlPath,
 		Method: r.Method,
