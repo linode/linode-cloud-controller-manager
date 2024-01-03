@@ -4,19 +4,16 @@ go 1.17
 
 require (
 	github.com/appscode/go v0.0.0-20200323182826-54e98e09185a
-	github.com/codeskyblue/go-sh v0.0.0-20190412065543-76bd3d59ff27
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/linode/linodego v0.21.1
 	github.com/onsi/ginkgo/v2 v2.3.1
 	github.com/onsi/gomega v1.22.0
-	github.com/pkg/errors v0.9.1
 	k8s.io/api v0.19.2
 	k8s.io/apimachinery v0.19.2
 	k8s.io/client-go v0.19.2
 )
 
 require (
-	github.com/codegangsta/inject v0.0.0-20150114235600-33e0aa1cb7c0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-logr/logr v0.2.0 // indirect
 	github.com/go-resty/resty/v2 v2.1.1-0.20191201195748-d7b97669fe48 // indirect

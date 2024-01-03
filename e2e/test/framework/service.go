@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -117,7 +116,7 @@ func (i *lbInvocation) GetLoadBalancerIps() ([]string, error) {
 		}
 	}
 	if serverAddr == nil {
-		return nil, errors.Errorf("failed to get Status.LoadBalancer.Ingress for service %s/%s", TestServerResourceName, i.Namespace())
+		return nil, fmt.Errorf("failed to get Status.LoadBalancer.Ingress for service %s/%s", TestServerResourceName, i.Namespace())
 	}
 	return serverAddr, nil
 }
