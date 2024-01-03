@@ -55,9 +55,7 @@ const (
 	annLinodeNodePrivateIP = "node.k8s.linode.com/private-ip"
 )
 
-var (
-	errNoNodesAvailable = errors.New("no nodes available for nodebalancer")
-)
+var errNoNodesAvailable = errors.New("no nodes available for nodebalancer")
 
 type lbNotFoundError struct {
 	serviceNn      string
@@ -547,7 +545,7 @@ func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1
 
 	health, err := getHealthCheckType(service)
 	if err != nil {
-		return linodego.NodeBalancerConfig{}, nil
+		return linodego.NodeBalancerConfig{}, err
 	}
 
 	config := linodego.NodeBalancerConfig{

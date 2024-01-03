@@ -34,22 +34,18 @@ func init() {
 	flag.StringVar(&framework.KubeConfigFile, "kubeconfig", os.Getenv("TEST_KUBECONFIG"), "To use existing cluster provide kubeconfig file")
 	flag.StringVar(&region, "region", region, "Region to create load balancers")
 	flag.StringVar(&k8s_version, "k8s_version", k8s_version, "k8s_version for child cluster")
-
 }
 
 const (
 	TIMEOUT = 5 * time.Minute
 )
 
-var (
-	root *framework.Framework
-)
+var root *framework.Framework
 
 func TestE2e(t *testing.T) {
 	RegisterFailHandler(Fail)
 	SetDefaultEventuallyTimeout(TIMEOUT)
 	RunSpecs(t, "e2e Suite")
-
 }
 
 var getLinodeClient = func() *linodego.Client {
