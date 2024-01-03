@@ -7,8 +7,6 @@ import (
 	"os/exec"
 	"strconv"
 
-	"e2e_test/test/framework"
-
 	"github.com/linode/linodego"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
