@@ -170,17 +170,17 @@ var _ = Describe("e2e tests", func() {
 
 		if args.checkType != "" {
 			By("Checking Health Check Type")
-			Expect(string(nbConfig.Check) == args.checkType).Should(BeTrue())
+			Expect(string(nbConfig.Check)).To(Equal(args.checkType))
 		}
 
 		if args.path != "" {
 			By("Checking Health Check Path")
-			Expect(nbConfig.CheckPath == args.path).Should(BeTrue())
+			Expect(nbConfig.CheckPath).To(Equal(args.path))
 		}
 
 		if args.body != "" {
 			By("Checking Health Check Body")
-			Expect(nbConfig.CheckBody == args.body).Should(BeTrue())
+			Expect(nbConfig.CheckBody).To(Equal(args.body))
 		}
 
 		if args.interval != "" {
@@ -188,7 +188,7 @@ var _ = Describe("e2e tests", func() {
 			intInterval, err := strconv.Atoi(args.interval)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(nbConfig.CheckInterval == intInterval).Should(BeTrue())
+			Expect(nbConfig.CheckInterval).To(Equal(intInterval))
 		}
 
 		if args.timeout != "" {
@@ -196,7 +196,7 @@ var _ = Describe("e2e tests", func() {
 			intTimeout, err := strconv.Atoi(args.timeout)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(nbConfig.CheckTimeout == intTimeout).Should(BeTrue())
+			Expect(nbConfig.CheckTimeout).To(Equal(intTimeout))
 		}
 
 		if args.attempts != "" {
@@ -204,7 +204,7 @@ var _ = Describe("e2e tests", func() {
 			intAttempts, err := strconv.Atoi(args.attempts)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(nbConfig.CheckAttempts == intAttempts).Should(BeTrue())
+			Expect(nbConfig.CheckAttempts).To(Equal(intAttempts))
 		}
 
 		if args.checkPassive != "" {
@@ -212,17 +212,17 @@ var _ = Describe("e2e tests", func() {
 			boolCheckPassive, err := strconv.ParseBool(args.checkPassive)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(nbConfig.CheckPassive == boolCheckPassive).Should(BeTrue())
+			Expect(nbConfig.CheckPassive).To(Equal(boolCheckPassive))
 		}
 
 		if args.protocol != "" {
 			By("Checking for Protocol")
-			Expect(string(nbConfig.Protocol) == args.protocol).Should(BeTrue())
+			Expect(string(nbConfig.Protocol)).To(Equal(args.protocol))
 		}
 
 		if args.proxyProtocol != "" {
 			By("Checking for Proxy Protocol")
-			Expect(string(nbConfig.ProxyProtocol) == args.proxyProtocol).Should(BeTrue())
+			Expect(string(nbConfig.ProxyProtocol)).To(Equal(args.proxyProtocol))
 		}
 
 		if args.checkNodes {
