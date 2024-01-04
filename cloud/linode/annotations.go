@@ -29,5 +29,5 @@ const (
 	annLinodeCloudFirewallID     = "service.beta.kubernetes.io/linode-loadbalancer-firewall-id"
 
 	annLinodeNodePrivateIP = "node.k8s.linode.com/private-ip"
-	annLinodeUUID          = "node.k8s.linode.com/uuid"
+	annLinodeHostUUID      = "node.k8s.linode.com/host-uuid"
 )

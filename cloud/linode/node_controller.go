@@ -43,7 +43,16 @@ func (s *nodeController) Run(stopCh <-chan struct{}) {
 				return
 			}
 
-			klog.Infof("NodeController will handle node (%s) metadata", node.Name)
+			klog.Infof("NodeController will handle newly created node (%s) metadata", node.Name)
+			s.queue.Add(node)
+		},
+		UpdateFunc: func(_, new interface{}) {
+			node, ok := new.(*v1.Node)
+			if !ok {
+				return
+			}
+
+			klog.Infof("NodeController will handle updated node (%s) metadata", node.Name)
 			s.queue.Add(node)
 		},
 	})
@@ -52,14 +61,14 @@ func (s *nodeController) Run(stopCh <-chan struct{}) {
 	s.informer.Informer().Run(stopCh)
 }
 
-// worker runs a worker thread that dequeues deleted services and processes
-// deleting their underlying NodeBalancers.
+// worker runs a worker thread that dequeues new or modified nodes and processes
+// metadata (host UUID) on each of them.
 func (s *nodeController) worker() {
-	for s.processNextAddition() {
+	for s.processNext() {
 	}
 }
 
-func (s *nodeController) processNextAddition() bool {
+func (s *nodeController) processNext() bool {
 	key, quit := s.queue.Get()
 	if quit {
 		return false
@@ -98,12 +107,12 @@ func (s *nodeController) handleNodeAdded(ctx context.Context, node *v1.Node) err
 		return err
 	}
 
-	uuid, ok := node.Labels[annLinodeUUID]
+	uuid, ok := node.Labels[annLinodeHostUUID]
 	if ok && uuid == linode.HostUUID {
 		return nil
 	}
 
-	node.Labels[annLinodeUUID] = linode.HostUUID
+	node.Labels[annLinodeHostUUID] = linode.HostUUID
 
 	_, err = s.kubeclient.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
 	if err != nil {
