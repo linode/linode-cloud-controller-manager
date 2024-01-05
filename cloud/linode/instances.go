@@ -52,7 +52,7 @@ type instances struct {
 	nodeCache *nodeCache
 }
 
-func newInstances(client Client) cloudprovider.InstancesV2 {
+func newInstances(client Client) *instances {
 	var timeout int
 	if raw, ok := os.LookupEnv("LINODE_INSTANCE_CACHE_TTL"); ok {
 		timeout, _ = strconv.Atoi(raw)

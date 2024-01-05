@@ -16,6 +16,7 @@ const (
 	ProviderName   = "linode"
 	accessTokenEnv = "LINODE_API_TOKEN"
 	regionEnv      = "LINODE_REGION"
+	urlEnv         = "LINODE_URL"
 )
 
 // Options is a configuration object for this cloudprovider implementation.
@@ -52,18 +53,23 @@ func newCloud() (cloudprovider.Interface, error) {
 		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", regionEnv)
 	}
 
-	linodeClient := linodego.NewClient(nil)
-	linodeClient.SetToken(apiToken)
+	url := os.Getenv(urlEnv)
+	ua := fmt.Sprintf("linode-cloud-controller-manager %s", linodego.DefaultUserAgent)
+
+	linodeClient, err := newLinodeClient(apiToken, ua, url)
+	if err != nil {
+		return nil, fmt.Errorf("client was not created succesfully: %w", err)
+	}
+
 	if Options.LinodeGoDebug {
 		linodeClient.SetDebug(true)
 	}
-	linodeClient.SetUserAgent(fmt.Sprintf("linode-cloud-controller-manager %s", linodego.DefaultUserAgent))
 
 	// Return struct that satisfies cloudprovider.Interface
 	return &linodeCloud{
-		client:        &linodeClient,
-		instances:     newInstances(&linodeClient),
-		loadbalancers: newLoadbalancers(&linodeClient, region),
+		client:        linodeClient,
+		instances:     newInstances(linodeClient),
+		loadbalancers: newLoadbalancers(linodeClient, region),
 	}, nil
 }
 
@@ -71,9 +77,13 @@ func (c *linodeCloud) Initialize(clientBuilder cloudprovider.ControllerClientBui
 	kubeclient := clientBuilder.ClientOrDie("linode-shared-informers")
 	sharedInformer := informers.NewSharedInformerFactory(kubeclient, 0)
 	serviceInformer := sharedInformer.Core().V1().Services()
+	nodeInformer := sharedInformer.Core().V1().Nodes()
 
 	serviceController := newServiceController(c.loadbalancers.(*loadbalancers), serviceInformer)
 	go serviceController.Run(stopCh)
+
+	nodeController := newNodeController(kubeclient, c.client, nodeInformer)
+	go nodeController.Run(stopCh)
 }
 
 func (c *linodeCloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {

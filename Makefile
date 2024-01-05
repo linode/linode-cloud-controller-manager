@@ -64,9 +64,8 @@ imgname:
 	echo IMG=${IMG}
 
 .PHONY: docker-build
-# we cross compile the binary for linux, then build a container
-docker-build: build-linux
-	docker build . -t ${IMG}
+docker-build:
+	docker build --platform=linux/amd64 --tag=${IMG} .
 
 .PHONY: docker-push
 # must run the docker build before pushing the image
