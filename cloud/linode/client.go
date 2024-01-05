@@ -6,6 +6,7 @@ import (
 	"context"
 	"net/url"
 	"regexp"
+	"strings"
 
 	"github.com/linode/linodego"
 )
@@ -52,7 +53,7 @@ func newLinodeClient(token, ua, apiURL string) (*linodego.Client, error) {
 	matches := regexp.MustCompile(`/v\d+`).FindAllString(parsedURL.Path, -1)
 
 	if len(matches) > 0 {
-		version = matches[len(matches)-1]
+		version = strings.Trim(matches[len(matches)-1], "/")
 	}
 
 	linodeClient.SetAPIVersion(version)
