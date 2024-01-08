@@ -1,6 +1,7 @@
 IMG ?= linode/linode-cloud-controller-manager:canary
 RELEASE_DIR ?= release
 GOLANGCI_LINT_IMG := golangci/golangci-lint:v1.55-alpine
+PLATFORM ?= linux/amd64
 
 export GO111MODULE=on
 
@@ -66,7 +67,7 @@ imgname:
 .PHONY: docker-build
 # we cross compile the binary for linux, then build a container
 docker-build: build-linux
-	docker build . -t ${IMG}
+	DOCKER_BUILDKIT=1 docker build --platform=$(PLATFORM) --tag ${IMG} .
 
 .PHONY: docker-push
 # must run the docker build before pushing the image
