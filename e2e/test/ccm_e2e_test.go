@@ -662,7 +662,7 @@ var _ = Describe("e2e tests", func() {
 				})
 			})
 
-			Context("With HTTP updating to have HTTPS", func() {
+			Context("With HTTP updating to have HTTPS", Serial, func() {
 				var (
 					pods        []string
 					labels      map[string]string
@@ -1055,6 +1055,7 @@ var _ = Describe("e2e tests", func() {
 				)
 
 				BeforeEach(func() {
+					Skip("skip until rewritten to drop terraform")
 					pods = []string{"test-pod-node-add"}
 					ports := []core.ContainerPort{
 						{

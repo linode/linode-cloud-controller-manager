@@ -10,13 +10,13 @@ endif
 .PHONY: test reuse-and-test clean
 
 ${GINKGO_PATH}:
-	go install github.com/onsi/ginkgo/v2/ginkgo@v2.3.1
+	go install github.com/onsi/ginkgo/v2/ginkgo@v2.13.2
 
 reuse-and-test: SUITE_ARGS='--reuse'
 
 test reuse-and-test: ${GINKGO_PATH} check-token
 	go list -m; \
-	ginkgo -r --v --trace --cover $(TEST_ARGS) -- --v=3 --image=${IMG} $(SUITE_ARGS)
+	ginkgo -r --vv --trace $(TEST_ARGS) -- --image=${IMG} $(SUITE_ARGS)
 
 clean: check-token
 	cd test; \

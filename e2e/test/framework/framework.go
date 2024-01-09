@@ -2,6 +2,7 @@ package framework
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/appscode/go/crypto/rand"
 	"github.com/linode/linodego"
@@ -12,6 +13,7 @@ import (
 var (
 	Image    = "linode/linode-cloud-controller-manager:latest"
 	ApiToken = ""
+	Timeout  time.Duration
 
 	KubeConfigFile         = ""
 	TestServerResourceName = "e2e-test-server-" + rand.Characters(5)

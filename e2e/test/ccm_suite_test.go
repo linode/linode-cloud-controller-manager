@@ -24,6 +24,7 @@ var (
 	clusterName string
 	region      = "us-east"
 	k8s_version string
+	linodeURL   = "https://api.linode.com"
 )
 
 func init() {
@@ -34,6 +35,8 @@ func init() {
 	flag.StringVar(&framework.KubeConfigFile, "kubeconfig", os.Getenv("TEST_KUBECONFIG"), "To use existing cluster provide kubeconfig file")
 	flag.StringVar(&region, "region", region, "Region to create load balancers")
 	flag.StringVar(&k8s_version, "k8s_version", k8s_version, "k8s_version for child cluster")
+	flag.DurationVar(&framework.Timeout, "timeout", 5*time.Minute, "Timeout for a test to complete successfully")
+	flag.StringVar(&linodeURL, "linode-url", linodeURL, "The Linode API URL to send requests to")
 }
 
 const (
@@ -44,13 +47,14 @@ var root *framework.Framework
 
 func TestE2e(t *testing.T) {
 	RegisterFailHandler(Fail)
-	SetDefaultEventuallyTimeout(TIMEOUT)
+	SetDefaultEventuallyTimeout(framework.Timeout)
 	RunSpecs(t, "e2e Suite")
 }
 
 var getLinodeClient = func() *linodego.Client {
 	linodeClient := linodego.NewClient(nil)
 	linodeClient.SetToken(framework.ApiToken)
+	linodeClient.SetBaseURL(linodeURL)
 	return &linodeClient
 }
 

@@ -14,8 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -71,7 +69,7 @@ func runCommand(cmd string, args ...string) error {
 	c := exec.Command(cmd, args...)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
-	glog.Infof("Running command %q\n", cmd)
+	log.Printf("Running command %q\n", cmd)
 	return c.Run()
 }
 
