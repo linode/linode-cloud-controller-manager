@@ -4,6 +4,9 @@ package linode
 
 import (
 	"context"
+	"net/url"
+	"regexp"
+	"strings"
 
 	"github.com/linode/linodego"
 )
@@ -27,3 +30,33 @@ type Client interface {
 
 // linodego.Client implements Client
 var _ Client = (*linodego.Client)(nil)
+
+func newLinodeClient(token, ua, apiURL string) (*linodego.Client, error) {
+	linodeClient := linodego.NewClient(nil)
+	linodeClient.SetUserAgent(ua)
+	linodeClient.SetToken(token)
+
+	// Validate apiURL
+	parsedURL, err := url.Parse(apiURL)
+	if err != nil {
+		return nil, err
+	}
+
+	validatedURL := &url.URL{
+		Host:   parsedURL.Host,
+		Scheme: parsedURL.Scheme,
+	}
+
+	linodeClient.SetBaseURL(validatedURL.String())
+
+	version := ""
+	matches := regexp.MustCompile(`/v\d+`).FindAllString(parsedURL.Path, -1)
+
+	if len(matches) > 0 {
+		version = strings.Trim(matches[len(matches)-1], "/")
+	}
+
+	linodeClient.SetAPIVersion(version)
+
+	return &linodeClient, nil
+}
