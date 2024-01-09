@@ -150,6 +150,18 @@ func TestCCMLoadBalancers(t *testing.T) {
 			f:    testUpdateLoadBalancerAddProxyProtocol,
 		},
 		{
+			name: "Update Load Balancer - Add new Firewall",
+			f:    testUpdateLoadBalancerAddNewFirewall,
+		},
+		{
+			name: "Update Load Balancer - Update Firewall",
+			f:    testUpdateLoadBalancerUpdateFirewall,
+		},
+		{
+			name: "Update Load Balancer - Delete Firewall",
+			f:    testUpdateLoadBalancerDeleteFirewall,
+		},
+		{
 			name: "Build Load Balancer Request",
 			f:    testBuildLoadBalancerRequest,
 		},
@@ -734,6 +746,18 @@ func testUpdateLoadBalancerAddProxyProtocol(t *testing.T, client *linodego.Clien
 			}
 		})
 	}
+}
+
+func testUpdateLoadBalancerAddNewFirewall(t *testing.T, client *linodego.Client, fakeAPI *fakeAPI) {
+
+}
+
+func testUpdateLoadBalancerUpdateFirewall(t *testing.T, client *linodego.Client, fakeAPI *fakeAPI) {
+
+}
+
+func testUpdateLoadBalancerDeleteFirewall(t *testing.T, client *linodego.Client, fakeAPI *fakeAPI) {
+
 }
 
 func testUpdateLoadBalancerAddNodeBalancerID(t *testing.T, client *linodego.Client, fakeAPI *fakeAPI) {
