@@ -274,7 +274,7 @@ func (l *loadbalancers) getNodeBalancerDeviceId(ctx context.Context, firewallID,
 
 	for _, device := range devices {
 		if device.Entity.ID == nbID {
-			return device.ID, false, nil
+			return device.ID, true, nil
 		}
 	}
 
@@ -282,22 +282,16 @@ func (l *loadbalancers) getNodeBalancerDeviceId(ctx context.Context, firewallID,
 }
 
 func (l *loadbalancers) updateNodeBalancerFirewall(ctx context.Context, service *v1.Service, nb *linodego.NodeBalancer) error {
-	fmt.Println("Came in here to update firewall")
 	var newFirewallID, existingFirewallID int
 	var err error
 	fwid, ok := getServiceAnnotation(service, annLinodeCloudFirewallID)
-	fmt.Println("Came in here to update firewall 2")
 	if ok {
 		newFirewallID, err = strconv.Atoi(fwid)
-		fmt.Println("Came in here to update firewall 3")
 		if err != nil {
-			fmt.Println("Came in here to update firewall 4")
 			return err
 		}
-		fmt.Println("Came in here to update firewall 5")
 	}
 
-	fmt.Print("newFirewallID:", newFirewallID)
 
 	// get the attached firewall
 	firewalls, err := l.client.ListNodeBalancerFirewalls(ctx, nb.ID, &linodego.ListOptions{})
@@ -313,12 +307,9 @@ func (l *loadbalancers) updateNodeBalancerFirewall(ctx context.Context, service 
 		existingFirewallID = firewalls[0].ID
 	}
 
-	fmt.Print("existingFirewallID:", existingFirewallID)
-
 	if existingFirewallID != newFirewallID {
 		// remove the existing firewall
 
-		fmt.Println("difference occured...")
 		if existingFirewallID != 0 {
 
 			deviceID, deviceExists, err := l.getNodeBalancerDeviceId(ctx, existingFirewallID, nb.ID, 1)
@@ -334,16 +325,17 @@ func (l *loadbalancers) updateNodeBalancerFirewall(ctx context.Context, service 
 			if err != nil {
 				return err
 			}
-			fmt.Print("deleted old device...")
 		}
 
 		// attach new firewall if ID != 0
 		if newFirewallID != 0 {
-			_, err = l.client.CreateFirewallDevice(ctx, newFirewallID, linodego.FirewallDeviceCreateOptions{})
+			_, err = l.client.CreateFirewallDevice(ctx, newFirewallID, linodego.FirewallDeviceCreateOptions{
+				ID: nb.ID,
+				Type: "nodebalancer",
+			})
 			if err != nil {
 				return err
 			}
-			fmt.Print("attached old device...")
 		}
 	}
 	return nil
