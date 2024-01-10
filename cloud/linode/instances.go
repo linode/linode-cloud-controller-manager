@@ -53,12 +53,11 @@ type instances struct {
 }
 
 func newInstances(client Client) *instances {
-	var timeout int
+	timeout := 15
 	if raw, ok := os.LookupEnv("LINODE_INSTANCE_CACHE_TTL"); ok {
-		timeout, _ = strconv.Atoi(raw)
-	}
-	if timeout == 0 {
-		timeout = 15
+		if t, _ := strconv.Atoi(raw); t > 0 {
+			timeout = t
+		}
 	}
 
 	return &instances{client, &nodeCache{

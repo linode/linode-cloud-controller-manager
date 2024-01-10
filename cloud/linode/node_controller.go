@@ -3,6 +3,9 @@ package linode
 import (
 	"context"
 	"net/http"
+	"os"
+	"strconv"
+	"sync"
 	"time"
 
 	"github.com/appscode/go/wait"
@@ -17,21 +20,35 @@ import (
 )
 
 type nodeController struct {
+	sync.RWMutex
+
 	client     Client
 	instances  *instances
 	kubeclient kubernetes.Interface
 	informer   v1informers.NodeInformer
 
+	metadataLastUpdate map[string]time.Time
+	ttl                time.Duration
+
 	queue workqueue.DelayingInterface
 }
 
 func newNodeController(kubeclient kubernetes.Interface, client Client, informer v1informers.NodeInformer) *nodeController {
+	timeout := 300
+	if raw, ok := os.LookupEnv("LINODE_METADATA_TTL"); ok {
+		if t, _ := strconv.Atoi(raw); t > 0 {
+			timeout = t
+		}
+	}
+
 	return &nodeController{
-		client:     client,
-		instances:  newInstances(client),
-		kubeclient: kubeclient,
-		informer:   informer,
-		queue:      workqueue.NewDelayingQueue(),
+		client:             client,
+		instances:          newInstances(client),
+		kubeclient:         kubeclient,
+		informer:           informer,
+		ttl:                time.Duration(timeout) * time.Second,
+		metadataLastUpdate: make(map[string]time.Time),
+		queue:              workqueue.NewDelayingQueue(),
 	}
 }
 
@@ -44,15 +61,6 @@ func (s *nodeController) Run(stopCh <-chan struct{}) {
 			}
 
 			klog.Infof("NodeController will handle newly created node (%s) metadata", node.Name)
-			s.queue.Add(node)
-		},
-		UpdateFunc: func(_, new interface{}) {
-			node, ok := new.(*v1.Node)
-			if !ok {
-				return
-			}
-
-			klog.Infof("NodeController will handle updated node (%s) metadata", node.Name)
 			s.queue.Add(node)
 		},
 	})
@@ -81,7 +89,7 @@ func (s *nodeController) processNext() bool {
 		return true
 	}
 
-	err := s.handleNodeAdded(context.TODO(), node)
+	err := s.handleNode(context.TODO(), node)
 	switch deleteErr := err.(type) {
 	case nil:
 		break
@@ -98,8 +106,27 @@ func (s *nodeController) processNext() bool {
 	return true
 }
 
-func (s *nodeController) handleNodeAdded(ctx context.Context, node *v1.Node) error {
-	klog.Infof("NodeController handling node (%s) addition", node.Name)
+func (s *nodeController) LastMetadataUpdate(nodeName string) time.Time {
+	s.RLock()
+	defer s.RUnlock()
+	return s.metadataLastUpdate[nodeName]
+}
+
+func (s *nodeController) SetLastMetadataUpdate(nodeName string) {
+	s.Lock()
+	defer s.Unlock()
+	s.metadataLastUpdate[nodeName] = time.Now()
+}
+
+func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
+	klog.Infof("NodeController handling node (%s) metadata", node.Name)
+
+	lastUpdate := s.LastMetadataUpdate(node.Name)
+
+	uuid, ok := node.Labels[annLinodeHostUUID]
+	if ok && time.Since(lastUpdate) < s.ttl {
+		return nil
+	}
 
 	linode, err := s.instances.lookupLinode(ctx, node)
 	if err != nil {
@@ -107,8 +134,8 @@ func (s *nodeController) handleNodeAdded(ctx context.Context, node *v1.Node) err
 		return err
 	}
 
-	uuid, ok := node.Labels[annLinodeHostUUID]
-	if ok && uuid == linode.HostUUID {
+	if uuid == linode.HostUUID {
+		s.SetLastMetadataUpdate(node.Name)
 		return nil
 	}
 
@@ -119,6 +146,8 @@ func (s *nodeController) handleNodeAdded(ctx context.Context, node *v1.Node) err
 		klog.Infof("node update error: %s", err.Error())
 		return err
 	}
+
+	s.SetLastMetadataUpdate(node.Name)
 
 	return nil
 }
