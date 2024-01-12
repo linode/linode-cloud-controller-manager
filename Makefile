@@ -41,10 +41,10 @@ test: fmt codegen
 
 .PHONY: build-linux
 build-linux: codegen
-	echo "cross compiling linode-cloud-controller-manager for linux/amd64" && \
+	echo "compiling linode-cloud-controller-manager for linux/amd64" && \
 		GOOS=linux GOARCH=amd64 \
 		CGO_ENABLED=0 \
-		go build -o dist/linode-cloud-controller-manager-linux-amd64 .
+		go build -ldflags '-extldflags "-static"' -o dist/linode-cloud-controller-manager-linux-amd64 .
 
 .PHONY: build
 build: codegen
@@ -65,8 +65,7 @@ imgname:
 	echo IMG=${IMG}
 
 .PHONY: docker-build
-# we cross compile the binary for linux, then build a container
-docker-build: build-linux
+docker-build:
 	DOCKER_BUILDKIT=1 docker build --platform=$(PLATFORM) --tag ${IMG} .
 
 .PHONY: docker-push

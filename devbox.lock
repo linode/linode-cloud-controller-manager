@@ -1,0 +1,65 @@
+{
+  "lockfile_version": "1",
+  "packages": {
+    "go_1_20@latest": {
+      "last_modified": "2024-01-02T02:19:20Z",
+      "resolved": "github:NixOS/nixpkgs/63143ac2c9186be6d9da6035fa22620018c85932#go_1_20",
+      "source": "devbox-search",
+      "version": "1.20.12",
+      "systems": {
+        "aarch64-darwin": {
+          "store_path": "/nix/store/vgygiqcs16im3ffw6p0bv9zihixxg0cl-go-1.20.12"
+        },
+        "aarch64-linux": {
+          "store_path": "/nix/store/rlk4nvwrz6rl7r87sn5g6v2vr2mhq8nv-go-1.20.12"
+        },
+        "x86_64-darwin": {
+          "store_path": "/nix/store/vw51wxs8110al4q12pbg3vpi78w8ijk9-go-1.20.12"
+        },
+        "x86_64-linux": {
+          "store_path": "/nix/store/s05mmkyf6sm6vskb4fwbjq0x93sqalqr-go-1.20.12"
+        }
+      }
+    },
+    "kubernetes-helm@latest": {
+      "last_modified": "2023-11-19T17:46:56Z",
+      "resolved": "github:NixOS/nixpkgs/0bf3f5cf6a98b5d077cdcdb00a6d4b3d92bc78b5#kubernetes-helm",
+      "source": "devbox-search",
+      "version": "3.13.2",
+      "systems": {
+        "aarch64-darwin": {
+          "store_path": "/nix/store/bm0hydn3x8qicnnpp1j59affzbh802g6-kubernetes-helm-3.13.2"
+        },
+        "aarch64-linux": {
+          "store_path": "/nix/store/rlxzcdijanfnr1cycmasxlqqbkhmfllc-kubernetes-helm-3.13.2"
+        },
+        "x86_64-darwin": {
+          "store_path": "/nix/store/wihx37d21rxyvp5d10ki9qr57mmqa96n-kubernetes-helm-3.13.2"
+        },
+        "x86_64-linux": {
+          "store_path": "/nix/store/2nsswfqlz4nc2hrbxchz7n98ccg9jfjx-kubernetes-helm-3.13.2"
+        }
+      }
+    },
+    "tilt@latest": {
+      "last_modified": "2023-11-19T17:46:56Z",
+      "resolved": "github:NixOS/nixpkgs/0bf3f5cf6a98b5d077cdcdb00a6d4b3d92bc78b5#tilt",
+      "source": "devbox-search",
+      "version": "0.33.6",
+      "systems": {
+        "aarch64-darwin": {
+          "store_path": "/nix/store/d0kpgvk6vvb8lvsvmh338zxfnb9b7vp9-tilt-0.33.6"
+        },
+        "aarch64-linux": {
+          "store_path": "/nix/store/d61h2m341hza65rs8ay04fjmdgwmw1m6-tilt-0.33.6"
+        },
+        "x86_64-darwin": {
+          "store_path": "/nix/store/30kfkrlyrbk3bzwr524kmqmsygf5a89p-tilt-0.33.6"
+        },
+        "x86_64-linux": {
+          "store_path": "/nix/store/9yqsnwx8khnbf86z81cyaaqmh4qkfy2i-tilt-0.33.6"
+        }
+      }
+    }
+  }
+}
