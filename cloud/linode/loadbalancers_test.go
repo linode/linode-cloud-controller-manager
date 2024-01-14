@@ -1776,10 +1776,12 @@ func testGetNodeBalancerForServiceIDDoesNotExist(t *testing.T, client *linodego.
 		t.Fatal("expected getNodeBalancerForService to return an error")
 	}
 
-	expectedErr := fmt.Sprintf("%s annotation points to a NodeBalancer that does not exist: LoadBalancer (%s) not found for service (%s)",
-		annLinodeNodeBalancerID, bogusNodeBalancerID, getServiceNn(svc))
-
-	if err.Error() != expectedErr {
+	nbid, _ := strconv.Atoi(bogusNodeBalancerID)
+	expectedErr := lbNotFoundError{
+		serviceNn:      getServiceNn(svc),
+		nodeBalancerID: nbid,
+	}
+	if err.Error() != expectedErr.Error() {
 		t.Errorf("expected error to be '%s' but got '%s'", expectedErr, err)
 	}
 }

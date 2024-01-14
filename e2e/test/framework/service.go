@@ -69,6 +69,10 @@ func (i *lbInvocation) GetServiceWatcher() (watch.Interface, error) {
 	return watcher, nil
 }
 
+func (i *lbInvocation) GetService() (*core.Service, error) {
+	return i.kubeClient.CoreV1().Services(i.Namespace()).Get(context.TODO(), TestServerResourceName, metav1.GetOptions{})
+}
+
 func (i *lbInvocation) CreateService(selector, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) error {
 	return i.createOrUpdateService(selector, annotations, ports, isSessionAffinityClientIP, true)
 }

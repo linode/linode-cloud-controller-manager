@@ -64,23 +64,13 @@ func newLoadbalancers(client Client, zone string) cloudprovider.LoadBalancer {
 }
 
 func (l *loadbalancers) getNodeBalancerForService(ctx context.Context, service *v1.Service) (*linodego.NodeBalancer, error) {
-	rawID, _ := getServiceAnnotation(service, annLinodeNodeBalancerID)
+	rawID := service.GetAnnotations()[annLinodeNodeBalancerID]
 	id, idErr := strconv.Atoi(rawID)
 	hasIDAnn := idErr == nil && id != 0
 
 	if hasIDAnn {
 		sentry.SetTag(ctx, "load_balancer_id", rawID)
-		nb, err := l.getNodeBalancerByID(ctx, service, id)
-		switch err.(type) {
-		case nil:
-			return nb, nil
-
-		case lbNotFoundError:
-			return nil, fmt.Errorf("%s annotation points to a NodeBalancer that does not exist: %s", annLinodeNodeBalancerID, err)
-
-		default:
-			return nil, err
-		}
+		return l.getNodeBalancerByID(ctx, service, id)
 	}
 	return l.getNodeBalancerByStatus(ctx, service)
 }
@@ -199,6 +189,13 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	nb, err = l.getNodeBalancerForService(ctx, service)
 	switch err.(type) {
 	case lbNotFoundError:
+		if service.GetAnnotations()[annLinodeNodeBalancerID] != "" {
+			// a load balancer annotation has been created so a NodeBalancer is coming, error out and retry later
+			klog.Infof("NodeBalancer created but not available yet, waiting...")
+			sentry.CaptureError(ctx, err)
+			return nil, err
+		}
+
 		if nb, err = l.buildLoadBalancerRequest(ctx, clusterName, service, nodes); err != nil {
 			sentry.CaptureError(ctx, err)
 			return nil, err
