@@ -292,11 +292,16 @@ func (l *loadbalancers) updateNodeBalancerFirewall(ctx context.Context, service 
 		}
 	}
 
-
 	// get the attached firewall
 	firewalls, err := l.client.ListNodeBalancerFirewalls(ctx, nb.ID, &linodego.ListOptions{})
 	if err != nil {
-		return err
+		if !ok {
+			if err.Error() != "[404] Not Found" {
+				return err
+			} else {
+				return nil
+			}
+		}
 	}
 
 	if !ok && len(firewalls) == 0 {
@@ -330,7 +335,7 @@ func (l *loadbalancers) updateNodeBalancerFirewall(ctx context.Context, service 
 		// attach new firewall if ID != 0
 		if newFirewallID != 0 {
 			_, err = l.client.CreateFirewallDevice(ctx, newFirewallID, linodego.FirewallDeviceCreateOptions{
-				ID: nb.ID,
+				ID:   nb.ID,
 				Type: "nodebalancer",
 			})
 			if err != nil {
@@ -620,6 +625,14 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 		createOpts.FirewallID = firewallID
 	}
 	return l.client.CreateNodeBalancer(ctx, createOpts)
+}
+
+func (l *loadbalancers) createEmptyFirewall(ctx context.Context, service *v1.Service, opts linodego.FirewallCreateOptions) (fw *linodego.Firewall, err error) {
+	return l.client.CreateFirewall(ctx, opts)
+}
+
+func (l *loadbalancers) deleteFirewall(ctx context.Context, firewall *linodego.Firewall) error {
+	return l.client.DeleteFirewall(ctx, firewall.ID)
 }
 
 //nolint:funlen

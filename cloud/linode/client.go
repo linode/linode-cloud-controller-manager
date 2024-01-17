@@ -27,6 +27,8 @@ type Client interface {
 	ListFirewallDevices(ctx context.Context, firewallID int, opts *linodego.ListOptions) ([]linodego.FirewallDevice, error)
 	DeleteFirewallDevice(ctx context.Context, firewallID, deviceID int) error
 	CreateFirewallDevice(ctx context.Context, firewallID int, opts linodego.FirewallDeviceCreateOptions) (*linodego.FirewallDevice, error)
+	CreateFirewall(ctx context.Context, opts linodego.FirewallCreateOptions) (*linodego.Firewall, error)
+	DeleteFirewall(ctx context.Context, fwid int) error
 }
 
 // linodego.Client implements Client
