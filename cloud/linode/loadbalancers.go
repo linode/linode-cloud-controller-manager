@@ -24,7 +24,16 @@ import (
 	"github.com/linode/linodego"
 )
 
-var errNoNodesAvailable = errors.New("no nodes available for nodebalancer")
+var (
+	errNoNodesAvailable = errors.New("no nodes available for nodebalancer")
+	errInvalidFWConfig  = errors.New("Specify either an allowList or a denyList for a firewall")
+	errTooManyFirewalls = errors.New("Too  many firewalls attached to a nodebalancer")
+)
+
+const (
+	allowListKey = "allowList"
+	denyListKey  = "denyList"
+)
 
 type lbNotFoundError struct {
 	serviceNn      string
@@ -39,9 +48,8 @@ func (e lbNotFoundError) Error() string {
 }
 
 type loadbalancers struct {
-	client Client
-	zone   string
-
+	client     Client
+	zone       string
 	kubeClient kubernetes.Interface
 }
 
@@ -323,6 +331,64 @@ func (l *loadbalancers) updateNodeBalancerFirewall(ctx context.Context, service 
 	return nil
 }
 
+func (l *loadbalancers) reconcileFirewall(ctx context.Context, nb *linodego.NodeBalancer, service *v1.Service) error {
+	// First things first, see if we need to do anything
+	// We do that by looking at the fw id annotation, and if it doesn't exist, look at the configMap annotation.
+	fwid, ok := service.GetAnnotations()[annLinodeCloudFirewallID]
+	if ok {
+		_, err := strconv.Atoi(fwid)
+		if err != nil {
+			return err
+		}
+		// this is a TODO
+		return nil
+	} else {
+		// There's no firewallID already set, see if a configMap exists
+		fwCM, fwCMannotationExists := service.GetAnnotations()[annLinodeCloudFirewallCM]
+		// Lots to do here. the user may have changed the configmap's name, we should look at what rules exist on the fw first
+		// and then reconcile it.
+		firewalls, err := l.client.ListNodeBalancerFirewalls(ctx, nb.ID, &linodego.ListOptions{})
+		if err != nil {
+			return err
+		}
+
+		if len(firewalls) > 1 {
+			// we do not support this case. This means that the customer likely attached a different firewall to this nb,
+			// don't want to risk changing stuff here.
+			return errTooManyFirewalls
+		}
+
+		if !fwCMannotationExists && len(firewalls) == 1 {
+			// No firewall annotation, but there is a firewall attached our node-balancer. we should remove it.
+			err := l.client.DeleteFirewallDevice(ctx, firewalls[0].ID, nb.ID)
+			if err != nil {
+				return err
+			}
+			// once we delete the device, we should see if there's anything attached to that firewall
+			devices, err := l.client.ListFirewallDevices(ctx, firewalls[0].ID, &linodego.ListOptions{})
+			if err != nil {
+				return err
+			}
+			if len(devices) == 0 {
+				// nothing attached to it, clean it up
+				return l.client.DeleteFirewall(ctx, firewalls[0].ID)
+			}
+			// else let that firewall linger, don't mess with it.
+		}
+
+		// We do not want to get into the complexity of reconciling differences, might as well just pull what's in the configMap now and update the fw.
+		fwCreateOpts, err := l.createFirewallOptsForSvc(ctx, fwCM, "", []string{""}, service.Spec.Ports)
+		if err != nil {
+			return err
+		}
+		_, err = l.client.UpdateFirewallRules(ctx, firewalls[0].ID, fwCreateOpts.Rules)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 //nolint:funlen
 func (l *loadbalancers) updateNodeBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node, nb *linodego.NodeBalancer) (err error) {
 	if len(nodes) == 0 {
@@ -428,6 +494,14 @@ func (l *loadbalancers) updateNodeBalancer(ctx context.Context, clusterName stri
 			return fmt.Errorf("[port %d] error rebuilding NodeBalancer config: %v", int(port.Port), err)
 		}
 	}
+
+	// Firewall configs
+	// Delete any configs for ports that have been removed from the Service
+	if err = l.reconcileFirewall(ctx, nb, service); err != nil {
+		sentry.CaptureError(ctx, err)
+		return err
+	}
+
 	return nil
 }
 
@@ -580,6 +654,73 @@ func (l *loadbalancers) getLoadBalancerTags(_ context.Context, clusterName strin
 	return tags
 }
 
+func processACL(fwcreateOpts *linodego.FirewallCreateOptions, acl string, aclType, label, cmName, ports string) error {
+	var allowedIPs linodego.NetworkAddresses
+	err := json.Unmarshal([]byte(acl), &allowedIPs)
+	if err != nil {
+		klog.Error("Error marshalling IPs in allowList")
+		return err
+	}
+
+	fwcreateOpts.Rules.Inbound = append(fwcreateOpts.Rules.Inbound, linodego.FirewallRule{
+		Action:      aclType,
+		Label:       fmt.Sprintf("%s-%s", aclType, cmName),
+		Description: fmt.Sprintf("Created by linode-ccm: %s, from %s", label, cmName),
+		Protocol:    linodego.TCP, // Nodebalancers support only TCP.
+		Ports:       ports,
+		Addresses:   allowedIPs,
+	})
+	fwcreateOpts.Rules.OutboundPolicy = "ACCEPT"
+	if aclType == "ACCEPT" {
+		// if an allowlist is present, we drop everything else.
+		fwcreateOpts.Rules.InboundPolicy = "DROP"
+	} else {
+		// if a denylist is present, we accept everything else.
+		fwcreateOpts.Rules.InboundPolicy = "ACCEPT"
+	}
+	return nil
+}
+
+func (l *loadbalancers) createFirewallOptsForSvc(ctx context.Context, fwCM, label string, tags []string, ports []v1.ServicePort) (*linodego.FirewallCreateOptions, error) {
+	// Fetch config map
+	cm, err := l.kubeClient.CoreV1().ConfigMaps("kube-system").Get(ctx, fwCM, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	fwcreateOpts := linodego.FirewallCreateOptions{
+		Label: label,
+		Tags:  tags,
+	}
+
+	servicePorts := make([]string, len(ports))
+	for idx, port := range ports {
+		servicePorts[idx] = strconv.Itoa(int(port.Port))
+	}
+
+	portsString := strings.Join(servicePorts[:], ",")
+
+	allowListJson, allowListOk := cm.Data[allowListKey]
+	denyListJson, denyListOk := cm.Data[denyListKey]
+
+	if (allowListOk && denyListOk) || (!allowListOk && !denyListOk) {
+		// it is a problem if both are set, or if both are not set
+		return nil, errInvalidFWConfig
+	}
+
+	aclType := "ACCEPT"
+	acl := allowListJson
+	if denyListOk {
+		aclType = "DROP"
+		acl = denyListJson
+	}
+
+	err = processACL(&fwcreateOpts, acl, aclType, label, cm.Name, portsString)
+	if err != nil {
+		return nil, err
+	}
+	return &fwcreateOpts, err
+}
+
 func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName string, service *v1.Service, configs []*linodego.NodeBalancerConfigCreateOptions) (lb *linodego.NodeBalancer, err error) {
 	connThrottle := getConnectionThrottle(service)
 
@@ -600,6 +741,18 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 			return nil, err
 		}
 		createOpts.FirewallID = firewallID
+	} else {
+		// There's no firewallID already set, see if we need to create a new fw
+		fwCM, ok := getServiceAnnotation(service, annLinodeCloudFirewallCM)
+		if ok {
+			fwcreateOpts, err := l.createFirewallOptsForSvc(ctx, fwCM, label, tags, service.Spec.Ports)
+			firewall, err := l.client.CreateFirewall(ctx, *fwcreateOpts)
+			if err != nil {
+				return nil, err
+			}
+			createOpts.FirewallID = firewall.ID
+		}
+		// no need to deal with firewalls, continue creating nb's
 	}
 
 	return l.client.CreateNodeBalancer(ctx, createOpts)

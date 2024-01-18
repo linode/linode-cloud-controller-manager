@@ -50,6 +50,7 @@ func (mr *MockClientMockRecorder) CreateFirewall(arg0, arg1 interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateFirewall", reflect.TypeOf((*MockClient)(nil).CreateFirewall), arg0, arg1)
 }
 
+<<<<<<< HEAD
 // CreateFirewallDevice mocks base method.
 func (m *MockClient) CreateFirewallDevice(arg0 context.Context, arg1 int, arg2 linodego.FirewallDeviceCreateOptions) (*linodego.FirewallDevice, error) {
 	m.ctrl.T.Helper()
@@ -65,6 +66,8 @@ func (mr *MockClientMockRecorder) CreateFirewallDevice(arg0, arg1, arg2 interfac
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateFirewallDevice", reflect.TypeOf((*MockClient)(nil).CreateFirewallDevice), arg0, arg1, arg2)
 }
 
+=======
+>>>>>>> d903958 (Firewall implementation)
 // CreateNodeBalancer mocks base method.
 func (m *MockClient) CreateNodeBalancer(arg0 context.Context, arg1 linodego.NodeBalancerCreateOptions) (*linodego.NodeBalancer, error) {
 	m.ctrl.T.Helper()
@@ -109,6 +112,7 @@ func (mr *MockClientMockRecorder) DeleteFirewall(arg0, arg1 interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFirewall", reflect.TypeOf((*MockClient)(nil).DeleteFirewall), arg0, arg1)
 }
 
+<<<<<<< HEAD
 // DeleteFirewallDevice mocks base method.
 func (m *MockClient) DeleteFirewallDevice(arg0 context.Context, arg1, arg2 int) error {
 	m.ctrl.T.Helper()
@@ -123,6 +127,8 @@ func (mr *MockClientMockRecorder) DeleteFirewallDevice(arg0, arg1, arg2 interfac
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFirewallDevice", reflect.TypeOf((*MockClient)(nil).DeleteFirewallDevice), arg0, arg1, arg2)
 }
 
+=======
+>>>>>>> d903958 (Firewall implementation)
 // DeleteNodeBalancer mocks base method.
 func (m *MockClient) DeleteNodeBalancer(arg0 context.Context, arg1 int) error {
 	m.ctrl.T.Helper()
@@ -149,6 +155,21 @@ func (m *MockClient) DeleteNodeBalancerConfig(arg0 context.Context, arg1, arg2 i
 func (mr *MockClientMockRecorder) DeleteNodeBalancerConfig(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteNodeBalancerConfig", reflect.TypeOf((*MockClient)(nil).DeleteNodeBalancerConfig), arg0, arg1, arg2)
+}
+
+// GetFirewall mocks base method.
+func (m *MockClient) GetFirewall(arg0 context.Context, arg1 int) (*linodego.Firewall, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetFirewall", arg0, arg1)
+	ret0, _ := ret[0].(*linodego.Firewall)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetFirewall indicates an expected call of GetFirewall.
+func (mr *MockClientMockRecorder) GetFirewall(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFirewall", reflect.TypeOf((*MockClient)(nil).GetFirewall), arg0, arg1)
 }
 
 // GetInstance mocks base method.
@@ -284,6 +305,36 @@ func (m *MockClient) RebuildNodeBalancerConfig(arg0 context.Context, arg1, arg2 
 func (mr *MockClientMockRecorder) RebuildNodeBalancerConfig(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RebuildNodeBalancerConfig", reflect.TypeOf((*MockClient)(nil).RebuildNodeBalancerConfig), arg0, arg1, arg2, arg3)
+}
+
+// UpdateFirewall mocks base method.
+func (m *MockClient) UpdateFirewall(arg0 context.Context, arg1 int, arg2 linodego.FirewallUpdateOptions) (*linodego.Firewall, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateFirewall", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*linodego.Firewall)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateFirewall indicates an expected call of UpdateFirewall.
+func (mr *MockClientMockRecorder) UpdateFirewall(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateFirewall", reflect.TypeOf((*MockClient)(nil).UpdateFirewall), arg0, arg1, arg2)
+}
+
+// UpdateFirewallRules mocks base method.
+func (m *MockClient) UpdateFirewallRules(arg0 context.Context, arg1 int, arg2 linodego.FirewallRuleSet) (*linodego.FirewallRuleSet, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateFirewallRules", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*linodego.FirewallRuleSet)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateFirewallRules indicates an expected call of UpdateFirewallRules.
+func (mr *MockClientMockRecorder) UpdateFirewallRules(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateFirewallRules", reflect.TypeOf((*MockClient)(nil).UpdateFirewallRules), arg0, arg1, arg2)
 }
 
 // UpdateNodeBalancer mocks base method.

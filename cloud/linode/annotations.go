@@ -27,6 +27,7 @@ const (
 	annLinodeHostnameOnlyIngress = "service.beta.kubernetes.io/linode-loadbalancer-hostname-only-ingress"
 	annLinodeLoadBalancerTags    = "service.beta.kubernetes.io/linode-loadbalancer-tags"
 	annLinodeCloudFirewallID     = "service.beta.kubernetes.io/linode-loadbalancer-firewall-id"
+	annLinodeCloudFirewallCM     = "service.beta.kubernetes.io/linode-loadbalancer-firewall-cm"
 
 	annLinodeNodePrivateIP = "node.k8s.linode.com/private-ip"
 	annLinodeHostUUID      = "node.k8s.linode.com/host-uuid"
