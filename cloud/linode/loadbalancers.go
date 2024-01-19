@@ -64,7 +64,7 @@ func newLoadbalancers(client Client, zone string) cloudprovider.LoadBalancer {
 }
 
 func (l *loadbalancers) getNodeBalancerForService(ctx context.Context, service *v1.Service) (*linodego.NodeBalancer, error) {
-	rawID, _ := service.GetAnnotations()[annLinodeNodeBalancerID]
+	rawID := service.GetAnnotations()[annLinodeNodeBalancerID]
 	id, idErr := strconv.Atoi(rawID)
 	hasIDAnn := idErr == nil && id != 0
 
