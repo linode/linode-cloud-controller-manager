@@ -624,6 +624,7 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 		}
 		createOpts.FirewallID = firewallID
 	}
+
 	return l.client.CreateNodeBalancer(ctx, createOpts)
 }
 

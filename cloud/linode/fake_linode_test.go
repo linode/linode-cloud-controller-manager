@@ -278,7 +278,37 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				_, _ = w.Write(rr)
 				return
 			}
+		case "networking":
+			rx, _ := regexp.Compile("/networking/firewalls/[0-9]+/devices")
+			if rx.MatchString(urlPath) {
+				fwdId, err := strconv.Atoi(strings.Split(urlPath, "/")[3])
+				if err != nil {
+					f.t.Fatal(err)
+				}
 
+				firewallDevices, found := f.fwd[fwdId]
+				if found {
+					firewallDeviceList := []linodego.FirewallDevice{}
+					for i := range firewallDevices {
+						firewallDeviceList = append(firewallDeviceList, *firewallDevices[i])
+					}
+					rr, _ := json.Marshal(linodego.FirewallDevicesPagedResponse{
+						PageOptions: &linodego.PageOptions{Page: 1, Pages: 1, Results: len(firewallDeviceList)},
+						Data:        firewallDeviceList,
+					})
+					_, _ = w.Write(rr)
+				} else {
+					w.WriteHeader(404)
+					resp := linodego.APIError{
+						Errors: []linodego.APIErrorReason{
+							{Reason: "Not Found"},
+						},
+					}
+					rr, _ := json.Marshal(resp)
+					_, _ = w.Write(rr)
+				}
+				return
+			}
 		}
 
 	case "POST":
@@ -349,6 +379,13 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					}
 					f.nbn[strconv.Itoa(nbn.ID)] = &nbn
 				}
+			}
+
+			if nbco.FirewallID != 0 {
+				createFirewallDevice(nbco.FirewallID, f, linodego.FirewallDeviceCreateOptions{
+					ID:   nb.ID,
+					Type: "nodebalancer",
+				})
 			}
 
 			resp, err := json.Marshal(nb)
@@ -521,28 +558,17 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		} else if tp == "devices" {
 			fwId := strings.Split(urlPath, "/")[3]
-			firewallID, err := strconv.Atoi(fwId)
-			if err != nil {
-				f.t.Fatal(err)
-			}
-
 			fdco := linodego.FirewallDeviceCreateOptions{}
 			if err := json.NewDecoder(r.Body).Decode(&fdco); err != nil {
 				f.t.Fatal(err)
 			}
 
-			fwd := linodego.FirewallDevice{
-				ID: rand.Intn(9999),
-				Entity: linodego.FirewallDeviceEntity{
-					ID:   fdco.ID,
-					Type: fdco.Type,
-				},
+			firewallID, err := strconv.Atoi(fwId)
+			if err != nil {
+				f.t.Fatal(err)
 			}
 
-			if _, ok := f.fwd[firewallID]; !ok {
-				f.fwd[firewallID] = make(map[int]*linodego.FirewallDevice)
-			}
-			f.fwd[firewallID][fwd.ID] = &fwd
+			fwd := createFirewallDevice(firewallID, f, fdco)
 			resp, err := json.Marshal(fwd)
 			if err != nil {
 				f.t.Fatal(err)
@@ -580,6 +606,25 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					delete(f.nbn, k)
 				}
 			}
+		} else if strings.Contains(urlPath, "devices") {
+			firewallId, err := strconv.Atoi(strings.Split(urlPath, "/")[3])
+			if err != nil {
+				f.t.Fatal(err)
+			}
+
+			deviceId, err := strconv.Atoi(strings.Split(urlPath, "/")[5])
+			if err != nil {
+				f.t.Fatal(err)
+			}
+			delete(f.fwd[firewallId], deviceId)
+		} else if strings.Contains(urlPath, "firewalls") {
+			firewallId, err := strconv.Atoi(strings.Split(urlPath, "/")[3])
+			if err != nil {
+				f.t.Fatal(err)
+			}
+
+			delete(f.fwd, firewallId)
+			delete(f.fw, firewallId)
 		}
 	case "PUT":
 		if strings.Contains(urlPath, "nodes") {
@@ -683,6 +728,22 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		}
 	}
+}
+
+func createFirewallDevice(fwId int, f *fakeAPI, fdco linodego.FirewallDeviceCreateOptions) linodego.FirewallDevice {
+	fwd := linodego.FirewallDevice{
+		ID: rand.Intn(9999),
+		Entity: linodego.FirewallDeviceEntity{
+			ID:   fdco.ID,
+			Type: fdco.Type,
+		},
+	}
+
+	if _, ok := f.fwd[fwId]; !ok {
+		f.fwd[fwId] = make(map[int]*linodego.FirewallDevice)
+	}
+	f.fwd[fwId][fwd.ID] = &fwd
+	return fwd
 }
 
 func randString(n int) string {
