@@ -3,4 +3,4 @@ name: ccm-linode
 description: The Linode Cloud Controller Manager (CCM) provides a way for Kubernetes clusters to access additional Linode services. Linode's CCM will automatically provision a Linode NodeBalancer for Kubernetes Services of type "LoadBalancer".
 type: application
 version: 1.0.0
-appVersion: "v0.3.16"
+appVersion: "latest"

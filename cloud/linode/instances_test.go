@@ -57,10 +57,12 @@ func TestInstanceExists(t *testing.T) {
 		instances := newInstances(client)
 		node := nodeWithProviderID(providerIDPrefix + "123")
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
-			{ID: 123,
+			{
+				ID:     123,
 				Label:  "mock",
 				Region: "us-east",
-				Type:   "g6-standard-2"},
+				Type:   "g6-standard-2",
+			},
 		}, nil)
 
 		exists, err := instances.InstanceExists(ctx, node)
@@ -154,16 +156,36 @@ func TestMetadataRetrieval(t *testing.T) {
 		expectedErr     error
 	}{
 		{"no IPs", nil, nil, instanceNoIPAddressesError{192910}},
-		{"one public, one private", []string{"32.74.121.25", "192.168.121.42"},
-			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "32.74.121.25"}, {Type: v1.NodeInternalIP, Address: "192.168.121.42"}}, nil},
-		{"one public, no private", []string{"32.74.121.25"},
-			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "32.74.121.25"}}, nil},
-		{"one private, no public", []string{"192.168.121.42"},
-			[]v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "192.168.121.42"}}, nil},
-		{"two public addresses", []string{"32.74.121.25", "32.74.121.22"},
-			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "32.74.121.25"}, {Type: v1.NodeExternalIP, Address: "32.74.121.22"}}, nil},
-		{"two private addresses", []string{"192.168.121.42", "10.0.2.15"},
-			[]v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "192.168.121.42"}, {Type: v1.NodeInternalIP, Address: "10.0.2.15"}}, nil},
+		{
+			"one public, one private",
+			[]string{"32.74.121.25", "192.168.121.42"},
+			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "32.74.121.25"}, {Type: v1.NodeInternalIP, Address: "192.168.121.42"}},
+			nil,
+		},
+		{
+			"one public, no private",
+			[]string{"32.74.121.25"},
+			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "32.74.121.25"}},
+			nil,
+		},
+		{
+			"one private, no public",
+			[]string{"192.168.121.42"},
+			[]v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "192.168.121.42"}},
+			nil,
+		},
+		{
+			"two public addresses",
+			[]string{"32.74.121.25", "32.74.121.22"},
+			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "32.74.121.25"}, {Type: v1.NodeExternalIP, Address: "32.74.121.22"}},
+			nil,
+		},
+		{
+			"two private addresses",
+			[]string{"192.168.121.42", "10.0.2.15"},
+			[]v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "192.168.121.42"}, {Type: v1.NodeInternalIP, Address: "10.0.2.15"}},
+			nil,
+		},
 	}
 
 	for _, test := range ipTests {
@@ -210,17 +232,6 @@ func TestMalformedProviders(t *testing.T) {
 	defer ctrl.Finish()
 
 	client := NewMockClient(ctrl)
-
-	t.Run("fails on malformed providerID", func(t *testing.T) {
-		instances := newInstances(client)
-		providerID := "bogus://bogus"
-		node := nodeWithProviderID(providerID)
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
-
-		meta, err := instances.InstanceMetadata(ctx, node)
-		assert.ErrorIs(t, err, invalidProviderIDError{providerID})
-		assert.Nil(t, meta)
-	})
 
 	t.Run("fails on non-numeric providerID", func(t *testing.T) {
 		instances := newInstances(client)
@@ -281,7 +292,8 @@ func TestInstanceShutdown(t *testing.T) {
 		id := 12345
 		node := nodeWithProviderID(providerIDPrefix + strconv.Itoa(id))
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
-			{ID: id, Label: "shutting-down-linode", Status: linodego.InstanceShuttingDown}}, nil)
+			{ID: id, Label: "shutting-down-linode", Status: linodego.InstanceShuttingDown},
+		}, nil)
 		shutdown, err := instances.InstanceShutdown(ctx, node)
 
 		assert.NoError(t, err)

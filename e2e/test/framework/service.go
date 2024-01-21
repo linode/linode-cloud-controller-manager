@@ -4,15 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/util/retry"
 )
 
-func (i *lbInvocation) createOrUpdateService(selector, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool, isCreate bool) error {
+func (i *lbInvocation) createOrUpdateService(selector, annotations map[string]string, ports []core.ServicePort, isSessionAffinityClientIP, isCreate bool) error {
 	var sessionAffinity core.ServiceAffinity = "None"
 	if isSessionAffinityClientIP {
 		sessionAffinity = "ClientIP"
@@ -63,7 +61,8 @@ func (i *lbInvocation) GetServiceWatcher() (watch.Interface, error) {
 	watcher, err := i.kubeClient.CoreV1().Events(i.Namespace()).Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:  "involvedObject.kind=Service",
 		Watch:          true,
-		TimeoutSeconds: &timeoutSeconds})
+		TimeoutSeconds: &timeoutSeconds,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +116,7 @@ func (i *lbInvocation) GetLoadBalancerIps() ([]string, error) {
 		}
 	}
 	if serverAddr == nil {
-		return nil, errors.Errorf("failed to get Status.LoadBalancer.Ingress for service %s/%s", TestServerResourceName, i.Namespace())
+		return nil, fmt.Errorf("failed to get Status.LoadBalancer.Ingress for service %s/%s", TestServerResourceName, i.Namespace())
 	}
 	return serverAddr, nil
 }
@@ -131,15 +130,4 @@ func (i *lbInvocation) getServiceIngress(name, namespace string) ([]core.LoadBal
 		return nil, fmt.Errorf("Status.LoadBalancer.Ingress is empty for %s", name)
 	}
 	return svc.Status.LoadBalancer.Ingress, nil
-}
-
-func (i *lbInvocation) testServerServicePorts() []core.ServicePort {
-	return []core.ServicePort{
-		{
-			Name:       "http-1",
-			Port:       80,
-			TargetPort: intstr.FromInt(8080),
-			Protocol:   "TCP",
-		},
-	}
 }

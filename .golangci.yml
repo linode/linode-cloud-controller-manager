@@ -1,24 +1,36 @@
+run:
+  timeout: 5m
+
 linters:
+  disable-all: true
   enable:
+    # these are enabled by default
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    # cherry picked from https://golangci-lint.run/usage/linters/
+    # - ginkgolinter # to be enabled once #158 is merged
+    - bodyclose
+    - exportloopref
+    - gocheckcompilerdirectives
     - gofmt
     - goimports
-    - structcheck
-    - varcheck
-    - staticcheck
+    - importas
+    - loggercheck
+    - makezero
+    - nilerr
+    - prealloc
+    - reassign
+    - tenv
     - unconvert
-    - revive
-    - ineffassign
-    - vet
-    - unused
-    - misspell
-  disable:
-    - errcheck
-
-run:
-  tests: false
-  timeout: 8m
-  skip-dirs:
-    - api
-    - design
-    - docs
-    - docs/man
+    - wastedassign
+    - unparam
+    - gofumpt
+    - nosprintfhostport
+    - musttag
+    - exhaustive
+    - nilnil

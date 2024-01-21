@@ -24,40 +24,7 @@ import (
 	"github.com/linode/linodego"
 )
 
-const (
-	// annLinodeDefaultProtocol is the annotation used to specify the default protocol
-	// for Linode load balancers. Options are tcp, http and https. Defaults to tcp.
-	annLinodeDefaultProtocol      = "service.beta.kubernetes.io/linode-loadbalancer-default-protocol"
-	annLinodePortConfigPrefix     = "service.beta.kubernetes.io/linode-loadbalancer-port-"
-	annLinodeDefaultProxyProtocol = "service.beta.kubernetes.io/linode-loadbalancer-default-proxy-protocol"
-
-	annLinodeCheckPath       = "service.beta.kubernetes.io/linode-loadbalancer-check-path"
-	annLinodeCheckBody       = "service.beta.kubernetes.io/linode-loadbalancer-check-body"
-	annLinodeHealthCheckType = "service.beta.kubernetes.io/linode-loadbalancer-check-type"
-
-	annLinodeHealthCheckInterval = "service.beta.kubernetes.io/linode-loadbalancer-check-interval"
-	annLinodeHealthCheckTimeout  = "service.beta.kubernetes.io/linode-loadbalancer-check-timeout"
-	annLinodeHealthCheckAttempts = "service.beta.kubernetes.io/linode-loadbalancer-check-attempts"
-	annLinodeHealthCheckPassive  = "service.beta.kubernetes.io/linode-loadbalancer-check-passive"
-
-	// annLinodeThrottle is the annotation specifying the value of the Client Connection
-	// Throttle, which limits the number of subsequent new connections per second from the
-	// same client IP. Options are a number between 1-20, or 0 to disable. Defaults to 20.
-	annLinodeThrottle = "service.beta.kubernetes.io/linode-loadbalancer-throttle"
-
-	annLinodeLoadBalancerPreserve = "service.beta.kubernetes.io/linode-loadbalancer-preserve"
-	annLinodeNodeBalancerID       = "service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"
-
-	annLinodeHostnameOnlyIngress = "service.beta.kubernetes.io/linode-loadbalancer-hostname-only-ingress"
-	annLinodeLoadBalancerTags    = "service.beta.kubernetes.io/linode-loadbalancer-tags"
-	annLinodeCloudFirewallID     = "service.beta.kubernetes.io/linode-loadbalancer-firewall-id"
-
-	annLinodeNodePrivateIP = "node.k8s.linode.com/private-ip"
-)
-
-var (
-	errNoNodesAvailable = errors.New("no nodes available for nodebalancer")
-)
+var errNoNodesAvailable = errors.New("no nodes available for nodebalancer")
 
 type lbNotFoundError struct {
 	serviceNn      string
@@ -97,7 +64,7 @@ func newLoadbalancers(client Client, zone string) cloudprovider.LoadBalancer {
 }
 
 func (l *loadbalancers) getNodeBalancerForService(ctx context.Context, service *v1.Service) (*linodego.NodeBalancer, error) {
-	rawID, _ := getServiceAnnotation(service, annLinodeNodeBalancerID)
+	rawID := service.GetAnnotations()[annLinodeNodeBalancerID]
 	id, idErr := strconv.Atoi(rawID)
 	hasIDAnn := idErr == nil && id != 0
 
@@ -153,7 +120,7 @@ func (l *loadbalancers) getNodeBalancerByStatus(ctx context.Context, service *v1
 func (l *loadbalancers) cleanupOldNodeBalancer(ctx context.Context, service *v1.Service) error {
 	// unless there's an annotation, we can never get a past and current NB to differ,
 	// because they're looked up the same way
-	if _, ok := getServiceAnnotation(service, annLinodeNodeBalancerID); !ok {
+	if _, ok := service.GetAnnotations()[annLinodeNodeBalancerID]; !ok {
 		return nil
 	}
 
@@ -596,7 +563,7 @@ func (l *loadbalancers) getNodeBalancerByID(ctx context.Context, service *v1.Ser
 
 func (l *loadbalancers) getLoadBalancerTags(_ context.Context, clusterName string, service *v1.Service) []string {
 	tags := []string{clusterName}
-	tagStr, ok := getServiceAnnotation(service, annLinodeLoadBalancerTags)
+	tagStr, ok := service.GetAnnotations()[annLinodeLoadBalancerTags]
 	if ok {
 		return append(tags, strings.Split(tagStr, ",")...)
 	}
@@ -616,7 +583,7 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 		Tags:               tags,
 	}
 
-	fwid, ok := getServiceAnnotation(service, annLinodeCloudFirewallID)
+	fwid, ok := service.GetAnnotations()[annLinodeCloudFirewallID]
 	if ok {
 		firewallID, err := strconv.Atoi(fwid)
 		if err != nil {
@@ -645,7 +612,7 @@ func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1
 
 	health, err := getHealthCheckType(service)
 	if err != nil {
-		return linodego.NodeBalancerConfig{}, nil
+		return linodego.NodeBalancerConfig{}, err
 	}
 
 	config := linodego.NodeBalancerConfig{
@@ -656,7 +623,7 @@ func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1
 	}
 
 	if health == linodego.CheckHTTP || health == linodego.CheckHTTPBody {
-		path := service.Annotations[annLinodeCheckPath]
+		path := service.GetAnnotations()[annLinodeCheckPath]
 		if path == "" {
 			path = "/"
 		}
@@ -664,14 +631,14 @@ func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1
 	}
 
 	if health == linodego.CheckHTTPBody {
-		body := service.Annotations[annLinodeCheckBody]
+		body := service.GetAnnotations()[annLinodeCheckBody]
 		if body == "" {
 			return config, fmt.Errorf("for health check type http_body need body regex annotation %v", annLinodeCheckBody)
 		}
 		config.CheckBody = body
 	}
 	checkInterval := 5
-	if ci, ok := service.Annotations[annLinodeHealthCheckInterval]; ok {
+	if ci, ok := service.GetAnnotations()[annLinodeHealthCheckInterval]; ok {
 		if checkInterval, err = strconv.Atoi(ci); err != nil {
 			return config, err
 		}
@@ -679,7 +646,7 @@ func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1
 	config.CheckInterval = checkInterval
 
 	checkTimeout := 3
-	if ct, ok := service.Annotations[annLinodeHealthCheckTimeout]; ok {
+	if ct, ok := service.GetAnnotations()[annLinodeHealthCheckTimeout]; ok {
 		if checkTimeout, err = strconv.Atoi(ct); err != nil {
 			return config, err
 		}
@@ -687,7 +654,7 @@ func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1
 	config.CheckTimeout = checkTimeout
 
 	checkAttempts := 2
-	if ca, ok := service.Annotations[annLinodeHealthCheckAttempts]; ok {
+	if ca, ok := service.GetAnnotations()[annLinodeHealthCheckAttempts]; ok {
 		if checkAttempts, err = strconv.Atoi(ca); err != nil {
 			return config, err
 		}
@@ -695,7 +662,7 @@ func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1
 	config.CheckAttempts = checkAttempts
 
 	checkPassive := true
-	if cp, ok := service.Annotations[annLinodeHealthCheckPassive]; ok {
+	if cp, ok := service.GetAnnotations()[annLinodeHealthCheckPassive]; ok {
 		if checkPassive, err = strconv.ParseBool(cp); err != nil {
 			return config, err
 		}
@@ -816,7 +783,7 @@ func getPortConfig(service *v1.Service, port int) (portConfig, error) {
 	protocol := portConfigAnnotation.Protocol
 	if protocol == "" {
 		protocol = "tcp"
-		if p, ok := service.Annotations[annLinodeDefaultProtocol]; ok {
+		if p, ok := service.GetAnnotations()[annLinodeDefaultProtocol]; ok {
 			protocol = p
 		}
 	}
@@ -826,7 +793,7 @@ func getPortConfig(service *v1.Service, port int) (portConfig, error) {
 	if proxyProtocol == "" {
 		proxyProtocol = string(linodego.ProxyProtocolNone)
 		for _, ann := range []string{annLinodeDefaultProxyProtocol, annLinodeProxyProtocolDeprecated} {
-			if pp, ok := service.Annotations[ann]; ok {
+			if pp, ok := service.GetAnnotations()[ann]; ok {
 				proxyProtocol = pp
 				break
 			}
@@ -853,7 +820,7 @@ func getPortConfig(service *v1.Service, port int) (portConfig, error) {
 }
 
 func getHealthCheckType(service *v1.Service) (linodego.ConfigCheck, error) {
-	hType, ok := service.Annotations[annLinodeHealthCheckType]
+	hType, ok := service.GetAnnotations()[annLinodeHealthCheckType]
 	if !ok {
 		return linodego.CheckConnection, nil
 	}
@@ -866,7 +833,7 @@ func getHealthCheckType(service *v1.Service) (linodego.ConfigCheck, error) {
 func getPortConfigAnnotation(service *v1.Service, port int) (portConfigAnnotation, error) {
 	annotation := portConfigAnnotation{}
 	annotationKey := annLinodePortConfigPrefix + strconv.Itoa(port)
-	annotationJSON, ok := service.Annotations[annotationKey]
+	annotationJSON, ok := service.GetAnnotations()[annotationKey]
 
 	if !ok {
 		return annotation, nil
@@ -920,7 +887,7 @@ func getTLSCertInfo(ctx context.Context, kubeClient kubernetes.Interface, namesp
 func getConnectionThrottle(service *v1.Service) int {
 	connThrottle := 20
 
-	if connThrottleString := service.Annotations[annLinodeThrottle]; connThrottleString != "" {
+	if connThrottleString := service.GetAnnotations()[annLinodeThrottle]; connThrottleString != "" {
 		parsed, err := strconv.Atoi(connThrottleString)
 		if err == nil {
 			if parsed < 0 {
@@ -967,16 +934,8 @@ func getServiceNn(service *v1.Service) string {
 	return fmt.Sprintf("%s/%s", service.Namespace, service.Name)
 }
 
-func getServiceAnnotation(service *v1.Service, name string) (string, bool) {
-	if service.Annotations == nil {
-		return "", false
-	}
-	val, ok := service.Annotations[name]
-	return val, ok
-}
-
 func getServiceBoolAnnotation(service *v1.Service, name string) bool {
-	value, ok := getServiceAnnotation(service, name)
+	value, ok := service.GetAnnotations()[name]
 	if !ok {
 		return false
 	}

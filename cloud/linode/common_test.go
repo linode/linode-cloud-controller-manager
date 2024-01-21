@@ -46,7 +46,3 @@ func TestParseProviderID(t *testing.T) {
 		})
 	}
 }
-
-func stringPtr(s string) *string {
-	return &s
-}

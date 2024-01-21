@@ -1,5 +1,19 @@
-# NB: We now cross-compile the go binary locally using the Makefile
-FROM alpine:latest
-RUN apk update && apk add ca-certificates && rm -rf /var/cache/apk/*
-COPY dist/linode-cloud-controller-manager-linux-amd64 /
-ENTRYPOINT ["/linode-cloud-controller-manager-linux-amd64"]
+FROM golang:1.21-alpine as builder
+RUN mkdir -p /linode
+WORKDIR /linode
+
+COPY go.mod .
+COPY go.sum .
+COPY main.go .
+COPY cloud ./cloud
+COPY sentry ./sentry
+
+RUN go mod download
+RUN go build -a -ldflags '-extldflags "-static"' -o /bin/linode-cloud-controller-manager-linux /linode
+
+FROM alpine:3.18.4
+RUN apk add --update --no-cache ca-certificates
+LABEL maintainers="Linode"
+LABEL description="Linode Cloud Controller Manager"
+COPY --from=builder /bin/linode-cloud-controller-manager-linux /linode-cloud-controller-manager-linux
+ENTRYPOINT ["/linode-cloud-controller-manager-linux"]

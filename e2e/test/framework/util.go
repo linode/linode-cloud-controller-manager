@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -13,8 +13,6 @@ import (
 	"path"
 	"strings"
 	"time"
-
-	"github.com/golang/glog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -71,8 +69,7 @@ func runCommand(cmd string, args ...string) error {
 	c := exec.Command(cmd, args...)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
-	c.Env = append(c.Env, append(os.Environ())...)
-	glog.Infof("Running command %q\n", cmd)
+	log.Printf("Running command %q\n", cmd)
 	return c.Run()
 }
 
@@ -129,7 +126,7 @@ func getHTTPSResponse(domain, ip, port string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -146,7 +143,7 @@ func WaitForHTTPSResponse(link string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(resp), nil
+	return resp, nil
 }
 
 func getHTTPResponse(link string) (bool, string, error) {
@@ -156,7 +153,7 @@ func getHTTPResponse(link string) (bool, string, error) {
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return false, "", err
 	}

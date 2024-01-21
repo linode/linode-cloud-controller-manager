@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"net"
 	"net/http"
@@ -53,9 +53,9 @@ func (f *fakeAPI) ResetRequests() {
 }
 
 func (f *fakeAPI) recordRequest(r *http.Request, urlPath string) {
-	bodyBytes, _ := ioutil.ReadAll(r.Body)
+	bodyBytes, _ := io.ReadAll(r.Body)
 	r.Body.Close()
-	r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 	f.requests[fakeRequest{
 		Path:   urlPath,
 		Method: r.Method,
@@ -746,9 +746,9 @@ func createFirewallDevice(fwId int, f *fakeAPI, fdco linodego.FirewallDeviceCrea
 	return fwd
 }
 
-func randString(n int) string {
+func randString() string {
 	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	b := make([]byte, n)
+	b := make([]byte, 10)
 	for i := range b {
 		b[i] = letterBytes[rand.Intn(len(letterBytes))]
 	}

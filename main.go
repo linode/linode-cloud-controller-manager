@@ -2,11 +2,9 @@ package main
 
 import (
 	"context"
-	goflag "flag"
+	"flag"
 	"fmt"
-	"math/rand"
 	"os"
-	"time"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode"
 	"github.com/linode/linode-cloud-controller-manager/sentry"
@@ -18,9 +16,10 @@ import (
 	"k8s.io/cloud-provider/options"
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
+	"k8s.io/klog"
+
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // for client metric registration
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
-	"k8s.io/klog"
 )
 
 const (
@@ -67,8 +66,6 @@ func main() {
 
 	ctx := sentry.SetHubOnContext(context.Background())
 
-	rand.Seed(time.Now().UTC().UnixNano())
-
 	ccmOptions, err := options.NewCloudControllerManagerOptions()
 	if err != nil {
 		klog.Fatalf("unable to initialize command options: %v", err)
@@ -111,7 +108,7 @@ func main() {
 	}
 
 	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
-	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 
 	logs.InitLogs()
 	defer logs.FlushLogs()
