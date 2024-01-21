@@ -595,7 +595,7 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 	return l.client.CreateNodeBalancer(ctx, createOpts)
 }
 
-func (l *loadbalancers) createEmptyFirewall(ctx context.Context, service *v1.Service, opts linodego.FirewallCreateOptions) (fw *linodego.Firewall, err error) {
+func (l *loadbalancers) createFirewall(ctx context.Context, opts linodego.FirewallCreateOptions) (fw *linodego.Firewall, err error) {
 	return l.client.CreateFirewall(ctx, opts)
 }
 
