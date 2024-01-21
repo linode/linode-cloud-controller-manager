@@ -251,7 +251,7 @@ func (l *loadbalancers) getNodeBalancerDeviceId(ctx context.Context, firewallID,
 func (l *loadbalancers) updateNodeBalancerFirewall(ctx context.Context, service *v1.Service, nb *linodego.NodeBalancer) error {
 	var newFirewallID, existingFirewallID int
 	var err error
-	fwid, ok := getServiceAnnotation(service, annLinodeCloudFirewallID)
+	fwid, ok := service.GetAnnotations()[annLinodeCloudFirewallID]
 	if ok {
 		newFirewallID, err = strconv.Atoi(fwid)
 		if err != nil {

@@ -762,7 +762,7 @@ func testUpdateLoadBalancerAddNewFirewall(t *testing.T, client *linodego.Client,
 
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: randString(10),
+			Name: randString(),
 			UID:  "foobar123",
 			Annotations: map[string]string{
 				annLinodeThrottle: "15",
@@ -771,7 +771,7 @@ func testUpdateLoadBalancerAddNewFirewall(t *testing.T, client *linodego.Client,
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
 				{
-					Name:     randString(10),
+					Name:     randString(),
 					Protocol: "TCP",
 					Port:     int32(80),
 					NodePort: int32(30000),
@@ -871,7 +871,7 @@ func testUpdateLoadBalancerUpdateFirewall(t *testing.T, client *linodego.Client,
 
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: randString(10),
+			Name: randString(),
 			UID:  "foobar123",
 			Annotations: map[string]string{
 				annLinodeThrottle: "15",
@@ -880,7 +880,7 @@ func testUpdateLoadBalancerUpdateFirewall(t *testing.T, client *linodego.Client,
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
 				{
-					Name:     randString(10),
+					Name:     randString(),
 					Protocol: "TCP",
 					Port:     int32(80),
 					NodePort: int32(30000),
@@ -984,7 +984,7 @@ func testUpdateLoadBalancerDeleteFirewall(t *testing.T, client *linodego.Client,
 
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: randString(10),
+			Name: randString(),
 			UID:  "foobar123",
 			Annotations: map[string]string{
 				annLinodeThrottle: "15",
@@ -993,7 +993,7 @@ func testUpdateLoadBalancerDeleteFirewall(t *testing.T, client *linodego.Client,
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
 				{
-					Name:     randString(10),
+					Name:     randString(),
 					Protocol: "TCP",
 					Port:     int32(80),
 					NodePort: int32(30000),
