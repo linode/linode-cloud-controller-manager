@@ -34,6 +34,13 @@ type Client interface {
 	DeleteFirewall(ctx context.Context, fwid int) error
 	GetFirewall(context.Context, int) (*linodego.Firewall, error)
 	UpdateFirewallRules(context.Context, int, linodego.FirewallRuleSet) (*linodego.FirewallRuleSet, error)
+<<<<<<< HEAD
+=======
+	DeleteFirewall(context.Context, int) error
+	ListNodeBalancerFirewalls(ctx context.Context, nodebalancerID int, opts *linodego.ListOptions) ([]linodego.Firewall, error)
+	DeleteFirewallDevice(ctx context.Context, firewallID, deviceID int) error
+	ListFirewallDevices(ctx context.Context, firewallID int, opts *linodego.ListOptions) ([]linodego.FirewallDevice, error)
+>>>>>>> dadcd59 (fixups + test code from other branch)
 }
 
 // linodego.Client implements Client

@@ -343,9 +343,9 @@ func (l *loadbalancers) reconcileFirewall(ctx context.Context, nb *linodego.Node
 		// this is a TODO
 		return nil
 	} else {
-		// There's no firewallID already set, see if a configMap exists
-		fwCM, fwCMannotationExists := service.GetAnnotations()[annLinodeCloudFirewallCM]
-		// Lots to do here. the user may have changed the configmap's name, we should look at what rules exist on the fw first
+		// There's no firewallID already set, see if a acl exists
+		_, fwACLExists := service.GetAnnotations()[annLinodeCloudFirewallACL]
+		// Lots to do here. the user may have changed the acl, we should look at what rules exist on the fw first
 		// and then reconcile it.
 		firewalls, err := l.client.ListNodeBalancerFirewalls(ctx, nb.ID, &linodego.ListOptions{})
 		if err != nil {
@@ -358,7 +358,7 @@ func (l *loadbalancers) reconcileFirewall(ctx context.Context, nb *linodego.Node
 			return errTooManyFirewalls
 		}
 
-		if !fwCMannotationExists && len(firewalls) == 1 {
+		if !fwACLExists && len(firewalls) == 1 {
 			// No firewall annotation, but there is a firewall attached our node-balancer. we should remove it.
 			err := l.client.DeleteFirewallDevice(ctx, firewalls[0].ID, nb.ID)
 			if err != nil {
@@ -377,7 +377,7 @@ func (l *loadbalancers) reconcileFirewall(ctx context.Context, nb *linodego.Node
 		}
 
 		// We do not want to get into the complexity of reconciling differences, might as well just pull what's in the configMap now and update the fw.
-		fwCreateOpts, err := l.createFirewallOptsForSvc(ctx, fwCM, "", []string{""}, service.Spec.Ports)
+		fwCreateOpts, err := l.createFirewallOptsForSvc(ctx, service.Name, []string{""}, service)
 		if err != nil {
 			return err
 		}
@@ -698,9 +698,8 @@ func (l *loadbalancers) createFirewallOptsForSvc(ctx context.Context, label stri
 	if err != nil {
 		return nil, err
 	}
-
+	// it is a problem if both are set, or if both are not set
 	if (acl.AllowList != nil && acl.DenyList != nil) || (acl.AllowList == nil && acl.DenyList == nil) {
-		// it is a problem if both are set, or if both are not set
 		return nil, errInvalidFWConfig
 	}
 
@@ -743,8 +742,13 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 		_, ok := service.GetAnnotations()[annLinodeCloudFirewallACL]
 		if ok {
 			fwcreateOpts, err := l.createFirewallOptsForSvc(ctx, label, tags, service)
+			if err != nil {
+				return nil, err
+			}
+
 			firewall, err := l.client.CreateFirewall(ctx, *fwcreateOpts)
 			if err != nil {
+				fmt.Printf("TARUN here %v", err)
 				return nil, err
 			}
 			createOpts.FirewallID = firewall.ID

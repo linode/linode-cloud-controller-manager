@@ -8,8 +8,9 @@ metadata:
     service.beta.kubernetes.io/linode-loadbalancer-default-protocol: "http"
     service.beta.kubernetes.io/linode-loadbalancer-firewall-acl: |
       {
-        "denyList": {
+        "allowList": {
           "ipv4": ["8.8.8.8/32"],
+          "ipv6": ["dead:beef::/64"]
         }
       }
 spec:

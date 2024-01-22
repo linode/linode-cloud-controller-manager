@@ -125,6 +125,18 @@ func TestCCMLoadBalancers(t *testing.T) {
 		{
 			name: "Create Load Balancer With Invalid Firewall ID",
 			f:    testCreateNodeBalancerWithInvalidFirewall,
+		}, {
+			name: "Create Load Balancer With Valid Firewall ACL - AllowList",
+			f:    testCreateNodeBalancerWithAllowList,
+		}, {
+			name: "Create Load Balancer With Valid Firewall ACL - DenyList",
+			f:    testCreateNodeBalancerWithDenyList,
+		}, {
+			name: "Create Load Balancer With Invalid Firewall ACL - Both Allow and Deny",
+			f:    testCreateNodeBalanceWithBothAllowOrDenyList,
+		}, {
+			name: "Create Load Balancer With Invalid Firewall ACL - NO Allow Or Deny",
+			f:    testCreateNodeBalanceWithNoAllowOrDenyList,
 		},
 		{
 			name: "Update Load Balancer - Add Annotation",
@@ -226,7 +238,7 @@ func stubService(fake *fake.Clientset, service *v1.Service) {
 	_, _ = fake.CoreV1().Services("").Create(context.TODO(), service, metav1.CreateOptions{})
 }
 
-func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, firewallID *string) error {
+func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, annotations map[string]string) error {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: randString(),
@@ -253,11 +265,9 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, f
 			},
 		},
 	}
-
-	if firewallID != nil {
-		svc.Annotations[annLinodeCloudFirewallID] = *firewallID
+	for key, value := range annotations {
+		svc.Annotations[key] = value
 	}
-
 	lb := &loadbalancers{client, "us-west", nil}
 	nodes := []*v1.Node{
 		{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}},
@@ -313,18 +323,81 @@ func testCreateNodeBalancerWithOutFirewall(t *testing.T, client *linodego.Client
 	}
 }
 
+func testCreateNodeBalanceWithNoAllowOrDenyList(t *testing.T, client *linodego.Client, f *fakeAPI) {
+	annotations := map[string]string{
+		annLinodeCloudFirewallACL: `{}`,
+	}
+
+	err := testCreateNodeBalancer(t, client, f, annotations)
+	if err == nil || !stderrors.Is(err, errInvalidFWConfig) {
+		t.Fatalf("expected a %v error, got %v", errInvalidFWConfig, err)
+	}
+}
+
+func testCreateNodeBalanceWithBothAllowOrDenyList(t *testing.T, client *linodego.Client, f *fakeAPI) {
+	annotations := map[string]string{
+		annLinodeCloudFirewallACL: `{
+			"allowList": {
+				"ipv4": ["2.2.2.2"]
+			},
+			"denyList": {
+				"ipv4": ["2.2.2.2"]
+			}
+		}`,
+	}
+
+	err := testCreateNodeBalancer(t, client, f, annotations)
+	if err == nil || !stderrors.Is(err, errInvalidFWConfig) {
+		t.Fatalf("expected a %v error, got %v", errInvalidFWConfig, err)
+	}
+}
+
+func testCreateNodeBalancerWithAllowList(t *testing.T, client *linodego.Client, f *fakeAPI) {
+	annotations := map[string]string{
+		annLinodeCloudFirewallACL: `{
+			"allowList": {
+				"ipv4": ["2.2.2.2"]
+			}
+		}`,
+	}
+
+	err := testCreateNodeBalancer(t, client, f, annotations)
+	if err == nil {
+		t.Fatalf("expected a non-nil error, got %v", err)
+	}
+}
+
+func testCreateNodeBalancerWithDenyList(t *testing.T, client *linodego.Client, f *fakeAPI) {
+	annotations := map[string]string{
+		annLinodeCloudFirewallACL: `{
+			"denyList": {
+				"ipv4": ["2.2.2.2"]
+			}
+		}`,
+	}
+
+	err := testCreateNodeBalancer(t, client, f, annotations)
+	if err != nil {
+		t.Fatalf("expected a non-nil error, got %v", err)
+	}
+}
+
 func testCreateNodeBalancerWithFirewall(t *testing.T, client *linodego.Client, f *fakeAPI) {
-	firewallID := "123"
-	err := testCreateNodeBalancer(t, client, f, &firewallID)
+	annotations := map[string]string{
+		annLinodeCloudFirewallID: "123",
+	}
+	err := testCreateNodeBalancer(t, client, f, annotations)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
 }
 
 func testCreateNodeBalancerWithInvalidFirewall(t *testing.T, client *linodego.Client, f *fakeAPI) {
-	firewallID := "qwerty"
+	annotations := map[string]string{
+		annLinodeCloudFirewallID: "qwerty",
+	}
 	expectedError := "strconv.Atoi: parsing \"qwerty\": invalid syntax"
-	err := testCreateNodeBalancer(t, client, f, &firewallID)
+	err := testCreateNodeBalancer(t, client, f, annotations)
 	if err.Error() != expectedError {
 		t.Fatalf("expected a %s error, got %v", expectedError, err)
 	}
