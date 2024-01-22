@@ -6,7 +6,12 @@ metadata:
   namespace: kube-system
   annotations:
     service.beta.kubernetes.io/linode-loadbalancer-default-protocol: "http"
-    service.beta.kubernetes.io/linode-loadbalancer-firewall-cm: "firewall-rules"
+    service.beta.kubernetes.io/linode-loadbalancer-firewall-acl: |
+      {
+        "denyList": {
+          "ipv4": ["8.8.8.8/32"],
+        }
+      }
 spec:
   type: LoadBalancer
   selector:
@@ -22,7 +27,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nginx-http-deployment
-  namespace: kube-system
+  namespace: kube-system    
 spec:
   replicas: 2
   selector:

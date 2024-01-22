@@ -654,21 +654,14 @@ func (l *loadbalancers) getLoadBalancerTags(_ context.Context, clusterName strin
 	return tags
 }
 
-func processACL(fwcreateOpts *linodego.FirewallCreateOptions, acl string, aclType, label, cmName, ports string) error {
-	var allowedIPs linodego.NetworkAddresses
-	err := json.Unmarshal([]byte(acl), &allowedIPs)
-	if err != nil {
-		klog.Error("Error marshalling IPs in allowList")
-		return err
-	}
-
+func processACL(fwcreateOpts *linodego.FirewallCreateOptions, aclType, label, svcName, ports string, ips linodego.NetworkAddresses) error {
 	fwcreateOpts.Rules.Inbound = append(fwcreateOpts.Rules.Inbound, linodego.FirewallRule{
 		Action:      aclType,
-		Label:       fmt.Sprintf("%s-%s", aclType, cmName),
-		Description: fmt.Sprintf("Created by linode-ccm: %s, from %s", label, cmName),
+		Label:       fmt.Sprintf("%s-%s", aclType, svcName),
+		Description: fmt.Sprintf("Created by linode-ccm: %s, for %s", label, svcName),
 		Protocol:    linodego.TCP, // Nodebalancers support only TCP.
 		Ports:       ports,
-		Addresses:   allowedIPs,
+		Addresses:   ips,
 	})
 	fwcreateOpts.Rules.OutboundPolicy = "ACCEPT"
 	if aclType == "ACCEPT" {
@@ -681,40 +674,44 @@ func processACL(fwcreateOpts *linodego.FirewallCreateOptions, acl string, aclTyp
 	return nil
 }
 
-func (l *loadbalancers) createFirewallOptsForSvc(ctx context.Context, fwCM, label string, tags []string, ports []v1.ServicePort) (*linodego.FirewallCreateOptions, error) {
-	// Fetch config map
-	cm, err := l.kubeClient.CoreV1().ConfigMaps("kube-system").Get(ctx, fwCM, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
+type aclConfig struct {
+	AllowList *linodego.NetworkAddresses `json:"allowList"`
+	DenyList  *linodego.NetworkAddresses `json:"denyList"`
+}
+
+func (l *loadbalancers) createFirewallOptsForSvc(ctx context.Context, label string, tags []string, svc *v1.Service) (*linodego.FirewallCreateOptions, error) {
+	// Fetch acl from annotation
+	aclString := svc.GetAnnotations()[annLinodeCloudFirewallACL]
 	fwcreateOpts := linodego.FirewallCreateOptions{
 		Label: label,
 		Tags:  tags,
 	}
 
-	servicePorts := make([]string, len(ports))
-	for idx, port := range ports {
+	servicePorts := make([]string, len(svc.Spec.Ports))
+	for idx, port := range svc.Spec.Ports {
 		servicePorts[idx] = strconv.Itoa(int(port.Port))
 	}
 
 	portsString := strings.Join(servicePorts[:], ",")
+	var acl aclConfig
+	err := json.Unmarshal([]byte(aclString), &acl)
+	if err != nil {
+		return nil, err
+	}
 
-	allowListJson, allowListOk := cm.Data[allowListKey]
-	denyListJson, denyListOk := cm.Data[denyListKey]
-
-	if (allowListOk && denyListOk) || (!allowListOk && !denyListOk) {
+	if (acl.AllowList != nil && acl.DenyList != nil) || (acl.AllowList == nil && acl.DenyList == nil) {
 		// it is a problem if both are set, or if both are not set
 		return nil, errInvalidFWConfig
 	}
 
 	aclType := "ACCEPT"
-	acl := allowListJson
-	if denyListOk {
+	allowedIPs := acl.AllowList
+	if acl.DenyList != nil {
 		aclType = "DROP"
-		acl = denyListJson
+		allowedIPs = acl.DenyList
 	}
 
-	err = processACL(&fwcreateOpts, acl, aclType, label, cm.Name, portsString)
+	err = processACL(&fwcreateOpts, aclType, label, svc.Name, portsString, *allowedIPs)
 	if err != nil {
 		return nil, err
 	}
@@ -742,10 +739,10 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 		}
 		createOpts.FirewallID = firewallID
 	} else {
-		// There's no firewallID already set, see if we need to create a new fw
-		fwCM, ok := getServiceAnnotation(service, annLinodeCloudFirewallCM)
+		// There's no firewallID already set, see if we need to create a new fw, look for the acl annotation.
+		_, ok := service.GetAnnotations()[annLinodeCloudFirewallACL]
 		if ok {
-			fwcreateOpts, err := l.createFirewallOptsForSvc(ctx, fwCM, label, tags, service.Spec.Ports)
+			fwcreateOpts, err := l.createFirewallOptsForSvc(ctx, label, tags, service)
 			firewall, err := l.client.CreateFirewall(ctx, *fwcreateOpts)
 			if err != nil {
 				return nil, err
