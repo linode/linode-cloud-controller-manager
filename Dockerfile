@@ -1,9 +1,3 @@
-# "docker": build in a Docker build container (default)
-# "local":  copy from the build context. This is useful for tilt's live_update
-#           feature, allowing hot reload of the linode-ccm binary for fast
-#           development iteration. See ./Tiltfile
-ARG BUILD_SOURCE="docker"
-
 FROM golang:1.21-alpine as builder
 RUN mkdir -p /linode
 WORKDIR /linode

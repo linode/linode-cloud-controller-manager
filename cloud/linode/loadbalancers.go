@@ -249,54 +249,35 @@ func (l *loadbalancers) getNodeBalancerDeviceId(ctx context.Context, firewallID,
 	return 0, false, nil
 }
 
-// updateNodeBalancerFirewall updates the firewall attached to the nodebalancer
-//
-// Firewall is updated in 3 scenario's:
-// - Add new firewall to the nodeBalancer
-// - Update firewall attached to the nodebalancer
-// - Remove firewall attached
-func (l *loadbalancers) updateNodeBalancerFirewall(ctx context.Context, service *v1.Service, nb *linodego.NodeBalancer) error {
+func (l *loadbalancers) updateFWwithID(ctx context.Context, service *v1.Service, nb *linodego.NodeBalancer) error {
 	var newFirewallID int
 	var err error
 
-	// get the new firewall id form the annotaiton (if any).
-	fwid, ok := service.GetAnnotations()[annLinodeCloudFirewallID]
-	if ok {
-		newFirewallID, err = strconv.Atoi(fwid)
-		if err != nil {
-			return err
-		}
+	fwID := service.GetAnnotations()[annLinodeCloudFirewallID]
+	newFirewallID, err = strconv.Atoi(fwID)
+	if err != nil {
+		return err
 	}
 
-	// get the list of attached firewalls to the node-balancer.
+	// See if a firewall is attached to the nodebalancer first.
 	firewalls, err := l.client.ListNodeBalancerFirewalls(ctx, nb.ID, &linodego.ListOptions{})
 	if err != nil {
-		if !ok {
-			if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == http.StatusNotFound {
-				return nil
-			} else {
-				return err
-			}
-		}
+		return err
+	}
+	if len(firewalls) > 1 {
+		return errTooManyFirewalls
 	}
 
-	// if there are no attached firewalls and no annotation added; return.
-	if !ok && len(firewalls) == 0 {
-		return nil
-	}
-
-	// get the ID of the firewall that is already attached to the nodeBalancer.
+	// get the ID of the firewall that is already attached to the nodeBalancer, if we have one.
 	var existingFirewallID int
-	if len(firewalls) != 0 {
+	if len(firewalls) == 1 {
 		existingFirewallID = firewalls[0].ID
 	}
 
-	// if existing firewall and new firewall differs, update accordingly.
+	// if existing firewall and new firewall differs,
 	if existingFirewallID != newFirewallID {
-
 		// remove the existing firewall if it exists
 		if existingFirewallID != 0 {
-
 			deviceID, deviceExists, err := l.getNodeBalancerDeviceId(ctx, existingFirewallID, nb.ID)
 			if err != nil {
 				return err
@@ -312,9 +293,40 @@ func (l *loadbalancers) updateNodeBalancerFirewall(ctx context.Context, service 
 			}
 		}
 
-		// attach new firewall if an ID is provided in the annotation.
-		if newFirewallID != 0 {
-			_, err = l.client.CreateFirewallDevice(ctx, newFirewallID, linodego.FirewallDeviceCreateOptions{
+		// attach new firewall.
+		_, err = l.client.CreateFirewallDevice(ctx, newFirewallID, linodego.FirewallDeviceCreateOptions{
+			ID:   nb.ID,
+			Type: "nodebalancer",
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (l *loadbalancers) updateFWwithACL(ctx context.Context, service *v1.Service, nb *linodego.NodeBalancer) error {
+	// See if a firewall is attached to the nodebalancer first.
+	firewalls, err := l.client.ListNodeBalancerFirewalls(ctx, nb.ID, &linodego.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	switch len(firewalls) {
+	case 0:
+		{
+			// need to create a fw and attach it to our nb
+			fwcreateOpts, err := l.createFirewallOptsForSvc(service.Name, l.getLoadBalancerTags(ctx, "", service), service)
+			if err != nil {
+				return err
+			}
+
+			fw, err := l.client.CreateFirewall(ctx, *fwcreateOpts)
+			if err != nil {
+				return err
+			}
+			// attach new firewall.
+			_, err = l.client.CreateFirewallDevice(ctx, fw.ID, linodego.FirewallDeviceCreateOptions{
 				ID:   nb.ID,
 				Type: "nodebalancer",
 			})
@@ -322,39 +334,61 @@ func (l *loadbalancers) updateNodeBalancerFirewall(ctx context.Context, service 
 				return err
 			}
 		}
+	case 1:
+		{
+			// We do not want to get into the complexity of reconciling differences, might as well just pull what's in the svc annotation now and update the fw.
+			fwCreateOpts, err := l.createFirewallOptsForSvc(service.Name, []string{""}, service)
+			if err != nil {
+				return err
+			}
+			_, err = l.client.UpdateFirewallRules(ctx, firewalls[0].ID, fwCreateOpts.Rules)
+			if err != nil {
+				return err
+			}
+		}
+	default:
+		return errTooManyFirewalls
 	}
 	return nil
 }
 
-func (l *loadbalancers) reconcileFirewall(ctx context.Context, nb *linodego.NodeBalancer, service *v1.Service) error {
-	// First things first, see if we need to do anything
-	// We do that by looking at the fw id annotation, and if it doesn't exist, look at the configMap annotation.
-	fwid, ok := service.GetAnnotations()[annLinodeCloudFirewallID]
-	if ok {
-		_, err := strconv.Atoi(fwid)
-		if err != nil {
-			return err
-		}
-		// this is a TODO
+// updateNodeBalancerFirewall reconciles the firewall attached to the nodebalancer
+//
+// This function does the follwing
+//  1. If a firewallID annotation is present, it checks if the nodebalancer has a firewall attached, and if it matches the annotationID
+//     a. If the IDs match, nothing to do here.
+//     b. If they don't match, then the nb is removed from the old FW, and its attached to the new firewall
+//  2. If a firewallACL annotation is present,
+//     a. it checks if the nodebalancer has a firewall attached, if a fw exists, it updates rules
+//     b. if a fw does not exist, it creates one
+//  3. If neither of these annotations are present,
+//	  a. AND if no firewalls are attached to the nodebalancer, nothing to do.
+//	  b. if the NB has ONE firewall attached, remove it from nb, and clean up if nothing else is attached to it
+//	  c. If there are more than one fw attached to it, then its a problem, return an err
+
+func (l *loadbalancers) updateNodeBalancerFirewall(ctx context.Context, service *v1.Service, nb *linodego.NodeBalancer) error {
+	// get the new firewall id from the annotation (if any).
+	_, fwIDExists := service.GetAnnotations()[annLinodeCloudFirewallID]
+	if fwIDExists { // If an ID exists, we ignore everything else and handle just that
+		return l.updateFWwithID(ctx, service, nb)
+	}
+
+	// See if a acl exists
+	_, fwACLExists := service.GetAnnotations()[annLinodeCloudFirewallACL]
+	if fwACLExists { // if an ACL exists, but no ID, just update the ACL on the fw.
+		return l.updateFWwithACL(ctx, service, nb)
+	}
+
+	// No firewall ID or ACL annotation, see if there are firewalls attached to our nb
+	firewalls, err := l.client.ListNodeBalancerFirewalls(ctx, nb.ID, &linodego.ListOptions{})
+	if err != nil {
+		return err
+	}
+	switch len(firewalls) {
+	case 0:
 		return nil
-	} else {
-		// There's no firewallID already set, see if a acl exists
-		_, fwACLExists := service.GetAnnotations()[annLinodeCloudFirewallACL]
-		// Lots to do here. the user may have changed the acl, we should look at what rules exist on the fw first
-		// and then reconcile it.
-		firewalls, err := l.client.ListNodeBalancerFirewalls(ctx, nb.ID, &linodego.ListOptions{})
-		if err != nil {
-			return err
-		}
-
-		if len(firewalls) > 1 {
-			// we do not support this case. This means that the customer likely attached a different firewall to this nb,
-			// don't want to risk changing stuff here.
-			return errTooManyFirewalls
-		}
-
-		if !fwACLExists && len(firewalls) == 1 {
-			// No firewall annotation, but there is a firewall attached our node-balancer. we should remove it.
+	case 1:
+		{
 			err := l.client.DeleteFirewallDevice(ctx, firewalls[0].ID, nb.ID)
 			if err != nil {
 				return err
@@ -370,16 +404,8 @@ func (l *loadbalancers) reconcileFirewall(ctx context.Context, nb *linodego.Node
 			}
 			// else let that firewall linger, don't mess with it.
 		}
-
-		// We do not want to get into the complexity of reconciling differences, might as well just pull what's in the configMap now and update the fw.
-		fwCreateOpts, err := l.createFirewallOptsForSvc(service.Name, []string{""}, service)
-		if err != nil {
-			return err
-		}
-		_, err = l.client.UpdateFirewallRules(ctx, firewalls[0].ID, fwCreateOpts.Rules)
-		if err != nil {
-			return err
-		}
+	default:
+		return errTooManyFirewalls
 	}
 	return nil
 }
@@ -487,13 +513,6 @@ func (l *loadbalancers) updateNodeBalancer(ctx context.Context, clusterName stri
 			sentry.CaptureError(ctx, err)
 			return fmt.Errorf("[port %d] error rebuilding NodeBalancer config: %v", int(port.Port), err)
 		}
-	}
-
-	// Firewall configs
-	// Delete any configs for ports that have been removed from the Service
-	if err = l.reconcileFirewall(ctx, nb, service); err != nil {
-		sentry.CaptureError(ctx, err)
-		return err
 	}
 
 	return nil
@@ -742,7 +761,6 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 
 			firewall, err := l.client.CreateFirewall(ctx, *fwcreateOpts)
 			if err != nil {
-				fmt.Printf("TARUN here %v", err)
 				return nil, err
 			}
 			createOpts.FirewallID = firewall.ID
