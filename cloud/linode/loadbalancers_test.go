@@ -740,7 +740,7 @@ func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *
 	}
 
 	if !reflect.DeepEqual(expectedPorts, observedPorts) {
-		t.Errorf("NodeBalancer ports mismatch: expected %v, got %v", `expectedPorts`, observedPorts)
+		t.Errorf("NodeBalancer ports mismatch: expected %v, got %v", expectedPorts, observedPorts)
 	}
 }
 

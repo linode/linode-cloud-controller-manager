@@ -24,8 +24,8 @@ type fakeAPI struct {
 	nb  map[string]*linodego.NodeBalancer
 	nbc map[string]*linodego.NodeBalancerConfig
 	nbn map[string]*linodego.NodeBalancerNode
-	fw  map[int]*linodego.Firewall
-	fwd map[int]map[int]*linodego.FirewallDevice
+	fw  map[int]*linodego.Firewall               // map of firewallID -> firewall
+	fwd map[int]map[int]*linodego.FirewallDevice // map of firewallID -> firewallDeviceID:FirewallDevice
 
 	requests map[fakeRequest]struct{}
 }
@@ -186,12 +186,15 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					},
 					Data: data,
 				}
-				rr, _ := json.Marshal(resp)
+				rr, err := json.Marshal(resp)
+				if err != nil {
+					f.t.Fatal(err)
+				}
 				_, _ = w.Write(rr)
 				return
 			}
 
-			rx, _ = regexp.Compile("/nodebalancers/[0-9]+/firewalls")
+			rx = regexp.MustCompile("/nodebalancers/[0-9]+/firewalls")
 			if rx.MatchString(urlPath) {
 				id := strings.Split(urlPath, "/")[2]
 				devID, err := strconv.Atoi(id)
