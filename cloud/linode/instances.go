@@ -107,7 +107,7 @@ func (i *instances) lookupLinode(ctx context.Context, node *v1.Node) (*linodego.
 	sentry.SetTag(ctx, "provider_id", providerID)
 	sentry.SetTag(ctx, "node_name", node.Name)
 
-	if providerID != "" && isLinodeProviderID(providerID){
+	if providerID != "" && isLinodeProviderID(providerID) {
 		id, err := parseProviderID(providerID)
 		if err != nil {
 			sentry.CaptureError(ctx, err)

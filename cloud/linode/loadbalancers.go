@@ -229,6 +229,103 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	return lbStatus, nil
 }
 
+// getNodeBalancerDeviceId gets the deviceID of the nodeBalancer that is attached to the firewall.
+func (l *loadbalancers) getNodeBalancerDeviceId(ctx context.Context, firewallID, nbID, page int) (int, bool, error) {
+	devices, err := l.client.ListFirewallDevices(ctx, firewallID, &linodego.ListOptions{PageSize: 500, PageOptions: &linodego.PageOptions{Page: page}})
+	if err != nil {
+		return 0, false, err
+	}
+
+	if len(devices) == 0 {
+		return 0, false, nil
+	}
+
+	for _, device := range devices {
+		if device.Entity.ID == nbID {
+			return device.ID, true, nil
+		}
+	}
+
+	return 0, false, nil
+}
+
+// updateNodeBalancerFirewall updates the firewall attached to the nodebalancer
+//
+// Firewall is updated in 3 scenario's:
+// - Add new firewall to the nodeBalancer
+// - Update firewall attached to the nodebalancer
+// - Remove firewall attached
+func (l *loadbalancers) updateNodeBalancerFirewall(ctx context.Context, service *v1.Service, nb *linodego.NodeBalancer) error {
+	var newFirewallID int
+	var err error
+
+	// get the new firewall id form the annotaiton (if any).
+	fwid, ok := service.GetAnnotations()[annLinodeCloudFirewallID]
+	if ok {
+		newFirewallID, err = strconv.Atoi(fwid)
+		if err != nil {
+			return err
+		}
+	}
+
+	// get the list of attached firewalls to the node-balancer.
+	firewalls, err := l.client.ListNodeBalancerFirewalls(ctx, nb.ID, &linodego.ListOptions{})
+	if err != nil {
+		if !ok {
+			if err.Error() != "[404] Not Found" {
+				return err
+			} else {
+				return nil
+			}
+		}
+	}
+
+	// if there are no attached firewalls and no annotation added; return.
+	if !ok && len(firewalls) == 0 {
+		return nil
+	}
+
+	// get the ID of the firewall that is already attached to the nodeBalancer.
+	var existingFirewallID int
+	if len(firewalls) != 0 {
+		existingFirewallID = firewalls[0].ID
+	}
+
+	// if existing firewall and new firewall differs, update accordingly.
+	if existingFirewallID != newFirewallID {
+
+		// remove the existing firewall if it exists
+		if existingFirewallID != 0 {
+
+			deviceID, deviceExists, err := l.getNodeBalancerDeviceId(ctx, existingFirewallID, nb.ID, 1)
+			if err != nil {
+				return err
+			}
+
+			if !deviceExists {
+				return fmt.Errorf("Error in fetching attached nodeBalancer device")
+			}
+
+			err = l.client.DeleteFirewallDevice(ctx, existingFirewallID, deviceID)
+			if err != nil {
+				return err
+			}
+		}
+
+		// attach new firewall if an ID is provided in the annotation.
+		if newFirewallID != 0 {
+			_, err = l.client.CreateFirewallDevice(ctx, newFirewallID, linodego.FirewallDeviceCreateOptions{
+				ID:   nb.ID,
+				Type: "nodebalancer",
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 //nolint:funlen
 func (l *loadbalancers) updateNodeBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node, nb *linodego.NodeBalancer) (err error) {
 	if len(nodes) == 0 {
@@ -239,7 +336,6 @@ func (l *loadbalancers) updateNodeBalancer(ctx context.Context, clusterName stri
 	if connThrottle != nb.ClientConnThrottle {
 		update := nb.GetUpdateOptions()
 		update.ClientConnThrottle = &connThrottle
-
 		nb, err = l.client.UpdateNodeBalancer(ctx, nb.ID, update)
 		if err != nil {
 			sentry.CaptureError(ctx, err)
@@ -256,6 +352,12 @@ func (l *loadbalancers) updateNodeBalancer(ctx context.Context, clusterName stri
 			sentry.CaptureError(ctx, err)
 			return err
 		}
+	}
+
+	// update node-balancer firewall
+	err = l.updateNodeBalancerFirewall(ctx, service, nb)
+	if err != nil {
+		return err
 	}
 
 	// Get all of the NodeBalancer's configs
@@ -502,7 +604,16 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 		}
 		createOpts.FirewallID = firewallID
 	}
+
 	return l.client.CreateNodeBalancer(ctx, createOpts)
+}
+
+func (l *loadbalancers) createFirewall(ctx context.Context, opts linodego.FirewallCreateOptions) (fw *linodego.Firewall, err error) {
+	return l.client.CreateFirewall(ctx, opts)
+}
+
+func (l *loadbalancers) deleteFirewall(ctx context.Context, firewall *linodego.Firewall) error {
+	return l.client.DeleteFirewall(ctx, firewall.ID)
 }
 
 //nolint:funlen

@@ -151,6 +151,18 @@ func TestCCMLoadBalancers(t *testing.T) {
 			f:    testUpdateLoadBalancerAddProxyProtocol,
 		},
 		{
+			name: "Update Load Balancer - Add new Firewall",
+			f:    testUpdateLoadBalancerAddNewFirewall,
+		},
+		{
+			name: "Update Load Balancer - Update Firewall",
+			f:    testUpdateLoadBalancerUpdateFirewall,
+		},
+		{
+			name: "Update Load Balancer - Delete Firewall",
+			f:    testUpdateLoadBalancerDeleteFirewall,
+		},
+		{
 			name: "Build Load Balancer Request",
 			f:    testBuildLoadBalancerRequest,
 		},
@@ -639,7 +651,7 @@ func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *
 	}
 
 	if !reflect.DeepEqual(expectedPorts, observedPorts) {
-		t.Errorf("NodeBalancer ports mismatch: expected %v, got %v", expectedPorts, observedPorts)
+		t.Errorf("NodeBalancer ports mismatch: expected %v, got %v", `expectedPorts`, observedPorts)
 	}
 }
 
@@ -743,6 +755,341 @@ func testUpdateLoadBalancerAddProxyProtocol(t *testing.T, client *linodego.Clien
 				}
 			}
 		})
+	}
+}
+
+func testUpdateLoadBalancerAddNewFirewall(t *testing.T, client *linodego.Client, fakeAPI *fakeAPI) {
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: randString(),
+			UID:  "foobar123",
+			Annotations: map[string]string{
+				annLinodeThrottle: "15",
+			},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     randString(),
+					Protocol: "TCP",
+					Port:     int32(80),
+					NodePort: int32(30000),
+				},
+			},
+		},
+	}
+
+	nodes := []*v1.Node{
+		{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+		},
+	}
+
+	lb := &loadbalancers{client, "us-west", nil}
+	fakeClientset := fake.NewSimpleClientset()
+	lb.kubeClient = fakeClientset
+
+	defer func() {
+		_ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+	}()
+
+	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
+	}
+	svc.Status.LoadBalancer = *lbStatus
+	stubService(fakeClientset, svc)
+	firewall, err := lb.createFirewall(context.TODO(), linodego.FirewallCreateOptions{
+		Label: "test",
+		Rules: linodego.FirewallRuleSet{Inbound: []linodego.FirewallRule{{
+			Action:      "ACCEPT",
+			Label:       "inbound-rule123",
+			Description: "inbound rule123",
+			Ports:       "4321",
+			Protocol:    linodego.TCP,
+			Addresses: linodego.NetworkAddresses{
+				IPv4: &[]string{"0.0.0.0/0"},
+			},
+		}}, Outbound: []linodego.FirewallRule{}, InboundPolicy: "ACCEPT", OutboundPolicy: "ACCEPT"},
+	})
+	if err != nil {
+		t.Errorf("CreatingFirewall returned an error: %s", err)
+	}
+	defer func() {
+		_ = lb.deleteFirewall(context.TODO(), firewall)
+	}()
+
+	svc.ObjectMeta.SetAnnotations(map[string]string{
+		annLinodeCloudFirewallID: strconv.Itoa(firewall.ID),
+	})
+
+	err = lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
+	}
+
+	nb, err := lb.getNodeBalancerByStatus(context.TODO(), svc)
+	if err != nil {
+		t.Fatalf("failed to get NodeBalancer via status: %s", err)
+	}
+
+	firewalls, err := lb.client.ListNodeBalancerFirewalls(context.TODO(), nb.ID, &linodego.ListOptions{})
+	if err != nil {
+		t.Fatalf("failed to List Firewalls %s", err)
+	}
+
+	if len(firewalls) == 0 {
+		t.Fatalf("No attached firewalls found")
+	}
+
+	if firewalls[0].ID != firewall.ID {
+		t.Fatalf("Attached firewallID not matching with created firewall")
+	}
+}
+
+func testUpdateLoadBalancerUpdateFirewall(t *testing.T, client *linodego.Client, fakeAPI *fakeAPI) {
+	firewallCreateOpts := linodego.FirewallCreateOptions{
+		Label: "test",
+		Rules: linodego.FirewallRuleSet{Inbound: []linodego.FirewallRule{{
+			Action:      "ACCEPT",
+			Label:       "inbound-rule123",
+			Description: "inbound rule123",
+			Ports:       "4321",
+			Protocol:    linodego.TCP,
+			Addresses: linodego.NetworkAddresses{
+				IPv4: &[]string{"0.0.0.0/0"},
+			},
+		}}, Outbound: []linodego.FirewallRule{}, InboundPolicy: "ACCEPT", OutboundPolicy: "ACCEPT"},
+	}
+
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: randString(),
+			UID:  "foobar123",
+			Annotations: map[string]string{
+				annLinodeThrottle: "15",
+			},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     randString(),
+					Protocol: "TCP",
+					Port:     int32(80),
+					NodePort: int32(30000),
+				},
+			},
+		},
+	}
+
+	nodes := []*v1.Node{
+		{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+		},
+	}
+
+	lb := &loadbalancers{client, "us-west", nil}
+	fakeClientset := fake.NewSimpleClientset()
+	lb.kubeClient = fakeClientset
+
+	defer func() {
+		_ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+	}()
+
+	firewall, err := lb.createFirewall(context.TODO(), firewallCreateOpts)
+	if err != nil {
+		t.Errorf("Error creating firewall %s", err)
+	}
+	defer func() {
+		_ = lb.deleteFirewall(context.TODO(), firewall)
+	}()
+
+	svc.ObjectMeta.SetAnnotations(map[string]string{
+		annLinodeCloudFirewallID: strconv.Itoa(firewall.ID),
+	})
+	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
+	}
+	svc.Status.LoadBalancer = *lbStatus
+	stubService(fakeClientset, svc)
+
+	nb, err := lb.getNodeBalancerByStatus(context.TODO(), svc)
+	if err != nil {
+		t.Fatalf("failed to get NodeBalancer via status: %s", err)
+	}
+
+	firewalls, err := lb.client.ListNodeBalancerFirewalls(context.TODO(), nb.ID, &linodego.ListOptions{})
+	if err != nil {
+		t.Fatalf("Failed to list nodeBalancer firewalls %s", err)
+	}
+
+	if len(firewalls) == 0 {
+		t.Fatalf("No firewalls attached")
+	}
+
+	if firewall.ID != firewalls[0].ID {
+		t.Fatalf("Attached firewallID not matching with created firewall")
+	}
+
+	firewallCreateOpts.Label = "test2"
+	firewallNew, err := lb.createFirewall(context.TODO(), firewallCreateOpts)
+	if err != nil {
+		t.Fatalf("Error in creating firewall %s", err)
+	}
+	defer func() {
+		_ = lb.deleteFirewall(context.TODO(), firewallNew)
+	}()
+
+	svc.ObjectMeta.SetAnnotations(map[string]string{
+		annLinodeCloudFirewallID: strconv.Itoa(firewallNew.ID),
+	})
+
+	err = lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("UpdateLoadBalancer returned an error: %s", err)
+	}
+
+	nbUpdated, err := lb.getNodeBalancerByStatus(context.TODO(), svc)
+	if err != nil {
+		t.Fatalf("failed to get NodeBalancer via status: %s", err)
+	}
+
+	firewallsNew, err := lb.client.ListNodeBalancerFirewalls(context.TODO(), nbUpdated.ID, &linodego.ListOptions{})
+	if err != nil {
+		t.Fatalf("failed to List Firewalls %s", err)
+	}
+
+	if len(firewallsNew) == 0 {
+		t.Fatalf("No attached firewalls found")
+	}
+
+	if firewallsNew[0].ID != firewallNew.ID {
+		t.Fatalf("Attached firewallID not matching with created firewall")
+	}
+}
+
+func testUpdateLoadBalancerDeleteFirewall(t *testing.T, client *linodego.Client, fakeAPI *fakeAPI) {
+	firewallCreateOpts := linodego.FirewallCreateOptions{
+		Label: "test",
+		Rules: linodego.FirewallRuleSet{Inbound: []linodego.FirewallRule{{
+			Action:      "ACCEPT",
+			Label:       "inbound-rule123",
+			Description: "inbound rule123",
+			Ports:       "4321",
+			Protocol:    linodego.TCP,
+			Addresses: linodego.NetworkAddresses{
+				IPv4: &[]string{"0.0.0.0/0"},
+			},
+		}}, Outbound: []linodego.FirewallRule{}, InboundPolicy: "ACCEPT", OutboundPolicy: "ACCEPT"},
+	}
+
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: randString(),
+			UID:  "foobar123",
+			Annotations: map[string]string{
+				annLinodeThrottle: "15",
+			},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     randString(),
+					Protocol: "TCP",
+					Port:     int32(80),
+					NodePort: int32(30000),
+				},
+			},
+		},
+	}
+
+	nodes := []*v1.Node{
+		{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+		},
+	}
+
+	lb := &loadbalancers{client, "us-west", nil}
+	fakeClientset := fake.NewSimpleClientset()
+	lb.kubeClient = fakeClientset
+
+	defer func() {
+		_ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+	}()
+
+	firewall, err := lb.createFirewall(context.TODO(), firewallCreateOpts)
+	if err != nil {
+		t.Errorf("Error in creating firewall %s", err)
+	}
+	defer func() {
+		_ = lb.deleteFirewall(context.TODO(), firewall)
+	}()
+
+	svc.ObjectMeta.SetAnnotations(map[string]string{
+		annLinodeCloudFirewallID: strconv.Itoa(firewall.ID),
+	})
+
+	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
+	}
+	svc.Status.LoadBalancer = *lbStatus
+	stubService(fakeClientset, svc)
+
+	nb, err := lb.getNodeBalancerByStatus(context.TODO(), svc)
+	if err != nil {
+		t.Fatalf("failed to get NodeBalancer via status: %s", err)
+	}
+
+	firewalls, err := lb.client.ListNodeBalancerFirewalls(context.TODO(), nb.ID, &linodego.ListOptions{})
+	if err != nil {
+		t.Errorf("Error in listing firewalls %s", err)
+	}
+
+	if len(firewalls) == 0 {
+		t.Fatalf("No firewalls attached")
+	}
+
+	if firewall.ID != firewalls[0].ID {
+		t.Fatalf("Attached firewallID not matching with created firewall")
+	}
+
+	svc.ObjectMeta.SetAnnotations(map[string]string{})
+
+	err = lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("UpdateLoadBalancer returned an error: %s", err)
+	}
+
+	firewallsNew, err := lb.client.ListNodeBalancerFirewalls(context.TODO(), nb.ID, &linodego.ListOptions{})
+	if err != nil {
+		t.Fatalf("failed to List Firewalls %s", err)
+	}
+
+	if len(firewallsNew) != 0 {
+		t.Fatalf("firewall's %d still attached", firewallsNew[0].ID)
 	}
 }
 
