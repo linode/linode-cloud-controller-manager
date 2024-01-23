@@ -125,10 +125,12 @@ func TestCCMLoadBalancers(t *testing.T) {
 		{
 			name: "Create Load Balancer With Invalid Firewall ID",
 			f:    testCreateNodeBalancerWithInvalidFirewall,
-		}, {
+		},
+		{
 			name: "Create Load Balancer With Valid Firewall ACL - AllowList",
 			f:    testCreateNodeBalancerWithAllowList,
-		}, {
+		},
+		{
 			name: "Create Load Balancer With Valid Firewall ACL - DenyList",
 			f:    testCreateNodeBalancerWithDenyList,
 		}, {
@@ -312,6 +314,19 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, a
 		t.Logf("actual: %v", nb.Tags)
 	}
 
+	_, ok := annotations[annLinodeCloudFirewallACL]
+	if ok {
+		// a firewall was configured for this
+		firewalls, err := client.ListNodeBalancerFirewalls(context.TODO(), nb.ID, &linodego.ListOptions{})
+		if err != nil {
+			t.Errorf("Expected nil error, got %v", err)
+		}
+
+		if len(firewalls) == 0 {
+			t.Errorf("Expected 1 firewall, got %d", len(firewalls))
+		}
+	}
+
 	defer func() { _ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc) }()
 	return nil
 }
@@ -362,9 +377,10 @@ func testCreateNodeBalancerWithAllowList(t *testing.T, client *linodego.Client, 
 	}
 
 	err := testCreateNodeBalancer(t, client, f, annotations)
-	if err == nil {
+	if err != nil {
 		t.Fatalf("expected a non-nil error, got %v", err)
 	}
+
 }
 
 func testCreateNodeBalancerWithDenyList(t *testing.T, client *linodego.Client, f *fakeAPI) {
