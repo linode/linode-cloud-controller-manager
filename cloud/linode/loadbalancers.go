@@ -229,6 +229,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	return lbStatus, nil
 }
 
+// getNodeBalancerDeviceId gets the deviceID of the nodeBalancer that is attached to the firewall.
 func (l *loadbalancers) getNodeBalancerDeviceId(ctx context.Context, firewallID, nbID, page int) (int, bool, error) {
 	devices, err := l.client.ListFirewallDevices(ctx, firewallID, &linodego.ListOptions{PageSize: 500, PageOptions: &linodego.PageOptions{Page: page}})
 	if err != nil {
@@ -245,12 +246,20 @@ func (l *loadbalancers) getNodeBalancerDeviceId(ctx context.Context, firewallID,
 		}
 	}
 
-	return l.getNodeBalancerDeviceId(ctx, firewallID, nbID, page+1)
+	return 0, false, nil
 }
 
+// updateNodeBalancerFirewall updates the firewall attached to the nodebalancer
+//
+// Firewall is updated in 3 scenario's:
+// - Add new firewall to the nodeBalancer
+// - Update firewall attached to the nodebalancer
+// - Remove firewall attached
 func (l *loadbalancers) updateNodeBalancerFirewall(ctx context.Context, service *v1.Service, nb *linodego.NodeBalancer) error {
-	var newFirewallID, existingFirewallID int
+	var newFirewallID int
 	var err error
+
+	// get the new firewall id form the annotaiton (if any).
 	fwid, ok := service.GetAnnotations()[annLinodeCloudFirewallID]
 	if ok {
 		newFirewallID, err = strconv.Atoi(fwid)
@@ -259,7 +268,7 @@ func (l *loadbalancers) updateNodeBalancerFirewall(ctx context.Context, service 
 		}
 	}
 
-	// get the attached firewall
+	// get the list of attached firewalls to the node-balancer.
 	firewalls, err := l.client.ListNodeBalancerFirewalls(ctx, nb.ID, &linodego.ListOptions{})
 	if err != nil {
 		if !ok {
@@ -271,17 +280,21 @@ func (l *loadbalancers) updateNodeBalancerFirewall(ctx context.Context, service 
 		}
 	}
 
+	// if there are no attached firewalls and no annotation added; return.
 	if !ok && len(firewalls) == 0 {
 		return nil
 	}
 
+	// get the ID of the firewall that is already attached to the nodeBalancer.
+	var existingFirewallID int
 	if len(firewalls) != 0 {
 		existingFirewallID = firewalls[0].ID
 	}
 
+	// if existing firewall and new firewall differs, update accordingly.
 	if existingFirewallID != newFirewallID {
-		// remove the existing firewall
 
+		// remove the existing firewall if it exists
 		if existingFirewallID != 0 {
 
 			deviceID, deviceExists, err := l.getNodeBalancerDeviceId(ctx, existingFirewallID, nb.ID, 1)
@@ -299,7 +312,7 @@ func (l *loadbalancers) updateNodeBalancerFirewall(ctx context.Context, service 
 			}
 		}
 
-		// attach new firewall if ID != 0
+		// attach new firewall if an ID is provided in the annotation.
 		if newFirewallID != 0 {
 			_, err = l.client.CreateFirewallDevice(ctx, newFirewallID, linodego.FirewallDeviceCreateOptions{
 				ID:   nb.ID,
