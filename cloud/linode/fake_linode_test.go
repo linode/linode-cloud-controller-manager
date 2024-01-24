@@ -729,6 +729,40 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			rr, _ := json.Marshal(resp)
 			_, _ = w.Write(rr)
 
+		} else if strings.Contains(urlPath, "firewalls") {
+			// path is networking/firewalls/%d/rules
+			parts := strings.Split(urlPath[1:], "/")
+			fwrs := new(linodego.FirewallRuleSet)
+			if err := json.NewDecoder(r.Body).Decode(fwrs); err != nil {
+				f.t.Fatal(err)
+			}
+
+			fwID, err := strconv.Atoi(parts[2])
+			if err != nil {
+				f.t.Fatal(err)
+			}
+
+			if firewall, found := f.fw[fwID]; found {
+				firewall.Rules.Inbound = fwrs.Inbound
+				firewall.Rules.InboundPolicy = fwrs.InboundPolicy
+				// outbound rules do not apply, ignoring.
+				f.fw[fwID] = firewall
+				resp, err := json.Marshal(firewall)
+				if err != nil {
+					f.t.Fatal(err)
+				}
+				_, _ = w.Write(resp)
+				return
+			}
+
+			w.WriteHeader(404)
+			resp := linodego.APIError{
+				Errors: []linodego.APIErrorReason{
+					{Reason: "Not Found"},
+				},
+			}
+			rr, _ := json.Marshal(resp)
+			_, _ = w.Write(rr)
 		}
 	}
 }

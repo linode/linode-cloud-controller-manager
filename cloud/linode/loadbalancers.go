@@ -365,6 +365,7 @@ func (l *loadbalancers) updateFWwithACL(ctx context.Context, service *v1.Service
 //	  a. AND if no firewalls are attached to the nodebalancer, nothing to do.
 //	  b. if the NB has ONE firewall attached, remove it from nb, and clean up if nothing else is attached to it
 //	  c. If there are more than one fw attached to it, then its a problem, return an err
+// IF a user creates a fw ID externally, and then switches to using a ACL, the CCM will take over the fw that's attached to the nodebalancer.
 
 func (l *loadbalancers) updateNodeBalancerFirewall(ctx context.Context, service *v1.Service, nb *linodego.NodeBalancer) error {
 	// get the new firewall id from the annotation (if any).
@@ -667,7 +668,7 @@ func (l *loadbalancers) getLoadBalancerTags(_ context.Context, clusterName strin
 	return tags
 }
 
-func processACL(fwcreateOpts *linodego.FirewallCreateOptions, aclType, label, svcName, ports string, ips linodego.NetworkAddresses) error {
+func processACL(fwcreateOpts *linodego.FirewallCreateOptions, aclType, label, svcName, ports string, ips linodego.NetworkAddresses) {
 	fwcreateOpts.Rules.Inbound = append(fwcreateOpts.Rules.Inbound, linodego.FirewallRule{
 		Action:      aclType,
 		Label:       fmt.Sprintf("%s-%s", aclType, svcName),
@@ -684,7 +685,6 @@ func processACL(fwcreateOpts *linodego.FirewallCreateOptions, aclType, label, sv
 		// if a denylist is present, we accept everything else.
 		fwcreateOpts.Rules.InboundPolicy = "ACCEPT"
 	}
-	return nil
 }
 
 type aclConfig struct {
@@ -723,11 +723,8 @@ func (l *loadbalancers) createFirewallOptsForSvc(label string, tags []string, sv
 		allowedIPs = acl.DenyList
 	}
 
-	err = processACL(&fwcreateOpts, aclType, label, svc.Name, portsString, *allowedIPs)
-	if err != nil {
-		return nil, err
-	}
-	return &fwcreateOpts, err
+	processACL(&fwcreateOpts, aclType, label, svc.Name, portsString, *allowedIPs)
+	return &fwcreateOpts, nil
 }
 
 func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName string, service *v1.Service, configs []*linodego.NodeBalancerConfigCreateOptions) (lb *linodego.NodeBalancer, err error) {
