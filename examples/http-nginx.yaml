@@ -20,7 +20,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nginx-http-deployment
-  namespace: kube-system    
 spec:
   replicas: 2
   selector:
