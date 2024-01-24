@@ -3,8 +3,16 @@ kind: Service
 apiVersion: v1
 metadata:
   name: http-lb
+  namespace: kube-system
   annotations:
     service.beta.kubernetes.io/linode-loadbalancer-default-protocol: "http"
+    service.beta.kubernetes.io/linode-loadbalancer-firewall-acl: |
+      {
+        "allowList": {
+          "ipv4": ["8.8.8.8/32"],
+          "ipv6": ["dead:beef::/64"]
+        }
+      }
 spec:
   type: LoadBalancer
   selector:
