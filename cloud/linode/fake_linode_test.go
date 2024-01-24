@@ -735,7 +735,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func createFirewallDevice(fwId int, f *fakeAPI, fdco linodego.FirewallDeviceCreateOptions) linodego.FirewallDevice {
 	fwd := linodego.FirewallDevice{
-		ID: rand.Intn(9999),
+		ID: fdco.ID,
 		Entity: linodego.FirewallDeviceEntity{
 			ID:   fdco.ID,
 			Type: fdco.Type,

@@ -165,16 +165,26 @@ func TestCCMLoadBalancers(t *testing.T) {
 			f:    testUpdateLoadBalancerAddProxyProtocol,
 		},
 		{
-			name: "Update Load Balancer - Add new Firewall",
+			name: "Update Load Balancer - Add new Firewall ID",
 			f:    testUpdateLoadBalancerAddNewFirewall,
 		},
 		{
-			name: "Update Load Balancer - Update Firewall",
+			name: "Update Load Balancer - Update Firewall ID",
 			f:    testUpdateLoadBalancerUpdateFirewall,
 		},
 		{
-			name: "Update Load Balancer - Delete Firewall",
+			name: "Update Load Balancer - Delete Firewall ID",
 			f:    testUpdateLoadBalancerDeleteFirewall,
+		}, {
+			name: "Update Load Balancer - Remove Firewall ID & Add ACL",
+			f:    testUpdateLoadBalancerAddNewFirewall,
+		}, {
+			name: "Update Load Balancer - Remove both Firewall ID & ACL",
+			f:    testUpdateLoadBalancerAddNewFirewall,
+		},
+		{
+			name: "Update Load Balancer - Remove both Firewall ACL & Add ID",
+			f:    testUpdateLoadBalancerAddNewFirewall,
 		},
 		{
 			name: "Build Load Balancer Request",
@@ -1091,9 +1101,6 @@ func testUpdateLoadBalancerDeleteFirewall(t *testing.T, client *linodego.Client,
 		ObjectMeta: metav1.ObjectMeta{
 			Name: randString(),
 			UID:  "foobar123",
-			Annotations: map[string]string{
-				annLinodeThrottle: "15",
-			},
 		},
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
