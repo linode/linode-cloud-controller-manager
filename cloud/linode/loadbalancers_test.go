@@ -1280,7 +1280,6 @@ func testUpdateLoadBalancerUpdateFirewallRemoveIDaddACL(t *testing.T, client *li
 	if fwIPs == nil {
 		t.Errorf("expected IP, got %v", fwIPs)
 	}
-	fmt.Printf("TARUN Old %v\n", firewalls)
 	svc.ObjectMeta.SetAnnotations(map[string]string{
 		annLinodeCloudFirewallACL: `{
 			"allowList": {

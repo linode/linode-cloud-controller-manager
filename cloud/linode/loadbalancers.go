@@ -660,7 +660,11 @@ func (l *loadbalancers) getNodeBalancerByID(ctx context.Context, service *v1.Ser
 }
 
 func (l *loadbalancers) getLoadBalancerTags(_ context.Context, clusterName string, service *v1.Service) []string {
-	tags := []string{clusterName}
+	tags := []string{}
+	if clusterName != "" {
+		tags = append(tags, clusterName)
+	}
+
 	tagStr, ok := service.GetAnnotations()[annLinodeLoadBalancerTags]
 	if ok {
 		return append(tags, strings.Split(tagStr, ",")...)
