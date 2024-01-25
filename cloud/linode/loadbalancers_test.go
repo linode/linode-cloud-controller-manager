@@ -1400,8 +1400,9 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 
 	svc.ObjectMeta.SetAnnotations(map[string]string{
 		annLinodeCloudFirewallACL: `{
-			"denyList": {
-				"ipv4": ["2.2.2.2"]
+			"allowList": {
+				"ipv4": ["2.2.2.2"],
+				"ipv6": ["dead:beef::/128"]
 			}
 		}`,
 	})
@@ -1425,13 +1426,21 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 		t.Fatalf("No attached firewalls found")
 	}
 
-	if firewallsNew[0].Rules.InboundPolicy != "ACCEPT" {
-		t.Errorf("expected ACCEPT inbound policy, got %s", firewallsNew[0].Rules.InboundPolicy)
-	}
-
 	fwIPs = firewallsNew[0].Rules.Inbound[0].Addresses.IPv4
 	if fwIPs == nil {
-		t.Errorf("expected 2.2.2.2, got %v", fwIPs)
+		t.Errorf("expected non nil IPv4, got %v", fwIPs)
+	}
+
+	if len(*fwIPs) != 1 {
+		t.Errorf("expected one IPv4, got %v", fwIPs)
+	}
+
+	if firewallsNew[0].Rules.Inbound[0].Addresses.IPv6 == nil {
+		t.Errorf("expected non nil IPv6, got %v", firewallsNew[0].Rules.Inbound[0].Addresses.IPv6)
+	}
+
+	if len(*firewallsNew[0].Rules.Inbound[0].Addresses.IPv6) != 1 {
+		t.Errorf("expected one IPv6, got %v", firewallsNew[0].Rules.Inbound[0].Addresses.IPv6)
 	}
 }
 
