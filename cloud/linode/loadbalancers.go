@@ -316,7 +316,7 @@ func (l *loadbalancers) updateFWwithACL(ctx context.Context, service *v1.Service
 	case 0:
 		{
 			// need to create a fw and attach it to our nb
-			fwcreateOpts, err := l.createFirewallOptsForSvc(service.Name, l.getLoadBalancerTags(ctx, "", service), service)
+			fwcreateOpts, err := l.createFirewallOptsForSvc(l.GetLoadBalancerName(ctx, "", service), l.getLoadBalancerTags(ctx, "", service), service)
 			if err != nil {
 				return err
 			}
