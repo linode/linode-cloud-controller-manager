@@ -8,10 +8,11 @@ import (
 	"net/http"
 	"os"
 	"reflect"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/exp/slices"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -315,14 +316,10 @@ func ipsChanged(ips *linodego.NetworkAddresses, rules []linodego.FirewallRule) b
 
 	for _, rule := range rules {
 		if rule.Addresses.IPv4 != nil {
-			for _, ip := range *rule.Addresses.IPv4 {
-				ruleIPv4s = append(ruleIPv4s, ip)
-			}
+			ruleIPv4s = append(ruleIPv4s, *rule.Addresses.IPv4...)
 		}
 		if rule.Addresses.IPv6 != nil {
-			for _, ip := range *rule.Addresses.IPv4 {
-				ruleIPv6s = append(ruleIPv6s, ip)
-			}
+			ruleIPv6s = append(ruleIPv6s, *rule.Addresses.IPv6...)
 		}
 	}
 
@@ -793,9 +790,9 @@ func (l *loadbalancers) createFirewallOptsForSvc(label string, tags []string, sv
 		Tags:  tags,
 	}
 
-	var servicePorts []string
-	for _, port := range svc.Spec.Ports {
-		servicePorts = append(servicePorts, strconv.Itoa(int(port.Port)))
+	servicePorts := make([]string, len(svc.Spec.Ports))
+	for idx, port := range svc.Spec.Ports {
+		servicePorts[idx] = strconv.Itoa(int(port.Port))
 	}
 
 	portsString := strings.Join(servicePorts[:], ",")
