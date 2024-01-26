@@ -789,10 +789,9 @@ func (l *loadbalancers) createFirewallOptsForSvc(label string, tags []string, sv
 		Label: label,
 		Tags:  tags,
 	}
-
-	servicePorts := make([]string, len(svc.Spec.Ports))
-	for idx, port := range svc.Spec.Ports {
-		servicePorts[idx] = strconv.Itoa(int(port.Port))
+	servicePorts := make([]string, 0, len(svc.Spec.Ports))
+	for _, port := range svc.Spec.Ports {
+		servicePorts = append(servicePorts, strconv.Itoa(int(port.Port)))
 	}
 
 	portsString := strings.Join(servicePorts[:], ",")
