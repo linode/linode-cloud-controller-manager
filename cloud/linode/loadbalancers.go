@@ -27,9 +27,9 @@ import (
 )
 
 var (
-	errNoNodesAvailable = errors.New("no nodes available for nodebalancer")
+	errNoNodesAvailable = errors.New("No nodes available for nodebalancer")
 	errInvalidFWConfig  = errors.New("Specify either an allowList or a denyList for a firewall")
-	errTooManyFirewalls = errors.New("Too  many firewalls attached to a nodebalancer")
+	errTooManyFirewalls = errors.New("Too many firewalls attached to a nodebalancer")
 )
 
 type lbNotFoundError struct {
