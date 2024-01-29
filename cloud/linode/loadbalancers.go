@@ -231,8 +231,8 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	return lbStatus, nil
 }
 
-// getNodeBalancerDeviceId gets the deviceID of the nodeBalancer that is attached to the firewall.
-func (l *loadbalancers) getNodeBalancerDeviceId(ctx context.Context, firewallID, nbID int) (int, bool, error) {
+// getNodeBalancerDeviceID gets the deviceID of the nodeBalancer that is attached to the firewall.
+func (l *loadbalancers) getNodeBalancerDeviceID(ctx context.Context, firewallID, nbID int) (int, bool, error) {
 	devices, err := l.client.ListFirewallDevices(ctx, firewallID, &linodego.ListOptions{})
 	if err != nil {
 		return 0, false, err
@@ -271,6 +271,7 @@ func (l *loadbalancers) updateFirewallwithID(ctx context.Context, service *v1.Se
 		return err
 	}
 	if len(firewalls) > 1 {
+		klog.Errorf("Found more than one firewall attached to nodebalancer: %d, firewall IDs: %v", nb.ID, firewalls)
 		return errTooManyFirewalls
 	}
 
@@ -292,7 +293,7 @@ func (l *loadbalancers) updateFirewallwithID(ctx context.Context, service *v1.Se
 		}
 		// remove the existing firewall if it exists
 		if existingFirewallID != 0 {
-			deviceID, deviceExists, err := l.getNodeBalancerDeviceId(ctx, existingFirewallID, nb.ID)
+			deviceID, deviceExists, err := l.getNodeBalancerDeviceID(ctx, existingFirewallID, nb.ID)
 			if err != nil {
 				return err
 			}
@@ -430,6 +431,7 @@ func (l *loadbalancers) updateFWwithACL(ctx context.Context, service *v1.Service
 			}
 		}
 	default:
+		klog.Errorf("Found more than one firewall attached to nodebalancer: %d, firewall IDs: %v", nb.ID, firewalls)
 		return errTooManyFirewalls
 	}
 	return nil
@@ -474,6 +476,7 @@ func (l *loadbalancers) updateNodeBalancerFirewall(ctx context.Context, service 
 		return nil
 	}
 	if len(firewalls) > 1 {
+		klog.Errorf("Found more than one firewall attached to nodebalancer: %d, firewall IDs: %v", nb.ID, firewalls)
 		return errTooManyFirewalls
 	}
 
