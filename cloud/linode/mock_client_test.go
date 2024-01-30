@@ -151,6 +151,21 @@ func (mr *MockClientMockRecorder) DeleteNodeBalancerConfig(arg0, arg1, arg2 inte
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteNodeBalancerConfig", reflect.TypeOf((*MockClient)(nil).DeleteNodeBalancerConfig), arg0, arg1, arg2)
 }
 
+// GetFirewall mocks base method.
+func (m *MockClient) GetFirewall(arg0 context.Context, arg1 int) (*linodego.Firewall, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetFirewall", arg0, arg1)
+	ret0, _ := ret[0].(*linodego.Firewall)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetFirewall indicates an expected call of GetFirewall.
+func (mr *MockClientMockRecorder) GetFirewall(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFirewall", reflect.TypeOf((*MockClient)(nil).GetFirewall), arg0, arg1)
+}
+
 // GetInstance mocks base method.
 func (m *MockClient) GetInstance(arg0 context.Context, arg1 int) (*linodego.Instance, error) {
 	m.ctrl.T.Helper()
@@ -284,6 +299,21 @@ func (m *MockClient) RebuildNodeBalancerConfig(arg0 context.Context, arg1, arg2 
 func (mr *MockClientMockRecorder) RebuildNodeBalancerConfig(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RebuildNodeBalancerConfig", reflect.TypeOf((*MockClient)(nil).RebuildNodeBalancerConfig), arg0, arg1, arg2, arg3)
+}
+
+// UpdateFirewallRules mocks base method.
+func (m *MockClient) UpdateFirewallRules(arg0 context.Context, arg1 int, arg2 linodego.FirewallRuleSet) (*linodego.FirewallRuleSet, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateFirewallRules", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*linodego.FirewallRuleSet)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateFirewallRules indicates an expected call of UpdateFirewallRules.
+func (mr *MockClientMockRecorder) UpdateFirewallRules(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateFirewallRules", reflect.TypeOf((*MockClient)(nil).UpdateFirewallRules), arg0, arg1, arg2)
 }
 
 // UpdateNodeBalancer mocks base method.

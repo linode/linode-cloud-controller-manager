@@ -24,8 +24,8 @@ type fakeAPI struct {
 	nb  map[string]*linodego.NodeBalancer
 	nbc map[string]*linodego.NodeBalancerConfig
 	nbn map[string]*linodego.NodeBalancerNode
-	fw  map[int]*linodego.Firewall
-	fwd map[int]map[int]*linodego.FirewallDevice
+	fw  map[int]*linodego.Firewall               // map of firewallID -> firewall
+	fwd map[int]map[int]*linodego.FirewallDevice // map of firewallID -> firewallDeviceID:FirewallDevice
 
 	requests map[fakeRequest]struct{}
 }
@@ -186,12 +186,15 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					},
 					Data: data,
 				}
-				rr, _ := json.Marshal(resp)
+				rr, err := json.Marshal(resp)
+				if err != nil {
+					f.t.Fatal(err)
+				}
 				_, _ = w.Write(rr)
 				return
 			}
 
-			rx, _ = regexp.Compile("/nodebalancers/[0-9]+/firewalls")
+			rx = regexp.MustCompile("/nodebalancers/[0-9]+/firewalls")
 			if rx.MatchString(urlPath) {
 				id := strings.Split(urlPath, "/")[2]
 				devID, err := strconv.Atoi(id)
@@ -726,13 +729,47 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			rr, _ := json.Marshal(resp)
 			_, _ = w.Write(rr)
 
+		} else if strings.Contains(urlPath, "firewalls") {
+			// path is networking/firewalls/%d/rules
+			parts := strings.Split(urlPath[1:], "/")
+			fwrs := new(linodego.FirewallRuleSet)
+			if err := json.NewDecoder(r.Body).Decode(fwrs); err != nil {
+				f.t.Fatal(err)
+			}
+
+			fwID, err := strconv.Atoi(parts[2])
+			if err != nil {
+				f.t.Fatal(err)
+			}
+
+			if firewall, found := f.fw[fwID]; found {
+				firewall.Rules.Inbound = fwrs.Inbound
+				firewall.Rules.InboundPolicy = fwrs.InboundPolicy
+				// outbound rules do not apply, ignoring.
+				f.fw[fwID] = firewall
+				resp, err := json.Marshal(firewall)
+				if err != nil {
+					f.t.Fatal(err)
+				}
+				_, _ = w.Write(resp)
+				return
+			}
+
+			w.WriteHeader(404)
+			resp := linodego.APIError{
+				Errors: []linodego.APIErrorReason{
+					{Reason: "Not Found"},
+				},
+			}
+			rr, _ := json.Marshal(resp)
+			_, _ = w.Write(rr)
 		}
 	}
 }
 
 func createFirewallDevice(fwId int, f *fakeAPI, fdco linodego.FirewallDeviceCreateOptions) linodego.FirewallDevice {
 	fwd := linodego.FirewallDevice{
-		ID: rand.Intn(9999),
+		ID: fdco.ID,
 		Entity: linodego.FirewallDeviceEntity{
 			ID:   fdco.ID,
 			Type: fdco.Type,
