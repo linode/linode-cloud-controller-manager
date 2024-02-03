@@ -4,6 +4,9 @@ package linode
 
 import (
 	"context"
+	"net/url"
+	"regexp"
+	"strings"
 
 	"github.com/linode/linodego"
 )
@@ -23,7 +26,45 @@ type Client interface {
 	DeleteNodeBalancerConfig(context.Context, int, int) error
 	ListNodeBalancerConfigs(context.Context, int, *linodego.ListOptions) ([]linodego.NodeBalancerConfig, error)
 	RebuildNodeBalancerConfig(context.Context, int, int, linodego.NodeBalancerConfigRebuildOptions) (*linodego.NodeBalancerConfig, error)
+	ListNodeBalancerFirewalls(ctx context.Context, nodebalancerID int, opts *linodego.ListOptions) ([]linodego.Firewall, error)
+	ListFirewallDevices(ctx context.Context, firewallID int, opts *linodego.ListOptions) ([]linodego.FirewallDevice, error)
+	DeleteFirewallDevice(ctx context.Context, firewallID, deviceID int) error
+	CreateFirewallDevice(ctx context.Context, firewallID int, opts linodego.FirewallDeviceCreateOptions) (*linodego.FirewallDevice, error)
+	CreateFirewall(ctx context.Context, opts linodego.FirewallCreateOptions) (*linodego.Firewall, error)
+	DeleteFirewall(ctx context.Context, fwid int) error
+	GetFirewall(context.Context, int) (*linodego.Firewall, error)
+	UpdateFirewallRules(context.Context, int, linodego.FirewallRuleSet) (*linodego.FirewallRuleSet, error)
 }
 
 // linodego.Client implements Client
 var _ Client = (*linodego.Client)(nil)
+
+func newLinodeClient(token, ua, apiURL string) (*linodego.Client, error) {
+	linodeClient := linodego.NewClient(nil)
+	linodeClient.SetUserAgent(ua)
+	linodeClient.SetToken(token)
+
+	// Validate apiURL
+	parsedURL, err := url.Parse(apiURL)
+	if err != nil {
+		return nil, err
+	}
+
+	validatedURL := &url.URL{
+		Host:   parsedURL.Host,
+		Scheme: parsedURL.Scheme,
+	}
+
+	linodeClient.SetBaseURL(validatedURL.String())
+
+	version := ""
+	matches := regexp.MustCompile(`/v\d+`).FindAllString(parsedURL.Path, -1)
+
+	if len(matches) > 0 {
+		version = strings.Trim(matches[len(matches)-1], "/")
+	}
+
+	linodeClient.SetAPIVersion(version)
+
+	return &linodeClient, nil
+}

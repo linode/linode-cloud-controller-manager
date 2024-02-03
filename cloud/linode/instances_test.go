@@ -233,17 +233,6 @@ func TestMalformedProviders(t *testing.T) {
 
 	client := NewMockClient(ctrl)
 
-	t.Run("fails on malformed providerID", func(t *testing.T) {
-		instances := newInstances(client)
-		providerID := "bogus://bogus"
-		node := nodeWithProviderID(providerID)
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
-
-		meta, err := instances.InstanceMetadata(ctx, node)
-		assert.ErrorIs(t, err, invalidProviderIDError{providerID})
-		assert.Nil(t, meta)
-	})
-
 	t.Run("fails on non-numeric providerID", func(t *testing.T) {
 		instances := newInstances(client)
 		providerID := providerIDPrefix + "abc"

@@ -52,13 +52,12 @@ type instances struct {
 	nodeCache *nodeCache
 }
 
-func newInstances(client Client) cloudprovider.InstancesV2 {
-	var timeout int
+func newInstances(client Client) *instances {
+	timeout := 15
 	if raw, ok := os.LookupEnv("LINODE_INSTANCE_CACHE_TTL"); ok {
-		timeout, _ = strconv.Atoi(raw)
-	}
-	if timeout == 0 {
-		timeout = 15
+		if t, _ := strconv.Atoi(raw); t > 0 {
+			timeout = t
+		}
 	}
 
 	return &instances{client, &nodeCache{
@@ -108,7 +107,7 @@ func (i *instances) lookupLinode(ctx context.Context, node *v1.Node) (*linodego.
 	sentry.SetTag(ctx, "provider_id", providerID)
 	sentry.SetTag(ctx, "node_name", node.Name)
 
-	if providerID != "" {
+	if providerID != "" && isLinodeProviderID(providerID) {
 		id, err := parseProviderID(providerID)
 		if err != nil {
 			sentry.CaptureError(ctx, err)

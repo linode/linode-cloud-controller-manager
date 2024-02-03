@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"os/exec"
 	"strconv"
+	"time"
+
+	"k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/linode/linodego"
 	. "github.com/onsi/ginkgo/v2"
@@ -88,6 +91,14 @@ var _ = Describe("e2e tests", func() {
 		watcher, err := f.LoadBalancer.GetServiceWatcher()
 		Expect(err).NotTo(HaveOccurred())
 		Eventually(watcher.ResultChan()).Should(Receive(EnsuredService()))
+	}
+
+	ensureServiceWasDeleted := func() {
+		err := func() error {
+			_, err := f.LoadBalancer.GetService()
+			return err
+		}
+		Eventually(err).WithTimeout(10 * time.Second).Should(MatchError(errors.IsNotFound, "IsNotFound"))
 	}
 
 	createServiceWithSelector := func(selector map[string]string, ports []core.ServicePort, isSessionAffinityClientIP bool) {
@@ -662,7 +673,7 @@ var _ = Describe("e2e tests", func() {
 				})
 			})
 
-			Context("With HTTP updating to have HTTPS", func() {
+			Context("With HTTP updating to have HTTPS", Serial, func() {
 				var (
 					pods        []string
 					labels      map[string]string
@@ -942,7 +953,7 @@ var _ = Describe("e2e tests", func() {
 					By("Creating new NodeBalancer")
 					nbID := createNodeBalancer()
 
-					By("Waiting for currenct NodeBalancer to be ready")
+					By("Waiting for current NodeBalancer to be ready")
 					checkNodeBalancerID(framework.TestServerResourceName, nodeBalancerID)
 
 					By("Annotating service with new NodeBalancer ID")
@@ -954,6 +965,97 @@ var _ = Describe("e2e tests", func() {
 
 					By("Checking old NodeBalancer was deleted")
 					checkNodeBalancerNotExists(nodeBalancerID)
+				})
+			})
+
+			Context("Deleted Service when NodeBalancer not present", func() {
+				var (
+					pods         []string
+					labels       map[string]string
+					annotations  map[string]string
+					servicePorts []core.ServicePort
+
+					nodeBalancerID int
+				)
+
+				BeforeEach(func() {
+					pods = []string{"test-pod-1"}
+					ports := []core.ContainerPort{
+						{
+							Name:          "http-1",
+							ContainerPort: 8080,
+						},
+					}
+					servicePorts = []core.ServicePort{
+						{
+							Name:       "http-1",
+							Port:       80,
+							TargetPort: intstr.FromInt(8080),
+							Protocol:   "TCP",
+						},
+					}
+
+					labels = map[string]string{
+						"app": "test-loadbalancer-with-nodebalancer-id",
+					}
+
+					By("Creating NodeBalancer")
+					nodeBalancerID = createNodeBalancer()
+
+					annotations = map[string]string{
+						annLinodeNodeBalancerID: strconv.Itoa(nodeBalancerID),
+					}
+
+					By("Creating Pod")
+					createPodWithLabel(pods, ports, framework.TestServerImage, labels, false)
+
+					By("Creating Service")
+					createServiceWithAnnotations(labels, annotations, servicePorts, false)
+				})
+
+				AfterEach(func() {
+					By("Deleting the Pods")
+					deletePods(pods)
+
+					err := root.Recycle()
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				It("should use the specified NodeBalancer", func() {
+					By("Checking the NodeBalancerID")
+					checkNodeBalancerID(framework.TestServerResourceName, nodeBalancerID)
+				})
+
+				It("should use the newly specified NodeBalancer ID", func() {
+					By("Creating new NodeBalancer")
+					nbID := createNodeBalancer()
+
+					By("Waiting for current NodeBalancer to be ready")
+					checkNodeBalancerID(framework.TestServerResourceName, nodeBalancerID)
+
+					By("Annotating service with new NodeBalancer ID")
+					annotations[annLinodeNodeBalancerID] = strconv.Itoa(nbID)
+					updateServiceWithAnnotations(labels, annotations, servicePorts, false)
+
+					By("Checking the NodeBalancer ID")
+					checkNodeBalancerID(framework.TestServerResourceName, nbID)
+
+					By("Checking old NodeBalancer was deleted")
+					checkNodeBalancerNotExists(nodeBalancerID)
+				})
+
+				It("should delete the service with no NodeBalancer present", func() {
+					By("Deleting the NodeBalancer")
+					deleteNodeBalancer(nodeBalancerID)
+
+					By("Checking old NodeBalancer was deleted")
+					checkNodeBalancerNotExists(nodeBalancerID)
+
+					By("Deleting the Service")
+					deleteService()
+
+					By("Checking if the service was deleted")
+					ensureServiceWasDeleted()
 				})
 			})
 
@@ -1055,6 +1157,7 @@ var _ = Describe("e2e tests", func() {
 				)
 
 				BeforeEach(func() {
+					Skip("skip until rewritten to drop terraform")
 					pods = []string{"test-pod-node-add"}
 					ports := []core.ContainerPort{
 						{
