@@ -251,26 +251,6 @@ func (f *fakeAPI) setupRoutes() {
 		}
 	})
 
-	f.mux.HandleFunc("DELETE /v4/nodebalancers/{nodeBalancerId}", func(w http.ResponseWriter, r *http.Request) {
-		delete(f.nb, r.PathValue("nodeBalancerId"))
-		nid, err := strconv.Atoi(r.PathValue("nodeBalancerId"))
-		if err != nil {
-			f.t.Fatal(err)
-		}
-
-		for k, c := range f.nbc {
-			if c.NodeBalancerID == nid {
-				delete(f.nbc, k)
-			}
-		}
-
-		for k, n := range f.nbn {
-			if n.NodeBalancerID == nid {
-				delete(f.nbn, k)
-			}
-		}
-	})
-
 	f.mux.HandleFunc("POST /v4/nodebalancers", func(w http.ResponseWriter, r *http.Request) {
 		nbco := linodego.NodeBalancerCreateOptions{}
 		if err := json.NewDecoder(r.Body).Decode(&nbco); err != nil {
@@ -503,6 +483,26 @@ func (f *fakeAPI) setupRoutes() {
 			f.t.Fatal(err)
 		}
 		_, _ = w.Write(resp)
+	})
+
+	f.mux.HandleFunc("DELETE /v4/nodebalancers/{nodeBalancerId}", func(w http.ResponseWriter, r *http.Request) {
+		delete(f.nb, r.PathValue("nodeBalancerId"))
+		nid, err := strconv.Atoi(r.PathValue("nodeBalancerId"))
+		if err != nil {
+			f.t.Fatal(err)
+		}
+
+		for k, c := range f.nbc {
+			if c.NodeBalancerID == nid {
+				delete(f.nbc, k)
+			}
+		}
+
+		for k, n := range f.nbn {
+			if n.NodeBalancerID == nid {
+				delete(f.nbn, k)
+			}
+		}
 	})
 
 	f.mux.HandleFunc("DELETE /v4/nodebalancers/{nodeBalancerId}/configs/{configId}/nodes/{nodeId}", func(w http.ResponseWriter, r *http.Request) {
