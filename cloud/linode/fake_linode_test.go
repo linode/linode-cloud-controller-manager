@@ -157,6 +157,71 @@ func (f *fakeAPI) setupRoutes() {
 		_, _ = w.Write(resp)
 	})
 
+	// TODO(PR): do we really not care about the NBid?
+	f.mux.HandleFunc("GET /v4/nodebalancers/{nodeBalancerId}/configs", func(w http.ResponseWriter, r *http.Request) {
+		res := 0
+		data := []linodego.NodeBalancerConfig{}
+		filter := r.Header.Get("X-Filter")
+		if filter == "" {
+			for _, n := range f.nbc {
+				data = append(data, *n)
+			}
+		} else {
+			var fs map[string]string
+			err := json.Unmarshal([]byte(filter), &fs)
+			if err != nil {
+				f.t.Fatal(err)
+			}
+			for _, n := range f.nbc {
+				if strconv.Itoa(n.NodeBalancerID) == fs["nodebalancer_id"] {
+					data = append(data, *n)
+				}
+			}
+		}
+		resp := linodego.NodeBalancerConfigsPagedResponse{
+			PageOptions: &linodego.PageOptions{
+				Page:    1,
+				Pages:   1,
+				Results: res,
+			},
+			Data: data,
+		}
+		rr, err := json.Marshal(resp)
+		if err != nil {
+			f.t.Fatal(err)
+		}
+		_, _ = w.Write(rr)
+		return
+	})
+
+	f.mux.HandleFunc("GET /v4/nodebalancers/{nodeBalancerId}/configs/{configId}/nodes", func(w http.ResponseWriter, r *http.Request) {
+		res := 0
+		nbcID, err := strconv.Atoi(r.PathValue("configId"))
+		if err != nil {
+			f.t.Fatal(err)
+		}
+
+		data := []linodego.NodeBalancerNode{}
+
+		for _, nbn := range f.nbn {
+			if nbcID == nbn.ConfigID {
+				data = append(data, *nbn)
+			}
+		}
+
+		resp := linodego.NodeBalancerNodesPagedResponse{
+			PageOptions: &linodego.PageOptions{
+				Page:    1,
+				Pages:   1,
+				Results: res,
+			},
+			Data: data,
+		}
+		rr, _ := json.Marshal(resp)
+		_, _ = w.Write(rr)
+
+	})
+
 	f.mux.HandleFunc("DELETE /v4/nodebalancers/{nodeBalancerId}", func(w http.ResponseWriter, r *http.Request) {
 		delete(f.nb, r.PathValue("nodeBalancerId"))
 		nid, err := strconv.Atoi(r.PathValue("nodeBalancerId"))
@@ -258,6 +323,116 @@ func (f *fakeAPI) setupRoutes() {
 		}
 		_, _ = w.Write(resp)
 		return
+	})
+
+	f.mux.HandleFunc("POST /v4/nodebalancers/{nodeBalancerId}/configs", func(w http.ResponseWriter, r *http.Request) {
+		nbcco := new(linodego.NodeBalancerConfigCreateOptions)
+		if err := json.NewDecoder(r.Body).Decode(nbcco); err != nil {
+			f.t.Fatal(err)
+		}
+		nbid, err := strconv.Atoi(r.PathValue("nodeBalancerId"))
+		if err != nil {
+			f.t.Fatal(err)
+		}
+
+		nbcc := linodego.NodeBalancerConfig{
+			ID:             rand.Intn(9999),
+			Port:           nbcco.Port,
+			Protocol:       nbcco.Protocol,
+			ProxyProtocol:  nbcco.ProxyProtocol,
+			Algorithm:      nbcco.Algorithm,
+			Stickiness:     nbcco.Stickiness,
+			Check:          nbcco.Check,
+			CheckInterval:  nbcco.CheckInterval,
+			CheckAttempts:  nbcco.CheckAttempts,
+			CheckPath:      nbcco.CheckPath,
+			CheckBody:      nbcco.CheckBody,
+			CheckPassive:   *nbcco.CheckPassive,
+			CheckTimeout:   nbcco.CheckTimeout,
+			CipherSuite:    nbcco.CipherSuite,
+			NodeBalancerID: nbid,
+			SSLCommonName:  "sslcomonname",
+			SSLFingerprint: "sslfingerprint",
+			SSLCert:        "<REDACTED>",
+			SSLKey:         "<REDACTED>",
+		}
+		f.nbc[strconv.Itoa(nbcc.ID)] = &nbcc
+
+		resp, err := json.Marshal(nbcc)
+		if err != nil {
+			f.t.Fatal(err)
+		}
+		_, _ = w.Write(resp)
+	})
+
+	f.mux.HandleFunc("POST /v4/nodebalancers/{nodeBalancerId}/configs/{configId}/rebuild", func(w http.ResponseWriter, r *http.Request) {
+		nbcco := new(linodego.NodeBalancerConfigRebuildOptions)
+		if err := json.NewDecoder(r.Body).Decode(nbcco); err != nil {
+			f.t.Fatal(err)
+		}
+		nbid, err := strconv.Atoi(r.PathValue("nodeBalancerId"))
+		if err != nil {
+			f.t.Fatal(err)
+		}
+		nbcid, err := strconv.Atoi(r.PathValue("configId"))
+		if err != nil {
+			f.t.Fatal(err)
+		}
+		if nbcco.Protocol == "https" {
+			if !strings.Contains(nbcco.SSLCert, "BEGIN CERTIFICATE") {
+				f.t.Fatal("HTTPS port declared without calid ssl cert", nbcco.SSLCert)
+			}
+			if !strings.Contains(nbcco.SSLKey, "BEGIN RSA PRIVATE KEY") {
+				f.t.Fatal("HTTPS port declared without calid ssl key", nbcco.SSLKey)
+			}
+		}
+		nbcc := linodego.NodeBalancerConfig{
+			ID:             nbcid,
+			Port:           nbcco.Port,
+			Protocol:       nbcco.Protocol,
+			ProxyProtocol:  nbcco.ProxyProtocol,
+			Algorithm:      nbcco.Algorithm,
+			Stickiness:     nbcco.Stickiness,
+			Check:          nbcco.Check,
+			CheckInterval:  nbcco.CheckInterval,
+			CheckAttempts:  nbcco.CheckAttempts,
+			CheckPath:      nbcco.CheckPath,
+			CheckBody:      nbcco.CheckBody,
+			CheckPassive:   *nbcco.CheckPassive,
+			CheckTimeout:   nbcco.CheckTimeout,
+			CipherSuite:    nbcco.CipherSuite,
+			NodeBalancerID: nbid,
+			SSLCommonName:  "sslcommonname",
+			SSLFingerprint: "sslfingerprint",
+			SSLCert:        "<REDACTED>",
+			SSLKey:         "<REDACTED>",
+		}
+
+		f.nbc[strconv.Itoa(nbcc.ID)] = &nbcc
+		for k, n := range f.nbn {
+			if n.ConfigID == nbcc.ID {
+				delete(f.nbn, k)
+			}
+		}
+
+		for _, n := range nbcco.Nodes {
+			node := linodego.NodeBalancerNode{
+				ID:             rand.Intn(99999),
+				Address:        n.Address,
+				Label:          n.Label,
+				Weight:         n.Weight,
+				Mode:           n.Mode,
+				NodeBalancerID: nbid,
+				ConfigID:       nbcc.ID,
+			}
+			f.nbn[strconv.Itoa(node.ID)] = &node
+		}
+		resp, err := json.Marshal(nbcc)
+		if err != nil {
+			f.t.Fatal(err)
+		}
+		_, _ = w.Write(resp)
+
 	})
 
 	f.mux.HandleFunc("POST /v4/networking/firewalls", func(w http.ResponseWriter, r *http.Request) {
@@ -538,35 +713,7 @@ func randString() string {
 // 			}
 // 			return
 // 		}
-// 		rx, _ = regexp.Compile("/nodebalancers/[0-9]+/configs/[0-9]+/nodes")
-// 		if rx.MatchString(urlPath) {
-// 			res := 0
-// 			parts := strings.Split(urlPath[1:], "/")
-// 			nbcID, err := strconv.Atoi(parts[3])
-// 			if err != nil {
-// 				f.t.Fatal(err)
-// 			}
 
-// 			data := []linodego.NodeBalancerNode{}
-
-// 			for _, nbn := range f.nbn {
-// 				if nbcID == nbn.ConfigID {
-// 					data = append(data, *nbn)
-// 				}
-// 			}
-
-// 			resp := linodego.NodeBalancerNodesPagedResponse{
-// 				PageOptions: &linodego.PageOptions{
-// 					Page:    1,
-// 					Pages:   1,
-// 					Results: res,
-// 				},
-// 				Data: data,
-// 			}
-// 			rr, _ := json.Marshal(resp)
-// 			_, _ = w.Write(rr)
-// 			return
-// 		}
 // 		rx, _ = regexp.Compile("/nodebalancers/[0-9]+/configs/[0-9]+")
 // 		if rx.MatchString(urlPath) {
 // 			id := filepath.Base(urlPath)
@@ -585,42 +732,6 @@ func randString() string {
 // 				rr, _ := json.Marshal(resp)
 // 				_, _ = w.Write(rr)
 // 			}
-// 			return
-// 		}
-// 		rx, _ = regexp.Compile("/nodebalancers/[0-9]+/configs")
-// 		if rx.MatchString(urlPath) {
-// 			res := 0
-// 			data := []linodego.NodeBalancerConfig{}
-// 			filter := r.Header.Get("X-Filter")
-// 			if filter == "" {
-// 				for _, n := range f.nbc {
-// 					data = append(data, *n)
-// 				}
-// 			} else {
-// 				var fs map[string]string
-// 				err := json.Unmarshal([]byte(filter), &fs)
-// 				if err != nil {
-// 					f.t.Fatal(err)
-// 				}
-// 				for _, n := range f.nbc {
-// 					if strconv.Itoa(n.NodeBalancerID) == fs["nodebalancer_id"] {
-// 						data = append(data, *n)
-// 					}
-// 				}
-// 			}
-// 			resp := linodego.NodeBalancerConfigsPagedResponse{
-// 				PageOptions: &linodego.PageOptions{
-// 					Page:    1,
-// 					Pages:   1,
-// 					Results: res,
-// 				},
-// 				Data: data,
-// 			}
-// 			rr, err := json.Marshal(resp)
-// 			if err != nil {
-// 				f.t.Fatal(err)
-// 			}
-// 			_, _ = w.Write(rr)
 // 			return
 // 		}
 // 	case "networking":
@@ -661,114 +772,7 @@ func randString() string {
 // 	if tp == "nodebalancers" {
 
 // 	} else if tp == "rebuild" {
-// 		parts := strings.Split(urlPath[1:], "/")
-// 		nbcco := new(linodego.NodeBalancerConfigRebuildOptions)
-// 		if err := json.NewDecoder(r.Body).Decode(nbcco); err != nil {
-// 			f.t.Fatal(err)
-// 		}
-// 		nbid, err := strconv.Atoi(parts[1])
-// 		if err != nil {
-// 			f.t.Fatal(err)
-// 		}
-// 		nbcid, err := strconv.Atoi(parts[3])
-// 		if err != nil {
-// 			f.t.Fatal(err)
-// 		}
-// 		if nbcco.Protocol == "https" {
-// 			if !strings.Contains(nbcco.SSLCert, "BEGIN CERTIFICATE") {
-// 				f.t.Fatal("HTTPS port declared without calid ssl cert", nbcco.SSLCert)
-// 			}
-// 			if !strings.Contains(nbcco.SSLKey, "BEGIN RSA PRIVATE KEY") {
-// 				f.t.Fatal("HTTPS port declared without calid ssl key", nbcco.SSLKey)
-// 			}
-// 		}
-// 		nbcc := linodego.NodeBalancerConfig{
-// 			ID:             nbcid,
-// 			Port:           nbcco.Port,
-// 			Protocol:       nbcco.Protocol,
-// 			ProxyProtocol:  nbcco.ProxyProtocol,
-// 			Algorithm:      nbcco.Algorithm,
-// 			Stickiness:     nbcco.Stickiness,
-// 			Check:          nbcco.Check,
-// 			CheckInterval:  nbcco.CheckInterval,
-// 			CheckAttempts:  nbcco.CheckAttempts,
-// 			CheckPath:      nbcco.CheckPath,
-// 			CheckBody:      nbcco.CheckBody,
-// 			CheckPassive:   *nbcco.CheckPassive,
-// 			CheckTimeout:   nbcco.CheckTimeout,
-// 			CipherSuite:    nbcco.CipherSuite,
-// 			NodeBalancerID: nbid,
-// 			SSLCommonName:  "sslcommonname",
-// 			SSLFingerprint: "sslfingerprint",
-// 			SSLCert:        "<REDACTED>",
-// 			SSLKey:         "<REDACTED>",
-// 		}
 
-// 		f.nbc[strconv.Itoa(nbcc.ID)] = &nbcc
-// 		for k, n := range f.nbn {
-// 			if n.ConfigID == nbcc.ID {
-// 				delete(f.nbn, k)
-// 			}
-// 		}
-
-// 		for _, n := range nbcco.Nodes {
-// 			node := linodego.NodeBalancerNode{
-// 				ID:             rand.Intn(99999),
-// 				Address:        n.Address,
-// 				Label:          n.Label,
-// 				Weight:         n.Weight,
-// 				Mode:           n.Mode,
-// 				NodeBalancerID: nbid,
-// 				ConfigID:       nbcc.ID,
-// 			}
-// 			f.nbn[strconv.Itoa(node.ID)] = &node
-// 		}
-// 		resp, err := json.Marshal(nbcc)
-// 		if err != nil {
-// 			f.t.Fatal(err)
-// 		}
-// 		_, _ = w.Write(resp)
-// 		return
-// 	} else if tp == "configs" {
-// 		parts := strings.Split(urlPath[1:], "/")
-// 		nbcco := new(linodego.NodeBalancerConfigCreateOptions)
-// 		if err := json.NewDecoder(r.Body).Decode(nbcco); err != nil {
-// 			f.t.Fatal(err)
-// 		}
-// 		nbid, err := strconv.Atoi(parts[1])
-// 		if err != nil {
-// 			f.t.Fatal(err)
-// 		}
-
-// 		nbcc := linodego.NodeBalancerConfig{
-// 			ID:             rand.Intn(9999),
-// 			Port:           nbcco.Port,
-// 			Protocol:       nbcco.Protocol,
-// 			ProxyProtocol:  nbcco.ProxyProtocol,
-// 			Algorithm:      nbcco.Algorithm,
-// 			Stickiness:     nbcco.Stickiness,
-// 			Check:          nbcco.Check,
-// 			CheckInterval:  nbcco.CheckInterval,
-// 			CheckAttempts:  nbcco.CheckAttempts,
-// 			CheckPath:      nbcco.CheckPath,
-// 			CheckBody:      nbcco.CheckBody,
-// 			CheckPassive:   *nbcco.CheckPassive,
-// 			CheckTimeout:   nbcco.CheckTimeout,
-// 			CipherSuite:    nbcco.CipherSuite,
-// 			NodeBalancerID: nbid,
-// 			SSLCommonName:  "sslcomonname",
-// 			SSLFingerprint: "sslfingerprint",
-// 			SSLCert:        "<REDACTED>",
-// 			SSLKey:         "<REDACTED>",
-// 		}
-// 		f.nbc[strconv.Itoa(nbcc.ID)] = &nbcc
-
-// 		resp, err := json.Marshal(nbcc)
-// 		if err != nil {
-// 			f.t.Fatal(err)
-// 		}
-// 		_, _ = w.Write(resp)
-// 		return
 // 	} else if tp == "nodes" {
 // 		parts := strings.Split(urlPath[1:], "/")
 // 		nbnco := new(linodego.NodeBalancerNodeCreateOptions)
