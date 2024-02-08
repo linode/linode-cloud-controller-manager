@@ -683,20 +683,17 @@ func (f *fakeAPI) setupRoutes() {
 func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("fakeAPI: %s %s", r.Method, r.URL.Path)
 
-	w.Header().Add("Content-Type", "application/json")
-	f.mux.ServeHTTP(w, r)
-	return
-
-	w.Header().Set("Content-Type", "application/json")
-	urlPath := r.URL.Path
-
 	// TODO(PR): consider removing all this
+	urlPath := r.URL.Path
 	if !strings.HasPrefix(urlPath, "/"+apiVersion) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
 	urlPath = strings.TrimPrefix(urlPath, "/"+apiVersion)
 	f.recordRequest(r, urlPath)
+
+	w.Header().Add("Content-Type", "application/json")
+	f.mux.ServeHTTP(w, r)
 }
 
 func createFirewallDevice(fwId int, f *fakeAPI, fdco linodego.FirewallDeviceCreateOptions) linodego.FirewallDevice {
@@ -723,6 +720,8 @@ func randString() string {
 	}
 	return string(b)
 }
+
+// TODO(PR): these are outstanding, but I didn't find them in the call graph
 
 // switch r.Method {
 // case "GET":
@@ -811,33 +810,3 @@ func randString() string {
 // 		}
 // 		_, _ = w.Write(resp)
 // 		return
-// 	} else if tp == "firewalls" {
-// 		fco := linodego.FirewallCreateOptions{}
-// 		if err := json.NewDecoder(r.Body).Decode(&fco); err != nil {
-// 			f.t.Fatal(err)
-// 		}
-
-// 		firewall := linodego.Firewall{
-// 			ID:     rand.Intn(9999),
-// 			Label:  fco.Label,
-// 			Rules:  fco.Rules,
-// 			Tags:   fco.Tags,
-// 			Status: "enabled",
-// 		}
-
-// 		f.fw[firewall.ID] = &firewall
-// 		resp, err := json.Marshal(firewall)
-// 		if err != nil {
-// 			f.t.Fatal(err)
-// 		}
-// 		_, _ = w.Write(resp)
-// 		return
-
-// case "PUT":
-// 	if strings.Contains(urlPath, "nodes") {
-// 		f.t.Fatal("PUT ...nodes is not supported by the mock API")
-// 	} else if strings.Contains(urlPath, "configs") {
-
-// 	} else if strings.Contains(urlPath, "nodebalancer") {
-
-// }
