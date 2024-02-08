@@ -26,6 +26,10 @@ import (
 	"github.com/linode/linodego"
 )
 
+const (
+	maxFirewallRuleLabelLen = 32
+)
+
 var (
 	errNoNodesAvailable = errors.New("No nodes available for nodebalancer")
 	errInvalidFWConfig  = errors.New("Specify either an allowList or a denyList for a firewall")
@@ -757,14 +761,22 @@ func (l *loadbalancers) getLoadBalancerTags(_ context.Context, clusterName strin
 	if ok {
 		return append(tags, strings.Split(tagStr, ",")...)
 	}
+
 	return tags
 }
 
 // processACL takes the IPs, aclType, label etc and formats them into the passed linodego.FirewallCreateOptions pointer.
 func processACL(fwcreateOpts *linodego.FirewallCreateOptions, aclType, label, svcName, ports string, ips linodego.NetworkAddresses) {
+	ruleLabel := fmt.Sprintf("%s-%s", aclType, svcName)
+	if len(ruleLabel) > maxFirewallRuleLabelLen {
+		newLabel := ruleLabel[0:maxFirewallRuleLabelLen]
+		klog.Infof("Firewall label '%s' is too long. Stripping to '%s'", ruleLabel, newLabel)
+		ruleLabel = newLabel
+	}
+
 	fwcreateOpts.Rules.Inbound = append(fwcreateOpts.Rules.Inbound, linodego.FirewallRule{
 		Action:      aclType,
-		Label:       fmt.Sprintf("%s-%s", aclType, svcName),
+		Label:       ruleLabel,
 		Description: fmt.Sprintf("Created by linode-ccm: %s, for %s", label, svcName),
 		Protocol:    linodego.TCP, // Nodebalancers support only TCP.
 		Ports:       ports,
