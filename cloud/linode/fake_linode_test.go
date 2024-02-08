@@ -222,6 +222,35 @@ func (f *fakeAPI) setupRoutes() {
 
 	})
 
+	f.mux.HandleFunc("GET /v4/networking/firewalls/{firewallId}/devices", func(w http.ResponseWriter, r *http.Request) {
+		fwdId, err := strconv.Atoi(r.PathValue("firewallId"))
+		if err != nil {
+			f.t.Fatal(err)
+		}
+
+		firewallDevices, found := f.fwd[fwdId]
+		if found {
+			firewallDeviceList := []linodego.FirewallDevice{}
+			for i := range firewallDevices {
+				firewallDeviceList = append(firewallDeviceList, *firewallDevices[i])
+			}
+			rr, _ := json.Marshal(linodego.FirewallDevicesPagedResponse{
+				PageOptions: &linodego.PageOptions{Page: 1, Pages: 1, Results: len(firewallDeviceList)},
+				Data:        firewallDeviceList,
+			})
+			_, _ = w.Write(rr)
+		} else {
+			w.WriteHeader(404)
+			resp := linodego.APIError{
+				Errors: []linodego.APIErrorReason{
+					{Reason: "Not Found"},
+				},
+			}
+			rr, _ := json.Marshal(resp)
+			_, _ = w.Write(rr)
+		}
+	})
+
 	f.mux.HandleFunc("DELETE /v4/nodebalancers/{nodeBalancerId}", func(w http.ResponseWriter, r *http.Request) {
 		delete(f.nb, r.PathValue("nodeBalancerId"))
 		nid, err := strconv.Atoi(r.PathValue("nodeBalancerId"))
@@ -457,6 +486,25 @@ func (f *fakeAPI) setupRoutes() {
 		_, _ = w.Write(resp)
 	})
 
+	f.mux.HandleFunc("POST /v4/networking/firewalls/{firewallId}/devices", func(w http.ResponseWriter, r *http.Request) {
+		fdco := linodego.FirewallDeviceCreateOptions{}
+		if err := json.NewDecoder(r.Body).Decode(&fdco); err != nil {
+			f.t.Fatal(err)
+		}
+
+		firewallID, err := strconv.Atoi(r.PathValue("firewallId"))
+		if err != nil {
+			f.t.Fatal(err)
+		}
+
+		fwd := createFirewallDevice(firewallID, f, fdco)
+		resp, err := json.Marshal(fwd)
+		if err != nil {
+			f.t.Fatal(err)
+		}
+		_, _ = w.Write(resp)
+	})
+
 	f.mux.HandleFunc("DELETE /v4/nodebalancers/{nodeBalancerId}/configs/{configId}/nodes/{nodeId}", func(w http.ResponseWriter, r *http.Request) {
 		delete(f.nbn, r.PathValue("nodeId"))
 	})
@@ -474,6 +522,29 @@ func (f *fakeAPI) setupRoutes() {
 				delete(f.nbn, k)
 			}
 		}
+	})
+
+	f.mux.HandleFunc("DELETE /v4/networking/firewalls/{firewallId}", func(w http.ResponseWriter, r *http.Request) {
+		firewallId, err := strconv.Atoi(r.PathValue("firewallId"))
+		if err != nil {
+			f.t.Fatal(err)
+		}
+
+		delete(f.fwd, firewallId)
+		delete(f.fw, firewallId)
+	})
+
+	f.mux.HandleFunc("DELETE /v4/networking/firewalls/{firewallId}/devices/{deviceId}", func(w http.ResponseWriter, r *http.Request) {
+		firewallId, err := strconv.Atoi(r.PathValue("firewallId"))
+		if err != nil {
+			f.t.Fatal(err)
+		}
+
+		deviceId, err := strconv.Atoi(r.PathValue("deviceId"))
+		if err != nil {
+			f.t.Fatal(err)
+		}
+		delete(f.fwd[firewallId], deviceId)
 	})
 
 	f.mux.HandleFunc("PUT /v4/nodebalancers/{nodeBalancerId}/configs/{configId}", func(w http.ResponseWriter, r *http.Request) {
@@ -653,41 +724,6 @@ func randString() string {
 	return string(b)
 }
 
-// f.mux.HandleFunc("DELETE /v4/foobar", func(w http.ResponseWriter, r *http.Request) {
-// 	idRaw := filepath.Base(urlPath)
-// 	id, err := strconv.Atoi(idRaw)
-// 	if err != nil {
-// 		f.t.Fatal(err)
-// 	}
-// 	if strings.Contains(urlPath, "nodes") {
-
-// 	} else if strings.Contains(urlPath, "configs") {
-
-// 	} else if strings.Contains(urlPath, "nodebalancers") {
-
-// 		// TODO(PR): couldn't find these endpoints
-// 	} else if strings.Contains(urlPath, "devices") {
-// 		firewallId, err := strconv.Atoi(strings.Split(urlPath, "/")[3])
-// 		if err != nil {
-// 			f.t.Fatal(err)
-// 		}
-
-// 		deviceId, err := strconv.Atoi(strings.Split(urlPath, "/")[5])
-// 		if err != nil {
-// 			f.t.Fatal(err)
-// 		}
-// 		delete(f.fwd[firewallId], deviceId)
-// 	} else if strings.Contains(urlPath, "firewalls") {
-// 		firewallId, err := strconv.Atoi(strings.Split(urlPath, "/")[3])
-// 		if err != nil {
-// 			f.t.Fatal(err)
-// 		}
-
-// 		delete(f.fwd, firewallId)
-// 		delete(f.fw, firewallId)
-// 	}
-// })
-
 // switch r.Method {
 // case "GET":
 // 	whichAPI := strings.Split(urlPath[1:], "/")
@@ -735,36 +771,7 @@ func randString() string {
 // 			return
 // 		}
 // 	case "networking":
-// 		rx, _ := regexp.Compile("/networking/firewalls/[0-9]+/devices")
-// 		if rx.MatchString(urlPath) {
-// 			fwdId, err := strconv.Atoi(strings.Split(urlPath, "/")[3])
-// 			if err != nil {
-// 				f.t.Fatal(err)
-// 			}
 
-// 			firewallDevices, found := f.fwd[fwdId]
-// 			if found {
-// 				firewallDeviceList := []linodego.FirewallDevice{}
-// 				for i := range firewallDevices {
-// 					firewallDeviceList = append(firewallDeviceList, *firewallDevices[i])
-// 				}
-// 				rr, _ := json.Marshal(linodego.FirewallDevicesPagedResponse{
-// 					PageOptions: &linodego.PageOptions{Page: 1, Pages: 1, Results: len(firewallDeviceList)},
-// 					Data:        firewallDeviceList,
-// 				})
-// 				_, _ = w.Write(rr)
-// 			} else {
-// 				w.WriteHeader(404)
-// 				resp := linodego.APIError{
-// 					Errors: []linodego.APIErrorReason{
-// 						{Reason: "Not Found"},
-// 					},
-// 				}
-// 				rr, _ := json.Marshal(resp)
-// 				_, _ = w.Write(rr)
-// 			}
-// 			return
-// 		}
 // 	}
 
 // case "POST":
@@ -825,26 +832,7 @@ func randString() string {
 // 		}
 // 		_, _ = w.Write(resp)
 // 		return
-// 	} else if tp == "devices" {
-// 		fwId := strings.Split(urlPath, "/")[3]
-// 		fdco := linodego.FirewallDeviceCreateOptions{}
-// 		if err := json.NewDecoder(r.Body).Decode(&fdco); err != nil {
-// 			f.t.Fatal(err)
-// 		}
 
-// 		firewallID, err := strconv.Atoi(fwId)
-// 		if err != nil {
-// 			f.t.Fatal(err)
-// 		}
-
-// 		fwd := createFirewallDevice(firewallID, f, fdco)
-// 		resp, err := json.Marshal(fwd)
-// 		if err != nil {
-// 			f.t.Fatal(err)
-// 		}
-// 		_, _ = w.Write(resp)
-// 		return
-// 	}
 // case "PUT":
 // 	if strings.Contains(urlPath, "nodes") {
 // 		f.t.Fatal("PUT ...nodes is not supported by the mock API")
