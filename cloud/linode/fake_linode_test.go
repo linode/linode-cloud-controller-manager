@@ -107,10 +107,57 @@ func (f *fakeAPI) setupRoutes() {
 		}
 		rr, _ := json.Marshal(resp)
 		_, _ = w.Write(rr)
-		return
 	})
 
 	f.mux.HandleFunc("GET /v4/nodebalancers/{nodeBalancerId}", func(w http.ResponseWriter, r *http.Request) {
+		nb, found := f.nb[r.PathValue("nodeBalancerId")]
+		if found {
+			rr, _ := json.Marshal(nb)
+			_, _ = w.Write(rr)
+
+		} else {
+			w.WriteHeader(404)
+			resp := linodego.APIError{
+				Errors: []linodego.APIErrorReason{
+					{Reason: "Not Found"},
+				},
+			}
+			rr, _ := json.Marshal(resp)
+			_, _ = w.Write(rr)
+		}
+	})
+
+	f.mux.HandleFunc("GET /v4/nodebalancers/{nodeBalancerId}/firewalls", func(w http.ResponseWriter, r *http.Request) {
+		devID, err := strconv.Atoi(r.PathValue("nodeBalancerId"))
+		if err != nil {
+			f.t.Fatal(err)
+		}
+
+		data := linodego.NodeBalancerFirewallsPagedResponse{
+			Data: []linodego.Firewall{},
+			PageOptions: &linodego.PageOptions{
+				Page:    1,
+				Pages:   1,
+				Results: 0,
+			},
+		}
+
+	out:
+		for fwid, devices := range f.fwd {
+			for _, device := range devices {
+				if device.Entity.ID == devID {
+					data.Data = append(data.Data, *f.fw[fwid])
+					data.PageOptions.Results = 1
+					break out
+				}
+			}
+		}
+
+		resp, _ := json.Marshal(data)
+		_, _ = w.Write(resp)
+	})
+
+	f.mux.HandleFunc("DELETE /v4/nodebalancers/{nodeBalancerId}", func(w http.ResponseWriter, r *http.Request) {
 		delete(f.nb, r.PathValue("nodeBalancerId"))
 		nid, err := strconv.Atoi(r.PathValue("nodeBalancerId"))
 		if err != nil {
@@ -209,11 +256,30 @@ func (f *fakeAPI) setupRoutes() {
 		if err != nil {
 			f.t.Fatal(err)
 		}
-		// TODO(PR): these headers are missing in all the responses
-		// maybe add it as middleware?
-		w.Header().Add("Content-Type", "application/json")
 		_, _ = w.Write(resp)
 		return
+	})
+
+	f.mux.HandleFunc("POST /v4/networking/firewalls", func(w http.ResponseWriter, r *http.Request) {
+		fco := linodego.FirewallCreateOptions{}
+		if err := json.NewDecoder(r.Body).Decode(&fco); err != nil {
+			f.t.Fatal(err)
+		}
+
+		firewall := linodego.Firewall{
+			ID:     rand.Intn(9999),
+			Label:  fco.Label,
+			Rules:  fco.Rules,
+			Tags:   fco.Tags,
+			Status: "enabled",
+		}
+
+		f.fw[firewall.ID] = &firewall
+		resp, err := json.Marshal(firewall)
+		if err != nil {
+			f.t.Fatal(err)
+		}
+		_, _ = w.Write(resp)
 	})
 
 	f.mux.HandleFunc("DELETE /v4/nodebalancers/{nodeBalancerId}/configs/{configId}/nodes/{nodeId}", func(w http.ResponseWriter, r *http.Request) {
@@ -293,12 +359,85 @@ func (f *fakeAPI) setupRoutes() {
 		}
 		_, _ = w.Write(resp)
 	})
+
+	f.mux.HandleFunc("PUT /v4/networking/firewalls/{firewallID}/rules", func(w http.ResponseWriter, r *http.Request) {
+		fwrs := new(linodego.FirewallRuleSet)
+		if err := json.NewDecoder(r.Body).Decode(fwrs); err != nil {
+			f.t.Fatal(err)
+		}
+
+		fwID, err := strconv.Atoi(r.PathValue("firewallID"))
+		if err != nil {
+			f.t.Fatal(err)
+		}
+
+		if firewall, found := f.fw[fwID]; found {
+			firewall.Rules.Inbound = fwrs.Inbound
+			firewall.Rules.InboundPolicy = fwrs.InboundPolicy
+			// outbound rules do not apply, ignoring.
+			f.fw[fwID] = firewall
+			resp, err := json.Marshal(firewall)
+			if err != nil {
+				f.t.Fatal(err)
+			}
+			_, _ = w.Write(resp)
+			return
+		}
+
+		w.WriteHeader(404)
+		resp := linodego.APIError{
+			Errors: []linodego.APIErrorReason{
+				{Reason: "Not Found"},
+			},
+		}
+		rr, _ := json.Marshal(resp)
+		_, _ = w.Write(rr)
+	})
+
+	f.mux.HandleFunc("PUT /v4/nodebalancers/{nodeBalancerId}", func(w http.ResponseWriter, r *http.Request) {
+		nbuo := new(linodego.NodeBalancerUpdateOptions)
+		if err := json.NewDecoder(r.Body).Decode(nbuo); err != nil {
+			f.t.Fatal(err)
+		}
+		if _, err := strconv.Atoi(r.PathValue("nodeBalancerId")); err != nil {
+			f.t.Fatal(err)
+		}
+
+		if nb, found := f.nb[r.PathValue("nodeBalancerId")]; found {
+			if nbuo.ClientConnThrottle != nil {
+				nb.ClientConnThrottle = *nbuo.ClientConnThrottle
+			}
+			if nbuo.Label != nil {
+				nb.Label = nbuo.Label
+			}
+			if nbuo.Tags != nil {
+				nb.Tags = *nbuo.Tags
+			}
+
+			f.nb[strconv.Itoa(nb.ID)] = nb
+			resp, err := json.Marshal(nb)
+			if err != nil {
+				f.t.Fatal(err)
+			}
+			_, _ = w.Write(resp)
+			return
+		}
+
+		w.WriteHeader(404)
+		resp := linodego.APIError{
+			Errors: []linodego.APIErrorReason{
+				{Reason: "Not Found"},
+			},
+		}
+		rr, _ := json.Marshal(resp)
+		_, _ = w.Write(rr)
+	})
 }
 
 func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("fakeAPI: %s %s", r.Method, r.URL.Path)
-	// 2024/02/08 12:50:04 fakeAPI: POST /v4/networking/firewalls
-	// 2024/02/08 12:50:04 fakeAPI: POST /v4/nodebalancers
+
+	w.Header().Add("Content-Type", "application/json")
 	f.mux.ServeHTTP(w, r)
 	return
 
@@ -482,60 +621,6 @@ func randString() string {
 // 				f.t.Fatal(err)
 // 			}
 // 			_, _ = w.Write(rr)
-// 			return
-// 		}
-
-// 		rx = regexp.MustCompile("/nodebalancers/[0-9]+/firewalls")
-// 		if rx.MatchString(urlPath) {
-// 			id := strings.Split(urlPath, "/")[2]
-// 			devID, err := strconv.Atoi(id)
-// 			if err != nil {
-// 				f.t.Fatal(err)
-// 			}
-
-// 			data := linodego.NodeBalancerFirewallsPagedResponse{
-// 				Data: []linodego.Firewall{},
-// 				PageOptions: &linodego.PageOptions{
-// 					Page:    1,
-// 					Pages:   1,
-// 					Results: 0,
-// 				},
-// 			}
-
-// 		out:
-// 			for fwid, devices := range f.fwd {
-// 				for _, device := range devices {
-// 					if device.Entity.ID == devID {
-// 						data.Data = append(data.Data, *f.fw[fwid])
-// 						data.PageOptions.Results = 1
-// 						break out
-// 					}
-// 				}
-// 			}
-
-// 			resp, _ := json.Marshal(data)
-// 			_, _ = w.Write(resp)
-// 			return
-// 		}
-
-// 		rx, _ = regexp.Compile("/nodebalancers/[0-9]+")
-// 		if rx.MatchString(urlPath) {
-// 			id := filepath.Base(urlPath)
-// 			nb, found := f.nb[id]
-// 			if found {
-// 				rr, _ := json.Marshal(nb)
-// 				_, _ = w.Write(rr)
-
-// 			} else {
-// 				w.WriteHeader(404)
-// 				resp := linodego.APIError{
-// 					Errors: []linodego.APIErrorReason{
-// 						{Reason: "Not Found"},
-// 					},
-// 				}
-// 				rr, _ := json.Marshal(resp)
-// 				_, _ = w.Write(rr)
-// 			}
 // 			return
 // 		}
 // 	case "networking":
@@ -762,77 +847,5 @@ func randString() string {
 // 	} else if strings.Contains(urlPath, "configs") {
 
 // 	} else if strings.Contains(urlPath, "nodebalancer") {
-// 		parts := strings.Split(urlPath[1:], "/")
-// 		nbuo := new(linodego.NodeBalancerUpdateOptions)
-// 		if err := json.NewDecoder(r.Body).Decode(nbuo); err != nil {
-// 			f.t.Fatal(err)
-// 		}
-// 		if _, err := strconv.Atoi(parts[1]); err != nil {
-// 			f.t.Fatal(err)
-// 		}
 
-// 		if nb, found := f.nb[parts[1]]; found {
-// 			if nbuo.ClientConnThrottle != nil {
-// 				nb.ClientConnThrottle = *nbuo.ClientConnThrottle
-// 			}
-// 			if nbuo.Label != nil {
-// 				nb.Label = nbuo.Label
-// 			}
-// 			if nbuo.Tags != nil {
-// 				nb.Tags = *nbuo.Tags
-// 			}
-
-// 			f.nb[strconv.Itoa(nb.ID)] = nb
-// 			resp, err := json.Marshal(nb)
-// 			if err != nil {
-// 				f.t.Fatal(err)
-// 			}
-// 			_, _ = w.Write(resp)
-// 			return
-// 		}
-
-// 		w.WriteHeader(404)
-// 		resp := linodego.APIError{
-// 			Errors: []linodego.APIErrorReason{
-// 				{Reason: "Not Found"},
-// 			},
-// 		}
-// 		rr, _ := json.Marshal(resp)
-// 		_, _ = w.Write(rr)
-
-// 	} else if strings.Contains(urlPath, "firewalls") {
-// 		// path is networking/firewalls/%d/rules
-// 		parts := strings.Split(urlPath[1:], "/")
-// 		fwrs := new(linodego.FirewallRuleSet)
-// 		if err := json.NewDecoder(r.Body).Decode(fwrs); err != nil {
-// 			f.t.Fatal(err)
-// 		}
-
-// 		fwID, err := strconv.Atoi(parts[2])
-// 		if err != nil {
-// 			f.t.Fatal(err)
-// 		}
-
-// 		if firewall, found := f.fw[fwID]; found {
-// 			firewall.Rules.Inbound = fwrs.Inbound
-// 			firewall.Rules.InboundPolicy = fwrs.InboundPolicy
-// 			// outbound rules do not apply, ignoring.
-// 			f.fw[fwID] = firewall
-// 			resp, err := json.Marshal(firewall)
-// 			if err != nil {
-// 				f.t.Fatal(err)
-// 			}
-// 			_, _ = w.Write(resp)
-// 			return
-// 		}
-
-// 		w.WriteHeader(404)
-// 		resp := linodego.APIError{
-// 			Errors: []linodego.APIErrorReason{
-// 				{Reason: "Not Found"},
-// 			},
-// 		}
-// 		rr, _ := json.Marshal(resp)
-// 		_, _ = w.Write(rr)
-// 	}
 // }
