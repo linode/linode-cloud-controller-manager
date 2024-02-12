@@ -15,6 +15,7 @@ import (
 	v1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 )
@@ -139,10 +140,24 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 		return nil
 	}
 
-	node.Labels[annLinodeHostUUID] = linode.HostUUID
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Get a fresh copy of the node so the resource version is up to date
+		n, err := s.kubeclient.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
 
-	_, err = s.kubeclient.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
-	if err != nil {
+		// It may be that the UUID has been set
+		if n.Labels[annLinodeHostUUID] == linode.HostUUID {
+			s.SetLastMetadataUpdate(node.Name)
+			return nil
+		}
+
+		// Try to update the node
+		n.Labels[annLinodeHostUUID] = linode.HostUUID
+		_, err = s.kubeclient.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
+		return err
+	}); err != nil {
 		klog.Infof("node update error: %s", err.Error())
 		return err
 	}
