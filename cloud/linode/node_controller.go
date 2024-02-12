@@ -149,7 +149,6 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 
 		// It may be that the UUID has been set
 		if n.Labels[annLinodeHostUUID] == linode.HostUUID {
-			s.SetLastMetadataUpdate(node.Name)
 			return nil
 		}
 
