@@ -84,3 +84,4 @@ jobs:
         with:
           charts_dir: deploy
           skip_existing: true
+          packages_with_index: true
