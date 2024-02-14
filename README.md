@@ -255,24 +255,28 @@ This will create a file `ccm-linode.yaml` which you can use to deploy the CCM.
 Note: Your kubelets, controller-manager, and apiserver must be started with `--cloud-provider=external` as noted in the following documentation.
 
 ## Deployment Through Helm Chart
-Use the helm chart located under './deploy/chart'. This dir has the manifest for Linode CCM. There are two arguments required.
+LINODE_API_TOKEN must be a Linode APIv4 [Personal Access Token](https://cloud.linode.com/profile/tokens) with all permissions.
 
-The first argument must be a Linode APIv4 [Personal Access Token](https://cloud.linode.com/profile/tokens) with all permissions.
+REGION must be a Linode [region](https://api.linode.com/v4/regions).
+### Install the ccm-linode repo
+```shell
+helm repo add ccm-linode https://linode.github.io/linode-cloud-controller-manager/ 
+helm repo update ccm-linode
+```
 
-The second argument must be a Linode [region](https://api.linode.com/v4/regions).
+### To deploy ccm-linode. Run the following command:
 
-### To deploy CCM run the following helm command once you are in the ccm root dir:
 ```sh
 export VERSION=v0.3.22
 export LINODE_API_TOKEN=<linodeapitoken>
 export REGION=<linoderegion>
-helm install linode-ccm --set apiToken=$LINODE_API_TOKEN,region=$REGION https://github.com/linode/linode-cloud-controller-manager/releases/download/$VERSION/helm-chart-$VERSION.tgz
+helm install ccm-linode --set apiToken=$LINODE_API_TOKEN,region=$REGION ccm-linode/ccm-linode
 ```
 _See [helm install](https://helm.sh/docs/helm/helm_install/) for command documentation._
 
-### To uninstall linode-ccm from kubernetes cluster. Run the following command:
+### To uninstall ccm-linode from kubernetes cluster. Run the following command:
 ```sh
-helm uninstall linode-ccm
+helm uninstall ccm-linode
 ```
 _See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall/) for command documentation._
 
@@ -282,7 +286,7 @@ export VERSION=v0.3.22
 export LINODE_API_TOKEN=<linodeapitoken>
 export REGION=<linoderegion>
 
-helm upgrade linode-ccm --install --set apiToken=$LINODE_API_TOKEN,region=$REGION https://github.com/linode/linode-cloud-controller-manager/releases/download/$VERSION/helm-chart-$VERSION.tgz
+helm upgrade ccm-linode --install --set apiToken=$LINODE_API_TOKEN,region=$REGION ccm-linode/ccm-linode
 ```
 _See [helm upgrade](https://helm.sh/docs/helm/helm_upgrade/) for command documentation._
 
