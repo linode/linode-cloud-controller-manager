@@ -19,7 +19,7 @@ nodeSelector:
 # The pullPolicy is set to Always but can be changed when it is not required to always pull the new image
 image:
   repository: linode/linode-cloud-controller-manager
-  tag: latest
+  tag:  # only set if required, defaults to .Chart.AppVersion set during release or "latest" by default
   pullPolicy: Always
 
 # Default namespace is "kube-system" but it can be set to another namespace
