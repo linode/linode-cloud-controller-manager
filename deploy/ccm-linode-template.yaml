@@ -77,10 +77,10 @@ spec:
       serviceAccountName: ccm-linode
       nodeSelector:
         # The CCM will only run on a Node labelled as a master, you may want to change this
-        node-role.kubernetes.io/master: ""
+        node-role.kubernetes.io/control-plane: ""
       tolerations:
         # The CCM can run on Nodes tainted as masters
-        - key: "node-role.kubernetes.io/master"
+        - key: "node-role.kubernetes.io/control-plane"
           effect: "NoSchedule"
         # The CCM is a "critical addon"
         - key: "CriticalAddonsOnly"
