@@ -2,8 +2,12 @@ package linode
 
 import (
 	"context"
+	cryptoRand "crypto/rand"
+	"encoding/hex"
+	"encoding/json"
 	stderrors "errors"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -960,6 +964,7 @@ func testUpdateLoadBalancerAddNewFirewall(t *testing.T, client *linodego.Client,
 	}
 }
 
+// This will also test the firewall with >255 IPs
 func testUpdateLoadBalancerAddNewFirewallACL(t *testing.T, client *linodego.Client, fakeAPI *fakeAPI) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1019,12 +1024,43 @@ func testUpdateLoadBalancerAddNewFirewallACL(t *testing.T, client *linodego.Clie
 		t.Fatalf("Firewalls attached when none specified")
 	}
 
+	var ipv4s []string
+	var ipv6s []string
+	i := 0
+	for i < 400 {
+		ipv4s = append(ipv4s, fmt.Sprintf("%d.%d.%d.%d", 192, rand.Int31n(255), rand.Int31n(255), rand.Int31n(255)))
+		i += 1
+	}
+	i = 0
+	for i < 300 {
+		ip := make([]byte, 16)
+		if _, err := cryptoRand.Read(ip); err != nil {
+			t.Fatalf("unable to read random bytes")
+		}
+		ipv6s = append(ipv6s, fmt.Sprintf("%s:%s:%s:%s:%s:%s:%s:%s",
+			hex.EncodeToString(ip[0:2]),
+			hex.EncodeToString(ip[2:4]),
+			hex.EncodeToString(ip[4:6]),
+			hex.EncodeToString(ip[6:8]),
+			hex.EncodeToString(ip[8:10]),
+			hex.EncodeToString(ip[10:12]),
+			hex.EncodeToString(ip[12:14]),
+			hex.EncodeToString(ip[14:16])))
+		i += 1
+	}
+	acl := map[string]map[string][]string{
+		"allowList": {
+			"ipv4": ipv4s,
+			"ipv6": ipv6s,
+		},
+	}
+	aclString, err := json.Marshal(acl)
+	if err != nil {
+		t.Fatalf("unable to marshal json acl")
+	}
+
 	svc.ObjectMeta.SetAnnotations(map[string]string{
-		annLinodeCloudFirewallACL: `{
-			"allowList": {
-				"ipv4": ["2.2.2.2"]
-			}
-		}`,
+		annLinodeCloudFirewallACL: string(aclString),
 	})
 
 	err = lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, nodes)
@@ -1049,10 +1085,9 @@ func testUpdateLoadBalancerAddNewFirewallACL(t *testing.T, client *linodego.Clie
 	if firewallsNew[0].Rules.InboundPolicy != "DROP" {
 		t.Errorf("expected DROP inbound policy, got %s", firewallsNew[0].Rules.InboundPolicy)
 	}
-
-	fwIPs := firewallsNew[0].Rules.Inbound[0].Addresses.IPv4
-	if fwIPs == nil {
-		t.Errorf("expected 2.2.2.2, got %v", fwIPs)
+	
+	if len(firewallsNew[0].Rules.Inbound) != 4 {
+		t.Errorf("expected 4 rules, got %d", len(firewallsNew[0].Rules.Inbound))
 	}
 }
 
