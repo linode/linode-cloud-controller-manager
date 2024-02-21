@@ -154,7 +154,7 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 
 		// Try to update the node
 		n.Labels[annLinodeHostUUID] = linode.HostUUID
-		_, err = s.kubeclient.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
+		_, err = s.kubeclient.CoreV1().Nodes().Update(ctx, n, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		klog.Infof("node update error: %s", err.Error())
