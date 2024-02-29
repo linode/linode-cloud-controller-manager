@@ -1,0 +1,7 @@
+{
+  "packages": [
+    "go_1_20@latest",
+    "tilt@latest",
+    "kubernetes-helm@latest"
+  ]
+}

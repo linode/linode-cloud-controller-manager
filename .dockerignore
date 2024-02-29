@@ -1,0 +1,5 @@
+.*
+deploy/
+e2e/
+examples/
+hack/

@@ -1,0 +1,9 @@
+env:
+- name: LINODE_HOSTNAME_ONLY_INGRESS
+  value: "false"
+nodeSelector:
+  node-role.kubernetes.io/master: "true"
+secretRef:
+  apiTokenRef: apiToken
+  name: linode-api-secret
+  regionRef: region
