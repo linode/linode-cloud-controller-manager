@@ -28,12 +28,15 @@ import (
 
 const (
 	maxFirewallRuleLabelLen = 32
+	maxIPsPerFirewall       = 255
+	maxRulesPerFirewall     = 25
 )
 
 var (
 	errNoNodesAvailable = errors.New("No nodes available for nodebalancer")
 	errInvalidFWConfig  = errors.New("Specify either an allowList or a denyList for a firewall")
 	errTooManyFirewalls = errors.New("Too many firewalls attached to a nodebalancer")
+	errTooManyIPs = errors.New("too many IPs in this ACL, will exceed rules per firewall limit")
 )
 
 type lbNotFoundError struct {
@@ -765,8 +768,34 @@ func (l *loadbalancers) getLoadBalancerTags(_ context.Context, clusterName strin
 	return tags
 }
 
+func chunkIPs(ips []string) [][]string {
+	chunks := [][]string{}
+	ipCount := len(ips)
+
+	// If the number of IPs is less than or equal to maxIPsPerFirewall,
+	// return a single chunk containing all IPs.
+	if ipCount <= maxIPsPerFirewall {
+		return [][]string{ips}
+	}
+
+	// Otherwise, break the IPs into chunks with maxIPsPerFirewall IPs per chunk.
+	chunkCount := 0
+	for ipCount > maxIPsPerFirewall {
+		start := chunkCount * maxIPsPerFirewall
+		end := (chunkCount + 1) * maxIPsPerFirewall
+		chunks = append(chunks, ips[start:end])
+		chunkCount++
+		ipCount -= maxIPsPerFirewall
+	}
+
+	// Append the remaining IPs as a chunk.
+	chunks = append(chunks, ips[chunkCount*maxIPsPerFirewall:])
+
+	return chunks
+}
+
 // processACL takes the IPs, aclType, label etc and formats them into the passed linodego.FirewallCreateOptions pointer.
-func processACL(fwcreateOpts *linodego.FirewallCreateOptions, aclType, label, svcName, ports string, ips linodego.NetworkAddresses) {
+func processACL(fwcreateOpts *linodego.FirewallCreateOptions, aclType, label, svcName, ports string, ips linodego.NetworkAddresses) error {
 	ruleLabel := fmt.Sprintf("%s-%s", aclType, svcName)
 	if len(ruleLabel) > maxFirewallRuleLabelLen {
 		newLabel := ruleLabel[0:maxFirewallRuleLabelLen]
@@ -774,14 +803,52 @@ func processACL(fwcreateOpts *linodego.FirewallCreateOptions, aclType, label, sv
 		ruleLabel = newLabel
 	}
 
-	fwcreateOpts.Rules.Inbound = append(fwcreateOpts.Rules.Inbound, linodego.FirewallRule{
-		Action:      aclType,
-		Label:       ruleLabel,
-		Description: fmt.Sprintf("Created by linode-ccm: %s, for %s", label, svcName),
-		Protocol:    linodego.TCP, // Nodebalancers support only TCP.
-		Ports:       ports,
-		Addresses:   ips,
-	})
+	// Linode has a limitation of firewall rules with a max of 255 IPs per rule
+	var ipv4s, ipv6s []string // doing this to avoid dereferencing a nil pointer
+	if ips.IPv6 != nil {
+		ipv6s = *ips.IPv6
+	}
+	if ips.IPv4 != nil {
+		ipv4s = *ips.IPv4
+	}
+
+	if len(ipv4s)+len(ipv6s) > maxIPsPerFirewall {
+		ipv4chunks := chunkIPs(ipv4s)
+		for i, chunk := range ipv4chunks {
+			v4chunk := chunk
+			fwcreateOpts.Rules.Inbound = append(fwcreateOpts.Rules.Inbound, linodego.FirewallRule{
+				Action:      aclType,
+				Label:       ruleLabel,
+				Description: fmt.Sprintf("Rule %d, Created by linode-ccm: %s, for %s", i, label, svcName),
+				Protocol:    linodego.TCP, // Nodebalancers support only TCP.
+				Ports:       ports,
+				Addresses:   linodego.NetworkAddresses{IPv4: &v4chunk},
+			})
+		}
+
+		ipv6chunks := chunkIPs(ipv6s)
+		for i, chunk := range ipv6chunks {
+			v6chunk := chunk
+			fwcreateOpts.Rules.Inbound = append(fwcreateOpts.Rules.Inbound, linodego.FirewallRule{
+				Action:      aclType,
+				Label:       ruleLabel,
+				Description: fmt.Sprintf("Rule %d, Created by linode-ccm: %s, for %s", i, label, svcName),
+				Protocol:    linodego.TCP, // Nodebalancers support only TCP.
+				Ports:       ports,
+				Addresses:   linodego.NetworkAddresses{IPv6: &v6chunk},
+			})
+		}
+	} else {
+		fwcreateOpts.Rules.Inbound = append(fwcreateOpts.Rules.Inbound, linodego.FirewallRule{
+			Action:      aclType,
+			Label:       ruleLabel,
+			Description: fmt.Sprintf("Created by linode-ccm: %s, for %s", label, svcName),
+			Protocol:    linodego.TCP, // Nodebalancers support only TCP.
+			Ports:       ports,
+			Addresses:   ips,
+		})
+	}
+
 	fwcreateOpts.Rules.OutboundPolicy = "ACCEPT"
 	if aclType == "ACCEPT" {
 		// if an allowlist is present, we drop everything else.
@@ -790,6 +857,11 @@ func processACL(fwcreateOpts *linodego.FirewallCreateOptions, aclType, label, sv
 		// if a denylist is present, we accept everything else.
 		fwcreateOpts.Rules.InboundPolicy = "ACCEPT"
 	}
+
+	if len(fwcreateOpts.Rules.Inbound) > maxRulesPerFirewall {
+		return errTooManyIPs
+	}
+	return nil
 }
 
 type aclConfig struct {
@@ -827,7 +899,10 @@ func (l *loadbalancers) createFirewallOptsForSvc(label string, tags []string, sv
 		allowedIPs = acl.DenyList
 	}
 
-	processACL(&fwcreateOpts, aclType, label, svc.Name, portsString, *allowedIPs)
+	err = processACL(&fwcreateOpts, aclType, label, svc.Name, portsString, *allowedIPs)
+	if err != nil {
+		return nil, err
+	}
 	return &fwcreateOpts, nil
 }
 
