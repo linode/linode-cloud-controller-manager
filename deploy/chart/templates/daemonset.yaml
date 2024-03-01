@@ -33,6 +33,19 @@ spec:
             - --v=3
             - --port=0
             - --secure-port=10253
+            {{- if .Values.linodegoDebug }}
+            - --linodego-debug={{ .Values.linodegoDebug }}
+            {{- end }}
+            {{- if .Values.routeController }}
+            - --enable-route-controller=true
+            - --cluster-cidr={{ .Values.routeController.clusterCIDR }}
+            {{- if .Values.routeController.configureCloudRoutes }}
+            - --configure-cloud-routes={{ .Values.routeController.configureCloudRoutes }}
+            {{- end }}
+            {{- if .Values.routeController.routeReconciliationPeriod }}
+            - --route-reconciliation-period={{ .Values.routeController.routeReconciliationPeriod }}
+            {{- end }}
+            {{- end }}
           volumeMounts:
             - mountPath: /etc/kubernetes
               name: k8s

@@ -25,14 +25,16 @@ const (
 // We expect it to be initialized with flags external to this package, likely in
 // main.go
 var Options struct {
-	KubeconfigFlag *pflag.Flag
-	LinodeGoDebug  bool
+	KubeconfigFlag        *pflag.Flag
+	LinodeGoDebug         bool
+	EnableRouteController bool
 }
 
 type linodeCloud struct {
 	client        client.Client
 	instances     cloudprovider.InstancesV2
 	loadbalancers cloudprovider.LoadBalancer
+	routes        cloudprovider.Routes
 }
 
 func init() {
@@ -72,6 +74,7 @@ func newCloud() (cloudprovider.Interface, error) {
 		client:        linodeClient,
 		instances:     newInstances(linodeClient),
 		loadbalancers: newLoadbalancers(linodeClient, region),
+		routes:        newRoutes(linodeClient),
 	}, nil
 }
 
@@ -109,6 +112,9 @@ func (c *linodeCloud) Clusters() (cloudprovider.Clusters, bool) {
 }
 
 func (c *linodeCloud) Routes() (cloudprovider.Routes, bool) {
+	if Options.EnableRouteController {
+		return c.routes, true
+	}
 	return nil, false
 }
 

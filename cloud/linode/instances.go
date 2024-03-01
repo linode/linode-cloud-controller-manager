@@ -98,6 +98,19 @@ func (i *instances) linodeByID(id int) (*linodego.Instance, error) {
 	return instance, nil
 }
 
+// listAllInstances returns all instances in nodeCache
+func (i *instances) listAllInstances(ctx context.Context) ([]linodego.Instance, error) {
+	if err := i.nodeCache.refreshInstances(ctx, i.client); err != nil {
+		return nil, err
+	}
+
+	instances := []linodego.Instance{}
+	for _, instance := range i.nodeCache.nodes {
+		instances = append(instances, *instance)
+	}
+	return instances, nil
+}
+
 func (i *instances) lookupLinode(ctx context.Context, node *v1.Node) (*linodego.Instance, error) {
 	if err := i.nodeCache.refreshInstances(ctx, i.client); err != nil {
 		return nil, err

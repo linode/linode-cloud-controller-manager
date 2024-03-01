@@ -126,7 +126,16 @@ Users can create CloudFirewall instances, supply their own rules and attach them
 **Note**<br/>
 If the user supplies a firewall-id, and later switches to using an ACL, the CCM will take over the CloudFirewall Instance. To avoid this, delete the service, and re-create it so the original CloudFirewall is left undisturbed.
 
+#### Routes
+When running k8s clusters within VPC, node specific podCIDRs need to be allowed on the VPC interface. Linode CCM comes with route-controller functionality which can be enabled for automatically adding/deleting routes on VPC interfaces. When installing CCM with helm, make sure to specify routeController settings.
 
+##### Example usage in values.yaml
+```yaml
+routeController:
+  clusterCIDR: 10.0.0.0/8
+  configureCloudRoutes: true
+  routeReconciliationPeriod: 1m
+```
 
 ### Nodes
 Kubernetes Nodes can be configured with the following annotations.
