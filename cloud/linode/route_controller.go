@@ -48,12 +48,13 @@ func (rc *routeCache) refreshRoutes(ctx context.Context, client Client) error {
 }
 
 type routes struct {
+	vpcid      int
 	client     Client
 	instances  *instances
 	routeCache *routeCache
 }
 
-func newRoutes(client Client) cloudprovider.Routes {
+func newRoutes(client Client) (cloudprovider.Routes, error) {
 	timeout := 60
 	if raw, ok := os.LookupEnv("LINODE_ROUTES_CACHE_TTL"); ok {
 		if t, _ := strconv.Atoi(raw); t > 0 {
@@ -61,14 +62,20 @@ func newRoutes(client Client) cloudprovider.Routes {
 		}
 	}
 
+	vpcid, err := getVPCID(client, Options.VPCName)
+	if err != nil {
+		return nil, err
+	}
+
 	return &routes{
+		vpcid:     vpcid,
 		client:    client,
 		instances: newInstances(client),
 		routeCache: &routeCache{
 			routes: make(map[int]*[]linodego.InstanceConfig),
 			ttl:    time.Duration(timeout) * time.Second,
 		},
-	}
+	}, nil
 }
 
 // instanceConfigsByID returns InstanceConfigs for given instance id
@@ -126,7 +133,7 @@ func (r *routes) CreateRoute(ctx context.Context, clusterName string, nameHint s
 
 	// find VPC interface and add route to it
 	for _, iface := range configs[0].Interfaces {
-		if iface.VPCID != nil && iface.IPv4.VPC != "" {
+		if iface.VPCID != nil && r.vpcid == *iface.VPCID && iface.IPv4.VPC != "" {
 			for _, configured_route := range iface.IPRanges {
 				if configured_route == route.DestinationCIDR {
 					klog.V(4).Infof("Route already exists for node %s", route.TargetNode)
@@ -164,7 +171,7 @@ func (r *routes) DeleteRoute(ctx context.Context, clusterName string, route *clo
 	}
 
 	for _, iface := range configs[0].Interfaces {
-		if iface.VPCID != nil && iface.IPv4.VPC != "" {
+		if iface.VPCID != nil && r.vpcid == *iface.VPCID && iface.IPv4.VPC != "" {
 			ipRanges := []string{}
 			for _, configured_route := range iface.IPRanges {
 				if configured_route != route.DestinationCIDR {
@@ -201,7 +208,7 @@ func (r *routes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpr
 			return nil, err
 		}
 		for _, iface := range configs[0].Interfaces {
-			if iface.VPCID != nil && iface.IPv4.VPC != "" {
+			if iface.VPCID != nil && r.vpcid == *iface.VPCID && iface.IPv4.VPC != "" {
 				for _, ipsubnet := range iface.IPRanges {
 					route := &cloudprovider.Route{
 						TargetNode:      types.NodeName(instance.Label),

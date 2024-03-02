@@ -301,6 +301,21 @@ func (mr *MockClientMockRecorder) ListNodeBalancers(arg0, arg1 interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListNodeBalancers", reflect.TypeOf((*MockClient)(nil).ListNodeBalancers), arg0, arg1)
 }
 
+// ListVPCs mocks base method.
+func (m *MockClient) ListVPCs(arg0 context.Context, arg1 *linodego.ListOptions) ([]linodego.VPC, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListVPCs", arg0, arg1)
+	ret0, _ := ret[0].([]linodego.VPC)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListVPCs indicates an expected call of ListVPCs.
+func (mr *MockClientMockRecorder) ListVPCs(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListVPCs", reflect.TypeOf((*MockClient)(nil).ListVPCs), arg0, arg1)
+}
+
 // RebuildNodeBalancerConfig mocks base method.
 func (m *MockClient) RebuildNodeBalancerConfig(arg0 context.Context, arg1, arg2 int, arg3 linodego.NodeBalancerConfigRebuildOptions) (*linodego.NodeBalancerConfig, error) {
 	m.ctrl.T.Helper()

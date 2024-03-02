@@ -28,6 +28,7 @@ var Options struct {
 	KubeconfigFlag        *pflag.Flag
 	LinodeGoDebug         bool
 	EnableRouteController bool
+	VPCName               string
 }
 
 type linodeCloud struct {
@@ -69,12 +70,17 @@ func newCloud() (cloudprovider.Interface, error) {
 		linodeClient.SetDebug(true)
 	}
 
+	routes, err := newRoutes(linodeClient)
+	if err != nil {
+		return nil, fmt.Errorf("routes client was not created successfully: %w", err)
+	}
+
 	// Return struct that satisfies cloudprovider.Interface
 	return &linodeCloud{
 		client:        linodeClient,
 		instances:     newInstances(linodeClient),
 		loadbalancers: newLoadbalancers(linodeClient, region),
-		routes:        newRoutes(linodeClient),
+		routes:        routes,
 	}, nil
 }
 
