@@ -75,13 +75,14 @@ func newCloud() (cloudprovider.Interface, error) {
 		return nil, fmt.Errorf("routes client was not created successfully: %w", err)
 	}
 
-	// Return struct that satisfies cloudprovider.Interface
-	return &linodeCloud{
+	// create struct that satisfies cloudprovider.Interface
+	lcloud := &linodeCloud{
 		client:        linodeClient,
 		instances:     newInstances(linodeClient),
 		loadbalancers: newLoadbalancers(linodeClient, region),
 		routes:        routes,
-	}, nil
+	}
+	return lcloud, nil
 }
 
 func (c *linodeCloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stopCh <-chan struct{}) {

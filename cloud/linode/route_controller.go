@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/linode/linodego"
+	"golang.org/x/exp/slices"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -17,7 +18,7 @@ import (
 
 type routeCache struct {
 	sync.RWMutex
-	routes     map[int]*[]linodego.InstanceConfig
+	routes     map[int][]linodego.InstanceConfig
 	lastUpdate time.Time
 	ttl        time.Duration
 }
@@ -34,16 +35,24 @@ func (rc *routeCache) refreshRoutes(ctx context.Context, client Client) error {
 	if err != nil {
 		return err
 	}
-	rc.routes = make(map[int]*[]linodego.InstanceConfig)
-	for _, instance := range instances {
-		configs, err := client.ListInstanceConfigs(ctx, instance.ID, &linodego.ListOptions{})
-		if err != nil {
-			return err
-		}
-		rc.routes[instance.ID] = &configs
-	}
-	rc.lastUpdate = time.Now()
 
+	rc.routes = make(map[int][]linodego.InstanceConfig, len(instances))
+	wg := sync.WaitGroup{}
+	for _, instance := range instances {
+		wg.Add(1)
+		go func(ctx context.Context, id int) {
+			configs, err := client.ListInstanceConfigs(ctx, id, &linodego.ListOptions{})
+			if err != nil {
+				klog.Errorf("Failed fetching instance configs for instance id %d. Error: %s", id, err.Error())
+			}
+			rc.routes[id] = configs
+			wg.Done()
+		}(ctx, instance.ID)
+	}
+
+	wg.Wait()
+
+	rc.lastUpdate = time.Now()
 	return nil
 }
 
@@ -61,6 +70,7 @@ func newRoutes(client Client) (cloudprovider.Routes, error) {
 			timeout = t
 		}
 	}
+	klog.V(3).Infof("TTL for routeCache set to %d", timeout)
 
 	vpcid, err := getVPCID(client, Options.VPCName)
 	if err != nil {
@@ -72,7 +82,7 @@ func newRoutes(client Client) (cloudprovider.Routes, error) {
 		client:    client,
 		instances: newInstances(client),
 		routeCache: &routeCache{
-			routes: make(map[int]*[]linodego.InstanceConfig),
+			routes: make(map[int][]linodego.InstanceConfig),
 			ttl:    time.Duration(timeout) * time.Second,
 		},
 	}, nil
@@ -86,7 +96,7 @@ func (r *routes) instanceConfigsByID(id int) ([]linodego.InstanceConfig, error) 
 	if !ok {
 		return nil, cloudprovider.InstanceNotFound
 	}
-	return *instanceConfigs, nil
+	return instanceConfigs, nil
 }
 
 // getInstanceConfigs returns InstanceConfigs for given instance id
@@ -106,7 +116,6 @@ func (r *routes) getInstanceFromName(ctx context.Context, name string) (*linodeg
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: v1.NodeSpec{},
 	}
 
 	// fetch instance with specified node name
@@ -134,11 +143,9 @@ func (r *routes) CreateRoute(ctx context.Context, clusterName string, nameHint s
 	// find VPC interface and add route to it
 	for _, iface := range configs[0].Interfaces {
 		if iface.VPCID != nil && r.vpcid == *iface.VPCID && iface.IPv4.VPC != "" {
-			for _, configured_route := range iface.IPRanges {
-				if configured_route == route.DestinationCIDR {
-					klog.V(4).Infof("Route already exists for node %s", route.TargetNode)
-					return nil
-				}
+			if slices.Contains(iface.IPRanges, route.DestinationCIDR) {
+				klog.V(4).Infof("Route already exists for node %s", route.TargetNode)
+				return nil
 			}
 
 			ipRanges := append(iface.IPRanges, route.DestinationCIDR)
@@ -171,24 +178,26 @@ func (r *routes) DeleteRoute(ctx context.Context, clusterName string, route *clo
 	}
 
 	for _, iface := range configs[0].Interfaces {
-		if iface.VPCID != nil && r.vpcid == *iface.VPCID && iface.IPv4.VPC != "" {
-			ipRanges := []string{}
-			for _, configured_route := range iface.IPRanges {
-				if configured_route != route.DestinationCIDR {
-					ipRanges = append(ipRanges, configured_route)
-				}
-			}
-
-			interfaceUpdateOptions := linodego.InstanceConfigInterfaceUpdateOptions{
-				IPRanges: ipRanges,
-			}
-			resp, err := r.client.UpdateInstanceConfigInterface(ctx, instance.ID, configs[0].ID, iface.ID, interfaceUpdateOptions)
-			if err != nil {
-				return err
-			}
-			klog.V(4).Infof("Deleted route for node %s. Current routes: %v", route.TargetNode, resp.IPRanges)
-			return nil
+		if iface.VPCID == nil || r.vpcid != *iface.VPCID || iface.IPv4.VPC == "" {
+			continue
 		}
+
+		ipRanges := []string{}
+		for _, configured_route := range iface.IPRanges {
+			if configured_route != route.DestinationCIDR {
+				ipRanges = append(ipRanges, configured_route)
+			}
+		}
+
+		interfaceUpdateOptions := linodego.InstanceConfigInterfaceUpdateOptions{
+			IPRanges: ipRanges,
+		}
+		resp, err := r.client.UpdateInstanceConfigInterface(ctx, instance.ID, configs[0].ID, iface.ID, interfaceUpdateOptions)
+		if err != nil {
+			return err
+		}
+		klog.V(4).Infof("Deleted route for node %s. Current routes: %v", route.TargetNode, resp.IPRanges)
+		return nil
 	}
 	return nil
 }
@@ -205,18 +214,22 @@ func (r *routes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpr
 	for _, instance := range instances {
 		configs, err := r.getInstanceConfigs(ctx, instance.ID)
 		if err != nil {
-			return nil, err
+			klog.Errorf("Failed finding routes for instance id %d. Error: %s", instance.ID, err.Error())
+			continue
 		}
+
 		for _, iface := range configs[0].Interfaces {
-			if iface.VPCID != nil && r.vpcid == *iface.VPCID && iface.IPv4.VPC != "" {
-				for _, ipsubnet := range iface.IPRanges {
-					route := &cloudprovider.Route{
-						TargetNode:      types.NodeName(instance.Label),
-						DestinationCIDR: ipsubnet,
-					}
-					klog.V(4).Infof("Found route: node %s, route %s", instance.Label, route.DestinationCIDR)
-					routes = append(routes, route)
+			if iface.VPCID == nil || r.vpcid != *iface.VPCID || iface.IPv4.VPC == "" {
+				continue
+			}
+
+			for _, ipsubnet := range iface.IPRanges {
+				route := &cloudprovider.Route{
+					TargetNode:      types.NodeName(instance.Label),
+					DestinationCIDR: ipsubnet,
 				}
+				klog.V(4).Infof("Found route: node %s, route %s", instance.Label, route.DestinationCIDR)
+				routes = append(routes, route)
 			}
 		}
 	}
