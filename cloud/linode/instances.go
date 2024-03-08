@@ -8,11 +8,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/linode/linode-cloud-controller-manager/sentry"
 	"github.com/linode/linodego"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
+	"github.com/linode/linode-cloud-controller-manager/sentry"
 )
 
 type nodeCache struct {
@@ -24,7 +26,7 @@ type nodeCache struct {
 
 // refreshInstances conditionally loads all instances from the Linode API and caches them.
 // It does not refresh if the last update happened less than `nodeCache.ttl` ago.
-func (nc *nodeCache) refreshInstances(ctx context.Context, client Client) error {
+func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client) error {
 	nc.Lock()
 	defer nc.Unlock()
 
@@ -47,12 +49,12 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client Client) error 
 }
 
 type instances struct {
-	client Client
+	client client.Client
 
 	nodeCache *nodeCache
 }
 
-func newInstances(client Client) *instances {
+func newInstances(client client.Client) *instances {
 	timeout := 15
 	if raw, ok := os.LookupEnv("LINODE_INSTANCE_CACHE_TTL"); ok {
 		if t, _ := strconv.Atoi(raw); t > 0 {

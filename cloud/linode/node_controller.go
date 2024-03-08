@@ -18,12 +18,15 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 )
 
 type nodeController struct {
 	sync.RWMutex
 
-	client     Client
+	client     client.Client
 	instances  *instances
 	kubeclient kubernetes.Interface
 	informer   v1informers.NodeInformer
@@ -34,7 +37,7 @@ type nodeController struct {
 	queue workqueue.DelayingInterface
 }
 
-func newNodeController(kubeclient kubernetes.Interface, client Client, informer v1informers.NodeInformer) *nodeController {
+func newNodeController(kubeclient kubernetes.Interface, client client.Client, informer v1informers.NodeInformer) *nodeController {
 	timeout := 300
 	if raw, ok := os.LookupEnv("LINODE_METADATA_TTL"); ok {
 		if t, _ := strconv.Atoi(raw); t > 0 {
@@ -124,7 +127,7 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 
 	lastUpdate := s.LastMetadataUpdate(node.Name)
 
-	uuid, ok := node.Labels[annLinodeHostUUID]
+	uuid, ok := node.Labels[annotations.AnnLinodeHostUUID]
 	if ok && time.Since(lastUpdate) < s.ttl {
 		return nil
 	}
@@ -148,12 +151,12 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 		}
 
 		// It may be that the UUID has been set
-		if n.Labels[annLinodeHostUUID] == linode.HostUUID {
+		if n.Labels[annotations.AnnLinodeHostUUID] == linode.HostUUID {
 			return nil
 		}
 
 		// Try to update the node
-		n.Labels[annLinodeHostUUID] = linode.HostUUID
+		n.Labels[annotations.AnnLinodeHostUUID] = linode.HostUUID
 		_, err = s.kubeclient.CoreV1().Nodes().Update(ctx, n, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
