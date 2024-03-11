@@ -1,6 +1,6 @@
-package linode
+package client
 
-//go:generate go run github.com/golang/mock/mockgen -destination mock_client_test.go -package linode github.com/linode/linode-cloud-controller-manager/cloud/linode Client
+//go:generate go run github.com/golang/mock/mockgen -destination mock_client_test.go -package client github.com/linode/linode-cloud-controller-manager/cloud/linode/client Client
 
 import (
 	"context"
@@ -39,9 +39,10 @@ type Client interface {
 // linodego.Client implements Client
 var _ Client = (*linodego.Client)(nil)
 
-func newLinodeClient(token, ua, apiURL string) (*linodego.Client, error) {
+// New creates a new linode client with a given token, userAgent, and API URL
+func New(token, userAgent, apiURL string) (*linodego.Client, error) {
 	linodeClient := linodego.NewClient(nil)
-	linodeClient.SetUserAgent(ua)
+	linodeClient.SetUserAgent(userAgent)
 	linodeClient.SetToken(token)
 
 	// Validate apiURL

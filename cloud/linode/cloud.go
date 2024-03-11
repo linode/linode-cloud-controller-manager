@@ -9,6 +9,8 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/client-go/informers"
 	cloudprovider "k8s.io/cloud-provider"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 )
 
 const (
@@ -28,7 +30,7 @@ var Options struct {
 }
 
 type linodeCloud struct {
-	client        Client
+	client        client.Client
 	instances     cloudprovider.InstancesV2
 	loadbalancers cloudprovider.LoadBalancer
 }
@@ -56,7 +58,7 @@ func newCloud() (cloudprovider.Interface, error) {
 	url := os.Getenv(urlEnv)
 	ua := fmt.Sprintf("linode-cloud-controller-manager %s", linodego.DefaultUserAgent)
 
-	linodeClient, err := newLinodeClient(apiToken, ua, url)
+	linodeClient, err := client.New(apiToken, ua, url)
 	if err != nil {
 		return nil, fmt.Errorf("client was not created succesfully: %w", err)
 	}
