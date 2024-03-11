@@ -56,8 +56,8 @@ Annotation (Suffix) | Values | Default | Description
 `nodebalancer-id` | string | | The ID of the NodeBalancer to front the service. When not specified, a new NodeBalancer will be created. This can be configured on service creation or patching
 `hostname-only-ingress` | [bool](#annotation-bool-values) | `false` | When `true`, the LoadBalancerStatus for the service will only contain the Hostname. This is useful for bypassing kube-proxy's rerouting of in-cluster requests originally intended for the external LoadBalancer to the service's constituent pod IPs.
 `tags` | string | | A comma seperated list of tags to be applied to the createad NodeBalancer instance
-`firewall-id` | string | | An existing Cloud Firewall ID to be attached to the NodeBalancer instance. See [Firewalls](#firewalls).
-`firewall-acl` | string | | The Firewall rules to be applied to the NodeBalancer. Adding this annotation creates a new CCM managed Linode CloudFirewall instance. See [Firewalls](#firewalls).
+`firewall-id` | string | | An existing Cloud Firewall ID to be attached to the NodeBalancer instance. See [Firewalls](#nodebalancer-firewalls).
+`firewall-acl` | string | | The Firewall rules to be applied to the NodeBalancer. Adding this annotation creates a new CCM managed Linode CloudFirewall instance. See [Firewalls](#nodebalancer-firewalls).
 
 #### Deprecated Annotations
 These annotations are deprecated, and will be removed in a future release.
@@ -78,13 +78,17 @@ Key | Values | Default | Description
 `proxy-protocol` | `none`, `v1`, `v2` | `none` | Specifies whether to use a version of Proxy Protocol on the underlying NodeBalancer. Overwrites `default-proxy-protocol`.
 `tls-secret-name` | string | | Specifies a secret to use for TLS. The secret type should be `kubernetes.io/tls`.
 
-#### Firewalls
-Firewall rules can be applied to the CCM Managed NodeBalancers in two distinct ways.
+#### Nodebalancer Firewalls
+Firewall rules can be applied to the CCM-managed NodeBalancers in two distinct ways.
 
-##### CCM Managed Firewall
-To use this feature, ensure that the linode api token used with the ccm has the `add_firewalls` grant. 
+##### CCM-Managed Firewall
+To use this feature, ensure that the Linode API token used with the CCM has the `add_firewalls` grant. 
 
-The CCM accepts firewall ACLs in json form. The ACL can either be an `allowList` or a `denyList`. Supplying both is not supported. Supplying neither is not supported. The `allowList` sets up a CloudFirewall that `ACCEPT`s traffic only from the specified IPs/CIDRs and `DROP`s everything else. The `denyList` sets up a CloudFirewall that `DROP`s traffic only from the specified IPs/CIDRs and `ACCEPT`s everything else. Ports are automatically inferred from the service configuration. 
+The CCM accepts firewall ACLs in JSON form. The ACL can either be an `allowList` or a `denyList`. Supplying both is not
+supported. Supplying neither is not supported. The `allowList` sets up a CloudFirewall that `ACCEPT`s traffic only from
+the specified IPs/CIDRs and `DROP`s everything else. The `denyList` sets up a CloudFirewall that `DROP`s traffic only
+from the specified IPs/CIDRs and `ACCEPT`s everything else. Ports are automatically inferred from the service
+configuration. 
 
 See [Firewall rules](https://www.linode.com/docs/api/networking/#firewall-create__request-body-schema) for more details on how to specify the IPs/CIDRs
 
@@ -121,10 +125,13 @@ spec:
 
 ##### User Managed Firewall
 Users can create CloudFirewall instances, supply their own rules and attach them to the NodeBalancer. To do so, set the
-`service.beta.kubernetes.io/linode-loadbalancer-firewall-id` annotation to the ID of the cloud firewall. The CCM does not manage the lifecycle of the CloudFirewall Instance in this case. Users are responsible for ensuring the policies are correct.
+`service.beta.kubernetes.io/linode-loadbalancer-firewall-id` annotation to the ID of the CloudFirewall. The CCM does
+not manage the lifecycle of the CloudFirewall Instance in this case. Users are responsible for ensuring the policies are
+correct.
 
 **Note**<br/>
-If the user supplies a firewall-id, and later switches to using an ACL, the CCM will take over the CloudFirewall Instance. To avoid this, delete the service, and re-create it so the original CloudFirewall is left undisturbed.
+If the user supplies a firewall-id, and later switches to using an ACL, the CCM will take over the CloudFirewall
+Instance. To avoid this, delete the service, and re-create it so the original CloudFirewall is left undisturbed.
 
 ### Nodes
 Kubernetes Nodes can be configured with the following annotations.
@@ -135,11 +142,57 @@ Each *Node* annotation **MUST** be prefixed with:<br />
 Key | Values | Default | Description
 ---|---|---|---
 `private-ip` | `IPv4` | `none` | Specifies the Linode Private IP overriding default detection of the Node InternalIP.<br />When using a [VLAN] or [VPC], the Node InternalIP may not be a Linode Private IP as [required for NodeBalancers] and should be specified.
-
+`linode-firewall-id` | string | | An existing Cloud Firewall ID to be attached to the Node. See [Firewalls](#linode-firewalls).
+`linode-firewall-acl` | string | | The Firewall rules to be applied to the Node. Adding this annotation creates a new CCM-managed Linode CloudFirewall instance. See [Firewalls](#linode-firewalls).
 
 [required for NodeBalancers]: https://www.linode.com/docs/api/nodebalancers/#nodebalancer-create__request-body-schema
 [VLAN]: https://www.linode.com/products/vlan/
 [VPC]: https://www.linode.com/blog/linode/new-betas-coming-to-green-light/
+
+#### Linode Firewalls
+Firewall rules can be applied to the CCM-managed Nodes in two distinct ways.
+
+##### CCM-managed Firewall
+To use this feature, ensure that the Linode API token used with the CCM has the `add_firewalls` grant. 
+
+The CCM accepts firewall ACLs in JSON form. The ACL can either be an `allowList` or a `denyList`.
+Supplying both is not supported. Supplying neither is not supported. The `allowList` sets up a
+CloudFirewall that `ACCEPT`s traffic only from the specified IPs/CIDRs and `DROP`s everything else.
+The `denyList` sets up a CloudFirewall that `DROP`s traffic only from the specified IPs/CIDRs and
+`ACCEPT`s everything else. Ports are automatically inferred from the service configuration. 
+
+See [Firewall rules](https://www.linode.com/docs/api/networking/#firewall-create__request-body-schema)
+for more details on how to specify the IPs/CIDRs
+
+Example usage of an ACL to allow traffic from a specific set of addresses
+
+```yaml
+kind: Node
+apiVersion: v1
+metadata:
+  name: k8s-worker-1
+  annotations:
+    node.k8s.linode.com/linode-firewall-acl: |
+      {
+        "allowList": {
+          "ipv4": ["192.166.0.0/16", "172.23.41.0/24"],
+          "ipv6": ["2001:DB8::/128"]
+        },
+        "ports": ["22","6443"]
+      }
+```
+
+##### User Managed Firewall
+Users can create CloudFirewall instances, supply their own rules and attach them to the
+Node. To do so, set the
+`node.k8s.linode.com/linode-firewall-id` annotation to the ID of the
+CloudFirewall. The CCM does not manage the lifecycle of the CloudFirewall Instance in
+this case. Users are responsible for ensuring the policies are correct.
+
+**Note**<br/>
+If the user supplies a linode-firewall-id, and later switches to using an ACL, the CCM will take
+over the CloudFirewall Instance. To avoid this, remove and delete the Node, and
+re-create it so the original CloudFirewall is left undisturbed.
 
 ### Example usage
 ```yaml

@@ -262,7 +262,7 @@ func (l *loadbalancers) updateNodeBalancer(
 		}
 	}
 
-	fwClient := firewall.LinodeClient{Client: l.client}
+	fwClient := firewall.Firewalls{Client: l.client}
 	err = fwClient.UpdateNodeBalancerFirewall(ctx, l.GetLoadBalancerName(ctx, clusterName, service), tags, service, nb)
 	if err != nil {
 		return err

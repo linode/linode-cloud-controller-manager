@@ -36,6 +36,9 @@ spec:
             {{- if .Values.linodegoDebug }}
             - --linodego-debug={{ .Values.linodegoDebug }}
             {{- end }}
+            {{- if .Values.nodeFirewallController }}
+            - --enable-node-firewall-controller=true
+            {{- end }}
           volumeMounts:
             - mountPath: /etc/kubernetes
               name: k8s

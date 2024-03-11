@@ -919,7 +919,7 @@ func testUpdateLoadBalancerAddNewFirewall(t *testing.T, client *linodego.Client,
 	}
 	svc.Status.LoadBalancer = *lbStatus
 	stubService(fakeClientset, svc)
-	fwClient := firewall.LinodeClient{Client: client}
+	fwClient := firewall.NewFirewalls(client)
 	fw, err := fwClient.CreateFirewall(context.TODO(), linodego.FirewallCreateOptions{
 		Label: "test",
 		Rules: linodego.FirewallRuleSet{Inbound: []linodego.FirewallRule{{
@@ -1171,7 +1171,7 @@ func testUpdateLoadBalancerUpdateFirewallRemoveACLaddID(t *testing.T, client *li
 		t.Errorf("expected IP, got %v", fwIPs)
 	}
 
-	fwClient := firewall.LinodeClient{Client: client}
+	fwClient := firewall.NewFirewalls(client)
 	fw, err := fwClient.CreateFirewall(context.TODO(), linodego.FirewallCreateOptions{
 		Label: "test",
 		Rules: linodego.FirewallRuleSet{Inbound: []linodego.FirewallRule{{
@@ -1264,7 +1264,7 @@ func testUpdateLoadBalancerUpdateFirewallRemoveIDaddACL(t *testing.T, client *li
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
 
-	fwClient := firewall.LinodeClient{Client: client}
+	fwClient := firewall.NewFirewalls(client)
 	fw, err := fwClient.CreateFirewall(context.TODO(), linodego.FirewallCreateOptions{
 		Label: "test",
 		Rules: linodego.FirewallRuleSet{Inbound: []linodego.FirewallRule{{
@@ -1541,7 +1541,7 @@ func testUpdateLoadBalancerUpdateFirewall(t *testing.T, client *linodego.Client,
 		_ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
 	}()
 
-	fwClient := firewall.LinodeClient{Client: client}
+	fwClient := firewall.NewFirewalls(client)
 	fw, err := fwClient.CreateFirewall(context.TODO(), firewallCreateOpts)
 	if err != nil {
 		t.Errorf("Error creating firewall %s", err)
@@ -1668,7 +1668,7 @@ func testUpdateLoadBalancerDeleteFirewall(t *testing.T, client *linodego.Client,
 		_ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
 	}()
 
-	fwClient := firewall.LinodeClient{Client: client}
+	fwClient := firewall.NewFirewalls(client)
 	fw, err := fwClient.CreateFirewall(context.TODO(), firewallCreateOpts)
 	if err != nil {
 		t.Errorf("Error in creating firewall %s", err)

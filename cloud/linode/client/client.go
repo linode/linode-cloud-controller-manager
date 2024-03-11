@@ -1,6 +1,6 @@
 package client
 
-//go:generate go run github.com/golang/mock/mockgen -destination mock_client_test.go -package client github.com/linode/linode-cloud-controller-manager/cloud/linode/client Client
+//go:generate go run github.com/golang/mock/mockgen -destination mocks/mock_client.go -package mocks github.com/linode/linode-cloud-controller-manager/cloud/linode/client Client
 
 import (
 	"context"
@@ -26,10 +26,14 @@ type Client interface {
 	DeleteNodeBalancerConfig(context.Context, int, int) error
 	ListNodeBalancerConfigs(context.Context, int, *linodego.ListOptions) ([]linodego.NodeBalancerConfig, error)
 	RebuildNodeBalancerConfig(context.Context, int, int, linodego.NodeBalancerConfigRebuildOptions) (*linodego.NodeBalancerConfig, error)
+
 	ListNodeBalancerFirewalls(ctx context.Context, nodebalancerID int, opts *linodego.ListOptions) ([]linodego.Firewall, error)
+	ListInstanceFirewalls(ctx context.Context, linodeID int, opts *linodego.ListOptions) ([]linodego.Firewall, error)
+
 	ListFirewallDevices(ctx context.Context, firewallID int, opts *linodego.ListOptions) ([]linodego.FirewallDevice, error)
 	DeleteFirewallDevice(ctx context.Context, firewallID, deviceID int) error
 	CreateFirewallDevice(ctx context.Context, firewallID int, opts linodego.FirewallDeviceCreateOptions) (*linodego.FirewallDevice, error)
+
 	CreateFirewall(ctx context.Context, opts linodego.FirewallCreateOptions) (*linodego.Firewall, error)
 	DeleteFirewall(ctx context.Context, fwid int) error
 	GetFirewall(context.Context, int) (*linodego.Firewall, error)

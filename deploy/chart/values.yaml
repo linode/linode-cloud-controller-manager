@@ -44,6 +44,9 @@ tolerations:
     operator: Exists
     effect: NoSchedule
 
+# This section adds ability to enable node-firewall-controller for ccm
+# nodeFirewallController: true
+
 # This section adds the ability to pass environment variables to adjust CCM defaults
 # https://github.com/linode/linode-cloud-controller-manager/blob/master/cloud/linode/loadbalancers.go
 # LINODE_HOSTNAME_ONLY_INGRESS type bool is supported

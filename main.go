@@ -76,6 +76,7 @@ func main() {
 
 	// Add Linode-specific flags
 	command.Flags().BoolVar(&linode.Options.LinodeGoDebug, "linodego-debug", false, "enables debug output for the LinodeAPI wrapper")
+	command.Flags().BoolVar(&linode.Options.EnableNodeFirewallController, "enable-node-firewall-controller", false, "enables node_firewall_controller for ccm")
 
 	// Set static flags
 	command.Flags().VisitAll(func(fl *pflag.Flag) {

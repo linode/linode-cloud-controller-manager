@@ -25,8 +25,9 @@ const (
 // We expect it to be initialized with flags external to this package, likely in
 // main.go
 var Options struct {
-	KubeconfigFlag *pflag.Flag
-	LinodeGoDebug  bool
+	KubeconfigFlag               *pflag.Flag
+	LinodeGoDebug                bool
+	EnableNodeFirewallController bool
 }
 
 type linodeCloud struct {
@@ -86,6 +87,11 @@ func (c *linodeCloud) Initialize(clientBuilder cloudprovider.ControllerClientBui
 
 	nodeController := newNodeController(kubeclient, c.client, nodeInformer)
 	go nodeController.Run(stopCh)
+
+	if Options.EnableNodeFirewallController {
+		firewallController := newFirewallController(c.client, nodeInformer)
+		go firewallController.Run(stopCh)
+	}
 }
 
 func (c *linodeCloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
