@@ -2,6 +2,7 @@ package linode
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strconv"
 	"sync"
@@ -14,16 +15,19 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 )
 
 type routeCache struct {
 	sync.RWMutex
 	routes     map[int][]linodego.InstanceConfig
+	mtx        sync.Mutex
 	lastUpdate time.Time
 	ttl        time.Duration
 }
 
-func (rc *routeCache) refreshRoutes(ctx context.Context, client Client) error {
+func (rc *routeCache) refreshRoutes(ctx context.Context, client client.Client) error {
 	rc.Lock()
 	defer rc.Unlock()
 
@@ -41,12 +45,16 @@ func (rc *routeCache) refreshRoutes(ctx context.Context, client Client) error {
 	for _, instance := range instances {
 		wg.Add(1)
 		go func(ctx context.Context, id int) {
+			defer wg.Done()
 			configs, err := client.ListInstanceConfigs(ctx, id, &linodego.ListOptions{})
 			if err != nil {
 				klog.Errorf("Failed fetching instance configs for instance id %d. Error: %s", id, err.Error())
+				return
 			}
+			// take lock on map so that concurrent writes are safe
+			rc.mtx.Lock()
+			defer rc.mtx.Unlock()
 			rc.routes[id] = configs
-			wg.Done()
 		}(ctx, instance.ID)
 	}
 
@@ -58,12 +66,12 @@ func (rc *routeCache) refreshRoutes(ctx context.Context, client Client) error {
 
 type routes struct {
 	vpcid      int
-	client     Client
+	client     client.Client
 	instances  *instances
 	routeCache *routeCache
 }
 
-func newRoutes(client Client) (cloudprovider.Routes, error) {
+func newRoutes(client client.Client) (cloudprovider.Routes, error) {
 	timeout := 60
 	if raw, ok := os.LookupEnv("LINODE_ROUTES_CACHE_TTL"); ok {
 		if t, _ := strconv.Atoi(raw); t > 0 {
@@ -82,7 +90,7 @@ func newRoutes(client Client) (cloudprovider.Routes, error) {
 		client:    client,
 		instances: newInstances(client),
 		routeCache: &routeCache{
-			routes: make(map[int][]linodego.InstanceConfig),
+			routes: make(map[int][]linodego.InstanceConfig, 0),
 			ttl:    time.Duration(timeout) * time.Second,
 		},
 	}, nil
@@ -94,7 +102,7 @@ func (r *routes) instanceConfigsByID(id int) ([]linodego.InstanceConfig, error) 
 	defer r.routeCache.RUnlock()
 	instanceConfigs, ok := r.routeCache.routes[id]
 	if !ok {
-		return nil, cloudprovider.InstanceNotFound
+		return nil, fmt.Errorf("no configs found for instance %d", id)
 	}
 	return instanceConfigs, nil
 }
@@ -142,27 +150,28 @@ func (r *routes) CreateRoute(ctx context.Context, clusterName string, nameHint s
 
 	// find VPC interface and add route to it
 	for _, iface := range configs[0].Interfaces {
-		if iface.VPCID != nil && r.vpcid == *iface.VPCID && iface.IPv4.VPC != "" {
-			if slices.Contains(iface.IPRanges, route.DestinationCIDR) {
-				klog.V(4).Infof("Route already exists for node %s", route.TargetNode)
-				return nil
-			}
+		if iface.VPCID == nil || r.vpcid != *iface.VPCID || iface.IPv4.VPC == "" {
+			continue
+		}
 
-			ipRanges := append(iface.IPRanges, route.DestinationCIDR)
-			interfaceUpdateOptions := linodego.InstanceConfigInterfaceUpdateOptions{
-				IPRanges: ipRanges,
-			}
-			resp, err := r.client.UpdateInstanceConfigInterface(ctx, instance.ID, configs[0].ID, iface.ID, interfaceUpdateOptions)
-			if err != nil {
-				return err
-			}
-			klog.V(4).Infof("Added routes for node %s. Current routes: %v", route.TargetNode, resp.IPRanges)
+		if slices.Contains(iface.IPRanges, route.DestinationCIDR) {
+			klog.V(4).Infof("Route already exists for node %s", route.TargetNode)
 			return nil
 		}
+
+		ipRanges := append(iface.IPRanges, route.DestinationCIDR)
+		interfaceUpdateOptions := linodego.InstanceConfigInterfaceUpdateOptions{
+			IPRanges: ipRanges,
+		}
+		resp, err := r.client.UpdateInstanceConfigInterface(ctx, instance.ID, configs[0].ID, iface.ID, interfaceUpdateOptions)
+		if err != nil {
+			return err
+		}
+		klog.V(4).Infof("Added routes for node %s. Current routes: %v", route.TargetNode, resp.IPRanges)
+		return nil
 	}
 
-	klog.V(4).Infof("Unable to add route for node %s. No valid interface found", route.TargetNode)
-	return nil
+	return fmt.Errorf("unable to add route %s for node %s. no valid interface found", route.DestinationCIDR, route.TargetNode)
 }
 
 // DeleteRoute removes route's subnet from ip_ranges of target node's VPC interface
@@ -199,7 +208,7 @@ func (r *routes) DeleteRoute(ctx context.Context, clusterName string, route *clo
 		klog.V(4).Infof("Deleted route for node %s. Current routes: %v", route.TargetNode, resp.IPRanges)
 		return nil
 	}
-	return nil
+	return fmt.Errorf("unable to remove route %s for node %s", route.DestinationCIDR, route.TargetNode)
 }
 
 // ListRoutes fetches routes configured on all instances which have VPC interfaces

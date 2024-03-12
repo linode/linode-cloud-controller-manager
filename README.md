@@ -133,7 +133,7 @@ When running k8s clusters within VPC, node specific podCIDRs need to be allowed 
 ```yaml
 routeController:
   vpcName: <name of VPC>
-  clusterCIDR: 10.0.0.0/8
+  linodeNodePrivateSubnet: 10.0.0.0/8
   configureCloudRoutes: true
   routeReconciliationPeriod: 1m
 ```

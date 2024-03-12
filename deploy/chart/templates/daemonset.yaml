@@ -39,7 +39,7 @@ spec:
             {{- if .Values.routeController }}
             - --enable-route-controller=true
             - --vpc-name={{ .Values.routeController.vpcName }}
-            - --cluster-cidr={{ .Values.routeController.clusterCIDR }}
+            - --linode-node-private-subnet={{ .Values.routeController.linodeNodePrivateSubnet }}
             {{- if .Values.routeController.configureCloudRoutes }}
             - --configure-cloud-routes={{ .Values.routeController.configureCloudRoutes }}
             {{- end }}

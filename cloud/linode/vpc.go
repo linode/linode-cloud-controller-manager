@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 	"github.com/linode/linodego"
 )
 
@@ -16,7 +17,7 @@ func (e vpcLookupError) Error() string {
 }
 
 // getVPCID returns the VPC id using the VPC label
-func getVPCID(client Client, vpcName string) (int, error) {
+func getVPCID(client client.Client, vpcName string) (int, error) {
 	vpcs, err := client.ListVPCs(context.TODO(), &linodego.ListOptions{})
 	if err != nil {
 		return 0, err
