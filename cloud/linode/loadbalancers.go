@@ -825,17 +825,13 @@ func getTLSCertInfo(ctx context.Context, kubeClient kubernetes.Interface, namesp
 }
 
 func getConnectionThrottle(service *v1.Service) int {
-	connThrottle := 20
+	connThrottle := 0 // default disable.
 
 	if connThrottleString := service.GetAnnotations()[annotations.AnnLinodeThrottle]; connThrottleString != "" {
 		parsed, err := strconv.Atoi(connThrottleString)
 		if err == nil {
 			if parsed < 0 {
 				parsed = 0
-			}
-
-			if parsed > 20 {
-				parsed = 20
 			}
 			connThrottle = parsed
 		}
