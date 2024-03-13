@@ -227,7 +227,7 @@ func (r *routes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpr
 	for _, instance := range instances {
 		configs, err := r.getInstanceConfigs(ctx, instance.ID)
 		if err != nil {
-			klog.Errorf("Failed finding routes for instance id %d. Error: %s", instance.ID, err.Error())
+			klog.Errorf("Failed finding routes for instance id %d. Error: %v", instance.ID, err)
 			continue
 		}
 
