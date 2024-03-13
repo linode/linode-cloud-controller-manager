@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/appscode/go v0.0.0-20200323182826-54e98e09185a
-	github.com/linode/linodego v1.26.0
+	github.com/linode/linodego v1.30.0
 	github.com/onsi/ginkgo/v2 v2.13.2
 	github.com/onsi/gomega v1.30.0
 	k8s.io/api v0.23.17
