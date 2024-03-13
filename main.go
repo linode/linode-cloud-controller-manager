@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"net"
 	"os"
 
 	"k8s.io/component-base/logs"
@@ -79,7 +78,6 @@ func main() {
 	command.Flags().BoolVar(&linode.Options.LinodeGoDebug, "linodego-debug", false, "enables debug output for the LinodeAPI wrapper")
 	command.Flags().BoolVar(&linode.Options.EnableRouteController, "enable-route-controller", false, "enables route_controller for ccm")
 	command.Flags().StringVar(&linode.Options.VPCName, "vpc-name", "", "vpc name whose routes will be managed by route-controller")
-	command.Flags().IPNetVar(&linode.Options.LinodeNodePrivateSubnet, "linode-node-private-subnet", net.IPNet{IP: net.ParseIP("192.168.128.0"), Mask: net.CIDRMask(17, 32)}, "specifies private network used by k8s")
 
 	// Set static flags
 	command.Flags().VisitAll(func(fl *pflag.Flag) {
@@ -87,8 +85,6 @@ func main() {
 		switch fl.Name {
 		case "cloud-provider":
 			err = fl.Value.Set(linode.ProviderName)
-		case "cluster-cidr":
-			err = fl.Value.Set(linode.Options.LinodeNodePrivateSubnet.String())
 		case
 			// Prevent reaching out to an authentication-related ConfigMap that
 			// we do not need, and thus do not intend to create RBAC permissions

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/linode/linodego"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/exp/slices"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,7 +23,6 @@ import (
 type routeCache struct {
 	sync.RWMutex
 	routes     map[int][]linodego.InstanceConfig
-	mtx        sync.Mutex
 	lastUpdate time.Time
 	ttl        time.Duration
 }
@@ -41,24 +41,28 @@ func (rc *routeCache) refreshRoutes(ctx context.Context, client client.Client) e
 	}
 
 	rc.routes = make(map[int][]linodego.InstanceConfig, len(instances))
-	wg := sync.WaitGroup{}
+
+	mtx := sync.Mutex{}
+	g := new(errgroup.Group)
 	for _, instance := range instances {
-		wg.Add(1)
-		go func(ctx context.Context, id int) {
-			defer wg.Done()
+		id := instance.ID
+		g.Go(func() error {
 			configs, err := client.ListInstanceConfigs(ctx, id, &linodego.ListOptions{})
 			if err != nil {
 				klog.Errorf("Failed fetching instance configs for instance id %d. Error: %s", id, err.Error())
-				return
+				return err
 			}
 			// take lock on map so that concurrent writes are safe
-			rc.mtx.Lock()
-			defer rc.mtx.Unlock()
+			mtx.Lock()
+			defer mtx.Unlock()
 			rc.routes[id] = configs
-		}(ctx, instance.ID)
+			return nil
+		})
 	}
 
-	wg.Wait()
+	if err := g.Wait(); err != nil {
+		return err
+	}
 
 	rc.lastUpdate = time.Now()
 	return nil

@@ -39,10 +39,8 @@ spec:
             {{- if .Values.routeController }}
             - --enable-route-controller=true
             - --vpc-name={{ .Values.routeController.vpcName }}
-            - --linode-node-private-subnet={{ .Values.routeController.linodeNodePrivateSubnet }}
-            {{- if .Values.routeController.configureCloudRoutes }}
             - --configure-cloud-routes={{ .Values.routeController.configureCloudRoutes }}
-            {{- end }}
+            - --cluster-cidr={{ .Values.routeController.clusterCIDR }}
             {{- if .Values.routeController.routeReconciliationPeriod }}
             - --route-reconciliation-period={{ .Values.routeController.routeReconciliationPeriod }}
             {{- end }}

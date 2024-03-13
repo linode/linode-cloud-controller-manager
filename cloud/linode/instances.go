@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/linode/linodego"
+	"golang.org/x/sync/errgroup"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
@@ -23,13 +24,16 @@ type nodeIP struct {
 	ipType v1.NodeAddressType
 }
 
+type linodeInstance struct {
+	instance *linodego.Instance
+	ips      []nodeIP
+}
+
 type nodeCache struct {
 	sync.RWMutex
-	mtx        sync.Mutex
-	nodes      map[int]*linodego.Instance
+	nodes      map[int]linodeInstance
 	lastUpdate time.Time
 	ttl        time.Duration
-	ips        map[int][]nodeIP
 }
 
 // getInstanceIPv4Addresses returns all ipv4 addresses configured on a linode.
@@ -85,31 +89,32 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 	if err != nil {
 		return err
 	}
-	nc.nodes = make(map[int]*linodego.Instance, len(instances))
-	nc.ips = make(map[int][]nodeIP, len(instances))
-	wg := sync.WaitGroup{}
-	for _, instance := range instances {
-		wg.Add(1)
-		go func(ctx context.Context, instance linodego.Instance) {
-			defer wg.Done()
 
+	nc.nodes = make(map[int]linodeInstance, len(instances))
+
+	mtx := sync.Mutex{}
+	g := new(errgroup.Group)
+	for _, instance := range instances {
+		instance := instance
+		g.Go(func() error {
 			addresses, err := nc.getInstanceIPv4Addresses(ctx, instance.ID, client)
 			if err != nil {
 				klog.Errorf("Failed fetching ip addresses for instance id %d. Error: %s", instance.ID, err.Error())
-				nc.mtx.Lock()
-				defer nc.mtx.Unlock()
-				nc.nodes[instance.ID] = &instance
-				return
+				return err
 			}
 			// take lock on map so that concurrent writes are safe
-			nc.mtx.Lock()
-			defer nc.mtx.Unlock()
-			nc.nodes[instance.ID] = &instance
-			nc.ips[instance.ID] = addresses
-		}(ctx, instance)
+			mtx.Lock()
+			defer mtx.Unlock()
+			node := linodeInstance{instance: &instance, ips: addresses}
+			nc.nodes[instance.ID] = node
+			return nil
+		})
 	}
 
-	wg.Wait()
+	if err := g.Wait(); err != nil {
+		return err
+	}
+
 	nc.lastUpdate = time.Now()
 
 	return nil
@@ -131,8 +136,7 @@ func newInstances(client client.Client) *instances {
 	klog.V(3).Infof("TTL for nodeCache set to %d", timeout)
 
 	return &instances{client, &nodeCache{
-		nodes: make(map[int]*linodego.Instance, 0),
-		ips:   make(map[int][]nodeIP, 0),
+		nodes: make(map[int]linodeInstance, 0),
 		ttl:   time.Duration(timeout) * time.Second,
 	}}
 }
@@ -149,8 +153,8 @@ func (i *instances) linodeByName(nodeName types.NodeName) (*linodego.Instance, e
 	i.nodeCache.RLock()
 	defer i.nodeCache.RUnlock()
 	for _, node := range i.nodeCache.nodes {
-		if node.Label == string(nodeName) {
-			return node, nil
+		if node.instance.Label == string(nodeName) {
+			return node.instance, nil
 		}
 	}
 
@@ -160,11 +164,11 @@ func (i *instances) linodeByName(nodeName types.NodeName) (*linodego.Instance, e
 func (i *instances) linodeByID(id int) (*linodego.Instance, error) {
 	i.nodeCache.RLock()
 	defer i.nodeCache.RUnlock()
-	instance, ok := i.nodeCache.nodes[id]
+	linodeInstance, ok := i.nodeCache.nodes[id]
 	if !ok {
 		return nil, cloudprovider.InstanceNotFound
 	}
-	return instance, nil
+	return linodeInstance.instance, nil
 }
 
 // listAllInstances returns all instances in nodeCache
@@ -174,8 +178,8 @@ func (i *instances) listAllInstances(ctx context.Context) ([]linodego.Instance, 
 	}
 
 	instances := []linodego.Instance{}
-	for _, instance := range i.nodeCache.nodes {
-		instances = append(instances, *instance)
+	for _, linodeInstance := range i.nodeCache.nodes {
+		instances = append(instances, *linodeInstance.instance)
 	}
 	return instances, nil
 }
@@ -283,12 +287,12 @@ func (i *instances) getLinodeIPv4Addresses(ctx context.Context, node *v1.Node) (
 
 	i.nodeCache.RLock()
 	defer i.nodeCache.RUnlock()
-	ips, ok := i.nodeCache.ips[instance.ID]
-	if !ok {
+	linodeInstance, ok := i.nodeCache.nodes[instance.ID]
+	if !ok || len(linodeInstance.ips) == 0 {
 		err := instanceNoIPAddressesError{instance.ID}
 		sentry.CaptureError(ctx, err)
 		return nil, err
 	}
 
-	return ips, nil
+	return linodeInstance.ips, nil
 }
