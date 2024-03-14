@@ -84,9 +84,13 @@ func newRoutes(client client.Client) (cloudprovider.Routes, error) {
 	}
 	klog.V(3).Infof("TTL for routeCache set to %d", timeout)
 
-	vpcid, err := getVPCID(client, Options.VPCName)
-	if err != nil {
-		return nil, err
+	vpcid := 0
+	if Options.EnableRouteController {
+		id, err := getVPCID(client, Options.VPCName)
+		if err != nil {
+			return nil, err
+		}
+		vpcid = id
 	}
 
 	return &routes{
