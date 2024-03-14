@@ -53,6 +53,7 @@ var _ = Describe("e2e tests", func() {
 		annLinodeHealthCheckPassive      = "service.beta.kubernetes.io/linode-loadbalancer-check-passive"
 		annLinodeNodeBalancerID          = "service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"
 		annLinodeHostnameOnlyIngress     = "service.beta.kubernetes.io/linode-loadbalancer-hostname-only-ingress"
+		annLinodeCloudFirewallID         = "service.beta.kubernetes.io/linode-loadbalancer-firewall-id"
 	)
 
 	BeforeEach(func() {
@@ -123,6 +124,29 @@ var _ = Describe("e2e tests", func() {
 		Expect(getLinodeClient().DeleteNodeBalancer(context.Background(), id)).NotTo(HaveOccurred())
 	}
 
+	createEmptyFirewall := func() int {
+		var fw *linodego.Firewall
+		fw, err = getLinodeClient().CreateFirewall(context.TODO(), linodego.FirewallCreateOptions{
+			Label: "ccm-e2e-test",
+			Rules: linodego.FirewallRuleSet{Inbound: []linodego.FirewallRule{{
+				Action:      "ACCEPT",
+				Label:       "inbound-rule123",
+				Description: "inbound rule123",
+				Ports:       "4321",
+				Protocol:    linodego.TCP,
+				Addresses: linodego.NetworkAddresses{
+					IPv4: &[]string{"0.0.0.0/0"},
+				},
+			}}, Outbound: []linodego.FirewallRule{}, InboundPolicy: "ACCEPT", OutboundPolicy: "ACCEPT"},
+		})
+		Expect(err).NotTo(HaveOccurred())
+		return fw.ID
+	}
+
+	deleteFirewall := func(id int) {
+		Expect(getLinodeClient().DeleteFirewall(context.Background(), id)).NotTo(HaveOccurred())
+	}
+
 	createNodeBalancer := func() int {
 		var nb *linodego.NodeBalancer
 		nb, err = getLinodeClient().CreateNodeBalancer(context.TODO(), linodego.NodeBalancerCreateOptions{
@@ -165,6 +189,19 @@ var _ = Describe("e2e tests", func() {
 
 	checkNodeBalancerID := func(service string, expectedID int) {
 		Eventually(f.LoadBalancer.GetNodeBalancerID).WithArguments(service).Should(Equal(expectedID))
+	}
+
+	checkNodeBalancerHasFirewallID := func(nbID, fwID int) {
+		devices, err := getLinodeClient().ListFirewallDevices(context.TODO(), fwID, &linodego.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		found := false
+		for _, device := range devices {
+			if device.Entity.ID == nbID {
+				found = true
+				break
+			}
+		}
+		Expect(found).To(Equal(true))
 	}
 
 	checkLBStatus := func(service string, hasIP bool) {
@@ -1391,6 +1428,76 @@ var _ = Describe("e2e tests", func() {
 						path:       path,
 						checkNodes: true,
 					})
+				})
+			})
+
+			Context("Created with FirewallID", func() {
+				var (
+					pods         []string
+					labels       map[string]string
+					servicePorts []core.ServicePort
+					fwID         int
+					annotations  = map[string]string{}
+				)
+				BeforeEach(func() {
+					pods = []string{"test-pod-1"}
+					ports := []core.ContainerPort{
+						{
+							Name:          "http-1",
+							ContainerPort: 8080,
+						},
+					}
+					servicePorts = []core.ServicePort{
+						{
+							Name:       "http-1",
+							Port:       80,
+							TargetPort: intstr.FromInt(8080),
+							Protocol:   "TCP",
+						},
+					}
+
+					labels = map[string]string{
+						"app": "test-loadbalancer-with-firewall-id",
+					}
+
+					By("Creating a Empty Firewall")
+					fwID = createEmptyFirewall()
+
+					annotations = map[string]string{
+						annLinodeCloudFirewallID: strconv.Itoa(fwID),
+					}
+
+					By("Creating Pod")
+					createPodWithLabel(pods, ports, framework.TestServerImage, labels, false)
+
+					By("Creating Service")
+					createServiceWithAnnotations(labels, annotations, servicePorts, false)
+				})
+
+				AfterEach(func() {
+					By("Deleting the Pods")
+					deletePods(pods)
+
+					By("Deleting the Service")
+					deleteService()
+
+					By("Deleting the empty firewall")
+					deleteFirewall(fwID)
+				})
+
+				It("should use the specified NodeBalancer", func() {
+					By("Creating new NodeBalancer")
+					nbID := createNodeBalancer()
+
+					By("Annotating service with new NodeBalancer ID")
+					annotations[annLinodeNodeBalancerID] = strconv.Itoa(nbID)
+					updateServiceWithAnnotations(labels, annotations, servicePorts, false)
+
+					By("Checking the NodeBalancer ID")
+					checkNodeBalancerID(framework.TestServerResourceName, nbID)
+
+					By("Checking the nodebalancer has the firewallAttached")
+					checkNodeBalancerHasFirewallID(nbID, fwID)
 				})
 			})
 		})
