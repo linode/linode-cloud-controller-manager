@@ -41,7 +41,7 @@ Each *Service* annotation **MUST** be prefixed with:<br />
 
 Annotation (Suffix) | Values | Default | Description
 ---|---|---|---
-`throttle` | `0`-`20` (`0` to disable) | `20` | Client Connection Throttle, which limits the number of subsequent new connections per second from the same client IP
+`throttle` | `0`-`20` (`0` to disable) | `0` | Client Connection Throttle, which limits the number of subsequent new connections per second from the same client IP
 `default-protocol` | `tcp`, `http`, `https` | `tcp` | This annotation is used to specify the default protocol for Linode NodeBalancer.
 `default-proxy-protocol` | `none`, `v1`, `v2` | `none` | Specifies whether to use a version of Proxy Protocol on the underlying NodeBalancer.
 `port-*` | json (e.g. `{ "tls-secret-name": "prod-app-tls", "protocol": "https", "proxy-protocol": "v2"}`) | | Specifies port specific NodeBalancer configuration. See [Port Specific Configuration](#port-specific-configuration). `*` is the port being configured, e.g. `linode-loadbalancer-port-443`
