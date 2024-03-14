@@ -1859,6 +1859,19 @@ func Test_getConnectionThrottle(t *testing.T) {
 			},
 			1,
 		},
+		{
+			"throttle value is too high",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annotations.AnnLinodeThrottle: "21",
+					},
+				},
+			},
+			20,
+		},
 	}
 
 	for _, test := range testcases {
