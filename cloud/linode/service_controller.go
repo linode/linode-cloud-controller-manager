@@ -33,7 +33,7 @@ func newServiceController(loadbalancers *loadbalancers, informer v1informers.Ser
 }
 
 func (s *serviceController) Run(stopCh <-chan struct{}) {
-	s.informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := s.informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: func(obj interface{}) {
 			service, ok := obj.(*v1.Service)
 			if !ok {
@@ -48,6 +48,9 @@ func (s *serviceController) Run(stopCh <-chan struct{}) {
 			s.queue.Add(service)
 		},
 	})
+	if err != nil {
+		klog.Errorf("ServiceController didn't successfully register it's Informer %s", err)
+	}
 
 	go wait.Until(s.worker, time.Second, stopCh)
 	s.informer.Informer().Run(stopCh)
