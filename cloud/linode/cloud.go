@@ -3,6 +3,7 @@ package linode
 import (
 	"fmt"
 	"io"
+	"net"
 	"os"
 
 	"github.com/linode/linodego"
@@ -25,10 +26,12 @@ const (
 // We expect it to be initialized with flags external to this package, likely in
 // main.go
 var Options struct {
-	KubeconfigFlag        *pflag.Flag
-	LinodeGoDebug         bool
-	EnableRouteController bool
-	VPCName               string
+	KubeconfigFlag          *pflag.Flag
+	LinodeGoDebug           bool
+	EnableRouteController   bool
+	VPCName                 string
+	LinodeNodePrivateSubnet net.IPNet
+	AutoAnnotateNode        bool
 }
 
 type linodeCloud struct {

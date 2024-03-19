@@ -2,6 +2,8 @@ package linode
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -127,8 +129,14 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 
 	lastUpdate := s.LastMetadataUpdate(node.Name)
 
-	uuid, ok := node.Labels[annotations.AnnLinodeHostUUID]
-	if ok && time.Since(lastUpdate) < s.ttl {
+	uuid, foundLabel := node.Labels[annotations.AnnLinodeHostUUID]
+	configuredPrivateIP, foundAnnotation := node.Annotations[annotations.AnnLinodeNodePrivateIP]
+	if foundLabel && foundAnnotation && time.Since(lastUpdate) < s.ttl {
+		return nil
+	}
+
+	// if autoannotate is set to false, just check label and ttl
+	if foundLabel && !Options.AutoAnnotateNode && time.Since(lastUpdate) < s.ttl {
 		return nil
 	}
 
@@ -138,7 +146,26 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 		return err
 	}
 
-	if uuid == linode.HostUUID {
+	expectedPrivateIP := ""
+	if Options.AutoAnnotateNode {
+		ips, err := s.instances.getLinodeIPv4Addresses(ctx, node)
+		if err != nil {
+			return fmt.Errorf("failed to get ips for linode: %w", err)
+		}
+
+		if len(ips) == 0 {
+			return fmt.Errorf("no ips found for node %s", node.Name)
+		}
+
+		for _, ip := range ips {
+			if Options.LinodeNodePrivateSubnet.Contains(net.ParseIP(ip.ip)) {
+				expectedPrivateIP = ip.ip
+				break
+			}
+		}
+	}
+
+	if uuid == linode.HostUUID && configuredPrivateIP == expectedPrivateIP {
 		s.SetLastMetadataUpdate(node.Name)
 		return nil
 	}
@@ -150,13 +177,16 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 			return err
 		}
 
-		// It may be that the UUID has been set
-		if n.Labels[annotations.AnnLinodeHostUUID] == linode.HostUUID {
+		// It may be that the UUID label and private ip annotation has been set
+		if n.Labels[annotations.AnnLinodeHostUUID] == linode.HostUUID && n.Annotations[annotations.AnnLinodeNodePrivateIP] == expectedPrivateIP {
 			return nil
 		}
 
 		// Try to update the node
 		n.Labels[annotations.AnnLinodeHostUUID] = linode.HostUUID
+		if Options.AutoAnnotateNode {
+			n.Annotations[annotations.AnnLinodeNodePrivateIP] = expectedPrivateIP
+		}
 		_, err = s.kubeclient.CoreV1().Nodes().Update(ctx, n, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
