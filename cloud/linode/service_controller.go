@@ -3,6 +3,7 @@ package linode
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/appscode/go/wait"
@@ -91,5 +92,6 @@ func (s *serviceController) processNextDeletion() bool {
 
 func (s *serviceController) handleServiceDeleted(service *v1.Service) error {
 	klog.Infof("ServiceController handling service (%s) deletion", getServiceNn(service))
-	return s.loadbalancers.EnsureLoadBalancerDeleted(context.Background(), service.ClusterName, service)
+	clusterName := strings.TrimPrefix(service.Namespace, "kube-system-")
+	return s.loadbalancers.EnsureLoadBalancerDeleted(context.Background(), clusterName, service)
 }

@@ -1788,7 +1788,8 @@ func testUpdateLoadBalancerAddNodeBalancerID(t *testing.T, client *linodego.Clie
 		t.Errorf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
 	}
 
-	lbStatus, _, err := lb.GetLoadBalancer(context.TODO(), svc.ClusterName, svc)
+	clusterName := strings.TrimPrefix(svc.Namespace, "kube-system-")
+	lbStatus, _, err := lb.GetLoadBalancer(context.TODO(), clusterName, svc)
 	if err != nil {
 		t.Errorf("GetLoadBalancer returned an error: %s", err)
 	}
