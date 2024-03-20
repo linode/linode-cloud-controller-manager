@@ -45,12 +45,6 @@ spec:
             - --route-reconciliation-period={{ .Values.routeController.routeReconciliationPeriod }}
             {{- end }}
             {{- end }}
-            {{- if .Values.autoAnnotateNode }}
-            - --auto-annotate-node={{ .Values.autoAnnotateNode }}
-            {{- end }}
-            {{- if .Values.nodePrivateSubnet }}
-            - --linode-node-private-subnet={{ .Values.nodePrivateSubnet }}
-            {{- end }}
           volumeMounts:
             - mountPath: /etc/kubernetes
               name: k8s

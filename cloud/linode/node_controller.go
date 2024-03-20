@@ -2,8 +2,6 @@ package linode
 
 import (
 	"context"
-	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -135,11 +133,6 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 		return nil
 	}
 
-	// if autoannotate is set to false, just check label and ttl
-	if foundLabel && !Options.AutoAnnotateNode && time.Since(lastUpdate) < s.ttl {
-		return nil
-	}
-
 	linode, err := s.instances.lookupLinode(ctx, node)
 	if err != nil {
 		klog.Infof("instance lookup error: %s", err.Error())
@@ -147,21 +140,14 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 	}
 
 	expectedPrivateIP := ""
-	if Options.AutoAnnotateNode {
-		ips, err := s.instances.getLinodeIPv4Addresses(ctx, node)
-		if err != nil {
-			return fmt.Errorf("failed to get ips for linode: %w", err)
-		}
-
-		if len(ips) == 0 {
-			return fmt.Errorf("no ips found for node %s", node.Name)
-		}
-
-		for _, ip := range ips {
-			if Options.LinodeNodePrivateSubnet.Contains(net.ParseIP(ip.ip)) {
-				expectedPrivateIP = ip.ip
-				break
-			}
+	// linode API response for linode will contain only one private ip
+	// if any private ip is configured. If it changes in future or linode
+	// supports other subnets with nodebalancer, this logic needs to be updated.
+	// https://www.linode.com/docs/api/linode-instances/#linode-view
+	for _, addr := range linode.IPv4 {
+		if addr.IsPrivate() {
+			expectedPrivateIP = addr.String()
+			break
 		}
 	}
 
@@ -184,7 +170,7 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 
 		// Try to update the node
 		n.Labels[annotations.AnnLinodeHostUUID] = linode.HostUUID
-		if Options.AutoAnnotateNode {
+		if expectedPrivateIP != "" {
 			n.Annotations[annotations.AnnLinodeNodePrivateIP] = expectedPrivateIP
 		}
 		_, err = s.kubeclient.CoreV1().Nodes().Update(ctx, n, metav1.UpdateOptions{})

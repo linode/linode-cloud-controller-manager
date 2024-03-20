@@ -50,13 +50,6 @@ tolerations:
 #   clusterCIDR: 10.0.0.0/8
 #   configureCloudRoutes: true
 
-# This section enables auto-annotating the nodes for backend ip to use with nodebalancers
-# By default, its set to false.
-# autoAnnotateNode: false
-
-# Set only if one wants to change the default backend network(192.168.128.0/17) to be configured with nodebalancers
-# nodePrivateSubnet: 192.168.128.0/17
-
 # This section adds the ability to pass environment variables to adjust CCM defaults
 # https://github.com/linode/linode-cloud-controller-manager/blob/master/cloud/linode/loadbalancers.go
 # LINODE_HOSTNAME_ONLY_INGRESS type bool is supported

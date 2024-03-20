@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"net"
 	"os"
 
 	"k8s.io/component-base/logs"
@@ -79,8 +78,6 @@ func main() {
 	command.Flags().BoolVar(&linode.Options.LinodeGoDebug, "linodego-debug", false, "enables debug output for the LinodeAPI wrapper")
 	command.Flags().BoolVar(&linode.Options.EnableRouteController, "enable-route-controller", false, "enables route_controller for ccm")
 	command.Flags().StringVar(&linode.Options.VPCName, "vpc-name", "", "vpc name whose routes will be managed by route-controller")
-	command.Flags().IPNetVar(&linode.Options.LinodeNodePrivateSubnet, "linode-node-private-subnet", net.IPNet{IP: net.ParseIP("192.168.128.0"), Mask: net.CIDRMask(17, 32)}, "specifies backend network to use for nodebalancers")
-	command.Flags().BoolVar(&linode.Options.AutoAnnotateNode, "auto-annotate-node", false, "enables automatically adding node annotation for ip in subnet specified in linode-node-private-subnet")
 
 	// Set static flags
 	command.Flags().VisitAll(func(fl *pflag.Flag) {
