@@ -127,9 +127,8 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 
 	lastUpdate := s.LastMetadataUpdate(node.Name)
 
-	uuid, foundLabel := node.Labels[annotations.AnnLinodeHostUUID]
-	configuredPrivateIP, foundAnnotation := node.Annotations[annotations.AnnLinodeNodePrivateIP]
-	if foundLabel && foundAnnotation && time.Since(lastUpdate) < s.ttl {
+	uuid, ok := node.Labels[annotations.AnnLinodeHostUUID]
+	if ok && time.Since(lastUpdate) < s.ttl {
 		return nil
 	}
 
@@ -139,19 +138,7 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 		return err
 	}
 
-	expectedPrivateIP := ""
-	// linode API response for linode will contain only one private ip
-	// if any private ip is configured. If it changes in future or linode
-	// supports other subnets with nodebalancer, this logic needs to be updated.
-	// https://www.linode.com/docs/api/linode-instances/#linode-view
-	for _, addr := range linode.IPv4 {
-		if addr.IsPrivate() {
-			expectedPrivateIP = addr.String()
-			break
-		}
-	}
-
-	if uuid == linode.HostUUID && configuredPrivateIP == expectedPrivateIP {
+	if uuid == linode.HostUUID {
 		s.SetLastMetadataUpdate(node.Name)
 		return nil
 	}
@@ -163,16 +150,13 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 			return err
 		}
 
-		// It may be that the UUID label and private ip annotation has been set
-		if n.Labels[annotations.AnnLinodeHostUUID] == linode.HostUUID && n.Annotations[annotations.AnnLinodeNodePrivateIP] == expectedPrivateIP {
+		// It may be that the UUID has been set
+		if n.Labels[annotations.AnnLinodeHostUUID] == linode.HostUUID {
 			return nil
 		}
 
 		// Try to update the node
 		n.Labels[annotations.AnnLinodeHostUUID] = linode.HostUUID
-		if expectedPrivateIP != "" {
-			n.Annotations[annotations.AnnLinodeNodePrivateIP] = expectedPrivateIP
-		}
 		_, err = s.kubeclient.CoreV1().Nodes().Update(ctx, n, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
