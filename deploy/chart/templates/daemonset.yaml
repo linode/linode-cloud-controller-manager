@@ -33,6 +33,9 @@ spec:
             - --v=3
             - --port=0
             - --secure-port=10253
+            {{- if .Values.linodegoDebug }}
+            - --linodego-debug={{ .Values.linodegoDebug }}
+            {{- end }}
           volumeMounts:
             - mountPath: /etc/kubernetes
               name: k8s
