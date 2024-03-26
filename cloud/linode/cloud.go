@@ -31,6 +31,10 @@ var Options struct {
 	VPCName               string
 }
 
+// VPCID is set when VPCName options flag is set.
+// We use it to list instances running within the VPC if set
+var VPCID int = 0
+
 type linodeCloud struct {
 	client        client.Client
 	instances     cloudprovider.InstancesV2
@@ -68,6 +72,14 @@ func newCloud() (cloudprovider.Interface, error) {
 
 	if Options.LinodeGoDebug {
 		linodeClient.SetDebug(true)
+	}
+
+	if Options.EnableRouteController && Options.VPCName != "" {
+		id, err := getVPCID(linodeClient, Options.VPCName)
+		if err != nil {
+			return nil, fmt.Errorf("failed finding VPC ID: %w", err)
+		}
+		VPCID = id
 	}
 
 	routes, err := newRoutes(linodeClient)

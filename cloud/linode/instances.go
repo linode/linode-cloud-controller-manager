@@ -37,67 +37,46 @@ type nodeCache struct {
 }
 
 // getInstanceIPv4Addresses returns all ipv4 addresses configured on a linode.
-func (nc *nodeCache) getInstanceIPv4Addresses(ctx context.Context, id int, client client.Client) ([]nodeIP, error) {
-	// Retrieve ipaddresses for the linode
-	addresses, err := client.GetInstanceIPAddresses(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
+func (nc *nodeCache) getInstanceIPv4Addresses(ctx context.Context, instance linodego.Instance, client client.Client) ([]nodeIP, error) {
 	var ips []nodeIP
-	if len(addresses.IPv4.Public) != 0 {
-		for _, ip := range addresses.IPv4.Public {
-			ips = append(ips, nodeIP{ip: ip.Address, ipType: v1.NodeExternalIP})
+
+	// If VPC ID is set, fetch instance config to get VPC specific IP
+	if VPCID != 0 {
+		// Retrieve instance configs for the linode
+		configs, err := client.ListInstanceConfigs(ctx, instance.ID, &linodego.ListOptions{})
+		if err != nil || len(configs) == 0 {
+			return nil, err
+		}
+
+		// Iterate over interfaces in config and find VPC specific ips
+		for _, iface := range configs[0].Interfaces {
+			if iface.VPCID != nil && iface.IPv4.VPC != "" {
+				ips = append(ips, nodeIP{ip: iface.IPv4.VPC, ipType: v1.NodeInternalIP})
+			}
 		}
 	}
 
-	// Retrieve instance configs for the linode
-	configs, err := client.ListInstanceConfigs(ctx, id, &linodego.ListOptions{})
-	if err != nil || len(configs) == 0 {
-		return nil, err
-	}
-
-	// Iterate over interfaces in config and find VPC specific ips
-	for _, iface := range configs[0].Interfaces {
-		if iface.VPCID != nil && iface.IPv4.VPC != "" {
-			ips = append(ips, nodeIP{ip: iface.IPv4.VPC, ipType: v1.NodeInternalIP})
+	for _, ip := range instance.IPv4 {
+		ipType := v1.NodeExternalIP
+		if ip.IsPrivate() {
+			ipType = v1.NodeInternalIP
 		}
-	}
-
-	// NOTE: We specifically store VPC ips first so that if they exist, they are
-	//       used as internal ip for the nodes than the private ip
-	if len(addresses.IPv4.Private) != 0 {
-		for _, ip := range addresses.IPv4.Private {
-			ips = append(ips, nodeIP{ip: ip.Address, ipType: v1.NodeInternalIP})
-		}
+		ips = append(ips, nodeIP{ip: ip.String(), ipType: ipType})
 	}
 
 	return ips, nil
 }
 
-// refreshInstances conditionally loads all instances from the Linode API and caches them.
-// It does not refresh if the last update happened less than `nodeCache.ttl` ago.
-func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client) error {
-	nc.Lock()
-	defer nc.Unlock()
-
-	if time.Since(nc.lastUpdate) < nc.ttl {
-		return nil
-	}
-
-	instances, err := client.ListInstances(ctx, nil)
-	if err != nil {
-		return err
-	}
-
+// updateInstances updates the nodecache
+func (nc *nodeCache) updateInstances(ctx context.Context, client client.Client, instances []linodego.Instance) error {
 	nc.nodes = make(map[int]linodeInstance, len(instances))
-
 	mtx := sync.Mutex{}
 	g := new(errgroup.Group)
 	for _, instance := range instances {
 		instance := instance
+
 		g.Go(func() error {
-			addresses, err := nc.getInstanceIPv4Addresses(ctx, instance.ID, client)
+			addresses, err := nc.getInstanceIPv4Addresses(ctx, instance, client)
 			if err != nil {
 				klog.Errorf("Failed fetching ip addresses for instance id %d. Error: %s", instance.ID, err.Error())
 				return err
@@ -116,8 +95,47 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 	}
 
 	nc.lastUpdate = time.Now()
-
 	return nil
+}
+
+// refreshInstances conditionally loads all instances from the Linode API and caches them.
+// It does not refresh if the last update happened less than `nodeCache.ttl` ago.
+func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client) error {
+	nc.Lock()
+	defer nc.Unlock()
+
+	if time.Since(nc.lastUpdate) < nc.ttl {
+		return nil
+	}
+
+	instances, err := client.ListInstances(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	// If running within VPC, filter instances list to contain only instances within VPC
+	if VPCID != 0 {
+		vpcNodes := map[int]bool{}
+		resp, err := client.GetVPC(ctx, VPCID)
+		if err != nil {
+			return err
+		}
+		for _, subnet := range resp.Subnets {
+			for _, linode := range subnet.Linodes {
+				vpcNodes[linode.ID] = true
+			}
+		}
+
+		filteredInstances := make([]linodego.Instance, 0)
+		for _, instance := range instances {
+			if _, ok := vpcNodes[instance.ID]; ok {
+				filteredInstances = append(filteredInstances, instance)
+			}
+		}
+		instances = filteredInstances
+	}
+
+	return nc.updateInstances(ctx, client, instances)
 }
 
 type instances struct {

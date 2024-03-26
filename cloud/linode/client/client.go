@@ -20,6 +20,7 @@ type Client interface {
 	UpdateInstanceConfigInterface(context.Context, int, int, int, linodego.InstanceConfigInterfaceUpdateOptions) (*linodego.InstanceConfigInterface, error)
 
 	ListVPCs(context.Context, *linodego.ListOptions) ([]linodego.VPC, error)
+	GetVPC(context.Context, int) (*linodego.VPC, error)
 
 	CreateNodeBalancer(context.Context, linodego.NodeBalancerCreateOptions) (*linodego.NodeBalancer, error)
 	GetNodeBalancer(context.Context, int) (*linodego.NodeBalancer, error)
