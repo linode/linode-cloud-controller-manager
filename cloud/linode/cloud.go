@@ -74,7 +74,7 @@ func newCloud() (cloudprovider.Interface, error) {
 		linodeClient.SetDebug(true)
 	}
 
-	if Options.EnableRouteController && Options.VPCName != "" {
+	if Options.VPCName != "" {
 		id, err := getVPCID(linodeClient, Options.VPCName)
 		if err != nil {
 			return nil, fmt.Errorf("failed finding VPC ID: %w", err)

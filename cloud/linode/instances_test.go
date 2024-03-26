@@ -190,19 +190,12 @@ func TestMetadataRetrieval(t *testing.T) {
 			node := nodeWithProviderID(providerID)
 
 			ips := make([]*net.IP, 0, len(test.inputIPs))
-			pubIPs := make([]*linodego.InstanceIP, 0)
-			privIPs := make([]*linodego.InstanceIP, 0)
 			for _, ip := range test.inputIPs {
 				parsed := net.ParseIP(ip)
 				if parsed == nil {
 					t.Fatalf("cannot parse %v as an ipv4", ip)
 				}
 				ips = append(ips, &parsed)
-				if parsed.IsPrivate() {
-					privIPs = append(privIPs, &linodego.InstanceIP{Address: ip})
-				} else {
-					pubIPs = append(pubIPs, &linodego.InstanceIP{Address: ip})
-				}
 			}
 
 			linodeType := "g6-standard-1"
