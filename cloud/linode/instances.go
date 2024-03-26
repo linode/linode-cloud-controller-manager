@@ -38,7 +38,7 @@ type nodeCache struct {
 
 // getInstanceIPv4Addresses returns all ipv4 addresses configured on a linode.
 func (nc *nodeCache) getInstanceIPv4Addresses(ctx context.Context, instance linodego.Instance, client client.Client) ([]nodeIP, error) {
-	var ips []nodeIP
+	ips := []nodeIP{}
 
 	// If VPC ID is set, fetch instance config to get VPC specific IP
 	if VPCID != 0 {

@@ -18,9 +18,19 @@ type MockClient struct {
 	recorder *MockClientMockRecorder
 }
 
-// GetVPC implements client.Client.
-func (m *MockClient) GetVPC(context.Context, int) (*linodego.VPC, error) {
-	panic("unimplemented")
+// GetVPC mocks base method.
+func (m *MockClient) GetVPC(arg0 context.Context, arg1 int) (*linodego.VPC, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetVPC", arg0, arg1)
+	ret0, _ := ret[0].(*linodego.VPC)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetVPC indicates an expected call of GetVPC.
+func (mr *MockClientMockRecorder) GetVPC(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVPC", reflect.TypeOf((*MockClient)(nil).GetVPC), arg0, arg1)
 }
 
 // MockClientMockRecorder is the mock recorder for MockClient.
