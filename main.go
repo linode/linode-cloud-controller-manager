@@ -76,6 +76,8 @@ func main() {
 
 	// Add Linode-specific flags
 	command.Flags().BoolVar(&linode.Options.LinodeGoDebug, "linodego-debug", false, "enables debug output for the LinodeAPI wrapper")
+	command.Flags().BoolVar(&linode.Options.EnableRouteController, "enable-route-controller", false, "enables route_controller for ccm")
+	command.Flags().StringVar(&linode.Options.VPCName, "vpc-name", "", "vpc name whose routes will be managed by route-controller")
 
 	// Set static flags
 	command.Flags().VisitAll(func(fl *pflag.Flag) {
