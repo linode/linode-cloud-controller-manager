@@ -54,18 +54,6 @@ func TestInstanceExists(t *testing.T) {
 				Type:   "g6-standard-2",
 			},
 		}, nil)
-		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), 123).Times(1).Return(&linodego.InstanceIPAddressResponse{
-			IPv4: &linodego.InstanceIPv4Response{
-				Public: []*linodego.InstanceIP{
-					{Address: "45.76.101.25"},
-				},
-				Private: []*linodego.InstanceIP{
-					{Address: "192.168.133.65"},
-				},
-			},
-			IPv6: nil,
-		}, nil)
-		client.EXPECT().ListInstanceConfigs(gomock.Any(), 123, gomock.Any()).Times(1).Return([]linodego.InstanceConfig{}, nil)
 
 		exists, err := instances.InstanceExists(ctx, node)
 		assert.NoError(t, err)
@@ -80,18 +68,6 @@ func TestInstanceExists(t *testing.T) {
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
 			{ID: 123, Label: name},
 		}, nil)
-		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), 123).Times(1).Return(&linodego.InstanceIPAddressResponse{
-			IPv4: &linodego.InstanceIPv4Response{
-				Public: []*linodego.InstanceIP{
-					{Address: "45.76.101.25"},
-				},
-				Private: []*linodego.InstanceIP{
-					{Address: "192.168.133.65"},
-				},
-			},
-			IPv6: nil,
-		}, nil)
-		client.EXPECT().ListInstanceConfigs(gomock.Any(), 123, gomock.Any()).Times(1).Return([]linodego.InstanceConfig{}, nil)
 
 		exists, err := instances.InstanceExists(ctx, node)
 		assert.NoError(t, err)
@@ -143,20 +119,6 @@ func TestMetadataRetrieval(t *testing.T) {
 		region := "us-east"
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
 			{ID: id, Label: name, Type: linodeType, Region: region, IPv4: []*net.IP{&publicIPv4, &privateIPv4}},
-		}, nil)
-		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), id).Times(1).Return(&linodego.InstanceIPAddressResponse{
-			IPv4: &linodego.InstanceIPv4Response{
-				Public: []*linodego.InstanceIP{
-					{Address: "45.76.101.25"},
-				},
-				Private: []*linodego.InstanceIP{
-					{Address: "192.168.133.65"},
-				},
-			},
-			IPv6: nil,
-		}, nil)
-		client.EXPECT().ListInstanceConfigs(gomock.Any(), 123, gomock.Any()).Times(1).Return([]linodego.InstanceConfig{
-			{ID: 123456},
 		}, nil)
 
 		meta, err := instances.InstanceMetadata(ctx, node)
@@ -243,22 +205,10 @@ func TestMetadataRetrieval(t *testing.T) {
 				}
 			}
 
-			ipv4s := &linodego.InstanceIPv4Response{
-				Public:  pubIPs,
-				Private: privIPs,
-			}
-
 			linodeType := "g6-standard-1"
 			region := "us-east"
 			client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
 				{ID: id, Label: name, Type: linodeType, Region: region, IPv4: ips},
-			}, nil)
-			client.EXPECT().GetInstanceIPAddresses(gomock.Any(), id).Times(1).Return(&linodego.InstanceIPAddressResponse{
-				IPv4: ipv4s,
-				IPv6: nil,
-			}, nil)
-			client.EXPECT().ListInstanceConfigs(gomock.Any(), id, gomock.Any()).Times(1).Return([]linodego.InstanceConfig{
-				{ID: 123456},
 			}, nil)
 
 			meta, err := instances.InstanceMetadata(ctx, node)
@@ -390,16 +340,6 @@ func TestInstanceShutdown(t *testing.T) {
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
 			{ID: id, Label: "offline-linode", Status: linodego.InstanceOffline},
 		}, nil)
-		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), id).Times(1).Return(&linodego.InstanceIPAddressResponse{
-			IPv4: &linodego.InstanceIPv4Response{
-				Public:  []*linodego.InstanceIP{},
-				Private: []*linodego.InstanceIP{},
-			},
-			IPv6: nil,
-		}, nil)
-		client.EXPECT().ListInstanceConfigs(gomock.Any(), id, gomock.Any()).Times(1).Return([]linodego.InstanceConfig{
-			{ID: 123456},
-		}, nil)
 		shutdown, err := instances.InstanceShutdown(ctx, node)
 
 		assert.NoError(t, err)
@@ -413,16 +353,6 @@ func TestInstanceShutdown(t *testing.T) {
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
 			{ID: id, Label: "shutting-down-linode", Status: linodego.InstanceShuttingDown},
 		}, nil)
-		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), id).Times(1).Return(&linodego.InstanceIPAddressResponse{
-			IPv4: &linodego.InstanceIPv4Response{
-				Public:  []*linodego.InstanceIP{},
-				Private: []*linodego.InstanceIP{},
-			},
-			IPv6: nil,
-		}, nil)
-		client.EXPECT().ListInstanceConfigs(gomock.Any(), id, gomock.Any()).Times(1).Return([]linodego.InstanceConfig{
-			{ID: 123456},
-		}, nil)
 		shutdown, err := instances.InstanceShutdown(ctx, node)
 
 		assert.NoError(t, err)
@@ -435,16 +365,6 @@ func TestInstanceShutdown(t *testing.T) {
 		node := nodeWithProviderID(providerIDPrefix + strconv.Itoa(id))
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
 			{ID: id, Label: "running-linode", Status: linodego.InstanceRunning},
-		}, nil)
-		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), id).Times(1).Return(&linodego.InstanceIPAddressResponse{
-			IPv4: &linodego.InstanceIPv4Response{
-				Public:  []*linodego.InstanceIP{},
-				Private: []*linodego.InstanceIP{},
-			},
-			IPv6: nil,
-		}, nil)
-		client.EXPECT().ListInstanceConfigs(gomock.Any(), id, gomock.Any()).Times(1).Return([]linodego.InstanceConfig{
-			{ID: 123456},
 		}, nil)
 		shutdown, err := instances.InstanceShutdown(ctx, node)
 

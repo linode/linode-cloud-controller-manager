@@ -35,17 +35,25 @@ func (rc *routeCache) refreshRoutes(ctx context.Context, client client.Client) e
 		return nil
 	}
 
-	instances, err := client.ListInstances(ctx, nil)
+	// Get VPC details to find instances within the VPC
+	resp, err := client.GetVPC(ctx, VPCID)
 	if err != nil {
 		return err
 	}
 
-	rc.routes = make(map[int][]linodego.InstanceConfig, len(instances))
+	vpcNodes := []int{}
+	for _, subnet := range resp.Subnets {
+		for _, linode := range subnet.Linodes {
+			vpcNodes = append(vpcNodes, linode.ID)
+		}
+	}
+
+	rc.routes = make(map[int][]linodego.InstanceConfig, len(vpcNodes))
 
 	mtx := sync.Mutex{}
 	g := new(errgroup.Group)
-	for _, instance := range instances {
-		id := instance.ID
+	for _, id := range vpcNodes {
+		id := id
 		g.Go(func() error {
 			configs, err := client.ListInstanceConfigs(ctx, id, &linodego.ListOptions{})
 			if err != nil {
@@ -84,17 +92,8 @@ func newRoutes(client client.Client) (cloudprovider.Routes, error) {
 	}
 	klog.V(3).Infof("TTL for routeCache set to %d", timeout)
 
-	vpcid := 0
-	if Options.EnableRouteController {
-		id, err := getVPCID(client, Options.VPCName)
-		if err != nil {
-			return nil, err
-		}
-		vpcid = id
-	}
-
 	return &routes{
-		vpcid:     vpcid,
+		vpcid:     VPCID,
 		client:    client,
 		instances: newInstances(client),
 		routeCache: &routeCache{
