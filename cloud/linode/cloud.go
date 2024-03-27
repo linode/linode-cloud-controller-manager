@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 
 	"github.com/linode/linodego"
 	"github.com/spf13/pflag"
@@ -31,9 +32,34 @@ var Options struct {
 	VPCName               string
 }
 
-// VPCID is set when VPCName options flag is set.
+// vpcDetails is set when VPCName options flag is set.
 // We use it to list instances running within the VPC if set
-var VPCID int = 0
+type vpcDetails struct {
+	mu   sync.RWMutex
+	id   int
+	name string
+}
+
+func (v *vpcDetails) setDetails(client client.Client, name string) error {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	id, err := getVPCID(client, Options.VPCName)
+	if err != nil {
+		return fmt.Errorf("failed finding VPC ID: %w", err)
+	}
+	v.id = id
+	v.name = name
+	return nil
+}
+
+func (v *vpcDetails) getID() int {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.id
+}
+
+var vpcInfo vpcDetails = vpcDetails{id: 0, name: ""}
 
 type linodeCloud struct {
 	client        client.Client
@@ -75,11 +101,10 @@ func newCloud() (cloudprovider.Interface, error) {
 	}
 
 	if Options.VPCName != "" {
-		id, err := getVPCID(linodeClient, Options.VPCName)
+		err := vpcInfo.setDetails(linodeClient, Options.VPCName)
 		if err != nil {
 			return nil, fmt.Errorf("failed finding VPC ID: %w", err)
 		}
-		VPCID = id
 	}
 
 	routes, err := newRoutes(linodeClient)

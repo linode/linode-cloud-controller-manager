@@ -36,7 +36,7 @@ func (rc *routeCache) refreshRoutes(ctx context.Context, client client.Client) e
 	}
 
 	// Get VPC details to find instances within the VPC
-	resp, err := client.GetVPC(ctx, VPCID)
+	resp, err := client.GetVPC(ctx, vpcInfo.getID())
 	if err != nil {
 		return err
 	}
@@ -92,12 +92,13 @@ func newRoutes(client client.Client) (cloudprovider.Routes, error) {
 	}
 	klog.V(3).Infof("TTL for routeCache set to %d", timeout)
 
-	if Options.EnableRouteController && VPCID == 0 {
+	vpcid := vpcInfo.getID()
+	if Options.EnableRouteController && vpcid == 0 {
 		return nil, fmt.Errorf("cannot enable route controller as vpc [%s] not found", Options.VPCName)
 	}
 
 	return &routes{
-		vpcid:     VPCID,
+		vpcid:     vpcid,
 		client:    client,
 		instances: newInstances(client),
 		routeCache: &routeCache{

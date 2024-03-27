@@ -42,7 +42,7 @@ func (nc *nodeCache) getInstanceIPv4Addresses(ctx context.Context, instance lino
 	ips := []nodeIP{}
 
 	// If VPC ID is set, fetch instance config to get VPC specific IP
-	if VPCID != 0 {
+	if vpcInfo.getID() != 0 {
 		// Retrieve instance configs for the linode
 		configs, err := client.ListInstanceConfigs(ctx, instance.ID, &linodego.ListOptions{})
 		if err != nil || len(configs) == 0 {
@@ -115,9 +115,9 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 	}
 
 	// If running within VPC, filter instances list to contain only instances within VPC
-	if VPCID != 0 {
+	if vpcInfo.getID() != 0 {
 		vpcNodes := map[int]bool{}
-		resp, err := client.GetVPC(ctx, VPCID)
+		resp, err := client.GetVPC(ctx, vpcInfo.getID())
 		if err != nil {
 			return err
 		}

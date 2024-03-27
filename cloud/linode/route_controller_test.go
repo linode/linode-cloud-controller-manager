@@ -22,7 +22,7 @@ func TestListRoutes(t *testing.T) {
 	defer ctrl.Finish()
 
 	client := NewMockClient(ctrl)
-	VPCID = 1
+	vpcInfo.id = 1
 
 	nodeID := 123
 	name := "mock-instance"
@@ -59,7 +59,7 @@ func TestListRoutes(t *testing.T) {
 		ID: 123456,
 		Interfaces: []linodego.InstanceConfigInterface{
 			{
-				VPCID: &VPCID,
+				VPCID: &vpcInfo.id,
 				IPv4:  linodego.VPCIPv4{VPC: "1.1.1.1"},
 			},
 		},
@@ -93,7 +93,7 @@ func TestListRoutes(t *testing.T) {
 		ID: 123456,
 		Interfaces: []linodego.InstanceConfigInterface{
 			{
-				VPCID:    &VPCID,
+				VPCID:    &vpcInfo.id,
 				IPv4:     linodego.VPCIPv4{VPC: "1.1.1.1"},
 				IPRanges: []string{"10.10.10.0/24", "10.11.11.0/24"},
 			},
@@ -147,7 +147,7 @@ func TestCreateRoute(t *testing.T) {
 	defer ctrl.Finish()
 
 	client := NewMockClient(ctrl)
-	VPCID = 1
+	vpcInfo.id = 1
 
 	nodeID := 123
 	name := "mock-instance"
@@ -174,13 +174,13 @@ func TestCreateRoute(t *testing.T) {
 		ID: 123456,
 		Interfaces: []linodego.InstanceConfigInterface{
 			{
-				VPCID: &VPCID,
+				VPCID: &vpcInfo.id,
 				IPv4:  linodego.VPCIPv4{VPC: "1.1.1.1"},
 			},
 		},
 	}
 	instanceConfigIntfWithVPCAndRoute := linodego.InstanceConfigInterface{
-		VPCID:    &VPCID,
+		VPCID:    &vpcInfo.id,
 		IPv4:     linodego.VPCIPv4{VPC: "1.1.1.1"},
 		IPRanges: []string{"10.10.10.0/24"},
 	}
@@ -237,7 +237,7 @@ func TestDeleteRoute(t *testing.T) {
 	defer ctrl.Finish()
 
 	client := NewMockClient(ctrl)
-	VPCID = 1
+	vpcInfo.id = 1
 
 	nodeID := 123
 	name := "mock-instance"
@@ -264,12 +264,12 @@ func TestDeleteRoute(t *testing.T) {
 		DestinationCIDR: "10.10.10.0/24",
 	}
 	instanceConfigIntfWithVPCAndRoute := linodego.InstanceConfigInterface{
-		VPCID:    &VPCID,
+		VPCID:    &vpcInfo.id,
 		IPv4:     linodego.VPCIPv4{VPC: "1.1.1.1"},
 		IPRanges: []string{"10.10.10.0/24"},
 	}
 	instanceConfigIntfWithVPCAndNoRoute := linodego.InstanceConfigInterface{
-		VPCID:    &VPCID,
+		VPCID:    &vpcInfo.id,
 		IPv4:     linodego.VPCIPv4{VPC: "1.1.1.1"},
 		IPRanges: []string{},
 	}
