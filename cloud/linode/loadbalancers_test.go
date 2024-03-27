@@ -150,6 +150,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 			f:    testCreateNodeBalanceWithNoAllowOrDenyList,
 		},
 		{
+			name: "Update Load Balancer - Add Node",
+			f:    testUpdateLoadBalancerAddNode,
+		},
+		{
 			name: "Update Load Balancer - Add Annotation",
 			f:    testUpdateLoadBalancerAddAnnotation,
 		},
@@ -440,6 +444,135 @@ func testCreateNodeBalancerWithInvalidFirewall(t *testing.T, client *linodego.Cl
 	err := testCreateNodeBalancer(t, client, f, annotations)
 	if err.Error() != expectedError {
 		t.Fatalf("expected a %s error, got %v", expectedError, err)
+	}
+}
+
+func testUpdateLoadBalancerAddNode(t *testing.T, client *linodego.Client, _ *fakeAPI) {
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: randString(),
+			UID:  "foobar1234",
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     randString(),
+					Protocol: "TCP",
+					Port:     int32(80),
+					NodePort: int32(30000),
+				},
+			},
+		},
+	}
+
+	nodes := []*v1.Node{
+		{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+		},
+	}
+
+	nodes2 := []*v1.Node{
+		{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+		},
+		{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.2",
+					},
+				},
+			},
+		},
+		{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.3",
+					},
+				},
+			},
+		},
+	}
+
+	lb := &loadbalancers{client, "us-west", nil}
+	fakeClientset := fake.NewSimpleClientset()
+	lb.kubeClient = fakeClientset
+
+	defer func() {
+		_ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+	}()
+
+	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("EnsureLoadBalancer returned an error %s", err)
+	}
+
+	svc.Status.LoadBalancer = *lbStatus
+
+	stubService(fakeClientset, svc)
+
+	err = lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("UpdateLoadBalancer returned an error while updated LB to have one node: %s", err)
+	}
+
+	err = lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, nodes2)
+	if err != nil {
+		t.Errorf("UpdateLoadBalancer returned an error while updated LB to have three nodes: %s", err)
+	}
+
+	nb, err := lb.getNodeBalancerByStatus(context.TODO(), svc)
+	if err != nil {
+		t.Fatalf("failed to get NodeBalancer via status: %s", err)
+	}
+
+	cfgs, errConfigs := client.ListNodeBalancerConfigs(context.TODO(), nb.ID, nil)
+	if errConfigs != nil {
+		t.Fatalf("error getting NodeBalancer configs: %v", errConfigs)
+	}
+
+	expectedPorts := map[int]struct{}{
+		80: {},
+	}
+
+	observedPorts := make(map[int]struct{})
+
+	for _, cfg := range cfgs {
+		nbnodes, errNodes := client.ListNodeBalancerNodes(context.TODO(), nb.ID, cfg.ID, nil)
+		if errNodes != nil {
+			t.Errorf("error getting NodeBalancer nodes: %v", errNodes)
+		}
+
+		for _, node := range nbnodes {
+			t.Logf("Node %v", node)
+		}
+
+		if len(nbnodes) != len(nodes2) {
+			t.Errorf("Expected %d nodes for port %d, got %d (%v)", len(nodes2), cfg.Port, len(nbnodes), nbnodes)
+		}
+
+		observedPorts[cfg.Port] = struct{}{}
+	}
+
+	if !reflect.DeepEqual(expectedPorts, observedPorts) {
+		t.Errorf("NodeBalancer ports mismatch: expected %v, got %v", expectedPorts, observedPorts)
 	}
 }
 
