@@ -296,12 +296,6 @@ func (l *loadbalancers) updateNodeBalancer(
 			return err
 		}
 
-		// Add all of the Nodes to the config
-		var newNBNodes []linodego.NodeBalancerNodeCreateOptions
-		for _, node := range nodes {
-			newNBNodes = append(newNBNodes, l.buildNodeBalancerNodeCreateOptions(node, port.NodePort))
-		}
-
 		// Look for an existing config for this port
 		var currentNBCfg *linodego.NodeBalancerConfig
 		for i := range nbCfgs {
@@ -310,6 +304,33 @@ func (l *loadbalancers) updateNodeBalancer(
 				currentNBCfg = &nbc
 				break
 			}
+		}
+		oldNBNodeIDs := make(map[string]int)
+		if currentNBCfg != nil {
+			// Obtain list of current NB nodes and convert it to map of node IDs
+			currentNBNodes, err := l.client.ListNodeBalancerNodes(ctx, nb.ID, currentNBCfg.ID, nil)
+			if err != nil {
+				klog.Warningf("Unable to list existing nodebalancer nodes for NB %d config %d, error: %s", nb.ID, newNBCfg.ID, err)
+			} else {
+				for _, node := range currentNBNodes {
+					oldNBNodeIDs[node.Address] = node.ID
+				}
+			}
+			klog.Infof("Nodebalancer %d had nodes %v", nb.ID, oldNBNodeIDs)
+		} else {
+			klog.Infof("No preexisting nodebalancer for port %v found.", port.Port)
+		}
+		// Add all of the Nodes to the config
+		newNBNodes := make([]linodego.NodeBalancerConfigRebuildNodeOptions, 0)
+		for _, node := range nodes {
+			newNodeOpts := l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort)
+			oldNodeID, ok := oldNBNodeIDs[newNodeOpts.Address]
+			if ok {
+				newNodeOpts.ID = oldNodeID
+			} else {
+				klog.Infof("No preexisting node id for %v found.", newNodeOpts.Address)
+			}
+			newNBNodes = append(newNBNodes, newNodeOpts)
 		}
 
 		// If there's no existing config, create it
@@ -652,7 +673,7 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 		createOpt := config.GetCreateOptions()
 
 		for _, n := range nodes {
-			createOpt.Nodes = append(createOpt.Nodes, l.buildNodeBalancerNodeCreateOptions(n, port.NodePort))
+			createOpt.Nodes = append(createOpt.Nodes, l.buildNodeBalancerNodeConfigRebuildOptions(n, port.NodePort).NodeBalancerNodeCreateOptions)
 		}
 
 		configs = append(configs, &createOpt)
@@ -672,14 +693,16 @@ func coerceString(s string, minLen, maxLen int, padding string) string {
 	return s
 }
 
-func (l *loadbalancers) buildNodeBalancerNodeCreateOptions(node *v1.Node, nodePort int32) linodego.NodeBalancerNodeCreateOptions {
-	return linodego.NodeBalancerNodeCreateOptions{
-		Address: fmt.Sprintf("%v:%v", getNodePrivateIP(node), nodePort),
-		// NodeBalancer backends must be 3-32 chars in length
-		// If < 3 chars, pad node name with "node-" prefix
-		Label:  coerceString(node.Name, 3, 32, "node-"),
-		Mode:   "accept",
-		Weight: 100,
+func (l *loadbalancers) buildNodeBalancerNodeConfigRebuildOptions(node *v1.Node, nodePort int32) linodego.NodeBalancerConfigRebuildNodeOptions {
+	return linodego.NodeBalancerConfigRebuildNodeOptions{
+		NodeBalancerNodeCreateOptions: linodego.NodeBalancerNodeCreateOptions{
+			Address: fmt.Sprintf("%v:%v", getNodePrivateIP(node), nodePort),
+			// NodeBalancer backends must be 3-32 chars in length
+			// If < 3 chars, pad node name with "node-" prefix
+			Label:  coerceString(node.Name, 3, 32, "node-"),
+			Mode:   "accept",
+			Weight: 100,
+		},
 	}
 }
 

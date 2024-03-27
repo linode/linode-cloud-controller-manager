@@ -271,6 +271,21 @@ func (mr *MockClientMockRecorder) ListNodeBalancerFirewalls(arg0, arg1, arg2 int
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListNodeBalancerFirewalls", reflect.TypeOf((*MockClient)(nil).ListNodeBalancerFirewalls), arg0, arg1, arg2)
 }
 
+// ListNodeBalancerNodes mocks base method.
+func (m *MockClient) ListNodeBalancerNodes(arg0 context.Context, arg1, arg2 int, arg3 *linodego.ListOptions) ([]linodego.NodeBalancerNode, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListNodeBalancerNodes", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].([]linodego.NodeBalancerNode)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListNodeBalancerNodes indicates an expected call of ListNodeBalancerNodes.
+func (mr *MockClientMockRecorder) ListNodeBalancerNodes(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListNodeBalancerNodes", reflect.TypeOf((*MockClient)(nil).ListNodeBalancerNodes), arg0, arg1, arg2, arg3)
+}
+
 // ListNodeBalancers mocks base method.
 func (m *MockClient) ListNodeBalancers(arg0 context.Context, arg1 *linodego.ListOptions) ([]linodego.NodeBalancer, error) {
 	m.ctrl.T.Helper()

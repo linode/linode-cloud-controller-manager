@@ -15,6 +15,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	"k8s.io/cloud-provider/app/config"
+	"k8s.io/cloud-provider/names"
 	"k8s.io/cloud-provider/options"
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
@@ -72,7 +73,8 @@ func main() {
 		klog.Fatalf("unable to initialize command options: %v", err)
 	}
 	fss := utilflag.NamedFlagSets{}
-	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, app.DefaultInitFuncConstructors, fss, wait.NeverStop)
+	controllerAliases := names.CCMControllerAliases()
+	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, app.DefaultInitFuncConstructors, controllerAliases, fss, wait.NeverStop)
 
 	// Add Linode-specific flags
 	command.Flags().BoolVar(&linode.Options.LinodeGoDebug, "linodego-debug", false, "enables debug output for the LinodeAPI wrapper")
