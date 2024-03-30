@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/linode/linodego"
-	"golang.org/x/sync/errgroup"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
@@ -38,23 +37,13 @@ type nodeCache struct {
 }
 
 // getInstanceIPv4Addresses returns all ipv4 addresses configured on a linode.
-func (nc *nodeCache) getInstanceIPv4Addresses(ctx context.Context, instance linodego.Instance, client client.Client) ([]nodeIP, error) {
+func (nc *nodeCache) getInstanceIPv4Addresses(instance linodego.Instance, vpcips []string) ([]nodeIP, error) {
 	ips := []nodeIP{}
 
-	// If VPC ID is set, fetch instance config to get VPC specific IP
-	if vpcInfo.getID() != 0 {
-		// Retrieve instance configs for the linode
-		configs, err := client.ListInstanceConfigs(ctx, instance.ID, &linodego.ListOptions{})
-		if err != nil || len(configs) == 0 {
-			return nil, err
-		}
-
-		// Iterate over interfaces in config and find VPC specific ips
-		for _, iface := range configs[0].Interfaces {
-			if iface.VPCID != nil && iface.IPv4.VPC != "" {
-				ips = append(ips, nodeIP{ip: iface.IPv4.VPC, ipType: v1.NodeInternalIP})
-			}
-		}
+	// If vpc ips are present, list them first
+	for _, ip := range vpcips {
+		ipType := v1.NodeInternalIP
+		ips = append(ips, nodeIP{ip: ip, ipType: ipType})
 	}
 
 	for _, ip := range instance.IPv4 {
@@ -66,37 +55,6 @@ func (nc *nodeCache) getInstanceIPv4Addresses(ctx context.Context, instance lino
 	}
 
 	return ips, nil
-}
-
-// updateInstances updates the nodecache
-func (nc *nodeCache) updateInstances(ctx context.Context, client client.Client, instances []linodego.Instance) error {
-	nc.nodes = make(map[int]linodeInstance, len(instances))
-	mtx := sync.Mutex{}
-	g := new(errgroup.Group)
-	for _, instance := range instances {
-		instance := instance
-
-		g.Go(func() error {
-			addresses, err := nc.getInstanceIPv4Addresses(ctx, instance, client)
-			if err != nil {
-				klog.Errorf("Failed fetching ip addresses for instance id %d. Error: %s", instance.ID, err.Error())
-				return err
-			}
-			// take lock on map so that concurrent writes are safe
-			mtx.Lock()
-			defer mtx.Unlock()
-			node := linodeInstance{instance: &instance, ips: addresses}
-			nc.nodes[instance.ID] = node
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return err
-	}
-
-	nc.lastUpdate = time.Now()
-	return nil
 }
 
 // refreshInstances conditionally loads all instances from the Linode API and caches them.
@@ -114,29 +72,36 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 		return err
 	}
 
-	// If running within VPC, filter instances list to contain only instances within VPC
+	// If running within VPC, find instances and store their ips
+	vpcNodes := map[int][]string{}
 	if vpcInfo.getID() != 0 {
-		vpcNodes := map[int]bool{}
-		resp, err := client.GetVPC(ctx, vpcInfo.getID())
+		resp, err := client.ListVPCIPAddresses(ctx, &linodego.ListOptions{})
 		if err != nil {
 			return err
 		}
-		for _, subnet := range resp.Subnets {
-			for _, linode := range subnet.Linodes {
-				vpcNodes[linode.ID] = true
+		for _, r := range resp {
+			if r.Address == nil {
+				continue
 			}
+			vpcNodes[r.LinodeID] = append(vpcNodes[r.LinodeID], *r.Address)
 		}
-
-		filteredInstances := make([]linodego.Instance, 0)
-		for _, instance := range instances {
-			if _, ok := vpcNodes[instance.ID]; ok {
-				filteredInstances = append(filteredInstances, instance)
-			}
-		}
-		instances = filteredInstances
 	}
 
-	return nc.updateInstances(ctx, client, instances)
+	newNodes := make(map[int]linodeInstance, len(instances))
+	for _, instance := range instances {
+		instance := instance
+		addresses, err := nc.getInstanceIPv4Addresses(instance, vpcNodes[instance.ID])
+		if err != nil {
+			klog.Errorf("Failed fetching ip addresses for instance id %d. Error: %s", instance.ID, err.Error())
+			return err
+		}
+		node := linodeInstance{instance: &instance, ips: addresses}
+		newNodes[instance.ID] = node
+	}
+
+	nc.nodes = newNodes
+	nc.lastUpdate = time.Now()
+	return nil
 }
 
 type instances struct {
