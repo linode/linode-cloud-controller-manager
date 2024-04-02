@@ -536,7 +536,6 @@ func testUpdateLoadBalancerAddNode(t *testing.T, client *linodego.Client, f *fak
 	}
 
 	checkIDs := func() (int, int) {
-
 		rx, _ := regexp.Compile("/nodebalancers/[0-9]+/configs/[0-9]+/rebuild")
 
 		var req *fakeRequest
@@ -567,7 +566,6 @@ func testUpdateLoadBalancerAddNode(t *testing.T, client *linodego.Client, f *fak
 		}
 
 		return len(nbcro.Nodes), withIds
-
 	}
 
 	nodecount, nodeswithIdcount := checkIDs()
