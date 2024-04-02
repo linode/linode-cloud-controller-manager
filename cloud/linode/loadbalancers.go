@@ -321,7 +321,7 @@ func (l *loadbalancers) updateNodeBalancer(
 			klog.Infof("No preexisting nodebalancer for port %v found.", port.Port)
 		}
 		// Add all of the Nodes to the config
-		newNBNodes := make([]linodego.NodeBalancerConfigRebuildNodeOptions, len(nodes))
+		newNBNodes := make([]linodego.NodeBalancerConfigRebuildNodeOptions, 0, len(nodes))
 		for _, node := range nodes {
 			newNodeOpts := l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort)
 			oldNodeID, ok := oldNBNodeIDs[newNodeOpts.Address]
