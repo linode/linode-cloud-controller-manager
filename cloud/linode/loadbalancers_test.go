@@ -542,7 +542,8 @@ func testUpdateLoadBalancerAddNode(t *testing.T, client *linodego.Client, f *fak
 		var req *fakeRequest
 		for request := range f.requests {
 			if rx.MatchString(request.Path) {
-				req = &request
+				copiedReq := request
+				req = &copiedReq
 				break
 			}
 		}
