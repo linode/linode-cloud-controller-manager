@@ -1,6 +1,6 @@
 package client
 
-//go:generate go run github.com/golang/mock/mockgen -destination mock_client_test.go -package client github.com/linode/linode-cloud-controller-manager/cloud/linode/client Client
+//go:generate go run github.com/golang/mock/mockgen@v1.6.0 -destination mock_client_test.go -package client github.com/linode/linode-cloud-controller-manager/cloud/linode/client Client
 
 import (
 	"context"
