@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/linode/linodego"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
@@ -79,12 +79,27 @@ func (e instanceNoIPAddressesError) Error() string {
 	return fmt.Sprintf("instance %d has no IP addresses", e.id)
 }
 
-func (i *instances) linodeByName(nodeName types.NodeName) (*linodego.Instance, error) {
+func (i *instances) linodeByIP(kNode *v1.Node) (*linodego.Instance, error) {
 	i.nodeCache.RLock()
 	defer i.nodeCache.RUnlock()
+	var kNodeAddresses []string
+	for _, address := range (kNode).Status.Addresses {
+		if address.Type == "ExternalIP" || address.Type == "InternalIP" {
+			kNodeAddresses = append(kNodeAddresses, address.Address)
+		}
+	}
+	if kNodeAddresses == nil {
+		return nil, fmt.Errorf("no IP address found on node %s", kNode.Name)
+	}
 	for _, node := range i.nodeCache.nodes {
-		if node.Label == string(nodeName) {
-			return node, nil
+		var nodeAddresses []string
+		for _, nodeIP := range node.IPv4 {
+			nodeAddresses = append(nodeAddresses, nodeIP.String())
+		}
+		for _, nodeIP := range nodeAddresses {
+			if slices.Contains(kNodeAddresses, nodeIP) {
+				return node, nil
+			}
 		}
 	}
 
@@ -107,7 +122,6 @@ func (i *instances) lookupLinode(ctx context.Context, node *v1.Node) (*linodego.
 	}
 
 	providerID := node.Spec.ProviderID
-	nodeName := types.NodeName(node.Name)
 
 	sentry.SetTag(ctx, "provider_id", providerID)
 	sentry.SetTag(ctx, "node_name", node.Name)
@@ -122,8 +136,7 @@ func (i *instances) lookupLinode(ctx context.Context, node *v1.Node) (*linodego.
 
 		return i.linodeByID(id)
 	}
-
-	return i.linodeByName(nodeName)
+	return i.linodeByIP(node)
 }
 
 func (i *instances) InstanceExists(ctx context.Context, node *v1.Node) (bool, error) {

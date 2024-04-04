@@ -245,6 +245,89 @@ func TestMalformedProviders(t *testing.T) {
 	})
 }
 
+func TestProviderByIP(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := NewMockClient(ctrl)
+
+	t.Run("gets linode by external IP", func(t *testing.T) {
+		instances := newInstances(client)
+
+		publicIP := net.ParseIP("172.234.31.123")
+		privateIP := net.ParseIP("192.168.159.135")
+		wrongIP := net.ParseIP("1.2.3.4")
+		expectedInstance := linodego.Instance{ID: 12345, IPv4: []*net.IP{&publicIP, &privateIP}}
+		instances.nodeCache.nodes = map[int]*linodego.Instance{0: {ID: 54363, IPv4: []*net.IP{&wrongIP}}, 1: &expectedInstance}
+		node := v1.Node{Status: v1.NodeStatus{Addresses: []v1.NodeAddress{
+			{
+				Type:    "Hostname",
+				Address: "node1.linodelke.com",
+			}, {
+				Type:    "ExternalIP",
+				Address: "172.234.31.123",
+			},
+		}}}
+		k8sNode, err := instances.linodeByIP(&node)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedInstance.ID, k8sNode.ID)
+	})
+
+	t.Run("gets linode by internal IP", func(t *testing.T) {
+		instances := newInstances(client)
+
+		publicIP := net.ParseIP("172.234.31.123")
+		privateIP := net.ParseIP("192.168.159.135")
+		wrongIP := net.ParseIP("1.2.3.4")
+		expectedInstance := linodego.Instance{ID: 12345, IPv4: []*net.IP{&publicIP, &privateIP}}
+		instances.nodeCache.nodes = map[int]*linodego.Instance{0: {ID: 54363, IPv4: []*net.IP{&wrongIP}}, 1: &expectedInstance}
+		node := v1.Node{Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{
+			Type:    "ExternalIP",
+			Address: "324.2.1.23",
+		}, {
+			Type:    "InternalIP",
+			Address: "192.168.159.135",
+		}}}}
+		k8sNode, err := instances.linodeByIP(&node)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedInstance.ID, k8sNode.ID)
+	})
+
+	t.Run("returns error on no matching nodes by IP", func(t *testing.T) {
+		instances := newInstances(client)
+
+		publicIP := net.ParseIP("172.234.31.200")
+		privateIP := net.ParseIP("192.168.159.200")
+		wrongIP := net.ParseIP("1.2.3.4")
+		expectedInstance := linodego.Instance{ID: 12345, IPv4: []*net.IP{&publicIP, &privateIP}}
+		instances.nodeCache.nodes = map[int]*linodego.Instance{0: {ID: 54363, IPv4: []*net.IP{&wrongIP}}, 1: &expectedInstance}
+		node := v1.Node{Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{
+			Type:    "ExternalIP",
+			Address: "324.2.1.23",
+		}, {
+			Type:    "InternalIP",
+			Address: "192.168.159.135",
+		}}}}
+		k8sNode, err := instances.linodeByIP(&node)
+		assert.Nil(t, k8sNode)
+		assert.ErrorContains(t, err, "instance not found")
+	})
+
+	t.Run("returns error on no node IPs", func(t *testing.T) {
+		instances := newInstances(client)
+
+		publicIP := net.ParseIP("172.234.31.200")
+		privateIP := net.ParseIP("192.168.159.200")
+		wrongIP := net.ParseIP("1.2.3.4")
+		expectedInstance := linodego.Instance{ID: 12345, IPv4: []*net.IP{&publicIP, &privateIP}}
+		instances.nodeCache.nodes = map[int]*linodego.Instance{0: {ID: 54363, IPv4: []*net.IP{&wrongIP}}, 1: &expectedInstance}
+		node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node-1"}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{}}}
+		k8sNode, err := instances.linodeByIP(&node)
+		assert.Nil(t, k8sNode)
+		assert.ErrorContains(t, err, "no IP address found on node test-node-1")
+	})
+}
+
 func TestInstanceShutdown(t *testing.T) {
 	ctx := context.TODO()
 	ctrl := gomock.NewController(t)
