@@ -553,8 +553,7 @@ func testUpdateLoadBalancerAddNode(t *testing.T, client *linodego.Client, f *fak
 
 		var nbcro linodego.NodeBalancerConfigRebuildOptions
 
-		err = json.Unmarshal([]byte(req.Body), &nbcro)
-		if err != nil {
+		if err := json.Unmarshal([]byte(req.Body), &nbcro); err != nil {
 			t.Fatalf("Unable to unmarshall request body %#v, error: %#v", req.Body, err)
 		}
 
