@@ -536,13 +536,13 @@ func testUpdateLoadBalancerAddNode(t *testing.T, client *linodego.Client, f *fak
 	}
 
 	checkIDs := func() (int, int) {
-		rx, _ := regexp.Compile("/nodebalancers/[0-9]+/configs/[0-9]+/rebuild")
+		rx := regexp.MustCompile("/nodebalancers/[0-9]+/configs/[0-9]+/rebuild")
 
 		var req *fakeRequest
 		for request := range f.requests {
+			request := request
 			if rx.MatchString(request.Path) {
-				copiedReq := request
-				req = &copiedReq
+				req = &request
 				break
 			}
 		}
