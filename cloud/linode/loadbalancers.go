@@ -313,10 +313,9 @@ func (l *loadbalancers) updateNodeBalancer(
 				// This error can be ignored, because if we fail to get nodes we can anyway rebuild the config from scratch,
 				// it would just cause the NB to reload config even if the node list did not change, so we prefer to send IDs when it is posible.
 				klog.Warningf("Unable to list existing nodebalancer nodes for NB %d config %d, error: %s", nb.ID, newNBCfg.ID, err)
-			} else {
-				for _, node := range currentNBNodes {
-					oldNBNodeIDs[node.Address] = node.ID
-				}
+			}
+			for _, node := range currentNBNodes {
+				oldNBNodeIDs[node.Address] = node.ID
 			}
 			klog.Infof("Nodebalancer %d had nodes %v", nb.ID, oldNBNodeIDs)
 		} else {
