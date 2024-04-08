@@ -111,11 +111,7 @@ func (f *fakeAPI) setupRoutes() {
 
 	f.mux.HandleFunc("GET /v4/nodebalancers/{nodeBalancerId}", func(w http.ResponseWriter, r *http.Request) {
 		nb, found := f.nb[r.PathValue("nodeBalancerId")]
-		if found {
-			rr, _ := json.Marshal(nb)
-			_, _ = w.Write(rr)
-
-		} else {
+		if !found {
 			w.WriteHeader(404)
 			resp := linodego.APIError{
 				Errors: []linodego.APIErrorReason{
@@ -124,11 +120,16 @@ func (f *fakeAPI) setupRoutes() {
 			}
 			rr, _ := json.Marshal(resp)
 			_, _ = w.Write(rr)
+			return
 		}
+
+		rr, _ := json.Marshal(nb)
+		_, _ = w.Write(rr)
+
 	})
 
 	f.mux.HandleFunc("GET /v4/nodebalancers/{nodeBalancerId}/firewalls", func(w http.ResponseWriter, r *http.Request) {
-		devID, err := strconv.Atoi(r.PathValue("nodeBalancerId"))
+		nodebalancerID, err := strconv.Atoi(r.PathValue("nodeBalancerId"))
 		if err != nil {
 			f.t.Fatal(err)
 		}
@@ -145,7 +146,7 @@ func (f *fakeAPI) setupRoutes() {
 	out:
 		for fwid, devices := range f.fwd {
 			for _, device := range devices {
-				if device.Entity.ID == devID {
+				if device.Entity.ID == nodebalancerID {
 					data.Data = append(data.Data, *f.fw[fwid])
 					data.PageOptions.Results = 1
 					break out
@@ -227,17 +228,7 @@ func (f *fakeAPI) setupRoutes() {
 		}
 
 		firewallDevices, found := f.fwd[fwdId]
-		if found {
-			firewallDeviceList := []linodego.FirewallDevice{}
-			for i := range firewallDevices {
-				firewallDeviceList = append(firewallDeviceList, *firewallDevices[i])
-			}
-			rr, _ := json.Marshal(linodego.FirewallDevicesPagedResponse{
-				PageOptions: &linodego.PageOptions{Page: 1, Pages: 1, Results: len(firewallDeviceList)},
-				Data:        firewallDeviceList,
-			})
-			_, _ = w.Write(rr)
-		} else {
+		if !found {
 			w.WriteHeader(404)
 			resp := linodego.APIError{
 				Errors: []linodego.APIErrorReason{
@@ -246,7 +237,18 @@ func (f *fakeAPI) setupRoutes() {
 			}
 			rr, _ := json.Marshal(resp)
 			_, _ = w.Write(rr)
+			return
 		}
+
+		firewallDeviceList := []linodego.FirewallDevice{}
+		for i := range firewallDevices {
+			firewallDeviceList = append(firewallDeviceList, *firewallDevices[i])
+		}
+		rr, _ := json.Marshal(linodego.FirewallDevicesPagedResponse{
+			PageOptions: &linodego.PageOptions{Page: 1, Pages: 1, Results: len(firewallDeviceList)},
+			Data:        firewallDeviceList,
+		})
+		_, _ = w.Write(rr)
 	})
 
 	f.mux.HandleFunc("POST /v4/nodebalancers", func(w http.ResponseWriter, r *http.Request) {
