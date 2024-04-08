@@ -125,7 +125,6 @@ func (f *fakeAPI) setupRoutes() {
 
 		rr, _ := json.Marshal(nb)
 		_, _ = w.Write(rr)
-
 	})
 
 	f.mux.HandleFunc("GET /v4/nodebalancers/{nodeBalancerId}/firewalls", func(w http.ResponseWriter, r *http.Request) {
