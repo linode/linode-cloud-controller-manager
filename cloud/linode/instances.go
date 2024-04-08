@@ -3,6 +3,7 @@ package linode
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/types"
 	"os"
 	"slices"
 	"strconv"
@@ -106,6 +107,18 @@ func (i *instances) linodeByIP(kNode *v1.Node) (*linodego.Instance, error) {
 	return nil, cloudprovider.InstanceNotFound
 }
 
+func (i *instances) linodeByName(nodeName types.NodeName) *linodego.Instance {
+	i.nodeCache.RLock()
+	defer i.nodeCache.RUnlock()
+	for _, node := range i.nodeCache.nodes {
+		if node.Label == string(nodeName) {
+			return node
+		}
+	}
+
+	return nil
+}
+
 func (i *instances) linodeByID(id int) (*linodego.Instance, error) {
 	i.nodeCache.RLock()
 	defer i.nodeCache.RUnlock()
@@ -122,6 +135,7 @@ func (i *instances) lookupLinode(ctx context.Context, node *v1.Node) (*linodego.
 	}
 
 	providerID := node.Spec.ProviderID
+	nodeName := types.NodeName(node.Name)
 
 	sentry.SetTag(ctx, "provider_id", providerID)
 	sentry.SetTag(ctx, "node_name", node.Name)
@@ -136,6 +150,11 @@ func (i *instances) lookupLinode(ctx context.Context, node *v1.Node) (*linodego.
 
 		return i.linodeByID(id)
 	}
+	instance := i.linodeByName(nodeName)
+	if instance != nil {
+		return instance, nil
+	}
+
 	return i.linodeByIP(node)
 }
 
