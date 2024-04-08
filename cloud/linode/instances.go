@@ -93,12 +93,8 @@ func (i *instances) linodeByIP(kNode *v1.Node) (*linodego.Instance, error) {
 		return nil, fmt.Errorf("no IP address found on node %s", kNode.Name)
 	}
 	for _, node := range i.nodeCache.nodes {
-		var nodeAddresses []string
 		for _, nodeIP := range node.IPv4 {
-			nodeAddresses = append(nodeAddresses, nodeIP.String())
-		}
-		for _, nodeIP := range nodeAddresses {
-			if slices.Contains(kNodeAddresses, nodeIP) {
+			if !nodeIP.IsPrivate() && slices.Contains(kNodeAddresses, nodeIP.String()) {
 				return node, nil
 			}
 		}
