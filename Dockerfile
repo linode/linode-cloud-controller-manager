@@ -1,4 +1,4 @@
-FROM golang:1.21-alpine as builder
+FROM golang:1.22-alpine as builder
 RUN mkdir -p /linode
 WORKDIR /linode
 
@@ -11,7 +11,7 @@ COPY sentry ./sentry
 RUN go mod download
 RUN go build -a -ldflags '-extldflags "-static"' -o /bin/linode-cloud-controller-manager-linux /linode
 
-FROM alpine:3.18.4
+FROM alpine:3.19.1
 RUN apk add --update --no-cache ca-certificates
 LABEL maintainers="Linode"
 LABEL description="Linode Cloud Controller Manager"
