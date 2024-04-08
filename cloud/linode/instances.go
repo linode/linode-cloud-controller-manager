@@ -3,12 +3,13 @@ package linode
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/types"
 	"os"
-	"slices"
 	"strconv"
 	"sync"
 	"time"
+
+	"golang.org/x/exp/slices"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/linode/linodego"
 	v1 "k8s.io/api/core/v1"
