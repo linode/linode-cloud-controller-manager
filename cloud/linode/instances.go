@@ -85,7 +85,7 @@ func (i *instances) linodeByIP(kNode *v1.Node) (*linodego.Instance, error) {
 	i.nodeCache.RLock()
 	defer i.nodeCache.RUnlock()
 	var kNodeAddresses []string
-	for _, address := range (kNode).Status.Addresses {
+	for _, address := range kNode.Status.Addresses {
 		if address.Type == "ExternalIP" || address.Type == "InternalIP" {
 			kNodeAddresses = append(kNodeAddresses, address.Address)
 		}
