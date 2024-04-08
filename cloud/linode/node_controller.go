@@ -57,7 +57,7 @@ func newNodeController(kubeclient kubernetes.Interface, client client.Client, in
 }
 
 func (s *nodeController) Run(stopCh <-chan struct{}) {
-	_, err := s.informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := s.informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			node, ok := obj.(*v1.Node)
 			if !ok {
@@ -67,8 +67,7 @@ func (s *nodeController) Run(stopCh <-chan struct{}) {
 			klog.Infof("NodeController will handle newly created node (%s) metadata", node.Name)
 			s.queue.Add(node)
 		},
-	})
-	if err != nil {
+	}); err != nil {
 		klog.Errorf("NodeController can't handle newly created node's metadata. %s", err)
 	}
 
