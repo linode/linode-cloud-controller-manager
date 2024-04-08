@@ -191,7 +191,6 @@ func (f *fakeAPI) setupRoutes() {
 			f.t.Fatal(err)
 		}
 		_, _ = w.Write(rr)
-		return
 	})
 
 	f.mux.HandleFunc("GET /v4/nodebalancers/{nodeBalancerId}/configs/{configId}/nodes", func(w http.ResponseWriter, r *http.Request) {
@@ -219,7 +218,6 @@ func (f *fakeAPI) setupRoutes() {
 		}
 		rr, _ := json.Marshal(resp)
 		_, _ = w.Write(rr)
-
 	})
 
 	f.mux.HandleFunc("GET /v4/networking/firewalls/{firewallId}/devices", func(w http.ResponseWriter, r *http.Request) {
@@ -331,7 +329,6 @@ func (f *fakeAPI) setupRoutes() {
 			f.t.Fatal(err)
 		}
 		_, _ = w.Write(resp)
-		return
 	})
 
 	f.mux.HandleFunc("POST /v4/nodebalancers/{nodeBalancerId}/configs", func(w http.ResponseWriter, r *http.Request) {
@@ -441,7 +438,6 @@ func (f *fakeAPI) setupRoutes() {
 			f.t.Fatal(err)
 		}
 		_, _ = w.Write(resp)
-
 	})
 
 	f.mux.HandleFunc("POST /v4/networking/firewalls", func(w http.ResponseWriter, r *http.Request) {
