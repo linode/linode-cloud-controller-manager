@@ -535,9 +535,8 @@ func testUpdateLoadBalancerAddNode(t *testing.T, client *linodego.Client, f *fak
 		t.Errorf("UpdateLoadBalancer returned an error while updated LB to have one node: %s", err)
 	}
 
+	rx := regexp.MustCompile("/nodebalancers/[0-9]+/configs/[0-9]+/rebuild")
 	checkIDs := func() (int, int) {
-		rx := regexp.MustCompile("/nodebalancers/[0-9]+/configs/[0-9]+/rebuild")
-
 		var req *fakeRequest
 		for request := range f.requests {
 			request := request
