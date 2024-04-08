@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 	"github.com/linode/linodego"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
@@ -30,7 +31,7 @@ func TestInstanceExists(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	client := NewMockClient(ctrl)
+	client := mocks.NewMockClient(ctrl)
 
 	t.Run("should return false if linode does not exist (by providerID)", func(t *testing.T) {
 		instances := newInstances(client)
@@ -90,7 +91,7 @@ func TestMetadataRetrieval(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	client := NewMockClient(ctrl)
+	client := mocks.NewMockClient(ctrl)
 
 	t.Run("errors when linode does not exist (by name)", func(t *testing.T) {
 		instances := newInstances(client)
@@ -231,7 +232,7 @@ func TestMalformedProviders(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	client := NewMockClient(ctrl)
+	client := mocks.NewMockClient(ctrl)
 
 	t.Run("fails on non-numeric providerID", func(t *testing.T) {
 		instances := newInstances(client)
@@ -250,7 +251,7 @@ func TestInstanceShutdown(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	client := NewMockClient(ctrl)
+	client := mocks.NewMockClient(ctrl)
 
 	t.Run("fails when instance not found (by provider)", func(t *testing.T) {
 		instances := newInstances(client)
