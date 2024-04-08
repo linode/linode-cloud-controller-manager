@@ -4,15 +4,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
 
-	"golang.org/x/exp/slices"
-	"k8s.io/apimachinery/pkg/types"
-
 	"github.com/linode/linodego"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
