@@ -29,9 +29,8 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           name: ccm-linode
           args:
-            - --leader-elect-resource-lock=endpoints
+            - --leader-elect-resource-lock=leases
             - --v=3
-            - --port=0
             - --secure-port=10253
             {{- if .Values.linodegoDebug }}
             - --linodego-debug={{ .Values.linodegoDebug }}

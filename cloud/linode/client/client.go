@@ -1,6 +1,6 @@
 package client
 
-//go:generate go run github.com/golang/mock/mockgen -destination mock_client_test.go -package client github.com/linode/linode-cloud-controller-manager/cloud/linode/client Client
+//go:generate go run github.com/golang/mock/mockgen -destination mocks/mock_client.go -package mocks github.com/linode/linode-cloud-controller-manager/cloud/linode/client Client
 
 import (
 	"context"
@@ -21,6 +21,7 @@ type Client interface {
 	UpdateNodeBalancer(context.Context, int, linodego.NodeBalancerUpdateOptions) (*linodego.NodeBalancer, error)
 	DeleteNodeBalancer(context.Context, int) error
 	ListNodeBalancers(context.Context, *linodego.ListOptions) ([]linodego.NodeBalancer, error)
+	ListNodeBalancerNodes(context.Context, int, int, *linodego.ListOptions) ([]linodego.NodeBalancerNode, error)
 
 	CreateNodeBalancerConfig(context.Context, int, linodego.NodeBalancerConfigCreateOptions) (*linodego.NodeBalancerConfig, error)
 	DeleteNodeBalancerConfig(context.Context, int, int) error

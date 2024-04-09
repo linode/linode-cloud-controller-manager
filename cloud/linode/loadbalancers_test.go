@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -148,6 +149,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 		{
 			name: "Create Load Balancer With Invalid Firewall ACL - NO Allow Or Deny",
 			f:    testCreateNodeBalanceWithNoAllowOrDenyList,
+		},
+		{
+			name: "Update Load Balancer - Add Node",
+			f:    testUpdateLoadBalancerAddNode,
 		},
 		{
 			name: "Update Load Balancer - Add Annotation",
@@ -440,6 +445,196 @@ func testCreateNodeBalancerWithInvalidFirewall(t *testing.T, client *linodego.Cl
 	err := testCreateNodeBalancer(t, client, f, annotations)
 	if err.Error() != expectedError {
 		t.Fatalf("expected a %s error, got %v", expectedError, err)
+	}
+}
+
+func testUpdateLoadBalancerAddNode(t *testing.T, client *linodego.Client, f *fakeAPI) {
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: randString(),
+			UID:  "foobar1234",
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     randString(),
+					Protocol: "TCP",
+					Port:     int32(80),
+					NodePort: int32(30000),
+				},
+			},
+		},
+	}
+
+	nodes1 := []*v1.Node{
+		{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+		},
+	}
+
+	nodes2 := []*v1.Node{
+		{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+		},
+		{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.2",
+					},
+				},
+			},
+		},
+		{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.3",
+					},
+				},
+			},
+		},
+	}
+
+	lb := &loadbalancers{client, "us-west", nil}
+	fakeClientset := fake.NewSimpleClientset()
+	lb.kubeClient = fakeClientset
+
+	defer func() {
+		_ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+	}()
+
+	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes1)
+	if err != nil {
+		t.Errorf("EnsureLoadBalancer returned an error %s", err)
+	}
+	svc.Status.LoadBalancer = *lbStatus
+
+	stubService(fakeClientset, svc)
+
+	f.ResetRequests()
+
+	err = lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, nodes1)
+	if err != nil {
+		t.Errorf("UpdateLoadBalancer returned an error while updated LB to have one node: %s", err)
+	}
+
+	rx := regexp.MustCompile("/nodebalancers/[0-9]+/configs/[0-9]+/rebuild")
+	checkIDs := func() (int, int) {
+		var req *fakeRequest
+		for request := range f.requests {
+			request := request
+			if rx.MatchString(request.Path) {
+				req = &request
+				break
+			}
+		}
+
+		if req == nil {
+			t.Fatalf("Nodebalancer config rebuild request was not called.")
+		}
+
+		var nbcro linodego.NodeBalancerConfigRebuildOptions
+
+		if err := json.Unmarshal([]byte(req.Body), &nbcro); err != nil {
+			t.Fatalf("Unable to unmarshall request body %#v, error: %#v", req.Body, err)
+		}
+
+		withIds := 0
+		for i := range nbcro.Nodes {
+			if nbcro.Nodes[i].ID > 0 {
+				withIds++
+			}
+		}
+
+		return len(nbcro.Nodes), withIds
+	}
+
+	nodecount, nodeswithIdcount := checkIDs()
+	if nodecount != 1 {
+		t.Fatalf("Unexpected node count (%d) in request on updating the nodebalancer with one node.", nodecount)
+	}
+	if nodeswithIdcount != 1 {
+		t.Fatalf("Expected Node ID to be set when updating the nodebalancer with the same node it had previously.")
+	}
+
+	f.ResetRequests()
+	err = lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, nodes2)
+	if err != nil {
+		t.Errorf("UpdateLoadBalancer returned an error while updated LB to have three nodes: %s", err)
+	}
+	nodecount, nodeswithIdcount = checkIDs()
+	if nodecount != 3 {
+		t.Fatalf("Unexpected node count (%d) in request on updating the nodebalancer with three nodes.", nodecount)
+	}
+	if nodeswithIdcount != 1 {
+		t.Fatalf("Expected ID to be set just on one node which was existing prior updating the node with three nodes, it is set on %d nodes", nodeswithIdcount)
+	}
+
+	f.ResetRequests()
+	err = lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, nodes2)
+	if err != nil {
+		t.Errorf("UpdateLoadBalancer returned an error while updated LB to have three nodes second time: %s", err)
+	}
+	nodecount, nodeswithIdcount = checkIDs()
+	if nodecount != 3 {
+		t.Fatalf("Unexpected node count (%d) in request on updating the nodebalancer with three nodes second time.", nodecount)
+	}
+	if nodeswithIdcount != 3 {
+		t.Fatalf("Expected ID to be set just on all three nodes when updating the NB with all three nodes which were pre-existing, instead it is set on %d nodes", nodeswithIdcount)
+	}
+
+	nb, err := lb.getNodeBalancerByStatus(context.TODO(), svc)
+	if err != nil {
+		t.Fatalf("failed to get NodeBalancer via status: %s", err)
+	}
+
+	cfgs, errConfigs := client.ListNodeBalancerConfigs(context.TODO(), nb.ID, nil)
+	if errConfigs != nil {
+		t.Fatalf("error getting NodeBalancer configs: %v", errConfigs)
+	}
+
+	expectedPorts := map[int]struct{}{
+		80: {},
+	}
+
+	observedPorts := make(map[int]struct{})
+
+	for _, cfg := range cfgs {
+		nbnodes, errNodes := client.ListNodeBalancerNodes(context.TODO(), nb.ID, cfg.ID, nil)
+		if errNodes != nil {
+			t.Errorf("error getting NodeBalancer nodes: %v", errNodes)
+		}
+
+		for _, node := range nbnodes {
+			t.Logf("Node %#v", node)
+		}
+
+		if len(nbnodes) != len(nodes2) {
+			t.Errorf("Expected %d nodes for port %d, got %d (%#v)", len(nodes2), cfg.Port, len(nbnodes), nbnodes)
+		}
+
+		observedPorts[cfg.Port] = struct{}{}
+	}
+
+	if !reflect.DeepEqual(expectedPorts, observedPorts) {
+		t.Errorf("NodeBalancer ports mismatch: expected %#v, got %#v", expectedPorts, observedPorts)
 	}
 }
 
@@ -1788,7 +1983,8 @@ func testUpdateLoadBalancerAddNodeBalancerID(t *testing.T, client *linodego.Clie
 		t.Errorf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
 	}
 
-	lbStatus, _, err := lb.GetLoadBalancer(context.TODO(), svc.ClusterName, svc)
+	clusterName := strings.TrimPrefix(svc.Namespace, "kube-system-")
+	lbStatus, _, err := lb.GetLoadBalancer(context.TODO(), clusterName, svc)
 	if err != nil {
 		t.Errorf("GetLoadBalancer returned an error: %s", err)
 	}

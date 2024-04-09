@@ -3,6 +3,7 @@ package linode
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/appscode/go/wait"
@@ -32,7 +33,7 @@ func newServiceController(loadbalancers *loadbalancers, informer v1informers.Ser
 }
 
 func (s *serviceController) Run(stopCh <-chan struct{}) {
-	s.informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := s.informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: func(obj interface{}) {
 			service, ok := obj.(*v1.Service)
 			if !ok {
@@ -46,7 +47,9 @@ func (s *serviceController) Run(stopCh <-chan struct{}) {
 			klog.Infof("ServiceController will handle service (%s) deletion", getServiceNn(service))
 			s.queue.Add(service)
 		},
-	})
+	}); err != nil {
+		klog.Errorf("ServiceController didn't successfully register it's Informer %s", err)
+	}
 
 	go wait.Until(s.worker, time.Second, stopCh)
 	s.informer.Informer().Run(stopCh)
@@ -91,5 +94,6 @@ func (s *serviceController) processNextDeletion() bool {
 
 func (s *serviceController) handleServiceDeleted(service *v1.Service) error {
 	klog.Infof("ServiceController handling service (%s) deletion", getServiceNn(service))
-	return s.loadbalancers.EnsureLoadBalancerDeleted(context.Background(), service.ClusterName, service)
+	clusterName := strings.TrimPrefix(service.Namespace, "kube-system-")
+	return s.loadbalancers.EnsureLoadBalancerDeleted(context.Background(), clusterName, service)
 }
