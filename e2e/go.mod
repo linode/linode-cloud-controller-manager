@@ -1,6 +1,6 @@
 module e2e_test
 
-go 1.21
+go 1.22
 
 require (
 	github.com/appscode/go v0.0.0-20200323182826-54e98e09185a
