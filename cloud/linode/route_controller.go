@@ -128,7 +128,7 @@ func (r *routes) CreateRoute(ctx context.Context, clusterName string, nameHint s
 		return err
 	}
 
-	// fetch instance configs
+	// fetch instance routes
 	instanceRoutes, err := r.getInstanceRoutes(ctx, instance.ID)
 	if err != nil {
 		return err

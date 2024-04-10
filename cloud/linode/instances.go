@@ -37,7 +37,7 @@ type nodeCache struct {
 }
 
 // getInstanceIPv4Addresses returns all ipv4 addresses configured on a linode.
-func (nc *nodeCache) getInstanceIPv4Addresses(instance linodego.Instance, vpcips []string) ([]nodeIP, error) {
+func (nc *nodeCache) getInstanceIPv4Addresses(instance linodego.Instance, vpcips []string) []nodeIP {
 	ips := []nodeIP{}
 
 	// If vpc ips are present, list them first
@@ -54,7 +54,7 @@ func (nc *nodeCache) getInstanceIPv4Addresses(instance linodego.Instance, vpcips
 		ips = append(ips, nodeIP{ip: ip.String(), ipType: ipType})
 	}
 
-	return ips, nil
+	return ips
 }
 
 // refreshInstances conditionally loads all instances from the Linode API and caches them.
@@ -90,12 +90,7 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 	newNodes := make(map[int]linodeInstance, len(instances))
 	for _, instance := range instances {
 		instance := instance
-		addresses, err := nc.getInstanceIPv4Addresses(instance, vpcNodes[instance.ID])
-		if err != nil {
-			klog.Errorf("Failed fetching ip addresses for instance id %d. Error: %s", instance.ID, err.Error())
-			return err
-		}
-		node := linodeInstance{instance: &instance, ips: addresses}
+		node := linodeInstance{instance: &instance, ips: nc.getInstanceIPv4Addresses(instance, vpcNodes[instance.ID])}
 		newNodes[instance.ID] = node
 	}
 
