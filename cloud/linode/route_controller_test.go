@@ -18,11 +18,6 @@ func TestListRoutes(t *testing.T) {
 	Options.VPCName = "test"
 	Options.EnableRouteController = true
 
-	ctx := context.Background()
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	client := mocks.NewMockClient(ctrl)
 	vpcInfo.id = 1
 	vpcid := vpcInfo.getID()
 
@@ -34,6 +29,10 @@ func TestListRoutes(t *testing.T) {
 	region := "us-east"
 
 	t.Run("should return empty if no instance exists in cluster", func(t *testing.T) {
+		ctx := context.Background()
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
 		routeController, err := newRoutes(client)
 		assert.NoError(t, err)
 
@@ -53,11 +52,15 @@ func TestListRoutes(t *testing.T) {
 	}
 
 	t.Run("should return no routes if instance exists but is not connected to VPC", func(t *testing.T) {
+		ctx := context.Background()
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
 		routeController, err := newRoutes(client)
 		assert.NoError(t, err)
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
-		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return([]linodego.VPCIP{}, nil)
+		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCIP{}, nil)
 		routes, err := routeController.ListRoutes(ctx, "abc")
 		assert.NoError(t, err)
 		assert.Empty(t, routes)
@@ -75,6 +78,10 @@ func TestListRoutes(t *testing.T) {
 	}
 
 	t.Run("should return no routes if instance exists, connected to VPC but no ip_ranges configured", func(t *testing.T) {
+		ctx := context.Background()
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
 		routeController, err := newRoutes(client)
 		assert.NoError(t, err)
 
@@ -112,6 +119,10 @@ func TestListRoutes(t *testing.T) {
 	}
 
 	t.Run("should return routes if instance exists, connected to VPC and ip_ranges configured", func(t *testing.T) {
+		ctx := context.Background()
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
 		routeController, err := newRoutes(client)
 		assert.NoError(t, err)
 
@@ -149,6 +160,10 @@ func TestListRoutes(t *testing.T) {
 	}
 
 	t.Run("should return no routes if instance exists, connected to VPC and ip_ranges configured but vpc id doesn't match", func(t *testing.T) {
+		ctx := context.Background()
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
 		routeController, err := newRoutes(client)
 		assert.NoError(t, err)
 
@@ -161,14 +176,10 @@ func TestListRoutes(t *testing.T) {
 }
 
 func TestCreateRoute(t *testing.T) {
+	ctx := context.Background()
 	Options.VPCName = "test"
 	Options.EnableRouteController = true
 
-	ctx := context.Background()
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	client := mocks.NewMockClient(ctrl)
 	vpcInfo.id = 1
 	vpcid := vpcInfo.getID()
 
@@ -209,6 +220,9 @@ func TestCreateRoute(t *testing.T) {
 	}
 
 	t.Run("should return no error if instance exists, connected to VPC we add a route", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
 		routeController, err := newRoutes(client)
 		assert.NoError(t, err)
 
@@ -238,6 +252,9 @@ func TestCreateRoute(t *testing.T) {
 	}
 
 	t.Run("should return no error if instance exists, connected to VPC and route already exists", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
 		routeController, err := newRoutes(client)
 		assert.NoError(t, err)
 
@@ -248,6 +265,9 @@ func TestCreateRoute(t *testing.T) {
 	})
 
 	t.Run("should return error if instance doesn't exist", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
 		routeController, err := newRoutes(client)
 		assert.NoError(t, err)
 
@@ -263,10 +283,7 @@ func TestDeleteRoute(t *testing.T) {
 	Options.EnableRouteController = true
 
 	ctx := context.Background()
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	client := mocks.NewMockClient(ctrl)
 	vpcInfo.id = 1
 	vpcid := vpcInfo.getID()
 
@@ -292,6 +309,9 @@ func TestDeleteRoute(t *testing.T) {
 	}
 
 	t.Run("should return error if instance doesn't exist", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
 		routeController, err := newRoutes(client)
 		assert.NoError(t, err)
 
@@ -319,6 +339,9 @@ func TestDeleteRoute(t *testing.T) {
 	}
 
 	t.Run("should return no error if instance exists, connected to VPC, route doesn't exist and we try to delete route", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
 		routeController, err := newRoutes(client)
 		assert.NoError(t, err)
 
@@ -347,6 +370,9 @@ func TestDeleteRoute(t *testing.T) {
 	}
 
 	t.Run("should return no error if instance exists, connected to VPC and route is deleted", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
 		routeController, err := newRoutes(client)
 		assert.NoError(t, err)
 
