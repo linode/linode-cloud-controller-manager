@@ -1,0 +1,30 @@
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: ${CLUSTER_NAME}
+  labels:
+    cni: cilium
+    ccm: linode
+    crs: ${CLUSTER_NAME}-crs
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks:
+        - 10.192.0.0/10
+  topology:
+    class: kubeadm
+    version: ${KUBERNETES_VERSION}
+    variables:
+    - name: region
+      value: ${LINODE_REGION}
+    - name: controlPlaneMachineType
+      value: ${LINODE_CONTROL_PLANE_MACHINE_TYPE}
+    - name: workerMachineType
+      value: ${LINODE_MACHINE_TYPE}
+    controlPlane:
+      replicas: ${CONTROL_PLANE_MACHINE_COUNT}
+    workers:
+      machineDeployments:
+      - class: default-worker
+        name: md-0
+        replicas: ${WORKER_MACHINE_COUNT}

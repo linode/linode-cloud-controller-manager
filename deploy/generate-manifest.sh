@@ -1,5 +1,7 @@
 #!/bin/bash
 
+: ${IMG:="linode/linode-cloud-controller-manager:latest"}
+
 set -o pipefail -o noclobber -o nounset
 
 die() { echo "$*" 1>&2; exit 1; }
@@ -12,6 +14,8 @@ Second argument must be a Linode region.
 
 Example:
 $ ./generate-manifest.sh \$LINODE_API_TOKEN us-east"
+
+rm -rf ccm-linode.yaml
 
 BASE64FLAGS=""
 longstring="1234567890123456789012345678901234567890123456789012345678901234567890"
@@ -26,4 +30,5 @@ ENCODED_REGION=$(echo -n $2 | base64 $BASE64FLAGS)
 
 cat "$(dirname "$0")/ccm-linode-template.yaml" |
 sed -e "s|{{ .Values.apiTokenB64 }}|$ENCODED_TOKEN|" |
-sed -e "s|{{ .Values.linodeRegionB64 }}|$ENCODED_REGION|" > ccm-linode.yaml
+sed -e "s|{{ .Values.linodeRegionB64 }}|$ENCODED_REGION|" |
+sed "s|linode/linode-cloud-controller-manager:latest|$IMG|" > ccm-linode.yaml

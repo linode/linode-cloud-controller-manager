@@ -1,0 +1,19 @@
+{
+  "packages": [
+    "go_1_22@latest",
+    "ginkgo@2.17.0",
+    "ctlptl@0.8.28",
+    "clusterctl@1.6.3",
+    "kind@0.22.0",
+    "kubectl@1.28.4"
+  ],
+  "shell": {
+    "init_hook": [
+      "export GOROOT=$(go env GOROOT)",
+      "export KUBECONFIG=${PWD}/e2e/test/kind-management.conf",
+      "export K8S_VERSION=v1.28.7",
+      "export REGION=eu-sea"
+    ],
+    "scripts": {}
+  }
+}

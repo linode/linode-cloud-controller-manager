@@ -4,19 +4,21 @@ import (
 	"context"
 	"e2e_test/test/framework"
 	"fmt"
-	"os/exec"
 	"strconv"
 	"time"
 
+	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ktypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/watch"
 
 	"github.com/linode/linodego"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
-	core "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/watch"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 func EnsuredService() types.GomegaMatcher {
@@ -57,7 +59,7 @@ var _ = Describe("e2e tests", func() {
 
 	BeforeEach(func() {
 		f = root.Invoke()
-		workers, err = f.GetNodeList()
+		workers, err = f.GetWorkerNodeList()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(workers)).Should(BeNumerically(">=", 2))
 	})
@@ -134,7 +136,7 @@ var _ = Describe("e2e tests", func() {
 	}
 
 	checkNumberOfWorkerNodes := func(numNodes int) {
-		Eventually(f.GetNodeList).Should(HaveLen(numNodes))
+		Eventually(f.GetWorkerNodeList).Should(HaveLen(numNodes))
 	}
 
 	checkNumberOfUpNodes := func(numNodes int) {
@@ -241,17 +243,36 @@ var _ = Describe("e2e tests", func() {
 		}
 	}
 
-	addNewNode := func() {
-		err := exec.Command("terraform", "apply", "-var", "nodes=3", "-auto-approve").Run()
+	changeReplicas := func(replicas int32) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+
+		kubeClient, err := framework.GetManagementKubeClientWitResource(capi.GroupVersion.WithResource("clusters"))
 		Expect(err).NotTo(HaveOccurred())
+
+		patch := fmt.Sprintf(`[{"op":"replace","path":"/spec/topology/workers/machineDeployments/0/replicas","value": %d}]`, replicas)
+
+		_, err = kubeClient.Namespace(clusterName).Patch(ctx, clusterName, ktypes.JSONPatchType, []byte(patch), metav1.PatchOptions{})
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	addNewNode := func() {
+		changeReplicas(3)
 	}
 
 	deleteNewNode := func() {
-		err := exec.Command("terraform", "apply", "-var", "nodes=2", "-auto-approve").Run()
-		Expect(err).NotTo(HaveOccurred())
+		changeReplicas(2)
 	}
 
 	waitForNodeAddition := func() {
+		By("Waiting for new worker node")
+		Eventually(func() []string {
+			workers, err = f.GetWorkerNodeList()
+			Expect(err).NotTo(HaveOccurred())
+
+			return workers
+		}()).Should(HaveLen(3))
+
 		checkNumberOfUpNodes(3)
 	}
 
@@ -1157,7 +1178,6 @@ var _ = Describe("e2e tests", func() {
 				)
 
 				BeforeEach(func() {
-					Skip("skip until rewritten to drop terraform")
 					pods = []string{"test-pod-node-add"}
 					ports := []core.ContainerPort{
 						{

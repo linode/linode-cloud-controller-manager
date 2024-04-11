@@ -10,7 +10,7 @@ const (
 	masterLabel = "node-role.kubernetes.io/master"
 )
 
-func (i *Invocation) GetNodeList() ([]string, error) {
+func (i *Invocation) GetWorkerNodeList() ([]string, error) {
 	workers := make([]string, 0)
 	nodes, err := i.kubeClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
