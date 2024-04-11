@@ -254,14 +254,14 @@ func TestMetadataRetrieval(t *testing.T) {
 			},
 		}
 
+		publicIP := net.ParseIP("172.234.31.123")
+		privateIP := net.ParseIP("192.168.159.135")
+		wrongIP := net.ParseIP("1.2.3.4")
+		expectedInstance := linodego.Instance{Label: "expected-instance", ID: 12345, IPv4: []*net.IP{&publicIP, &privateIP}}
+
 		for _, test := range getByIPTests {
 			t.Run(fmt.Sprintf("gets lindoe by IP - %s", test.name), func(t *testing.T) {
 				instances := newInstances(client)
-
-				publicIP := net.ParseIP("172.234.31.123")
-				privateIP := net.ParseIP("192.168.159.135")
-				wrongIP := net.ParseIP("1.2.3.4")
-				expectedInstance := linodego.Instance{Label: "expected-instance", ID: 12345, IPv4: []*net.IP{&publicIP, &privateIP}}
 				client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{{ID: 3456, IPv4: []*net.IP{&wrongIP}}, expectedInstance}, nil)
 				node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node-1"}, Status: v1.NodeStatus{Addresses: test.nodeAddresses}}
 				meta, err := instances.InstanceMetadata(ctx, &node)
