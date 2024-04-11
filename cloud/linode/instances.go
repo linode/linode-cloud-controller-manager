@@ -74,8 +74,9 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 
 	// If running within VPC, find instances and store their ips
 	vpcNodes := map[int][]string{}
-	if vpcInfo.getID() != 0 {
-		resp, err := client.ListVPCIPAddresses(ctx, &linodego.ListOptions{})
+	vpcID := vpcInfo.getID()
+	if vpcID != 0 {
+		resp, err := client.ListVPCIPAddresses(ctx, vpcID, linodego.NewListOptions(0, ""))
 		if err != nil {
 			return err
 		}
@@ -89,7 +90,6 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 
 	newNodes := make(map[int]linodeInstance, len(instances))
 	for _, instance := range instances {
-		instance := instance
 		node := linodeInstance{instance: &instance, ips: nc.getInstanceIPv4Addresses(instance, vpcNodes[instance.ID])}
 		newNodes[instance.ID] = node
 	}

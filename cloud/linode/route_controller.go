@@ -33,11 +33,9 @@ func (rc *routeCache) refreshRoutes(ctx context.Context, client client.Client) e
 		return nil
 	}
 
-	// Get all VPC specific ipaddresses
-	// TODO: Change /v4/vpcs/ips api call to /v4/vpcs/:id/ips call once api is available in linodego
-	//       We can then remove all vpc id matching checks in this code
 	vpcNodes := map[int][]linodego.VPCIP{}
-	resp, err := client.ListVPCIPAddresses(ctx, &linodego.ListOptions{})
+	vpcID := vpcInfo.getID()
+	resp, err := client.ListVPCIPAddresses(ctx, vpcID, linodego.NewListOptions(0, ""))
 	if err != nil {
 		return err
 	}
