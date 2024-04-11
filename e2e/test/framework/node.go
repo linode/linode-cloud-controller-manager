@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	masterLabel = "node-role.kubernetes.io/master"
+	masterLabel = "node-role.kubernetes.io/control-plane"
 )
 
 func (i *Invocation) GetWorkerNodeList() ([]string, error) {

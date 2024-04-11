@@ -61,7 +61,7 @@ var _ = Describe("e2e tests", func() {
 		f = root.Invoke()
 		workers, err = f.GetWorkerNodeList()
 		Expect(err).NotTo(HaveOccurred())
-		Expect(len(workers)).Should(BeNumerically(">=", 2))
+		Expect(workers).Should(HaveLen(2))
 	})
 
 	createPodWithLabel := func(pods []string, ports []core.ContainerPort, image string, labels map[string]string, selectNode bool) {
