@@ -101,7 +101,7 @@ metadata:
         "allowList": {
           "ipv4": ["192.166.0.0/16", "172.23.41.0/24"],
           "ipv6": ["2001:DB8::/128"]
-        },
+        }
       }
 spec:
   type: LoadBalancer
