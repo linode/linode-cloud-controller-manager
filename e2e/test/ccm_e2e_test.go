@@ -265,14 +265,6 @@ var _ = Describe("e2e tests", func() {
 	}
 
 	waitForNodeAddition := func() {
-		By("Waiting for new worker node")
-		Eventually(func() []string {
-			workers, err = f.GetWorkerNodeList()
-			Expect(err).NotTo(HaveOccurred())
-
-			return workers
-		}()).Should(HaveLen(3))
-
 		checkNumberOfUpNodes(3)
 	}
 
