@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -79,16 +80,39 @@ func (e instanceNoIPAddressesError) Error() string {
 	return fmt.Sprintf("instance %d has no IP addresses", e.id)
 }
 
-func (i *instances) linodeByName(nodeName types.NodeName) (*linodego.Instance, error) {
+func (i *instances) linodeByIP(kNode *v1.Node) (*linodego.Instance, error) {
 	i.nodeCache.RLock()
 	defer i.nodeCache.RUnlock()
+	var kNodeAddresses []string
+	for _, address := range kNode.Status.Addresses {
+		if address.Type == "ExternalIP" || address.Type == "InternalIP" {
+			kNodeAddresses = append(kNodeAddresses, address.Address)
+		}
+	}
+	if kNodeAddresses == nil {
+		return nil, fmt.Errorf("no IP address found on node %s", kNode.Name)
+	}
 	for _, node := range i.nodeCache.nodes {
-		if node.Label == string(nodeName) {
-			return node, nil
+		for _, nodeIP := range node.IPv4 {
+			if !nodeIP.IsPrivate() && slices.Contains(kNodeAddresses, nodeIP.String()) {
+				return node, nil
+			}
 		}
 	}
 
 	return nil, cloudprovider.InstanceNotFound
+}
+
+func (i *instances) linodeByName(nodeName types.NodeName) *linodego.Instance {
+	i.nodeCache.RLock()
+	defer i.nodeCache.RUnlock()
+	for _, node := range i.nodeCache.nodes {
+		if node.Label == string(nodeName) {
+			return node
+		}
+	}
+
+	return nil
 }
 
 func (i *instances) linodeByID(id int) (*linodego.Instance, error) {
@@ -122,8 +146,12 @@ func (i *instances) lookupLinode(ctx context.Context, node *v1.Node) (*linodego.
 
 		return i.linodeByID(id)
 	}
+	instance := i.linodeByName(nodeName)
+	if instance != nil {
+		return instance, nil
+	}
 
-	return i.linodeByName(nodeName)
+	return i.linodeByIP(node)
 }
 
 func (i *instances) InstanceExists(ctx context.Context, node *v1.Node) (bool, error) {

@@ -140,25 +140,28 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 		return err
 	}
 
-	if uuid == linode.HostUUID {
+	if uuid == linode.HostUUID && node.Spec.ProviderID != "" {
 		s.SetLastMetadataUpdate(node.Name)
 		return nil
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		// Get a fresh copy of the node so the resource version is up to date
+		// Get a fresh copy of the node so the resource version is up-to-date
 		n, err := s.kubeclient.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 
-		// It may be that the UUID has been set
-		if n.Labels[annotations.AnnLinodeHostUUID] == linode.HostUUID {
-			return nil
+		// Try to update the node UUID if it has not been set
+		if n.Labels[annotations.AnnLinodeHostUUID] != linode.HostUUID {
+			n.Labels[annotations.AnnLinodeHostUUID] = linode.HostUUID
 		}
 
-		// Try to update the node
-		n.Labels[annotations.AnnLinodeHostUUID] = linode.HostUUID
+		// Try to update the node ProviderID if it has not been set
+		if n.Spec.ProviderID == "" {
+			n.Spec.ProviderID = providerIDPrefix + strconv.Itoa(linode.ID)
+		}
+
 		_, err = s.kubeclient.CoreV1().Nodes().Update(ctx, n, metav1.UpdateOptions{})
 		return err
 	}); err != nil {

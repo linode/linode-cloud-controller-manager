@@ -43,17 +43,6 @@ func TestInstanceExists(t *testing.T) {
 		assert.False(t, exists)
 	})
 
-	t.Run("should return false if linode does not exist (by name)", func(t *testing.T) {
-		instances := newInstances(client)
-		name := "some-name"
-		node := nodeWithName(name)
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
-
-		exists, err := instances.InstanceExists(ctx, node)
-		assert.NoError(t, err)
-		assert.False(t, exists)
-	})
-
 	t.Run("should return true if linode exists (by provider)", func(t *testing.T) {
 		instances := newInstances(client)
 		node := nodeWithProviderID(providerIDPrefix + "123")
@@ -93,15 +82,18 @@ func TestMetadataRetrieval(t *testing.T) {
 
 	client := mocks.NewMockClient(ctrl)
 
-	t.Run("errors when linode does not exist (by name)", func(t *testing.T) {
+	t.Run("uses name over IP for finding linode", func(t *testing.T) {
 		instances := newInstances(client)
-		name := "does-not-exist"
+		publicIP := net.ParseIP("172.234.31.123")
+		privateIP := net.ParseIP("192.168.159.135")
+		expectedInstance := linodego.Instance{Label: "expected-instance", ID: 12345, IPv4: []*net.IP{&publicIP, &privateIP}}
+		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{{Label: "wrong-instance", ID: 3456, IPv4: []*net.IP{&publicIP, &privateIP}}, expectedInstance}, nil)
+		name := "expected-instance"
 		node := nodeWithName(name)
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
 
 		meta, err := instances.InstanceMetadata(ctx, node)
-		assert.ErrorIs(t, err, cloudprovider.InstanceNotFound)
-		assert.Nil(t, meta)
+		assert.Nil(t, err)
+		assert.Equal(t, providerIDPrefix+strconv.Itoa(expectedInstance.ID), meta.ProviderID)
 	})
 
 	t.Run("fails when linode does not exist (by provider)", func(t *testing.T) {
@@ -224,6 +216,65 @@ func TestMetadataRetrieval(t *testing.T) {
 				assert.Equal(t, meta.NodeAddresses, addresses)
 			}
 		})
+
+		getByIPTests := []struct {
+			name          string
+			nodeAddresses []v1.NodeAddress
+			expectedErr   error
+		}{
+			{name: "gets linode by External IP", nodeAddresses: []v1.NodeAddress{{
+				Type:    "ExternalIP",
+				Address: "172.234.31.123",
+			}, {
+				Type:    "InternalIP",
+				Address: "192.168.159.135",
+			}}},
+			{
+				name: "returns error on node with only internal IP", nodeAddresses: []v1.NodeAddress{{
+					Type:    "ExternalIP",
+					Address: "123.2.1.23",
+				}, {
+					Type:    "InternalIP",
+					Address: "192.168.159.135",
+				}},
+				expectedErr: cloudprovider.InstanceNotFound,
+			},
+			{
+				name: "returns error on no matching nodes by IP", nodeAddresses: []v1.NodeAddress{{
+					Type:    "ExternalIP",
+					Address: "123.2.1.23",
+				}, {
+					Type:    "InternalIP",
+					Address: "192.168.10.10",
+				}},
+				expectedErr: cloudprovider.InstanceNotFound,
+			},
+			{
+				name: "returns error on no node IPs", nodeAddresses: []v1.NodeAddress{},
+				expectedErr: fmt.Errorf("no IP address found on node test-node-1"),
+			},
+		}
+
+		publicIP := net.ParseIP("172.234.31.123")
+		privateIP := net.ParseIP("192.168.159.135")
+		wrongIP := net.ParseIP("1.2.3.4")
+		expectedInstance := linodego.Instance{Label: "expected-instance", ID: 12345, IPv4: []*net.IP{&publicIP, &privateIP}}
+
+		for _, test := range getByIPTests {
+			t.Run(fmt.Sprintf("gets lindoe by IP - %s", test.name), func(t *testing.T) {
+				instances := newInstances(client)
+				client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{{ID: 3456, IPv4: []*net.IP{&wrongIP}}, expectedInstance}, nil)
+				node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node-1"}, Status: v1.NodeStatus{Addresses: test.nodeAddresses}}
+				meta, err := instances.InstanceMetadata(ctx, &node)
+				if test.expectedErr != nil {
+					assert.Nil(t, meta)
+					assert.Equal(t, err, test.expectedErr)
+				} else {
+					assert.Nil(t, err)
+					assert.Equal(t, providerIDPrefix+strconv.Itoa(expectedInstance.ID), meta.ProviderID)
+				}
+			})
+		}
 	}
 }
 
