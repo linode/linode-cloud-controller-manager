@@ -32,6 +32,7 @@ spec:
             - --leader-elect-resource-lock=leases
             - --v=3
             - --secure-port=10253
+            - --webhook-secure-port=0
             {{- if .Values.linodegoDebug }}
             - --linodego-debug={{ .Values.linodegoDebug }}
             {{- end }}
