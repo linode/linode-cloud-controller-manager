@@ -57,12 +57,12 @@ type routes struct {
 
 func newRoutes(client client.Client) (cloudprovider.Routes, error) {
 	timeout := 60
-	if raw, ok := os.LookupEnv("LINODE_ROUTES_CACHE_TTL"); ok {
+	if raw, ok := os.LookupEnv("LINODE_ROUTES_CACHE_TTL_SECONDS"); ok {
 		if t, _ := strconv.Atoi(raw); t > 0 {
 			timeout = t
 		}
 	}
-	klog.V(3).Infof("TTL for routeCache set to %d", timeout)
+	klog.V(3).Infof("TTL for routeCache set to %d seconds", timeout)
 
 	vpcid := vpcInfo.getID()
 	if Options.EnableRouteController && vpcid == 0 {
@@ -136,12 +136,12 @@ func (r *routes) CreateRoute(ctx context.Context, clusterName string, nameHint s
 	intfRoutes := []string{}
 	intfVPCIP := linodego.VPCIP{}
 	for _, ir := range instanceRoutes {
-		if ir.Address != nil && ir.VPCID == r.vpcid {
-			intfVPCIP = ir
+		if ir.VPCID != r.vpcid {
 			continue
 		}
 
-		if ir.Address != nil || ir.VPCID != r.vpcid {
+		if ir.Address != nil {
+			intfVPCIP = ir
 			continue
 		}
 
@@ -186,12 +186,12 @@ func (r *routes) DeleteRoute(ctx context.Context, clusterName string, route *clo
 	intfRoutes := []string{}
 	intfVPCIP := linodego.VPCIP{}
 	for _, ir := range instanceRoutes {
-		if ir.Address != nil && ir.VPCID == r.vpcid {
-			intfVPCIP = ir
+		if ir.VPCID != r.vpcid {
 			continue
 		}
 
-		if ir.Address != nil || ir.VPCID != r.vpcid {
+		if ir.Address != nil {
+			intfVPCIP = ir
 			continue
 		}
 
