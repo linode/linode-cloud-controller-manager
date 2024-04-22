@@ -108,7 +108,7 @@ $(CLUSTERCTL): $(LOCALBIN)
 	chmod +x $(CLUSTERCTL)
 
 .PHONY: kind
-kind: $(KIND) ## Download kustomize locally if necessary.
+kind: $(KIND) ## Download kind locally if necessary.
 $(KIND): $(LOCALBIN)
 	curl -fsSL https://github.com/kubernetes-sigs/kind/releases/download/$(KIND_VERSION)/kind-$(OS)-$(ARCH_SHORT) -o $(KIND)
 	chmod +x $(KIND)
