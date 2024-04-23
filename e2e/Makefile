@@ -12,18 +12,18 @@ endif
 
 .PHONY: test reuse-and-test clean
 
-test-cluster: ctlptl kind clean-cluster
+test-cluster: kind ctlptl kind clean-cluster
 	./test/scripts/create_management_cluster.sh $(K8S_VERSION)
 
 clean-cluster: ctlptl
-	ctlptl delete cluster kind-management --ignore-not-found
+	$(CTLPTL) delete cluster kind-management --ignore-not-found
 	rm -rf $(MANAGEMENT_KUBECONFIG)
 
 reuse-and-test: SUITE_ARGS='--reuse'
 
 test reuse-and-test: clusterctl ginkgo check-token test-cluster
 	go list -m; \
-	MANAGEMENT_KUBECONFIG=$(ROOT_DIR)/e2e/$(MANAGEMENT_KUBECONFIG) ginkgo -r --vv --trace $(TEST_ARGS) -- --image=${IMG} --k8s_version=${K8S_VERSION} $(SUITE_ARGS)
+	MANAGEMENT_KUBECONFIG=$(ROOT_DIR)/e2e/$(MANAGEMENT_KUBECONFIG) $(GINKGO) -r --vv --trace $(TEST_ARGS) -- --image=${IMG} --k8s_version=${K8S_VERSION} $(SUITE_ARGS)
 
 	$(MAKE) clean-cluster
 
@@ -73,6 +73,8 @@ ifdef DEVBOX_PACKAGES_DIR
 endif
 
 export PATH := $(CACHE_BIN):$(PATH)
+$(CACHE_BIN):
+	mkdir -p $(CACHE_BIN)
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 

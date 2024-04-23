@@ -11,8 +11,7 @@
     "init_hook": [
       "export GOROOT=$(go env GOROOT)",
       "export KUBECONFIG=${PWD}/e2e/test/kind-management.conf",
-      "export K8S_VERSION=v1.28.7",
-      "export REGION=eu-sea"
+      "export K8S_VERSION=v1.28.7"
     ],
     "scripts": {}
   }

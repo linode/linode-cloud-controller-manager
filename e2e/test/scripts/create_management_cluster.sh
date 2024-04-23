@@ -6,9 +6,9 @@ set -o nounset
 set -x
 
 export KUBERNETES_VERSION="$1"
+export GOPROXY=off # clusterctl workaround to fetch addons
 export CAPI_VERSION="v1.6.3"
-export HELM_VERSION="v0.1.1-alpha.1"
-export CAPL_VERSION="0.1.0"
+export HELM_VERSION="v0.2.1"
 export KUBECONFIG="$(realpath "$(dirname "$0")/../kind-management.conf")"
 
 ctlptl create cluster kind \
@@ -21,7 +21,7 @@ prepare_images() {
   echo "${images//[\'\"]}" | xargs -I {} sh -c 'docker pull '{}' ; kind -n management load docker-image '{}
 }
 
-(set +x ; prepare_images "$(cat $(realpath "$(dirname "$0")/infrastructure-linode/${CAPL_VERSION}/infrastructure-components.yaml"))")
+(set +x; prepare_images "$(curl -sfL $(cat $(realpath "$(dirname "$0")/clusterctl.yaml") | grep cluster-api-provider-linode | awk '{print $2}'))")
 (set +x ; prepare_images "$(clusterctl init list-images \
   --core cluster-api:${CAPI_VERSION} \
   --addon helm:${HELM_VERSION} \
@@ -31,5 +31,5 @@ prepare_images() {
   --wait-providers \
   --core cluster-api:${CAPI_VERSION} \
   --addon helm:${HELM_VERSION} \
-  --infrastructure linode:${CAPL_VERSION} \
+  --infrastructure akamai-linode \
   --config clusterctl.yaml)

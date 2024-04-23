@@ -1,6 +1,6 @@
 CLUSTER_TOPOLOGY: "true"
 EXP_CLUSTER_RESOURCE_SET: "true"
 providers:
-   - name: linode
-     url: ${PWD}/infrastructure-linode/${CAPL_VERSION}/infrastructure-components.yaml
+   - name: akamai-linode
+     url: https://github.com/linode/cluster-api-provider-linode/releases/latest/infrastructure-components.yaml
      type: InfrastructureProvider

@@ -18,13 +18,10 @@ export ROOT_DIR="$(git rev-parse --show-toplevel)"
 
 if [[ -z "$5" ]]
 then
-  export LINODE_REGION="us-sea"
+  export LINODE_REGION="eu-west"
 else
   export LINODE_REGION="$5"
 fi
-
-METADATA_REGIONS="nl-ams in-maa us-ord id-cgk us-lax es-mad us-mia it-mil jp-osa fr-par br-gru us-sea se-sto us-iad"
-[[ "$METADATA_REGIONS" =~ .*"${LINODE_REGION}".* ]] || (echo "Given region doesn't support Metadata service" ; exit 1)
 
 (cd ${ROOT_DIR}/deploy ; set +x ; ./generate-manifest.sh ${LINODE_TOKEN} ${LINODE_REGION})
 

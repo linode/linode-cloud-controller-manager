@@ -22,7 +22,7 @@ var (
 	useExisting = false
 	reuse       = false
 	clusterName string
-	region      = "us-sea"
+	region      = "us-east"
 	k8s_version string
 	linodeURL   = "https://api.linode.com"
 )
