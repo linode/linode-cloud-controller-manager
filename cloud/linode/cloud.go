@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 
 	"github.com/linode/linodego"
 	"github.com/spf13/pflag"
@@ -25,14 +26,46 @@ const (
 // We expect it to be initialized with flags external to this package, likely in
 // main.go
 var Options struct {
-	KubeconfigFlag *pflag.Flag
-	LinodeGoDebug  bool
+	KubeconfigFlag        *pflag.Flag
+	LinodeGoDebug         bool
+	EnableRouteController bool
+	VPCName               string
 }
+
+// vpcDetails is set when VPCName options flag is set.
+// We use it to list instances running within the VPC if set
+type vpcDetails struct {
+	mu   sync.RWMutex
+	id   int
+	name string
+}
+
+func (v *vpcDetails) setDetails(client client.Client, name string) error {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	id, err := getVPCID(client, Options.VPCName)
+	if err != nil {
+		return fmt.Errorf("failed finding VPC ID: %w", err)
+	}
+	v.id = id
+	v.name = name
+	return nil
+}
+
+func (v *vpcDetails) getID() int {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.id
+}
+
+var vpcInfo vpcDetails = vpcDetails{id: 0, name: ""}
 
 type linodeCloud struct {
 	client        client.Client
 	instances     cloudprovider.InstancesV2
 	loadbalancers cloudprovider.LoadBalancer
+	routes        cloudprovider.Routes
 }
 
 func init() {
@@ -67,12 +100,26 @@ func newCloud() (cloudprovider.Interface, error) {
 		linodeClient.SetDebug(true)
 	}
 
-	// Return struct that satisfies cloudprovider.Interface
-	return &linodeCloud{
+	if Options.VPCName != "" {
+		err := vpcInfo.setDetails(linodeClient, Options.VPCName)
+		if err != nil {
+			return nil, fmt.Errorf("failed finding VPC ID: %w", err)
+		}
+	}
+
+	routes, err := newRoutes(linodeClient)
+	if err != nil {
+		return nil, fmt.Errorf("routes client was not created successfully: %w", err)
+	}
+
+	// create struct that satisfies cloudprovider.Interface
+	lcloud := &linodeCloud{
 		client:        linodeClient,
 		instances:     newInstances(linodeClient),
 		loadbalancers: newLoadbalancers(linodeClient, region),
-	}, nil
+		routes:        routes,
+	}
+	return lcloud, nil
 }
 
 func (c *linodeCloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stopCh <-chan struct{}) {
@@ -109,6 +156,9 @@ func (c *linodeCloud) Clusters() (cloudprovider.Clusters, bool) {
 }
 
 func (c *linodeCloud) Routes() (cloudprovider.Routes, bool) {
+	if Options.EnableRouteController {
+		return c.routes, true
+	}
 	return nil, false
 }
 

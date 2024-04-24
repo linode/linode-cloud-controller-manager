@@ -16,6 +16,11 @@ type Client interface {
 	ListInstances(context.Context, *linodego.ListOptions) ([]linodego.Instance, error)
 	GetInstanceIPAddresses(context.Context, int) (*linodego.InstanceIPAddressResponse, error)
 
+	UpdateInstanceConfigInterface(context.Context, int, int, int, linodego.InstanceConfigInterfaceUpdateOptions) (*linodego.InstanceConfigInterface, error)
+
+	ListVPCs(context.Context, *linodego.ListOptions) ([]linodego.VPC, error)
+	ListVPCIPAddresses(context.Context, int, *linodego.ListOptions) ([]linodego.VPCIP, error)
+
 	CreateNodeBalancer(context.Context, linodego.NodeBalancerCreateOptions) (*linodego.NodeBalancer, error)
 	GetNodeBalancer(context.Context, int) (*linodego.NodeBalancer, error)
 	UpdateNodeBalancer(context.Context, int, linodego.NodeBalancerUpdateOptions) (*linodego.NodeBalancer, error)

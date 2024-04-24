@@ -126,7 +126,7 @@ func TestMetadataRetrieval(t *testing.T) {
 		assert.Equal(t, providerIDPrefix+strconv.Itoa(id), meta.ProviderID)
 		assert.Equal(t, region, meta.Region)
 		assert.Equal(t, linodeType, meta.InstanceType)
-		assert.Equal(t, meta.NodeAddresses, []v1.NodeAddress{
+		assert.Equal(t, []v1.NodeAddress{
 			{
 				Type:    v1.NodeHostName,
 				Address: name,
@@ -139,7 +139,7 @@ func TestMetadataRetrieval(t *testing.T) {
 				Type:    v1.NodeInternalIP,
 				Address: privateIPv4.String(),
 			},
-		})
+		}, meta.NodeAddresses)
 	})
 
 	ipTests := []struct {

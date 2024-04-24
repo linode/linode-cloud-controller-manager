@@ -301,6 +301,36 @@ func (mr *MockClientMockRecorder) ListNodeBalancers(arg0, arg1 interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListNodeBalancers", reflect.TypeOf((*MockClient)(nil).ListNodeBalancers), arg0, arg1)
 }
 
+// ListVPCIPAddresses mocks base method.
+func (m *MockClient) ListVPCIPAddresses(arg0 context.Context, arg1 int, arg2 *linodego.ListOptions) ([]linodego.VPCIP, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListVPCIPAddresses", arg0, arg1, arg2)
+	ret0, _ := ret[0].([]linodego.VPCIP)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListVPCIPAddresses indicates an expected call of ListVPCIPAddresses.
+func (mr *MockClientMockRecorder) ListVPCIPAddresses(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListVPCIPAddresses", reflect.TypeOf((*MockClient)(nil).ListVPCIPAddresses), arg0, arg1, arg2)
+}
+
+// ListVPCs mocks base method.
+func (m *MockClient) ListVPCs(arg0 context.Context, arg1 *linodego.ListOptions) ([]linodego.VPC, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListVPCs", arg0, arg1)
+	ret0, _ := ret[0].([]linodego.VPC)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListVPCs indicates an expected call of ListVPCs.
+func (mr *MockClientMockRecorder) ListVPCs(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListVPCs", reflect.TypeOf((*MockClient)(nil).ListVPCs), arg0, arg1)
+}
+
 // RebuildNodeBalancerConfig mocks base method.
 func (m *MockClient) RebuildNodeBalancerConfig(arg0 context.Context, arg1, arg2 int, arg3 linodego.NodeBalancerConfigRebuildOptions) (*linodego.NodeBalancerConfig, error) {
 	m.ctrl.T.Helper()
@@ -329,6 +359,21 @@ func (m *MockClient) UpdateFirewallRules(arg0 context.Context, arg1 int, arg2 li
 func (mr *MockClientMockRecorder) UpdateFirewallRules(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateFirewallRules", reflect.TypeOf((*MockClient)(nil).UpdateFirewallRules), arg0, arg1, arg2)
+}
+
+// UpdateInstanceConfigInterface mocks base method.
+func (m *MockClient) UpdateInstanceConfigInterface(arg0 context.Context, arg1, arg2, arg3 int, arg4 linodego.InstanceConfigInterfaceUpdateOptions) (*linodego.InstanceConfigInterface, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateInstanceConfigInterface", arg0, arg1, arg2, arg3, arg4)
+	ret0, _ := ret[0].(*linodego.InstanceConfigInterface)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateInstanceConfigInterface indicates an expected call of UpdateInstanceConfigInterface.
+func (mr *MockClientMockRecorder) UpdateInstanceConfigInterface(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateInstanceConfigInterface", reflect.TypeOf((*MockClient)(nil).UpdateInstanceConfigInterface), arg0, arg1, arg2, arg3, arg4)
 }
 
 // UpdateNodeBalancer mocks base method.

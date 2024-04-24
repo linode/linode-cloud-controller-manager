@@ -36,6 +36,15 @@ spec:
             {{- if .Values.linodegoDebug }}
             - --linodego-debug={{ .Values.linodegoDebug }}
             {{- end }}
+            {{- if .Values.routeController }}
+            - --enable-route-controller=true
+            - --vpc-name={{ required "A valid .Values.routeController.vpcName is required" .Values.routeController.vpcName }}
+            - --configure-cloud-routes={{ default true .Values.routeController.configureCloudRoutes }}
+            - --cluster-cidr={{ required "A valid .Values.routeController.clusterCIDR is required" .Values.routeController.clusterCIDR }}
+            {{- if .Values.routeController.routeReconciliationPeriod }}
+            - --route-reconciliation-period={{ .Values.routeController.routeReconciliationPeriod }}
+            {{- end }}
+            {{- end }}
           volumeMounts:
             - mountPath: /etc/kubernetes
               name: k8s
