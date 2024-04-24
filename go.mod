@@ -6,7 +6,7 @@ require (
 	github.com/appscode/go v0.0.0-20200323182826-54e98e09185a
 	github.com/getsentry/sentry-go v0.4.0
 	github.com/golang/mock v1.6.0
-	github.com/linode/linodego v1.32.1-0.20240410152938-4eb565879494
+	github.com/linode/linodego v1.33.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/exp v0.0.0-20240119083558-1b970713d09a
