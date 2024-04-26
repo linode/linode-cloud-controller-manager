@@ -16,16 +16,17 @@ test-cluster: kind ctlptl kind clean-cluster
 	./test/scripts/create_management_cluster.sh $(K8S_VERSION)
 
 clean-cluster: ctlptl
-	$(CTLPTL) delete cluster kind-management --ignore-not-found
+	$(CTLPTL) delete cluster kind-ccm-management --ignore-not-found
 	rm -rf $(MANAGEMENT_KUBECONFIG)
 
 reuse-and-test: SUITE_ARGS='--reuse'
 
-test reuse-and-test: clusterctl ginkgo check-token test-cluster
+test reuse-and-test: clusterctl check-token test-cluster _test
+	$(MAKE) clean-cluster
+
+_test: ginkgo
 	go list -m; \
 	MANAGEMENT_KUBECONFIG=$(ROOT_DIR)/e2e/$(MANAGEMENT_KUBECONFIG) $(GINKGO) -r --vv --trace $(TEST_ARGS) -- --image=${IMG} --k8s_version=${K8S_VERSION} $(SUITE_ARGS)
-
-	$(MAKE) clean-cluster
 
 clean: check-token
 	cd test; \

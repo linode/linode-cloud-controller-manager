@@ -25,7 +25,7 @@ fi
 
 (cd ${ROOT_DIR}/deploy ; set +x ; ./generate-manifest.sh ${LINODE_TOKEN} ${LINODE_REGION})
 
-kubectl create ns ${CLUSTER_NAME}
+kubectl create ns ${CLUSTER_NAME} ||:
 (cd $(realpath "$(dirname "$0")"); clusterctl generate cluster ${CLUSTER_NAME} \
   --target-namespace ${CLUSTER_NAME} \
   --flavor clusterclass-kubeadm \
@@ -37,9 +37,7 @@ until kubectl get secret -n ${CLUSTER_NAME} ${CLUSTER_NAME}-kubeconfig; do
   sleep $(((c--)))
 done
 
-kubectl get secret -n ${CLUSTER_NAME} ${CLUSTER_NAME}-kubeconfig -o jsonpath="{.data.value}" \
-  | base64 --decode \
-  > "$(pwd)/${CLUSTER_NAME}.conf"
+clusterctl get kubeconfig -n ${CLUSTER_NAME} ${CLUSTER_NAME} > "$(pwd)/${CLUSTER_NAME}.conf"
 
 export KUBECONFIG="$(pwd)/${CLUSTER_NAME}.conf"
 
@@ -47,9 +45,6 @@ c=16
 until kubectl version; do
   sleep $(((c--)))
 done
-
-# Skip if it's failing because of CCM is already exists.
-kubectl apply -f ${ROOT_DIR}/deploy/ccm-linode.yaml || kubectl get clusterrole ccm-linode-clusterrole
 
 c=24
 until [[ $(kubectl get no --no-headers | grep Ready | wc -l) == 3 ]]; do
