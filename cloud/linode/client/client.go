@@ -11,7 +11,12 @@ import (
 type Client interface {
 	GetInstance(context.Context, int) (*linodego.Instance, error)
 	ListInstances(context.Context, *linodego.ListOptions) ([]linodego.Instance, error)
+	CreateInstance(ctx context.Context, opts linodego.InstanceCreateOptions) (*linodego.Instance, error)
 	GetInstanceIPAddresses(context.Context, int) (*linodego.InstanceIPAddressResponse, error)
+	AddInstanceIPAddress(ctx context.Context, linodeID int, public bool) (*linodego.InstanceIP, error)
+	DeleteInstanceIPAddress(ctx context.Context, linodeID int, ipAddress string) error
+
+	ShareIPAddresses(ctx context.Context, opts linodego.IPAddressesShareOptions) error
 
 	UpdateInstanceConfigInterface(context.Context, int, int, int, linodego.InstanceConfigInterfaceUpdateOptions) (*linodego.InstanceConfigInterface, error)
 

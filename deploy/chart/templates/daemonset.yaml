@@ -45,6 +45,10 @@ spec:
             - --route-reconciliation-period={{ .Values.routeController.routeReconciliationPeriod }}
             {{- end }}
             {{- end }}
+            {{- if .Values.sharedIPLoadBalancing }}
+            - --bgp-node-selector={{ .Values.sharedIPLoadBalancing.bgpNodeSelector }}
+            - --default-load-balancer={{ .Values.sharedIPLoadBalancing.defaultLoadBalancer }}
+            {{- end }}
           volumeMounts:
             - mountPath: /etc/kubernetes
               name: k8s

@@ -300,7 +300,7 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, a
 	for key, value := range annMap {
 		svc.Annotations[key] = value
 	}
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	nodes := []*v1.Node{
 		{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}},
 	}
@@ -512,7 +512,7 @@ func testUpdateLoadBalancerAddNode(t *testing.T, client *linodego.Client, f *fak
 		},
 	}
 
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
 
@@ -672,7 +672,7 @@ func testUpdateLoadBalancerAddAnnotation(t *testing.T, client *linodego.Client, 
 		},
 	}
 
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
 
@@ -742,7 +742,7 @@ func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Clie
 		},
 	}
 
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
 
@@ -822,7 +822,7 @@ func testUpdateLoadBalancerAddTags(t *testing.T, client *linodego.Client, _ *fak
 		},
 	}
 
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
 	clusterName := "linodelb"
@@ -902,7 +902,7 @@ func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *
 		NodePort: int32(30001),
 	}
 
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 
 	defer func() {
 		_ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
@@ -977,7 +977,7 @@ func testUpdateLoadBalancerAddProxyProtocol(t *testing.T, client *linodego.Clien
 		},
 	}
 
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
 
@@ -1100,7 +1100,7 @@ func testUpdateLoadBalancerAddNewFirewall(t *testing.T, client *linodego.Client,
 		},
 	}
 
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
 
@@ -1195,7 +1195,7 @@ func testUpdateLoadBalancerAddNewFirewallACL(t *testing.T, client *linodego.Clie
 		},
 	}
 
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
 
@@ -1321,7 +1321,7 @@ func testUpdateLoadBalancerUpdateFirewallRemoveACLaddID(t *testing.T, client *li
 		},
 	}
 
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
 
@@ -1455,7 +1455,7 @@ func testUpdateLoadBalancerUpdateFirewallRemoveIDaddACL(t *testing.T, client *li
 		},
 	}
 
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
 
@@ -1595,7 +1595,7 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 		},
 	}
 
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
 
@@ -1728,7 +1728,7 @@ func testUpdateLoadBalancerUpdateFirewall(t *testing.T, client *linodego.Client,
 		},
 	}
 
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
 
@@ -1855,7 +1855,7 @@ func testUpdateLoadBalancerDeleteFirewall(t *testing.T, client *linodego.Client,
 		},
 	}
 
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
 
@@ -1950,7 +1950,7 @@ func testUpdateLoadBalancerAddNodeBalancerID(t *testing.T, client *linodego.Clie
 		},
 	}
 
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	defer func() {
 		_ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
 	}()
@@ -2433,7 +2433,7 @@ func testBuildLoadBalancerRequest(t *testing.T, client *linodego.Client, _ *fake
 		},
 	}
 
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	nb, err := lb.buildLoadBalancerRequest(context.TODO(), "linodelb", svc, nodes)
 	if err != nil {
 		t.Fatal(err)
@@ -2480,7 +2480,7 @@ func testEnsureLoadBalancerPreserveAnnotation(t *testing.T, client *linodego.Cli
 		},
 	}
 
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	for _, test := range []struct {
 		name        string
 		deleted     bool
@@ -2592,7 +2592,7 @@ func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client, fake *
 		},
 	}
 
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	configs := []*linodego.NodeBalancerConfigCreateOptions{}
 	_, err := lb.createNodeBalancer(context.TODO(), "linodelb", svc, configs)
 	if err != nil {
@@ -2640,7 +2640,7 @@ func testEnsureExistingLoadBalancer(t *testing.T, client *linodego.Client, _ *fa
 		},
 	}
 
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	lb.kubeClient = fake.NewSimpleClientset()
 	addTLSSecret(t, lb.kubeClient)
 
@@ -2841,7 +2841,7 @@ func testCleanupDoesntCall(t *testing.T, client *linodego.Client, fakeAPI *fakeA
 	}
 	svc.Status.LoadBalancer = *makeLoadBalancerStatus(svc, nb1)
 	svcAnn.Status.LoadBalancer = *makeLoadBalancerStatus(svcAnn, nb1)
-	lb := &loadbalancers{client, region, nil}
+	lb := newLoadbalancers(client, region).(*loadbalancers)
 
 	fakeAPI.ResetRequests()
 	t.Run("non-annotated service shouldn't call the API during cleanup", func(t *testing.T) {
@@ -2888,7 +2888,7 @@ func testUpdateLoadBalancerNoNodes(t *testing.T, client *linodego.Client, _ *fak
 		},
 	}
 
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	defer func() {
 		_ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
 	}()
@@ -2921,7 +2921,7 @@ func testUpdateLoadBalancerNoNodes(t *testing.T, client *linodego.Client, _ *fak
 }
 
 func testGetNodeBalancerForServiceIDDoesNotExist(t *testing.T, client *linodego.Client, _ *fakeAPI) {
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	bogusNodeBalancerID := "123456"
 
 	svc := &v1.Service{
@@ -2960,7 +2960,7 @@ func testGetNodeBalancerForServiceIDDoesNotExist(t *testing.T, client *linodego.
 }
 
 func testEnsureNewLoadBalancerWithNodeBalancerID(t *testing.T, client *linodego.Client, _ *fakeAPI) {
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	nodeBalancer, err := client.CreateNodeBalancer(context.TODO(), linodego.NodeBalancerCreateOptions{
 		Region: lb.zone,
 	})
@@ -3054,7 +3054,7 @@ func testEnsureNewLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI
 			},
 		},
 	}
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	lb.kubeClient = fake.NewSimpleClientset()
 	addTLSSecret(t, lb.kubeClient)
 
@@ -3067,7 +3067,7 @@ func testEnsureNewLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI
 }
 
 func testGetLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
-	lb := &loadbalancers{client, "us-west", nil}
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test",

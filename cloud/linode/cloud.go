@@ -8,6 +8,7 @@ import (
 
 	"github.com/linode/linodego"
 	"github.com/spf13/pflag"
+	"golang.org/x/exp/slices"
 	"k8s.io/client-go/informers"
 	cloudprovider "k8s.io/cloud-provider"
 
@@ -30,7 +31,11 @@ var Options struct {
 	LinodeGoDebug         bool
 	EnableRouteController bool
 	VPCName               string
+	DefaultLoadBalancer   string
+	BGPNodeSelector       string
 }
+
+var supportedLoadBalancerTypes = []string{ciliumLBType, nodeBalancerLBType}
 
 // vpcDetails is set when VPCName options flag is set.
 // We use it to list instances running within the VPC if set
@@ -110,6 +115,14 @@ func newCloud() (cloudprovider.Interface, error) {
 	routes, err := newRoutes(linodeClient)
 	if err != nil {
 		return nil, fmt.Errorf("routes client was not created successfully: %w", err)
+	}
+
+	if Options.DefaultLoadBalancer != "" && !slices.Contains(supportedLoadBalancerTypes, Options.DefaultLoadBalancer) {
+		return nil, fmt.Errorf(
+			"unsupported default load-balancer type %s. Options are %v",
+			Options.DefaultLoadBalancer,
+			supportedLoadBalancerTypes,
+		)
 	}
 
 	// create struct that satisfies cloudprovider.Interface

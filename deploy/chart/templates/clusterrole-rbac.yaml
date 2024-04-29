@@ -30,3 +30,8 @@ rules:
   - apiGroups: [""]
     resources: ["services/status"]
     verbs: ["get", "watch", "list", "update", "patch"]
+{{- if .Values.sharedIPLoadBalancing }}
+  - apiGroups: ["cilium.io"]
+    resources: ["ciliumloadbalancerippools"]
+    verbs: ["get", "watch", "list", "update", "create", "delete"]
+{{- end }}

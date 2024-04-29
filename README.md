@@ -29,7 +29,13 @@ Kubernetes 1.9+
 ## Usage
 
 ### LoadBalancer Services
-Kubernetes Services of type `LoadBalancer` will be served through a [Linode NodeBalancer](https://www.linode.com/nodebalancers) which the Cloud Controller Manager will provision on demand.  For general feature and usage notes, refer to the [Getting Started with Linode NodeBalancers](https://www.linode.com/docs/platform/nodebalancer/getting-started-with-nodebalancers/) guide.
+Kubernetes Services of type `LoadBalancer` will be served through a [Linode NodeBalancer](https://www.linode.com/nodebalancers) by default which the Cloud Controller Manager will provision on demand.
+For general feature and usage notes, refer to the [Getting Started with Linode NodeBalancers](https://www.linode.com/docs/platform/nodebalancer/getting-started-with-nodebalancers/) guide.
+
+#### Using IP Sharing instead of NodeBalancers
+Alternatively, the Linode CCM can integrate with [Cilium's BGP Control Plane](https://docs.cilium.io/en/stable/network/bgp-control-plane/)
+to perform load-balancing via IP sharing on Nodes selected by an existing `CiliumBGPPeeringPolicy` in the cluster. This option does not create a backing NodeBalancer and instead
+provisions a new IP on an ip-holder Nanode to share. See [Shared IP LoadBalancing](#shared-ip-load-balancing).
 
 #### Annotations
 The Linode CCM accepts several annotations which affect the properties of the underlying NodeBalancer deployment.
@@ -58,6 +64,7 @@ Annotation (Suffix) | Values | Default | Description
 `tags` | string | | A comma seperated list of tags to be applied to the createad NodeBalancer instance
 `firewall-id` | string | | An existing Cloud Firewall ID to be attached to the NodeBalancer instance. See [Firewalls](#firewalls).
 `firewall-acl` | string | | The Firewall rules to be applied to the NodeBalancer. Adding this annotation creates a new CCM managed Linode CloudFirewall instance. See [Firewalls](#firewalls).
+`type` | `nodebalancer`, `cilium-bgp` | | The type of load-balancert to use. If unspecified, the type specified in the CCM's `--default-load-balancer` is used for the Service.
 
 #### Deprecated Annotations
 These annotations are deprecated, and will be removed in a future release.
@@ -77,6 +84,55 @@ Key | Values | Default | Description
 `protocol` | `tcp`, `http`, `https` | `tcp` | Specifies protocol of the NodeBalancer port. Overwrites `default-protocol`.
 `proxy-protocol` | `none`, `v1`, `v2` | `none` | Specifies whether to use a version of Proxy Protocol on the underlying NodeBalancer. Overwrites `default-proxy-protocol`.
 `tls-secret-name` | string | | Specifies a secret to use for TLS. The secret type should be `kubernetes.io/tls`.
+
+#### Shared IP Load-Balancing
+**NOTE:** This feature requires contacting [Customer Support](https://www.linode.com/support/contact/) to enable provisioning additional IPs.
+
+Services of `type: LoadBalancer` can receive an external IP not backed by a NodeBalancer if `--bgp-node-selector` is set on the Linode CCM and either `--default-load-balancer` is set to `cilium-bgp` or the Service has the `service.beta.kubernetes.io/linode-loadbalancer-type` annotation set to `cilium-bgp`. Additionally, the `LINODE_URL` environment variable in the linode CCM needs to be set to "https://api.linode.com/v4beta".
+
+This feature requires the Kubernetes cluster to be using [Cilium](https://cilium.io/) as the CNI with the `bgp-control-plane` feature enabled and a `CiliumBGPPeeringPolicy` applied to the cluster with a node selector specified in the `--bgp-node-selector` flag.
+
+Example configuration:
+
+```
+apiVersion: "cilium.io/v2alpha1"
+kind: CiliumBGPPeeringPolicy
+metadata:
+  name: 01-bgp-peering-policy
+spec:
+  nodeSelector:
+    matchLabels:
+      cilium-bgp-peering: "true"
+...
+```
+
+```
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ccm-linode
+  namespace: kube-system
+spec:
+  template:
+    spec:
+      containers:
+        - image: linode/linode-cloud-controller-manager:latest
+          name: ccm-linode
+          args:
+          - --leader-elect-resource-lock=endpoints
+          - --v=3
+          - --port=0
+          - --secure-port=10253
+          - --bgp-node-selector=cilium-bgp-peering=true
+          - --default-load-balancer=cilium-bgp
+          volumeMounts:
+          - mountPath: /etc/kubernetes
+            name: k8s
+          env:
+            - name: LINODE_URL
+              value: https://api.linode.com/v4beta
+...
+```
 
 #### Firewalls
 Firewall rules can be applied to the CCM Managed NodeBalancers in two distinct ways.

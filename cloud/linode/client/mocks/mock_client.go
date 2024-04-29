@@ -35,6 +35,21 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 	return m.recorder
 }
 
+// AddInstanceIPAddress mocks base method.
+func (m *MockClient) AddInstanceIPAddress(arg0 context.Context, arg1 int, arg2 bool) (*linodego.InstanceIP, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddInstanceIPAddress", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*linodego.InstanceIP)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AddInstanceIPAddress indicates an expected call of AddInstanceIPAddress.
+func (mr *MockClientMockRecorder) AddInstanceIPAddress(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddInstanceIPAddress", reflect.TypeOf((*MockClient)(nil).AddInstanceIPAddress), arg0, arg1, arg2)
+}
+
 // CreateFirewall mocks base method.
 func (m *MockClient) CreateFirewall(arg0 context.Context, arg1 linodego.FirewallCreateOptions) (*linodego.Firewall, error) {
 	m.ctrl.T.Helper()
@@ -63,6 +78,21 @@ func (m *MockClient) CreateFirewallDevice(arg0 context.Context, arg1 int, arg2 l
 func (mr *MockClientMockRecorder) CreateFirewallDevice(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateFirewallDevice", reflect.TypeOf((*MockClient)(nil).CreateFirewallDevice), arg0, arg1, arg2)
+}
+
+// CreateInstance mocks base method.
+func (m *MockClient) CreateInstance(arg0 context.Context, arg1 linodego.InstanceCreateOptions) (*linodego.Instance, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateInstance", arg0, arg1)
+	ret0, _ := ret[0].(*linodego.Instance)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateInstance indicates an expected call of CreateInstance.
+func (mr *MockClientMockRecorder) CreateInstance(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateInstance", reflect.TypeOf((*MockClient)(nil).CreateInstance), arg0, arg1)
 }
 
 // CreateNodeBalancer mocks base method.
@@ -121,6 +151,20 @@ func (m *MockClient) DeleteFirewallDevice(arg0 context.Context, arg1, arg2 int) 
 func (mr *MockClientMockRecorder) DeleteFirewallDevice(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFirewallDevice", reflect.TypeOf((*MockClient)(nil).DeleteFirewallDevice), arg0, arg1, arg2)
+}
+
+// DeleteInstanceIPAddress mocks base method.
+func (m *MockClient) DeleteInstanceIPAddress(arg0 context.Context, arg1 int, arg2 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteInstanceIPAddress", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteInstanceIPAddress indicates an expected call of DeleteInstanceIPAddress.
+func (mr *MockClientMockRecorder) DeleteInstanceIPAddress(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteInstanceIPAddress", reflect.TypeOf((*MockClient)(nil).DeleteInstanceIPAddress), arg0, arg1, arg2)
 }
 
 // DeleteNodeBalancer mocks base method.
@@ -344,6 +388,20 @@ func (m *MockClient) RebuildNodeBalancerConfig(arg0 context.Context, arg1, arg2 
 func (mr *MockClientMockRecorder) RebuildNodeBalancerConfig(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RebuildNodeBalancerConfig", reflect.TypeOf((*MockClient)(nil).RebuildNodeBalancerConfig), arg0, arg1, arg2, arg3)
+}
+
+// ShareIPAddresses mocks base method.
+func (m *MockClient) ShareIPAddresses(arg0 context.Context, arg1 linodego.IPAddressesShareOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ShareIPAddresses", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ShareIPAddresses indicates an expected call of ShareIPAddresses.
+func (mr *MockClientMockRecorder) ShareIPAddresses(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShareIPAddresses", reflect.TypeOf((*MockClient)(nil).ShareIPAddresses), arg0, arg1)
 }
 
 // UpdateFirewallRules mocks base method.
