@@ -123,6 +123,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 			f:    testGetLoadBalancer,
 		},
 		{
+			name: "Create Load Balancer With loadBalancerClass",
+			f:    testCreateNodeBalancerWithLBClass,
+		},
+		{
 			name: "Create Load Balancer Without Firewall",
 			f:    testCreateNodeBalancerWithOutFirewall,
 		},
@@ -268,6 +272,48 @@ func TestCCMLoadBalancers(t *testing.T) {
 
 func stubService(fake *fake.Clientset, service *v1.Service) {
 	_, _ = fake.CoreV1().Services("").Create(context.TODO(), service, metav1.CreateOptions{})
+}
+
+func testCreateNodeBalancerWithLBClass(t *testing.T, client *linodego.Client, _ *fakeAPI) {
+	lbClass := "io.cilium/bgp-control-plane"
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: randString(),
+			UID:  "foobar123",
+			Annotations: map[string]string{
+				annotations.AnnLinodeThrottle:         "15",
+				annotations.AnnLinodeLoadBalancerTags: "fake,test,yolo",
+			},
+		},
+		Spec: v1.ServiceSpec{
+			LoadBalancerClass: &lbClass,
+			Ports: []v1.ServicePort{
+				{
+					Name:     randString(),
+					Protocol: "TCP",
+					Port:     int32(80),
+					NodePort: int32(30000),
+				},
+				{
+					Name:     randString(),
+					Protocol: "TCP",
+					Port:     int32(8080),
+					NodePort: int32(30001),
+				},
+			},
+		},
+	}
+	lb := &loadbalancers{client, "us-west", nil}
+	nodes := []*v1.Node{
+		{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}},
+	}
+	nb, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Fatalf("expected a nil error, got %v", err)
+	}
+	if nb != nil {
+		t.Fatalf("expected a nil nb, got %v", nb)
+	}
 }
 
 func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, annMap map[string]string) error {

@@ -40,7 +40,8 @@ func (s *serviceController) Run(stopCh <-chan struct{}) {
 				return
 			}
 
-			if service.Spec.Type != "LoadBalancer" {
+			if service.Spec.Type != "LoadBalancer" ||
+				(service.Spec.LoadBalancerClass != nil && *service.Spec.LoadBalancerClass == "io.cilium/bgp-control-plane") {
 				return
 			}
 

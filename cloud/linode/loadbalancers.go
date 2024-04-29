@@ -185,6 +185,11 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	sentry.SetTag(ctx, "cluster_name", clusterName)
 	sentry.SetTag(ctx, "service", service.Name)
 
+	if service.Spec.LoadBalancerClass != nil && *service.Spec.LoadBalancerClass == "io.cilium/bgp-control-plane" {
+		klog.Infof("Skipping NodeBalancer creation for Cilium LoadBalancerClass")
+		return lbStatus, err
+	}
+
 	var nb *linodego.NodeBalancer
 	serviceNn := getServiceNn(service)
 
