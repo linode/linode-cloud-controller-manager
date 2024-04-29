@@ -2,6 +2,8 @@ module github.com/linode/linode-cloud-controller-manager
 
 go 1.22
 
+toolchain go1.22.2
+
 require (
 	github.com/appscode/go v0.0.0-20200323182826-54e98e09185a
 	github.com/getsentry/sentry-go v0.4.0

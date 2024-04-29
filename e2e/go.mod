@@ -2,6 +2,8 @@ module e2e_test
 
 go 1.22
 
+toolchain go1.22.2
+
 require (
 	github.com/appscode/go v0.0.0-20200323182826-54e98e09185a
 	github.com/linode/linodego v1.33.0
