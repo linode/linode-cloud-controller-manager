@@ -817,6 +817,7 @@ func getPortConfigAnnotation(service *v1.Service, port int) (portConfigAnnotatio
 // cluster operators may specify in such a situation.
 func getNodePrivateIP(node *v1.Node) string {
 	if address, exists := node.Annotations[annotations.AnnLinodeNodePrivateIP]; exists {
+		klog.Warningf("Using private IP from node %v annotation: %v", node.Name, address)
 		return address
 	}
 
