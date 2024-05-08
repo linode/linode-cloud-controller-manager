@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"io"
 	"log"
 	"net"
@@ -15,6 +16,9 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 const (
@@ -177,4 +181,27 @@ func GetResponseFromCurl(endpoint string) string {
 		return ""
 	}
 	return string(resp)
+}
+
+func GetManagementKubeClient() (*dynamic.DynamicClient, error) {
+	cfgFile := os.Getenv("MANAGEMENT_KUBECONFIG")
+	if cfgFile == "" {
+		return nil, errors.New("Missing MANAGEMENT_KUBECONFIG env variable!")
+	}
+
+	kubeConfig, err := clientcmd.BuildConfigFromFlags("", cfgFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return dynamic.NewForConfig(kubeConfig)
+}
+
+func GetManagementKubeClientWitResource(resource schema.GroupVersionResource) (dynamic.NamespaceableResourceInterface, error) {
+	kubeClient, err := GetManagementKubeClient()
+	if err != nil {
+		return nil, err
+	}
+
+	return kubeClient.Resource(resource), err
 }

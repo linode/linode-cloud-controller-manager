@@ -22,7 +22,7 @@ metadata:
 rules:
 - apiGroups: [""]
   resources: ["endpoints"]
-  verbs: ["get", "watch", "list", "update", "create"]
+  verbs: ["get"]
 - apiGroups: [""]
   resources: ["nodes"]
   verbs: ["get", "watch", "list", "update", "delete", "patch"]
@@ -44,6 +44,9 @@ rules:
 - apiGroups: [""]
   resources: ["services/status"]
   verbs: ["get", "watch", "list", "update", "patch"]
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "watch", "list", "update", "create"]
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -101,9 +104,8 @@ spec:
           imagePullPolicy: Always
           name: ccm-linode
           args:
-          - --leader-elect-resource-lock=endpoints
+          - --leader-elect-resource-lock=leases
           - --v=3
-          - --port=0
           - --secure-port=10253
           volumeMounts:
           - mountPath: /etc/kubernetes
