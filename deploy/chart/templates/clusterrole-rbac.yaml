@@ -34,4 +34,7 @@ rules:
   - apiGroups: ["cilium.io"]
     resources: ["ciliumloadbalancerippools"]
     verbs: ["get", "watch", "list", "update", "create", "delete"]
+  - apiGroups: ["cilium.io"]
+    resources: ["ciliumbgppeeringpolicies"]
+    verbs: ["get", "watch", "list", "create"]
 {{- end }}

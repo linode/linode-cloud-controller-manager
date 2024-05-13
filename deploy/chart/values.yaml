@@ -47,7 +47,7 @@ tolerations:
 # Options for LoadBalancers backed by shared IPs instead of NodeBalancers
 # sharedIPLoadBalancing:
 #   defaultLoadBalancer: <nodebalancer or cilium-bgp>
-#   bgpNodeSelector: <node label for CiliumBGPPeeringPolicy (e.g. cilium-bgp-peering=true)>
+#   bgpNodeSelector: <node label (e.g. cilium-bgp-peering=true)>
 
 # This section adds ability to enable route-controller for ccm
 # routeController:

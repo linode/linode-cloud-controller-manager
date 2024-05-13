@@ -29,11 +29,6 @@ import (
 	"github.com/linode/linode-cloud-controller-manager/sentry"
 )
 
-const (
-	ciliumLBType       = "cilium-bgp"
-	nodeBalancerLBType = "nodebalancer"
-)
-
 var errNoNodesAvailable = errors.New("no nodes available for nodebalancer")
 
 type lbNotFoundError struct {
@@ -214,6 +209,11 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	if l.isCiliumLBType(service) {
 		klog.Infof("handling LoadBalancer Service %s as %s", serviceNn, ciliumLBClass)
 
+		if err = l.ensureCiliumBGPPeeringPolicy(ctx); err != nil {
+			klog.Infof("Failed to ensure CiliumBGPPeeringPolicy: %v", err)
+			return nil, err
+		}
+
 		// check for existing CiliumLoadBalancerIPPool for service
 		pool, err := l.getCiliumLBIPPool(ctx, service)
 		// if the CiliumLoadBalancerIPPool doesn't exist, it's not nil, just empty
@@ -226,7 +226,6 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 		}
 		if err != nil && !k8serrors.IsNotFound(err) {
 			klog.Infof("Failed to get CiliumLoadBalancerIPPool: %s", err.Error())
-			sentry.CaptureError(ctx, err)
 			return nil, err
 		}
 
@@ -234,12 +233,10 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 		var sharedIP string
 		if sharedIP, err = l.createSharedIP(ctx, nodes); err != nil {
 			klog.Errorf("Failed to request shared instance IP: %s", err.Error())
-			sentry.CaptureError(ctx, err)
 			return nil, err
 		}
 		if _, err = l.createCiliumLBIPPool(ctx, service, sharedIP); err != nil {
 			klog.Infof("Failed to create CiliumLoadBalancerIPPool: %s", err.Error())
-			sentry.CaptureError(ctx, err)
 			return nil, err
 		}
 
@@ -505,14 +502,11 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 	if l.isCiliumLBType(service) {
 		klog.Infof("handling LoadBalancer Service %s/%s as %s", service.Namespace, service.Name, ciliumLBClass)
 		if err := l.deleteSharedIP(ctx, service); err != nil {
-			klog.Infof("Failed to delete shared instance IP")
-			sentry.CaptureError(ctx, err)
 			return err
 		}
 		// delete CiliumLoadBalancerIPPool for service
 		if err := l.deleteCiliumLBIPPool(ctx, service); err != nil && !k8serrors.IsNotFound(err) {
 			klog.Infof("Failed to delete CiliumLoadBalancerIPPool")
-			sentry.CaptureError(ctx, err)
 			return err
 		}
 

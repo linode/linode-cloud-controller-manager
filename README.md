@@ -34,7 +34,7 @@ For general feature and usage notes, refer to the [Getting Started with Linode N
 
 #### Using IP Sharing instead of NodeBalancers
 Alternatively, the Linode CCM can integrate with [Cilium's BGP Control Plane](https://docs.cilium.io/en/stable/network/bgp-control-plane/)
-to perform load-balancing via IP sharing on Nodes selected by an existing `CiliumBGPPeeringPolicy` in the cluster. This option does not create a backing NodeBalancer and instead
+to perform load-balancing via IP sharing on labelled Nodes. This option does not create a backing NodeBalancer and instead
 provisions a new IP on an ip-holder Nanode to share. See [Shared IP LoadBalancing](#shared-ip-load-balancing).
 
 #### Annotations
@@ -90,21 +90,9 @@ Key | Values | Default | Description
 
 Services of `type: LoadBalancer` can receive an external IP not backed by a NodeBalancer if `--bgp-node-selector` is set on the Linode CCM and either `--default-load-balancer` is set to `cilium-bgp` or the Service has the `service.beta.kubernetes.io/linode-loadbalancer-type` annotation set to `cilium-bgp`. Additionally, the `LINODE_URL` environment variable in the linode CCM needs to be set to "https://api.linode.com/v4beta".
 
-This feature requires the Kubernetes cluster to be using [Cilium](https://cilium.io/) as the CNI with the `bgp-control-plane` feature enabled and a `CiliumBGPPeeringPolicy` applied to the cluster with a node selector specified in the `--bgp-node-selector` flag.
+This feature requires the Kubernetes cluster to be using [Cilium](https://cilium.io/) as the CNI with the `bgp-control-plane` feature enabled.
 
 Example configuration:
-
-```
-apiVersion: "cilium.io/v2alpha1"
-kind: CiliumBGPPeeringPolicy
-metadata:
-  name: 01-bgp-peering-policy
-spec:
-  nodeSelector:
-    matchLabels:
-      cilium-bgp-peering: "true"
-...
-```
 
 ```
 apiVersion: apps/v1

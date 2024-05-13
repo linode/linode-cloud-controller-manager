@@ -21,6 +21,7 @@ import (
 )
 
 var (
+	zone  = "us-ord"
 	nodes = []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -67,6 +68,10 @@ func TestCiliumCCMLoadBalancers(t *testing.T) {
 		{
 			name: "Create Cilium Load Balancer Without BGP Node Labels specified",
 			f:    testNoBGPNodeLabel,
+		},
+		{
+			name: "Create Cilium Load Balancer with unsupported region",
+			f:    testUnsupportedRegion,
 		},
 		{
 			name: "Create Cilium Load Balancer With explicit loadBalancerClass and existing IP holder nanode",
@@ -155,11 +160,28 @@ func testNoBGPNodeLabel(t *testing.T, mc *mocks.MockClient) {
 	kubeClient := fake.NewSimpleClientset()
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.Fake}
 	addService(t, kubeClient, svc)
-	lb := &loadbalancers{mc, "us-west", kubeClient, ciliumClient, nodeBalancerLBType}
+	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, nodeBalancerLBType}
 
 	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
-	if !errors.Is(err, noBGPSelector) {
-		t.Fatalf("expected %v, got %v", noBGPSelector, err)
+	if !errors.Is(err, errNoBGPSelector) {
+		t.Fatalf("expected %v, got %v... %s", errNoBGPSelector, err, Options.BGPNodeSelector)
+	}
+	if lbStatus != nil {
+		t.Fatalf("expected a nil lbStatus, got %v", lbStatus)
+	}
+}
+
+func testUnsupportedRegion(t *testing.T, mc *mocks.MockClient) {
+	Options.BGPNodeSelector = "cilium-bgp-peering=true"
+	svc := createTestService(Pointer(ciliumLBType))
+	kubeClient := fake.NewSimpleClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.Fake}
+	addService(t, kubeClient, svc)
+	lb := &loadbalancers{mc, "us-foobar", kubeClient, ciliumClient, nodeBalancerLBType}
+
+	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err == nil {
+		t.Fatal("expected nil error")
 	}
 	if lbStatus != nil {
 		t.Fatalf("expected a nil lbStatus, got %v", lbStatus)
@@ -173,7 +195,7 @@ func testCreateWithExistingIPHolder(t *testing.T, mc *mocks.MockClient) {
 	kubeClient := fake.NewSimpleClientset()
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.Fake}
 	addService(t, kubeClient, svc)
-	lb := &loadbalancers{mc, "us-west", kubeClient, ciliumClient, nodeBalancerLBType}
+	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, nodeBalancerLBType}
 
 	filter := map[string]string{"label": ipHolderLabel}
 	rawFilter, _ := json.Marshal(filter)
@@ -217,7 +239,7 @@ func testCreateWithDefaultLBCilium(t *testing.T, mc *mocks.MockClient) {
 	kubeClient := fake.NewSimpleClientset()
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.Fake}
 	addService(t, kubeClient, svc)
-	lb := &loadbalancers{mc, "us-west", kubeClient, ciliumClient, ciliumLBType}
+	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
 	filter := map[string]string{"label": ipHolderLabel}
 	rawFilter, _ := json.Marshal(filter)
@@ -261,7 +283,7 @@ func testCreateWithDefaultLBCiliumNodebalancher(t *testing.T, mc *mocks.MockClie
 	kubeClient := fake.NewSimpleClientset()
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.Fake}
 	addService(t, kubeClient, svc)
-	lb := &loadbalancers{mc, "us-west", kubeClient, ciliumClient, ciliumLBType}
+	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
 	mc.EXPECT().CreateNodeBalancer(gomock.Any(), gomock.Any()).Times(1).Return(&linodego.NodeBalancer{
 		ID:       12345,
@@ -287,7 +309,7 @@ func testCreateWithNoExistingIPHolder(t *testing.T, mc *mocks.MockClient) {
 	kubeClient := fake.NewSimpleClientset()
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.Fake}
 	addService(t, kubeClient, svc)
-	lb := &loadbalancers{mc, "us-west", kubeClient, ciliumClient, ciliumLBType}
+	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
 	filter := map[string]string{"label": ipHolderLabel}
 	rawFilter, _ := json.Marshal(filter)
@@ -333,7 +355,7 @@ func testEnsureCiliumLoadBalancerDeleted(t *testing.T, mc *mocks.MockClient) {
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
-	lb := &loadbalancers{mc, "us-west", kubeClient, ciliumClient, nodeBalancerLBType}
+	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, nodeBalancerLBType}
 
 	dummySharedIP := "45.76.101.26"
 	svc.Status.LoadBalancer = v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{{IP: dummySharedIP}}}
@@ -358,7 +380,7 @@ func testDeleteNBWithDefaultLBCilium(t *testing.T, mc *mocks.MockClient) {
 	kubeClient := fake.NewSimpleClientset()
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.Fake}
 	addService(t, kubeClient, svc)
-	lb := &loadbalancers{mc, "us-west", kubeClient, ciliumClient, ciliumLBType}
+	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
 	dummySharedIP := "45.76.101.26"
 	svc.Status.LoadBalancer = v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{{IP: dummySharedIP}}}

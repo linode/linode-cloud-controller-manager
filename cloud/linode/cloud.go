@@ -17,11 +17,15 @@ import (
 
 const (
 	// The name of this cloudprovider
-	ProviderName   = "linode"
-	accessTokenEnv = "LINODE_API_TOKEN"
-	regionEnv      = "LINODE_REGION"
-	urlEnv         = "LINODE_URL"
+	ProviderName       = "linode"
+	accessTokenEnv     = "LINODE_API_TOKEN"
+	regionEnv          = "LINODE_REGION"
+	urlEnv             = "LINODE_URL"
+	ciliumLBType       = "cilium-bgp"
+	nodeBalancerLBType = "nodebalancer"
 )
+
+var supportedLoadBalancerTypes = []string{ciliumLBType, nodeBalancerLBType}
 
 // Options is a configuration object for this cloudprovider implementation.
 // We expect it to be initialized with flags external to this package, likely in
@@ -34,8 +38,6 @@ var Options struct {
 	DefaultLoadBalancer   string
 	BGPNodeSelector       string
 }
-
-var supportedLoadBalancerTypes = []string{ciliumLBType, nodeBalancerLBType}
 
 // vpcDetails is set when VPCName options flag is set.
 // We use it to list instances running within the VPC if set
