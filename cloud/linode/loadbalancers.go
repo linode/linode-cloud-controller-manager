@@ -432,10 +432,15 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 	sentry.SetTag(ctx, "cluster_name", clusterName)
 	sentry.SetTag(ctx, "service", service.Name)
 
-	// ignore LoadBalancers backed by Cilium
+	// handle LoadBalancers backed by Cilium
 	if l.isCiliumLBType(service) {
-		klog.Infof("ignoring update for LoadBalancer Service %s/%s as %s", service.Namespace, service.Name, ciliumLBClass)
-
+		klog.Infof("handling update for LoadBalancer Service %s/%s as %s", service.Namespace, service.Name, ciliumLBClass)
+		// make sure that IPs are shared properly on the Node if using load-balancers not backed by NodeBalancers
+		for _, node := range nodes {
+			if err := l.handleIPSharing(ctx, node); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 

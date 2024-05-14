@@ -35,5 +35,6 @@ const (
 	// AnnLinodeLoadBalancerType is the annotation used to specify which type of load-balancing solution
 	// to use for the Service. Options are nodebalancer and cilium-bgp. Defaults to the default-load-balancer
 	// flag value if this annotation is not set on a Service.
-	AnnLinodeLoadBalancerType = "service.beta.kubernetes.io/linode-loadbalancer-type"
+	AnnLinodeLoadBalancerType     = "service.beta.kubernetes.io/linode-loadbalancer-type"
+	AnnLinodeNodeIPSharingUpdated = "node.k8s.linode.com/ip-sharing-updated"
 )

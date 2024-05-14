@@ -12,12 +12,14 @@ import (
 	ciliumclient "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/typed/cilium.io/v2alpha1"
 	slimv1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/apis/meta/v1"
 	"github.com/google/uuid"
+	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
 	"github.com/linode/linodego"
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 )
 
@@ -62,6 +64,104 @@ var (
 	errNoBGPSelector = errors.New("no BGP node selector set to configure IP sharing")
 )
 
+// getExistingSharedIPs determines the list of addresses to share on nodes by checking the
+// CiliumLoadBalancerIPPools created by the CCM in createCiliumLBIPPool
+// NOTE: Cilium CRDs must be installed for this to work
+func (l *loadbalancers) getExistingSharedIPs(ctx context.Context) ([]string, error) {
+	addrs := []string{}
+	if err := l.retrieveCiliumClientset(); err != nil {
+		return addrs, err
+	}
+	pools, err := l.ciliumClient.CiliumLoadBalancerIPPools().List(ctx, metav1.ListOptions{
+		LabelSelector: "app.kubernetes.io/managed-by=linode-ccm",
+	})
+	if err != nil {
+		return addrs, err
+	}
+	for _, pool := range pools.Items {
+		for _, block := range pool.Spec.Blocks {
+			addrs = append(addrs, strings.TrimSuffix(string(block.Cidr), "/32"))
+		}
+	}
+	return addrs, nil
+}
+
+// shareIPs shares the given list of IP addresses on the given Node
+func (l *loadbalancers) shareIPs(ctx context.Context, addrs []string, node *v1.Node) error {
+	nodeLinodeID, err := parseProviderID(node.Spec.ProviderID)
+	if err != nil {
+		return err
+	}
+	if err = l.retrieveKubeClient(); err != nil {
+		return err
+	}
+	if err = l.client.ShareIPAddresses(ctx, linodego.IPAddressesShareOptions{
+		IPs:      addrs,
+		LinodeID: nodeLinodeID,
+	}); err != nil {
+		return err
+	}
+	// need to make sure node is up-to-date
+	node, err = l.kubeClient.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	node.Labels[annotations.AnnLinodeNodeIPSharingUpdated] = "true"
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		_, err := l.kubeClient.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
+		return err
+	})
+	if retryErr != nil {
+		klog.Infof("could not update Node: %s", retryErr.Error())
+		return retryErr
+	}
+
+	klog.Infof("shared IPs %v on Linode %d", addrs, nodeLinodeID)
+
+	return nil
+}
+
+// handleIPSharing makes sure that the appropriate Nodes that are labeled to
+// perform IP sharing (via a specified node selector) have the expected IPs shared
+// in the event that a Node joins the cluster after the LoadBalancer Service already
+// exists
+func (l *loadbalancers) handleIPSharing(ctx context.Context, node *v1.Node) error {
+	// ignore cases where the provider ID has been set
+	if node.Spec.ProviderID == "" {
+		klog.Info("skipping IP while providerID is unset")
+		return nil
+	}
+	if Options.BGPNodeSelector == "" {
+		return errNoBGPSelector
+	}
+	// If performing Service load-balancing via IP sharing + BGP, check for a special annotation
+	// added by the CCM gets set when load-balancer IPs have been successfully shared on the node
+	kv := strings.Split(Options.BGPNodeSelector, "=")
+	// Check if node should be participating in IP sharing via the given selector
+	if val, ok := node.Labels[kv[0]]; !ok || len(kv) != 2 || val != kv[1] {
+		// not a selected Node
+		return nil
+	}
+	// check if node has been updated with IPs to share
+	if _, foundIpSharingUpdatedLabel := node.Labels[annotations.AnnLinodeNodeIPSharingUpdated]; foundIpSharingUpdatedLabel {
+		// IPs are already shared on the Node
+		return nil
+	}
+	// Get the IPs to be shared on the Node and configure sharing.
+	// This also annotates the node that IPs have been shared.
+	addrs, err := l.getExistingSharedIPs(ctx)
+	if err != nil {
+		klog.Infof("error getting shared IPs: %s", err.Error())
+		return err
+	}
+	if err = l.shareIPs(ctx, addrs, node); err != nil {
+		klog.Infof("error sharing IPs: %s", err.Error())
+		return err
+	}
+
+	return nil
+}
+
 // createSharedIP requests an additional IP that can be shared on Nodes to support
 // loadbalancing via Cilium LB IPAM + BGP Control Plane.
 func (l *loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node) (string, error) {
@@ -81,31 +181,19 @@ func (l *loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node) (s
 
 	// need to retrieve existing public IPs on the IP holder since ShareIPAddresses
 	// expects the full list of IPs to be shared
-	ipv4PublicAddrs := []string{}
-	addrResp, err := l.client.GetInstanceIPAddresses(ctx, ipHolder.ID)
+	addrs, err := l.getExistingSharedIPs(ctx)
 	if err != nil {
 		return "", err
 	}
-	for _, addr := range addrResp.IPv4.Public {
-		ipv4PublicAddrs = append(ipv4PublicAddrs, addr.Address)
-	}
+	addrs = append(addrs, newSharedIP.Address)
 
 	// share the IPs with nodes participating in Cilium BGP peering
 	kv := strings.Split(Options.BGPNodeSelector, "=")
 	for _, node := range nodes {
 		if val, ok := node.Labels[kv[0]]; ok && len(kv) == 2 && val == kv[1] {
-			nodeLinodeID, err := parseProviderID(node.Spec.ProviderID)
-			if err != nil {
+			if err = l.shareIPs(ctx, addrs, node); err != nil {
 				return "", err
 			}
-
-			if err = l.client.ShareIPAddresses(ctx, linodego.IPAddressesShareOptions{
-				IPs:      ipv4PublicAddrs,
-				LinodeID: nodeLinodeID,
-			}); err != nil {
-				return "", err
-			}
-			klog.Infof("shared IPs %v on Linode %d", ipv4PublicAddrs, nodeLinodeID)
 		}
 	}
 
@@ -236,7 +324,8 @@ func (l *loadbalancers) createCiliumLBIPPool(ctx context.Context, service *v1.Se
 	}
 	ciliumLBIPPool := &v2alpha1.CiliumLoadBalancerIPPool{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("%s-%s-pool", service.Namespace, service.Name),
+			Name:   fmt.Sprintf("%s-%s-pool", service.Namespace, service.Name),
+			Labels: map[string]string{"app.kubernetes.io/managed-by": "linode-ccm"},
 		},
 		Spec: v2alpha1.CiliumLoadBalancerIPPoolSpec{
 			ServiceSelector: &slimv1.LabelSelector{
