@@ -8,16 +8,15 @@ import (
 	"net"
 	"testing"
 
+	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
 	fakev2alpha1 "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/typed/cilium.io/v2alpha1/fake"
 	"github.com/golang/mock/gomock"
+	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 	"github.com/linode/linodego"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/fake"
-
-	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
 )
 
 var (
@@ -157,8 +156,9 @@ func addNodes(t *testing.T, kubeClient kubernetes.Interface, nodes []*v1.Node) {
 
 func testNoBGPNodeLabel(t *testing.T, mc *mocks.MockClient) {
 	svc := createTestService(Pointer(ciliumLBType))
-	kubeClient := fake.NewSimpleClientset()
-	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.Fake}
+
+	kubeClient, _ := k8sClient.NewFakeClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
 	addService(t, kubeClient, svc)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, nodeBalancerLBType}
 
@@ -174,8 +174,9 @@ func testNoBGPNodeLabel(t *testing.T, mc *mocks.MockClient) {
 func testUnsupportedRegion(t *testing.T, mc *mocks.MockClient) {
 	Options.BGPNodeSelector = "cilium-bgp-peering=true"
 	svc := createTestService(Pointer(ciliumLBType))
-	kubeClient := fake.NewSimpleClientset()
-	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.Fake}
+
+	kubeClient, _ := k8sClient.NewFakeClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
 	addService(t, kubeClient, svc)
 	lb := &loadbalancers{mc, "us-foobar", kubeClient, ciliumClient, nodeBalancerLBType}
 
@@ -192,9 +193,10 @@ func testCreateWithExistingIPHolder(t *testing.T, mc *mocks.MockClient) {
 	Options.BGPNodeSelector = "cilium-bgp-peering=true"
 	svc := createTestService(Pointer(ciliumLBType))
 
-	kubeClient := fake.NewSimpleClientset()
-	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.Fake}
+	kubeClient, _ := k8sClient.NewFakeClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
 	addService(t, kubeClient, svc)
+	addNodes(t, kubeClient, nodes)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, nodeBalancerLBType}
 
 	filter := map[string]string{"label": ipHolderLabel}
@@ -202,24 +204,12 @@ func testCreateWithExistingIPHolder(t *testing.T, mc *mocks.MockClient) {
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{ipHolderInstance}, nil)
 	dummySharedIP := "45.76.101.26"
 	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), ipHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
-	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), ipHolderInstance.ID).Times(1).Return(
-		&linodego.InstanceIPAddressResponse{
-			IPv4: &linodego.InstanceIPv4Response{Public: []*linodego.InstanceIP{
-				{
-					Address: dummySharedIP,
-				},
-				{
-					Address: string(publicIPv4),
-				},
-			}},
-		}, nil,
-	)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
-		IPs:      []string{dummySharedIP, string(publicIPv4)},
+		IPs:      []string{dummySharedIP},
 		LinodeID: 11111,
 	}).Times(1)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
-		IPs:      []string{dummySharedIP, string(publicIPv4)},
+		IPs:      []string{dummySharedIP},
 		LinodeID: 22222,
 	}).Times(1)
 
@@ -236,9 +226,10 @@ func testCreateWithDefaultLBCilium(t *testing.T, mc *mocks.MockClient) {
 	Options.BGPNodeSelector = "cilium-bgp-peering=true"
 	svc := createTestService(nil)
 
-	kubeClient := fake.NewSimpleClientset()
-	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.Fake}
+	kubeClient, _ := k8sClient.NewFakeClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
 	addService(t, kubeClient, svc)
+	addNodes(t, kubeClient, nodes)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
 	filter := map[string]string{"label": ipHolderLabel}
@@ -246,24 +237,12 @@ func testCreateWithDefaultLBCilium(t *testing.T, mc *mocks.MockClient) {
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{ipHolderInstance}, nil)
 	dummySharedIP := "45.76.101.26"
 	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), ipHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
-	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), ipHolderInstance.ID).Times(1).Return(
-		&linodego.InstanceIPAddressResponse{
-			IPv4: &linodego.InstanceIPv4Response{Public: []*linodego.InstanceIP{
-				{
-					Address: dummySharedIP,
-				},
-				{
-					Address: string(publicIPv4),
-				},
-			}},
-		}, nil,
-	)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
-		IPs:      []string{dummySharedIP, string(publicIPv4)},
+		IPs:      []string{dummySharedIP},
 		LinodeID: 11111,
 	}).Times(1)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
-		IPs:      []string{dummySharedIP, string(publicIPv4)},
+		IPs:      []string{dummySharedIP},
 		LinodeID: 22222,
 	}).Times(1)
 
@@ -280,9 +259,10 @@ func testCreateWithDefaultLBCiliumNodebalancher(t *testing.T, mc *mocks.MockClie
 	Options.BGPNodeSelector = "cilium-bgp-peering=true"
 	svc := createTestService(Pointer(nodeBalancerLBType))
 
-	kubeClient := fake.NewSimpleClientset()
-	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.Fake}
+	kubeClient, _ := k8sClient.NewFakeClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
 	addService(t, kubeClient, svc)
+	addNodes(t, kubeClient, nodes)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
 	mc.EXPECT().CreateNodeBalancer(gomock.Any(), gomock.Any()).Times(1).Return(&linodego.NodeBalancer{
@@ -306,9 +286,10 @@ func testCreateWithNoExistingIPHolder(t *testing.T, mc *mocks.MockClient) {
 	Options.BGPNodeSelector = "cilium-bgp-peering=true"
 	svc := createTestService(nil)
 
-	kubeClient := fake.NewSimpleClientset()
-	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.Fake}
+	kubeClient, _ := k8sClient.NewFakeClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
 	addService(t, kubeClient, svc)
+	addNodes(t, kubeClient, nodes)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
 	filter := map[string]string{"label": ipHolderLabel}
@@ -317,24 +298,12 @@ func testCreateWithNoExistingIPHolder(t *testing.T, mc *mocks.MockClient) {
 	dummySharedIP := "45.76.101.26"
 	mc.EXPECT().CreateInstance(gomock.Any(), gomock.Any()).Times(1).Return(&ipHolderInstance, nil)
 	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), ipHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
-	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), ipHolderInstance.ID).Times(1).Return(
-		&linodego.InstanceIPAddressResponse{
-			IPv4: &linodego.InstanceIPv4Response{Public: []*linodego.InstanceIP{
-				{
-					Address: dummySharedIP,
-				},
-				{
-					Address: string(publicIPv4),
-				},
-			}},
-		}, nil,
-	)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
-		IPs:      []string{dummySharedIP, string(publicIPv4)},
+		IPs:      []string{dummySharedIP},
 		LinodeID: 11111,
 	}).Times(1)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
-		IPs:      []string{dummySharedIP, string(publicIPv4)},
+		IPs:      []string{dummySharedIP},
 		LinodeID: 22222,
 	}).Times(1)
 
@@ -351,8 +320,8 @@ func testEnsureCiliumLoadBalancerDeleted(t *testing.T, mc *mocks.MockClient) {
 	Options.BGPNodeSelector = "cilium-bgp-peering=true"
 	svc := createTestService(Pointer(ciliumLBType))
 
-	kubeClient := fake.NewSimpleClientset()
-	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.Fake}
+	kubeClient, _ := k8sClient.NewFakeClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, nodeBalancerLBType}
@@ -377,8 +346,8 @@ func testDeleteNBWithDefaultLBCilium(t *testing.T, mc *mocks.MockClient) {
 	Options.BGPNodeSelector = "cilium-bgp-peering=true"
 	svc := createTestService(Pointer(nodeBalancerLBType))
 
-	kubeClient := fake.NewSimpleClientset()
-	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.Fake}
+	kubeClient, _ := k8sClient.NewFakeClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
 	addService(t, kubeClient, svc)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
