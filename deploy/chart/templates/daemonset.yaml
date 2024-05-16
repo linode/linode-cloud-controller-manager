@@ -47,7 +47,7 @@ spec:
             {{- end }}
             {{- if .Values.sharedIPLoadBalancing }}
             - --bgp-node-selector={{ required "A valid .Values.sharedIPLoadBalancing.bgpNodeSelector is required for shared IP load-balancing" .Values.sharedIPLoadBalancing.bgpNodeSelector }}
-            - --default-load-balancer={{ default "nodebalancer" .Values.sharedIPLoadBalancing.defaultLoadBalancer }}
+            - --load-balancer-type={{ required "A valid .Values.sharedIPLoadBalancing.loadBalancerType is required for shared IP load-balancing" .Values.sharedIPLoadBalancing.defaultLoadBalancer }}
             {{- end }}
           volumeMounts:
             - mountPath: /etc/kubernetes

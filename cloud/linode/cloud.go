@@ -35,7 +35,7 @@ var Options struct {
 	LinodeGoDebug         bool
 	EnableRouteController bool
 	VPCName               string
-	DefaultLoadBalancer   string
+	LoadBalancerType      string
 	BGPNodeSelector       string
 }
 
@@ -119,10 +119,10 @@ func newCloud() (cloudprovider.Interface, error) {
 		return nil, fmt.Errorf("routes client was not created successfully: %w", err)
 	}
 
-	if Options.DefaultLoadBalancer != "" && !slices.Contains(supportedLoadBalancerTypes, Options.DefaultLoadBalancer) {
+	if Options.LoadBalancerType != "" && !slices.Contains(supportedLoadBalancerTypes, Options.LoadBalancerType) {
 		return nil, fmt.Errorf(
 			"unsupported default load-balancer type %s. Options are %v",
-			Options.DefaultLoadBalancer,
+			Options.LoadBalancerType,
 			supportedLoadBalancerTypes,
 		)
 	}

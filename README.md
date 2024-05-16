@@ -34,7 +34,7 @@ For general feature and usage notes, refer to the [Getting Started with Linode N
 
 #### Using IP Sharing instead of NodeBalancers
 Alternatively, the Linode CCM can integrate with [Cilium's BGP Control Plane](https://docs.cilium.io/en/stable/network/bgp-control-plane/)
-to perform load-balancing via IP sharing on labelled Nodes. This option does not create a backing NodeBalancer and instead
+to perform load-balancing via IP sharing on labeled Nodes. This option does not create a backing NodeBalancer and instead
 provisions a new IP on an ip-holder Nanode to share. See [Shared IP LoadBalancing](#shared-ip-load-balancing).
 
 #### Annotations
@@ -64,7 +64,6 @@ Annotation (Suffix) | Values | Default | Description
 `tags` | string | | A comma seperated list of tags to be applied to the createad NodeBalancer instance
 `firewall-id` | string | | An existing Cloud Firewall ID to be attached to the NodeBalancer instance. See [Firewalls](#firewalls).
 `firewall-acl` | string | | The Firewall rules to be applied to the NodeBalancer. Adding this annotation creates a new CCM managed Linode CloudFirewall instance. See [Firewalls](#firewalls).
-`type` | `nodebalancer`, `cilium-bgp` | | The type of load-balancert to use. If unspecified, the type specified in the CCM's `--default-load-balancer` is used for the Service.
 
 #### Deprecated Annotations
 These annotations are deprecated, and will be removed in a future release.
@@ -88,7 +87,7 @@ Key | Values | Default | Description
 #### Shared IP Load-Balancing
 **NOTE:** This feature requires contacting [Customer Support](https://www.linode.com/support/contact/) to enable provisioning additional IPs.
 
-Services of `type: LoadBalancer` can receive an external IP not backed by a NodeBalancer if `--bgp-node-selector` is set on the Linode CCM and either `--default-load-balancer` is set to `cilium-bgp` or the Service has the `service.beta.kubernetes.io/linode-loadbalancer-type` annotation set to `cilium-bgp`. Additionally, the `LINODE_URL` environment variable in the linode CCM needs to be set to "https://api.linode.com/v4beta".
+Services of `type: LoadBalancer` can receive an external IP not backed by a NodeBalancer if `--bgp-node-selector` is set on the Linode CCM and `--load-balancer-type` is set to `cilium-bgp`. Additionally, the `LINODE_URL` environment variable in the linode CCM needs to be set to "https://api.linode.com/v4beta" for IP sharing to work.
 
 This feature requires the Kubernetes cluster to be using [Cilium](https://cilium.io/) as the CNI with the `bgp-control-plane` feature enabled.
 
@@ -112,7 +111,7 @@ spec:
           - --port=0
           - --secure-port=10253
           - --bgp-node-selector=cilium-bgp-peering=true
-          - --default-load-balancer=cilium-bgp
+          - --load-balancer-type=cilium-bgp
           volumeMounts:
           - mountPath: /etc/kubernetes
             name: k8s

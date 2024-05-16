@@ -44,11 +44,11 @@ func (e lbNotFoundError) Error() string {
 }
 
 type loadbalancers struct {
-	client       client.Client
-	zone         string
-	kubeClient   kubernetes.Interface
-	ciliumClient ciliumclient.CiliumV2alpha1Interface
-	defaultLB    string
+	client           client.Client
+	zone             string
+	kubeClient       kubernetes.Interface
+	ciliumClient     ciliumclient.CiliumV2alpha1Interface
+	loadBalancerType string
 }
 
 type portConfigAnnotation struct {
@@ -66,7 +66,7 @@ type portConfig struct {
 
 // newLoadbalancers returns a cloudprovider.LoadBalancer whose concrete type is a *loadbalancer.
 func newLoadbalancers(client client.Client, zone string) cloudprovider.LoadBalancer {
-	return &loadbalancers{client: client, zone: zone, defaultLB: Options.DefaultLoadBalancer}
+	return &loadbalancers{client: client, zone: zone, loadBalancerType: Options.LoadBalancerType}
 }
 
 func (l *loadbalancers) getNodeBalancerForService(ctx context.Context, service *v1.Service) (*linodego.NodeBalancer, error) {
@@ -156,14 +156,6 @@ func (l *loadbalancers) GetLoadBalancerName(_ context.Context, _ string, _ *v1.S
 	return fmt.Sprintf("ccm-%s", unixNano[len(unixNano)-12:])
 }
 
-func (l *loadbalancers) isCiliumLBType(service *v1.Service) bool {
-	if (l.defaultLB == ciliumLBType && service.GetAnnotations()[annotations.AnnLinodeLoadBalancerType] != nodeBalancerLBType) ||
-		service.GetAnnotations()[annotations.AnnLinodeLoadBalancerType] == ciliumLBType {
-		return true
-	}
-	return false
-}
-
 // GetLoadBalancer returns the *v1.LoadBalancerStatus of service.
 //
 // GetLoadBalancer will not modify service.
@@ -173,7 +165,7 @@ func (l *loadbalancers) GetLoadBalancer(ctx context.Context, clusterName string,
 	sentry.SetTag(ctx, "service", service.Name)
 
 	// Handle LoadBalancers backed by Cilium
-	if l.isCiliumLBType(service) {
+	if l.loadBalancerType == ciliumLBType {
 		return &v1.LoadBalancerStatus{
 			Ingress: service.Status.LoadBalancer.Ingress,
 		}, true, nil
@@ -206,7 +198,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	serviceNn := getServiceNn(service)
 
 	// Handle LoadBalancers backed by Cilium
-	if l.isCiliumLBType(service) {
+	if l.loadBalancerType == ciliumLBType {
 		klog.Infof("handling LoadBalancer Service %s as %s", serviceNn, ciliumLBClass)
 
 		if err = l.ensureCiliumBGPPeeringPolicy(ctx); err != nil {
@@ -433,7 +425,7 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 	sentry.SetTag(ctx, "service", service.Name)
 
 	// handle LoadBalancers backed by Cilium
-	if l.isCiliumLBType(service) {
+	if l.loadBalancerType == ciliumLBType {
 		klog.Infof("handling update for LoadBalancer Service %s/%s as %s", service.Namespace, service.Name, ciliumLBClass)
 		// make sure that IPs are shared properly on the Node if using load-balancers not backed by NodeBalancers
 		for _, node := range nodes {
@@ -504,7 +496,7 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 	sentry.SetTag(ctx, "service", service.Name)
 
 	// Handle LoadBalancers backed by Cilium
-	if l.isCiliumLBType(service) {
+	if l.loadBalancerType == ciliumLBType {
 		klog.Infof("handling LoadBalancer Service %s/%s as %s", service.Namespace, service.Name, ciliumLBClass)
 		if err := l.deleteSharedIP(ctx, service); err != nil {
 			return err
