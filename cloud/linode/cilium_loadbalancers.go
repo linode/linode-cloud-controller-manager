@@ -21,6 +21,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -266,7 +267,7 @@ func (l *loadbalancers) ensureIPHolder(ctx context.Context) (*linodego.Instance,
 		Label:    ipHolderLabel,
 		RootPass: uuid.NewString(),
 		Image:    "linode/ubuntu22.04",
-		Booted:   Pointer(false),
+		Booted:   ptr.To(false),
 	})
 	if err != nil {
 		return nil, err
@@ -406,7 +407,7 @@ func (l *loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error 
 			NodeSelector: &slimv1.LabelSelector{MatchLabels: map[string]string{kv[0]: kv[1]}},
 			VirtualRouters: []v2alpha1.CiliumBGPVirtualRouter{{
 				LocalASN:      65001,
-				ExportPodCIDR: Pointer(true),
+				ExportPodCIDR: ptr.To(true),
 				ServiceSelector: &slimv1.LabelSelector{
 					MatchExpressions: []slimv1.LabelSelectorRequirement{{
 						Key:      "somekey",
@@ -421,10 +422,10 @@ func (l *loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error 
 		neighbor := v2alpha1.CiliumBGPNeighbor{
 			PeerAddress:             fmt.Sprintf("2600:3c0f:%d:34::%d/64", regionID, i),
 			PeerASN:                 65000,
-			EBGPMultihopTTL:         Pointer(int32(10)),
-			ConnectRetryTimeSeconds: Pointer(int32(5)),
-			HoldTimeSeconds:         Pointer(int32(9)),
-			KeepAliveTimeSeconds:    Pointer(int32(3)),
+			EBGPMultihopTTL:         ptr.To(int32(10)),
+			ConnectRetryTimeSeconds: ptr.To(int32(5)),
+			HoldTimeSeconds:         ptr.To(int32(9)),
+			KeepAliveTimeSeconds:    ptr.To(int32(3)),
 			AdvertisedPathAttributes: []v2alpha1.CiliumBGPPathAttributes{
 				{
 					SelectorType: "CiliumLoadBalancerIPPool",
