@@ -26,7 +26,7 @@ import (
 
 const (
 	ciliumLBClass              = "io.cilium/bgp-control-plane"
-	ipHolderLabel              = "linode-ccm-ip-holder"
+	ipHolderLabelPrefix        = "linode-ccm-ip-holder"
 	ciliumBGPPeeringPolicyName = "linode-ccm-bgp-peering"
 )
 
@@ -264,7 +264,7 @@ func (l *loadbalancers) ensureIPHolder(ctx context.Context) (*linodego.Instance,
 	ipHolder, err = l.client.CreateInstance(ctx, linodego.InstanceCreateOptions{
 		Region:   l.zone,
 		Type:     "g6-nanode-1",
-		Label:    ipHolderLabel,
+		Label:    fmt.Sprintf("%s-%s", ipHolderLabelPrefix, l.zone),
 		RootPass: uuid.NewString(),
 		Image:    "linode/ubuntu22.04",
 		Booted:   ptr.To(false),
@@ -277,7 +277,7 @@ func (l *loadbalancers) ensureIPHolder(ctx context.Context) (*linodego.Instance,
 }
 
 func (l *loadbalancers) getIPHolder(ctx context.Context) (*linodego.Instance, error) {
-	filter := map[string]string{"label": ipHolderLabel}
+	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, l.zone)}
 	rawFilter, err := json.Marshal(filter)
 	if err != nil {
 		panic("this should not have failed")

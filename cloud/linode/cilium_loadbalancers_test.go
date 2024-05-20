@@ -51,7 +51,7 @@ var (
 	publicIPv4       = net.ParseIP("45.76.101.25")
 	ipHolderInstance = linodego.Instance{
 		ID:     12345,
-		Label:  ipHolderLabel,
+		Label:  fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone),
 		Type:   "g6-standard-1",
 		Region: "us-west",
 		IPv4:   []*net.IP{&publicIPv4},
@@ -183,7 +183,7 @@ func testCreateWithExistingIPHolder(t *testing.T, mc *mocks.MockClient) {
 	addNodes(t, kubeClient, nodes)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
-	filter := map[string]string{"label": ipHolderLabel}
+	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
 	rawFilter, _ := json.Marshal(filter)
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{ipHolderInstance}, nil)
 	dummySharedIP := "45.76.101.26"
@@ -216,7 +216,7 @@ func testCreateWithNoExistingIPHolder(t *testing.T, mc *mocks.MockClient) {
 	addNodes(t, kubeClient, nodes)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
-	filter := map[string]string{"label": ipHolderLabel}
+	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
 	rawFilter, _ := json.Marshal(filter)
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
 	dummySharedIP := "45.76.101.26"
@@ -253,7 +253,7 @@ func testEnsureCiliumLoadBalancerDeleted(t *testing.T, mc *mocks.MockClient) {
 	dummySharedIP := "45.76.101.26"
 	svc.Status.LoadBalancer = v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{{IP: dummySharedIP}}}
 
-	filter := map[string]string{"label": ipHolderLabel}
+	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
 	rawFilter, _ := json.Marshal(filter)
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{ipHolderInstance}, nil)
 	mc.EXPECT().DeleteInstanceIPAddress(gomock.Any(), 11111, dummySharedIP).Times(1).Return(nil)
