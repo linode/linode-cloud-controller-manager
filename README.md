@@ -91,7 +91,7 @@ Services of `type: LoadBalancer` can receive an external IP not backed by a Node
 
 This feature requires the Kubernetes cluster to be using [Cilium](https://cilium.io/) as the CNI with the `bgp-control-plane` feature enabled.
 
-Example configuration:
+##### Example Daemonset configuration:
 
 ```
 apiVersion: apps/v1
@@ -105,20 +105,21 @@ spec:
       containers:
         - image: linode/linode-cloud-controller-manager:latest
           name: ccm-linode
-          args:
-          - --leader-elect-resource-lock=endpoints
-          - --v=3
-          - --port=0
-          - --secure-port=10253
-          - --bgp-node-selector=cilium-bgp-peering=true
-          - --load-balancer-type=cilium-bgp
-          volumeMounts:
-          - mountPath: /etc/kubernetes
-            name: k8s
           env:
             - name: LINODE_URL
               value: https://api.linode.com/v4beta
+          args:
+          - --bgp-node-selector=cilium-bgp-peering=true
+          - --load-balancer-type=cilium-bgp
 ...
+```
+
+##### Example Helm chart configuration:
+
+```
+sharedIPLoadBalancing:
+  loadBalancerType: cilium-bgp
+  bgpNodeSelector: cilium-bgp-peering=true
 ```
 
 #### Firewalls
