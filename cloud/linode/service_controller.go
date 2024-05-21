@@ -47,6 +47,21 @@ func (s *serviceController) Run(stopCh <-chan struct{}) {
 			klog.Infof("ServiceController will handle service (%s) deletion", getServiceNn(service))
 			s.queue.Add(service)
 		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			newSvc, ok := newObj.(*v1.Service)
+			if !ok {
+				return
+			}
+			oldSvc, ok := oldObj.(*v1.Service)
+			if !ok {
+				return
+			}
+
+			if newSvc.Spec.Type != "LoadBalancer" && oldSvc.Spec.Type == "LoadBalancer" {
+				klog.Infof("ServiceController will handle service (%s) LoadBalancer deletion", getServiceNn(oldSvc))
+				s.queue.Add(oldSvc)
+			}
+		},
 	}); err != nil {
 		klog.Errorf("ServiceController didn't successfully register it's Informer %s", err)
 	}
