@@ -409,6 +409,10 @@ func (l *loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error 
 				LocalASN:      65001,
 				ExportPodCIDR: ptr.To(true),
 				ServiceSelector: &slimv1.LabelSelector{
+					// By default, virtual routers will not announce any services.
+					// This selector makes it so all services within the cluster are announced.
+					// See https://docs.cilium.io/en/stable/network/bgp-control-plane/#service-announcements
+					// for more information.
 					MatchExpressions: []slimv1.LabelSelectorRequirement{{
 						Key:      "somekey",
 						Operator: slimv1.LabelSelectorOpNotIn,
@@ -418,6 +422,7 @@ func (l *loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error 
 			}},
 		},
 	}
+	// As in https://github.com/linode/lelastic, there are 4 peers per DC
 	for i := 1; i <= 4; i++ {
 		neighbor := v2alpha1.CiliumBGPNeighbor{
 			PeerAddress:             fmt.Sprintf("2600:3c0f:%d:34::%d/64", regionID, i),

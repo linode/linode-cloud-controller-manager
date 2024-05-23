@@ -208,7 +208,8 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 
 		// check for existing CiliumLoadBalancerIPPool for service
 		pool, err := l.getCiliumLBIPPool(ctx, service)
-		// if the CiliumLoadBalancerIPPool doesn't exist, it's not nil, just empty
+		// if the CiliumLoadBalancerIPPool doesn't exist, it's not nil, instead an empty struct
+		// gets returned, so we check if this is so via the Name being empty
 		if pool != nil && pool.Name != "" {
 			klog.Infof("Cilium LB IP pool %s for Service %s ensured", pool.Name, serviceNn)
 			// ingress will be set by Cilium
