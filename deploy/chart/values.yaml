@@ -44,6 +44,11 @@ tolerations:
     operator: Exists
     effect: NoSchedule
 
+# Options for LoadBalancers backed by shared IPs instead of NodeBalancers
+# sharedIPLoadBalancing:
+#   loadBalancerType: cilium-bgp
+#   bgpNodeSelector: <node label (e.g. cilium-bgp-peering=true)>
+
 # This section adds ability to enable route-controller for ccm
 # routeController:
 #   vpcName: <name of VPC>

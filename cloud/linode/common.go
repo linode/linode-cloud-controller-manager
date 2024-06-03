@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/linode/linodego"
 )
 
 const providerIDPrefix = "linode://"
@@ -29,4 +31,14 @@ func parseProviderID(providerID string) (int, error) {
 		return 0, invalidProviderIDError{providerID}
 	}
 	return id, nil
+}
+
+// IgnoreLinodeAPIError returns the error except matches to status code
+func IgnoreLinodeAPIError(err error, code int) error {
+	apiErr := linodego.Error{Code: code}
+	if apiErr.Is(err) {
+		err = nil
+	}
+
+	return err
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/linode/linodego"
 	"github.com/spf13/pflag"
+	"golang.org/x/exp/slices"
 	"k8s.io/client-go/informers"
 	cloudprovider "k8s.io/cloud-provider"
 
@@ -16,11 +17,15 @@ import (
 
 const (
 	// The name of this cloudprovider
-	ProviderName   = "linode"
-	accessTokenEnv = "LINODE_API_TOKEN"
-	regionEnv      = "LINODE_REGION"
-	urlEnv         = "LINODE_URL"
+	ProviderName       = "linode"
+	accessTokenEnv     = "LINODE_API_TOKEN"
+	regionEnv          = "LINODE_REGION"
+	urlEnv             = "LINODE_URL"
+	ciliumLBType       = "cilium-bgp"
+	nodeBalancerLBType = "nodebalancer"
 )
+
+var supportedLoadBalancerTypes = []string{ciliumLBType, nodeBalancerLBType}
 
 // Options is a configuration object for this cloudprovider implementation.
 // We expect it to be initialized with flags external to this package, likely in
@@ -30,6 +35,8 @@ var Options struct {
 	LinodeGoDebug         bool
 	EnableRouteController bool
 	VPCName               string
+	LoadBalancerType      string
+	BGPNodeSelector       string
 }
 
 // vpcDetails is set when VPCName options flag is set.
@@ -110,6 +117,14 @@ func newCloud() (cloudprovider.Interface, error) {
 	routes, err := newRoutes(linodeClient)
 	if err != nil {
 		return nil, fmt.Errorf("routes client was not created successfully: %w", err)
+	}
+
+	if Options.LoadBalancerType != "" && !slices.Contains(supportedLoadBalancerTypes, Options.LoadBalancerType) {
+		return nil, fmt.Errorf(
+			"unsupported default load-balancer type %s. Options are %v",
+			Options.LoadBalancerType,
+			supportedLoadBalancerTypes,
+		)
 	}
 
 	// create struct that satisfies cloudprovider.Interface
