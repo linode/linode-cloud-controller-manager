@@ -2,6 +2,20 @@ apiVersion: v1
 entries:
   ccm-linode:
   - apiVersion: v2
+    appVersion: v0.4.6
+    created: "2024-06-04T17:56:30.284346014Z"
+    description: The Linode Cloud Controller Manager (CCM) provides a way for Kubernetes
+      clusters to access additional Linode services. Linode's CCM will automatically
+      provision a Linode NodeBalancer for Kubernetes Services of type "LoadBalancer".
+    digest: bd07ccd67d8eb79936b2b8b1ef35911e8941e4747aa43ba7666d07f1d823c883
+    maintainers:
+    - name: linode
+    name: ccm-linode
+    type: application
+    urls:
+    - https://github.com/linode/linode-cloud-controller-manager/releases/download/helm-v0.4.6/ccm-linode-v0.4.6.tgz
+    version: v0.4.6
+  - apiVersion: v2
     appVersion: v0.4.5
     created: "2024-06-03T16:52:51.445479356Z"
     description: The Linode Cloud Controller Manager (CCM) provides a way for Kubernetes
@@ -99,4 +113,4 @@ entries:
     urls:
     - https://github.com/linode/linode-cloud-controller-manager/releases/download/helm-v0.3.24/ccm-linode-v0.3.24.tgz
     version: v0.3.24
-generated: "2024-06-03T16:52:51.445518728Z"
+generated: "2024-06-04T17:56:30.284383464Z"
