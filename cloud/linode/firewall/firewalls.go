@@ -260,11 +260,17 @@ func (l *LinodeClient) UpdateNodeBalancerFirewall(
 		klog.Errorf("Found more than one firewall attached to nodebalancer: %d, firewall IDs: %v", nb.ID, firewalls)
 		return ErrTooManyNBFirewalls
 	}
-
-	err = l.Client.DeleteFirewallDevice(ctx, firewalls[0].ID, nb.ID)
+	deviceID, deviceExists, err := l.getNodeBalancerDeviceID(ctx, firewalls[0].ID, nb.ID)
 	if err != nil {
 		return err
 	}
+	if deviceExists {
+		err = l.Client.DeleteFirewallDevice(ctx, firewalls[0].ID, deviceID)
+		if err != nil {
+			return err
+		}
+	}
+
 	// once we delete the device, we should see if there's anything attached to that firewall
 	devices, err := l.Client.ListFirewallDevices(ctx, firewalls[0].ID, &linodego.ListOptions{})
 	if err != nil {
