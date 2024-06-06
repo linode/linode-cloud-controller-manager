@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2alpha1"
@@ -65,10 +66,10 @@ var (
 	errNoBGPSelector = errors.New("no BGP node selector set to configure IP sharing")
 )
 
-// getExistingSharedIPs determines the list of addresses to share on nodes by checking the
+// getExistingSharedIPsInCluster determines the list of addresses to share on nodes by checking the
 // CiliumLoadBalancerIPPools created by the CCM in createCiliumLBIPPool
 // NOTE: Cilium CRDs must be installed for this to work
-func (l *loadbalancers) getExistingSharedIPs(ctx context.Context) ([]string, error) {
+func (l *loadbalancers) getExistingSharedIPsInCluster(ctx context.Context) ([]string, error) {
 	addrs := []string{}
 	if err := l.retrieveCiliumClientset(); err != nil {
 		return addrs, err
@@ -83,6 +84,22 @@ func (l *loadbalancers) getExistingSharedIPs(ctx context.Context) ([]string, err
 		for _, block := range pool.Spec.Blocks {
 			addrs = append(addrs, strings.TrimSuffix(string(block.Cidr), "/32"))
 		}
+	}
+	return addrs, nil
+}
+
+func (l *loadbalancers) getExistingSharedIPsOnHolder(ctx context.Context) ([]string, error) {
+	addrs := []string{}
+	ipHolder, err := l.ensureIPHolder(ctx)
+	if err != nil {
+		return addrs, err
+	}
+	ipHolderAddrs, err := l.client.GetInstanceIPAddresses(ctx, ipHolder.ID)
+	if err != nil {
+		return addrs, err
+	}
+	for _, addr := range ipHolderAddrs.IPv4.Shared {
+		addrs = append(addrs, addr.Address)
 	}
 	return addrs, nil
 }
@@ -150,10 +167,24 @@ func (l *loadbalancers) handleIPSharing(ctx context.Context, node *v1.Node) erro
 	}
 	// Get the IPs to be shared on the Node and configure sharing.
 	// This also annotates the node that IPs have been shared.
-	addrs, err := l.getExistingSharedIPs(ctx)
+	inClusterAddrs, err := l.getExistingSharedIPsInCluster(ctx)
 	if err != nil {
-		klog.Infof("error getting shared IPs: %s", err.Error())
+		klog.Infof("error getting shared IPs in cluster: %s", err.Error())
 		return err
+	}
+	// if any of the addrs don't exist on the ip-holder (e.g. someone manually deleted it outside the CCM),
+	// we need to exclude that from the list
+	// TODO: also clean up the CiliumLoadBalancerIPPool for that missing IP if that happens
+	ipHolderAddrs, err := l.getExistingSharedIPsOnHolder(ctx)
+	if err != nil {
+		klog.Infof("error getting shared IPs in cluster: %s", err.Error())
+		return err
+	}
+	addrs := []string{}
+	for _, i := range inClusterAddrs {
+		if slices.Contains(ipHolderAddrs, i) {
+			addrs = append(addrs, i)
+		}
 	}
 	if err = l.shareIPs(ctx, addrs, node); err != nil {
 		klog.Infof("error sharing IPs: %s", err.Error())
@@ -182,11 +213,25 @@ func (l *loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node) (s
 
 	// need to retrieve existing public IPs on the IP holder since ShareIPAddresses
 	// expects the full list of IPs to be shared
-	addrs, err := l.getExistingSharedIPs(ctx)
+	inClusterAddrs, err := l.getExistingSharedIPsInCluster(ctx)
 	if err != nil {
 		return "", err
 	}
-	addrs = append(addrs, newSharedIP.Address)
+	inClusterAddrs = append(inClusterAddrs, newSharedIP.Address)
+	// if any of the addrs don't exist on the ip-holder (e.g. someone manually deleted it outside the CCM),
+	// we need to exclude that from the list
+	// TODO: also clean up the CiliumLoadBalancerIPPool for that missing IP if that happens
+	ipHolderAddrs, err := l.getExistingSharedIPsOnHolder(ctx)
+	if err != nil {
+		klog.Infof("error getting shared IPs in cluster: %s", err.Error())
+		return "", err
+	}
+	addrs := []string{}
+	for _, i := range inClusterAddrs {
+		if slices.Contains(ipHolderAddrs, i) {
+			addrs = append(addrs, i)
+		}
+	}
 
 	// share the IPs with nodes participating in Cilium BGP peering
 	kv := strings.Split(Options.BGPNodeSelector, "=")
