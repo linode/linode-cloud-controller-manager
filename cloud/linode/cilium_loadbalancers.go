@@ -88,16 +88,15 @@ func (l *loadbalancers) getExistingSharedIPsInCluster(ctx context.Context) ([]st
 	return addrs, nil
 }
 
-func (l *loadbalancers) getExistingSharedIPsOnHolder(ctx context.Context) ([]string, error) {
-	addrs := []string{}
-	ipHolder, err := l.ensureIPHolder(ctx)
-	if err != nil {
-		return addrs, err
+func (l *loadbalancers) getExistingSharedIPs(ctx context.Context, ipHolder *linodego.Instance) ([]string, error) {
+	if ipHolder == nil {
+		return nil, nil
 	}
 	ipHolderAddrs, err := l.client.GetInstanceIPAddresses(ctx, ipHolder.ID)
 	if err != nil {
-		return addrs, err
+		return nil, err
 	}
+	addrs := make([]string, 0, len(ipHolderAddrs.IPv4.Shared))
 	for _, addr := range ipHolderAddrs.IPv4.Shared {
 		addrs = append(addrs, addr.Address)
 	}
@@ -175,7 +174,11 @@ func (l *loadbalancers) handleIPSharing(ctx context.Context, node *v1.Node) erro
 	// if any of the addrs don't exist on the ip-holder (e.g. someone manually deleted it outside the CCM),
 	// we need to exclude that from the list
 	// TODO: also clean up the CiliumLoadBalancerIPPool for that missing IP if that happens
-	ipHolderAddrs, err := l.getExistingSharedIPsOnHolder(ctx)
+	ipHolder, err := l.getIPHolder(ctx)
+	if err != nil {
+		return err
+	}
+	ipHolderAddrs, err := l.getExistingSharedIPs(ctx, ipHolder)
 	if err != nil {
 		klog.Infof("error getting shared IPs in cluster: %s", err.Error())
 		return err
@@ -221,7 +224,7 @@ func (l *loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node) (s
 	// if any of the addrs don't exist on the ip-holder (e.g. someone manually deleted it outside the CCM),
 	// we need to exclude that from the list
 	// TODO: also clean up the CiliumLoadBalancerIPPool for that missing IP if that happens
-	ipHolderAddrs, err := l.getExistingSharedIPsOnHolder(ctx)
+	ipHolderAddrs, err := l.getExistingSharedIPs(ctx, ipHolder)
 	if err != nil {
 		klog.Infof("error getting shared IPs in cluster: %s", err.Error())
 		return "", err
