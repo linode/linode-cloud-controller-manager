@@ -188,6 +188,11 @@ func testCreateWithExistingIPHolder(t *testing.T, mc *mocks.MockClient) {
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{ipHolderInstance}, nil)
 	dummySharedIP := "45.76.101.26"
 	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), ipHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), ipHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
+		IPv4: &linodego.InstanceIPv4Response{
+			Shared: []*linodego.InstanceIP{{Address: dummySharedIP}},
+		},
+	}, nil)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
 		IPs:      []string{dummySharedIP},
 		LinodeID: 11111,
@@ -221,6 +226,11 @@ func testCreateWithNoExistingIPHolder(t *testing.T, mc *mocks.MockClient) {
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
 	dummySharedIP := "45.76.101.26"
 	mc.EXPECT().CreateInstance(gomock.Any(), gomock.Any()).Times(1).Return(&ipHolderInstance, nil)
+	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), ipHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
+		IPv4: &linodego.InstanceIPv4Response{
+			Shared: []*linodego.InstanceIP{{Address: dummySharedIP}},
+		},
+	}, nil)
 	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), ipHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
 		IPs:      []string{dummySharedIP},
