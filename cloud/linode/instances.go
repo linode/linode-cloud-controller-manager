@@ -6,6 +6,7 @@ import (
 	"os"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -55,7 +56,7 @@ func (nc *nodeCache) getInstanceAddresses(instance linodego.Instance, vpcips []s
 	}
 
 	if instance.IPv6 != "" {
-		ips = append(ips, nodeIP{ip: instance.IPv6, ipType: v1.NodeExternalIP})
+		ips = append(ips, nodeIP{ip: strings.TrimSuffix(instance.IPv6, "/128"), ipType: v1.NodeExternalIP})
 	}
 
 	return ips
