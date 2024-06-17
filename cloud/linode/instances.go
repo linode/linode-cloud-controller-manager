@@ -36,8 +36,8 @@ type nodeCache struct {
 	ttl        time.Duration
 }
 
-// getInstanceIPv4Addresses returns all ipv4 addresses configured on a linode.
-func (nc *nodeCache) getInstanceIPv4Addresses(instance linodego.Instance, vpcips []string) []nodeIP {
+// getInstanceAddresses returns all addresses configured on a linode.
+func (nc *nodeCache) getInstanceAddresses(instance linodego.Instance, vpcips []string) []nodeIP {
 	ips := []nodeIP{}
 
 	// If vpc ips are present, list them first
@@ -52,6 +52,10 @@ func (nc *nodeCache) getInstanceIPv4Addresses(instance linodego.Instance, vpcips
 			ipType = v1.NodeInternalIP
 		}
 		ips = append(ips, nodeIP{ip: ip.String(), ipType: ipType})
+	}
+
+	if instance.IPv6 != "" {
+		ips = append(ips, nodeIP{ip: instance.IPv6, ipType: v1.NodeExternalIP})
 	}
 
 	return ips
@@ -97,7 +101,7 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 		}
 		node := linodeInstance{
 			instance: &instances[i],
-			ips:      nc.getInstanceIPv4Addresses(instance, vpcNodes[instance.ID]),
+			ips:      nc.getInstanceAddresses(instance, vpcNodes[instance.ID]),
 		}
 		newNodes[instance.ID] = node
 	}
@@ -141,7 +145,7 @@ func (i *instances) linodeByIP(kNode *v1.Node) (*linodego.Instance, error) {
 	defer i.nodeCache.RUnlock()
 	var kNodeAddresses []string
 	for _, address := range kNode.Status.Addresses {
-		if address.Type == "ExternalIP" || address.Type == "InternalIP" {
+		if address.Type == v1.NodeExternalIP || address.Type == v1.NodeInternalIP {
 			kNodeAddresses = append(kNodeAddresses, address.Address)
 		}
 	}
@@ -262,7 +266,7 @@ func (i *instances) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloud
 		return nil, err
 	}
 
-	ips, err := i.getLinodeIPv4Addresses(ctx, node)
+	ips, err := i.getLinodeAddresses(ctx, node)
 	if err != nil {
 		sentry.CaptureError(ctx, err)
 		return nil, err
@@ -291,7 +295,7 @@ func (i *instances) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloud
 	return meta, nil
 }
 
-func (i *instances) getLinodeIPv4Addresses(ctx context.Context, node *v1.Node) ([]nodeIP, error) {
+func (i *instances) getLinodeAddresses(ctx context.Context, node *v1.Node) ([]nodeIP, error) {
 	ctx = sentry.SetHubOnContext(ctx)
 	instance, err := i.lookupLinode(ctx, node)
 	if err != nil {
