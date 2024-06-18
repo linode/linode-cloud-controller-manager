@@ -59,13 +59,16 @@ func (nc *nodeCache) getInstanceIPv4Addresses(instance linodego.Instance, vpcips
 
 // refreshInstances conditionally loads all instances from the Linode API and caches them.
 // It does not refresh if the last update happened less than `nodeCache.ttl` ago.
-func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client) error {
+func (nc *nodeCache) refreshInstances(_ context.Context, client client.Client) error {
 	nc.Lock()
 	defer nc.Unlock()
 
 	if time.Since(nc.lastUpdate) < nc.ttl {
 		return nil
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
 
 	instances, err := client.ListInstances(ctx, nil)
 	if err != nil {

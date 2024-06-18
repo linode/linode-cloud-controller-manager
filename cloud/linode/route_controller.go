@@ -25,13 +25,16 @@ type routeCache struct {
 	ttl        time.Duration
 }
 
-func (rc *routeCache) refreshRoutes(ctx context.Context, client client.Client) error {
+func (rc *routeCache) refreshRoutes(_ context.Context, client client.Client) error {
 	rc.Lock()
 	defer rc.Unlock()
 
 	if time.Since(rc.lastUpdate) < rc.ttl {
 		return nil
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
 
 	vpcNodes := map[int][]linodego.VPCIP{}
 	vpcID := vpcInfo.getID()
@@ -162,6 +165,9 @@ func (r *routes) CreateRoute(ctx context.Context, clusterName string, nameHint s
 		IPRanges: &intfRoutes,
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+
 	resp, err := r.client.UpdateInstanceConfigInterface(ctx, instance.ID, intfVPCIP.ConfigID, intfVPCIP.InterfaceID, interfaceUpdateOptions)
 	if err != nil {
 		return err
@@ -205,6 +211,9 @@ func (r *routes) DeleteRoute(ctx context.Context, clusterName string, route *clo
 	if intfVPCIP.Address == nil {
 		return fmt.Errorf("unable to remove route %s for node %s. no valid interface found", route.DestinationCIDR, route.TargetNode)
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
 
 	interfaceUpdateOptions := linodego.InstanceConfigInterfaceUpdateOptions{
 		IPRanges: &intfRoutes,

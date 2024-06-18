@@ -4,11 +4,16 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/linode/linodego"
 )
 
-const providerIDPrefix = "linode://"
+const (
+	providerIDPrefix = "linode://"
+	// context timeout for API requests
+	requestTimeout = 120 * time.Second
+)
 
 type invalidProviderIDError struct {
 	value string

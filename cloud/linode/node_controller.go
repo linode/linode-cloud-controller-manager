@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -95,13 +96,17 @@ func (s *nodeController) processNext() bool {
 		return true
 	}
 
-	err := s.handleNode(context.TODO(), node)
-	switch deleteErr := err.(type) {
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+	err := s.handleNode(ctx, node)
+	switch errType := err.(type) {
 	case nil:
 		break
 
 	case *linodego.Error:
-		if deleteErr.Code >= http.StatusInternalServerError || deleteErr.Code == http.StatusTooManyRequests {
+		if errType.Code >= http.StatusInternalServerError ||
+			errType.Code == http.StatusTooManyRequests ||
+			strings.Contains(errType.Error(), "context deadline exceeded") {
 			klog.Errorf("failed to add metadata for node (%s); retrying in 1 minute: %s", node.Name, err)
 			s.queue.AddAfter(node, retryInterval)
 		}

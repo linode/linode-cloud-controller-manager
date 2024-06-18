@@ -96,7 +96,9 @@ func (s *serviceController) processNextDeletion() bool {
 		break
 
 	case *linodego.Error:
-		if deleteErr.Code >= http.StatusInternalServerError || deleteErr.Code == http.StatusTooManyRequests {
+		if deleteErr.Code >= http.StatusInternalServerError ||
+			deleteErr.Code == http.StatusTooManyRequests ||
+			strings.Contains(deleteErr.Error(), "context deadline exceeded") {
 			klog.Errorf("failed to delete NodeBalancer for service (%s); retrying in 1 minute: %s", getServiceNn(service), err)
 			s.queue.AddAfter(service, retryInterval)
 		}
@@ -110,5 +112,7 @@ func (s *serviceController) processNextDeletion() bool {
 func (s *serviceController) handleServiceDeleted(service *v1.Service) error {
 	klog.Infof("ServiceController handling service (%s) deletion", getServiceNn(service))
 	clusterName := strings.TrimPrefix(service.Namespace, "kube-system-")
-	return s.loadbalancers.EnsureLoadBalancerDeleted(context.Background(), clusterName, service)
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+	return s.loadbalancers.EnsureLoadBalancerDeleted(ctx, clusterName, service)
 }

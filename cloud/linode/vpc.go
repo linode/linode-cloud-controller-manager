@@ -18,7 +18,9 @@ func (e vpcLookupError) Error() string {
 
 // getVPCID returns the VPC id using the VPC label
 func getVPCID(client client.Client, vpcName string) (int, error) {
-	vpcs, err := client.ListVPCs(context.TODO(), &linodego.ListOptions{})
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+	vpcs, err := client.ListVPCs(ctx, &linodego.ListOptions{})
 	if err != nil {
 		return 0, err
 	}
