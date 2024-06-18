@@ -286,6 +286,15 @@ sessionAffinityConfig:
     timeoutSeconds: 100
 ```
 
+## Additional environment variables
+To tweak CCM based on needs, one can overwrite the default values set for caches and requests by setting appropriate environment variables when applying the manifest or helm chart.
+
+Environment Variable | Default | Description
+---|---|---
+`LINODE_INSTANCE_CACHE_TTL` | `15` | Default timeout of instance cache in seconds
+`LINODE_ROUTES_CACHE_TTL_SECONDS` | `60` | Default timeout of route cache in seconds
+`LINODE_REQUEST_TIMEOUT_SECONDS` | `120` | Default timeout in seconds for http requests to linode API
+
 ## Generating a Manifest for Deployment
 Use the script located at `./deploy/generate-manifest.sh` to generate a self-contained deployment manifest for the Linode CCM. Two arguments are required.
 
@@ -320,7 +329,7 @@ helm repo update ccm-linode
 ### To deploy ccm-linode. Run the following command:
 
 ```sh
-export VERSION=v0.3.22
+export VERSION=v0.4.8
 export LINODE_API_TOKEN=<linodeapitoken>
 export REGION=<linoderegion>
 helm install ccm-linode --set apiToken=$LINODE_API_TOKEN,region=$REGION ccm-linode/ccm-linode
@@ -335,7 +344,7 @@ _See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall/) for command doc
 
 ### To upgrade when new changes are made to the helm chart. Run the following command:
 ```sh
-export VERSION=v0.3.22
+export VERSION=v0.4.8
 export LINODE_API_TOKEN=<linodeapitoken>
 export REGION=<linoderegion>
 

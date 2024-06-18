@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/linode/linodego"
 	"github.com/spf13/pflag"
@@ -98,7 +100,15 @@ func newCloud() (cloudprovider.Interface, error) {
 	url := os.Getenv(urlEnv)
 	ua := fmt.Sprintf("linode-cloud-controller-manager %s", linodego.DefaultUserAgent)
 
-	linodeClient, err := client.New(apiToken, ua, url)
+	// set timeout used by linodeclient for API calls
+	timeout := client.DefaultClientTimeout
+	if raw, ok := os.LookupEnv("LINODE_REQUEST_TIMEOUT_SECONDS"); ok {
+		if t, _ := strconv.Atoi(raw); t > 0 {
+			timeout = time.Duration(t) * time.Second
+		}
+	}
+
+	linodeClient, err := client.New(apiToken, ua, url, timeout)
 	if err != nil {
 		return nil, fmt.Errorf("client was not created succesfully: %w", err)
 	}
