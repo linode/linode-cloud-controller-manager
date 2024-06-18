@@ -4,7 +4,9 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/linode/linodego"
@@ -56,8 +58,11 @@ type Client interface {
 // linodego.Client implements Client
 var _ Client = (*linodego.Client)(nil)
 
-// New creates a new linode client with a given token, userAgent, and API URL
-func New(token, userAgent, apiURL string, timeout time.Duration) (*linodego.Client, error) {
+// New creates a new linode client with a given token and default timeout
+func New(token string, timeout time.Duration) (*linodego.Client, error) {
+	userAgent := fmt.Sprintf("linode-cloud-controller-manager %s", linodego.DefaultUserAgent)
+	apiURL := os.Getenv("LINODE_URL")
+
 	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
 	oauth2Client := &http.Client{
 		Transport: &oauth2.Transport{
@@ -72,6 +77,6 @@ func New(token, userAgent, apiURL string, timeout time.Duration) (*linodego.Clie
 	}
 	client.SetUserAgent(userAgent)
 
-	klog.V(3).Infof("Linode client created with default timeout of %v seconds", timeout)
+	klog.V(3).Infof("Linode client created with default timeout of %v", timeout)
 	return client, nil
 }
