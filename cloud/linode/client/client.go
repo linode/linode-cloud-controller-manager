@@ -4,8 +4,19 @@ package client
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"os"
+	"time"
 
 	"github.com/linode/linodego"
+	"golang.org/x/oauth2"
+	"k8s.io/klog/v2"
+)
+
+const (
+	// DefaultClientTimeout is the default timeout for a client Linode API call
+	DefaultClientTimeout = 120 * time.Second
 )
 
 type Client interface {
@@ -47,15 +58,25 @@ type Client interface {
 // linodego.Client implements Client
 var _ Client = (*linodego.Client)(nil)
 
-// New creates a new linode client with a given token, userAgent, and API URL
-func New(token, userAgent, apiURL string) (*linodego.Client, error) {
-	linodeClient := linodego.NewClient(nil)
+// New creates a new linode client with a given token and default timeout
+func New(token string, timeout time.Duration) (*linodego.Client, error) {
+	userAgent := fmt.Sprintf("linode-cloud-controller-manager %s", linodego.DefaultUserAgent)
+	apiURL := os.Getenv("LINODE_URL")
+
+	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
+	oauth2Client := &http.Client{
+		Transport: &oauth2.Transport{
+			Source: tokenSource,
+		},
+		Timeout: timeout,
+	}
+	linodeClient := linodego.NewClient(oauth2Client)
 	client, err := linodeClient.UseURL(apiURL)
 	if err != nil {
 		return nil, err
 	}
 	client.SetUserAgent(userAgent)
-	client.SetToken(token)
 
+	klog.V(3).Infof("Linode client created with default timeout of %v", timeout)
 	return client, nil
 }

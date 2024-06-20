@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"sync"
+	"time"
 
-	"github.com/linode/linodego"
 	"github.com/spf13/pflag"
 	"golang.org/x/exp/slices"
 	"k8s.io/client-go/informers"
@@ -20,7 +21,6 @@ const (
 	ProviderName       = "linode"
 	accessTokenEnv     = "LINODE_API_TOKEN"
 	regionEnv          = "LINODE_REGION"
-	urlEnv             = "LINODE_URL"
 	ciliumLBType       = "cilium-bgp"
 	nodeBalancerLBType = "nodebalancer"
 )
@@ -95,10 +95,15 @@ func newCloud() (cloudprovider.Interface, error) {
 		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", regionEnv)
 	}
 
-	url := os.Getenv(urlEnv)
-	ua := fmt.Sprintf("linode-cloud-controller-manager %s", linodego.DefaultUserAgent)
+	// set timeout used by linodeclient for API calls
+	timeout := client.DefaultClientTimeout
+	if raw, ok := os.LookupEnv("LINODE_REQUEST_TIMEOUT_SECONDS"); ok {
+		if t, err := strconv.Atoi(raw); err == nil && t > 0 {
+			timeout = time.Duration(t) * time.Second
+		}
+	}
 
-	linodeClient, err := client.New(apiToken, ua, url)
+	linodeClient, err := client.New(apiToken, timeout)
 	if err != nil {
 		return nil, fmt.Errorf("client was not created succesfully: %w", err)
 	}
