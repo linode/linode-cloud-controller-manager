@@ -144,38 +144,51 @@ func TestMetadataRetrieval(t *testing.T) {
 
 	ipTests := []struct {
 		name            string
-		inputIPs        []string
+		inputIPv4s      []string
+		inputIPv6       string
 		outputAddresses []v1.NodeAddress
 		expectedErr     error
 	}{
-		{"no IPs", nil, nil, instanceNoIPAddressesError{192910}},
+		{"no IPs", nil, "", nil, instanceNoIPAddressesError{192910}},
 		{
 			"one public, one private",
 			[]string{"32.74.121.25", "192.168.121.42"},
+			"",
 			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "32.74.121.25"}, {Type: v1.NodeInternalIP, Address: "192.168.121.42"}},
+			nil,
+		},
+		{
+			"one public ipv4, one public ipv6",
+			[]string{"32.74.121.25"},
+			"2600:3c06::f03c:94ff:fe1e:e072",
+			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "32.74.121.25"}, {Type: v1.NodeExternalIP, Address: "2600:3c06::f03c:94ff:fe1e:e072"}},
 			nil,
 		},
 		{
 			"one public, no private",
 			[]string{"32.74.121.25"},
+			"",
 			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "32.74.121.25"}},
 			nil,
 		},
 		{
 			"one private, no public",
 			[]string{"192.168.121.42"},
+			"",
 			[]v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "192.168.121.42"}},
 			nil,
 		},
 		{
 			"two public addresses",
 			[]string{"32.74.121.25", "32.74.121.22"},
+			"",
 			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "32.74.121.25"}, {Type: v1.NodeExternalIP, Address: "32.74.121.22"}},
 			nil,
 		},
 		{
 			"two private addresses",
 			[]string{"192.168.121.42", "10.0.2.15"},
+			"",
 			[]v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "192.168.121.42"}, {Type: v1.NodeInternalIP, Address: "10.0.2.15"}},
 			nil,
 		},
@@ -189,8 +202,8 @@ func TestMetadataRetrieval(t *testing.T) {
 			providerID := providerIDPrefix + strconv.Itoa(id)
 			node := nodeWithProviderID(providerID)
 
-			ips := make([]*net.IP, 0, len(test.inputIPs))
-			for _, ip := range test.inputIPs {
+			ips := make([]*net.IP, 0, len(test.inputIPv4s))
+			for _, ip := range test.inputIPv4s {
 				parsed := net.ParseIP(ip)
 				if parsed == nil {
 					t.Fatalf("cannot parse %v as an ipv4", ip)
@@ -201,7 +214,7 @@ func TestMetadataRetrieval(t *testing.T) {
 			linodeType := "g6-standard-1"
 			region := "us-east"
 			client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
-				{ID: id, Label: name, Type: linodeType, Region: region, IPv4: ips},
+				{ID: id, Label: name, Type: linodeType, Region: region, IPv4: ips, IPv6: test.inputIPv6},
 			}, nil)
 
 			meta, err := instances.InstanceMetadata(ctx, node)
