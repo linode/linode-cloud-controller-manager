@@ -64,6 +64,9 @@ env:
 #  - name: EXAMPLE_ENV_VAR
 #    value: "true"
 
+# Linode tags to apply to all NodeBalancers
+nodeBalancerTags: []
+
 # This section adds the ability to pass volumes to the CCM DaemonSet
 volumes:
 #  - name: test-volume
@@ -74,3 +77,4 @@ volumes:
 volumeMounts:
 #  - mountPath: /tmp/
 #    name: test-volume
+

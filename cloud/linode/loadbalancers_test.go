@@ -151,6 +151,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 			f:    testCreateNodeBalanceWithNoAllowOrDenyList,
 		},
 		{
+			name: "Create Load Balancer With Global Tags set",
+			f:    testCreateNodeBalancerWithGlobalTags,
+		},
+		{
 			name: "Update Load Balancer - Add Node",
 			f:    testUpdateLoadBalancerAddNode,
 		},
@@ -274,7 +278,7 @@ func stubService(fake *fake.Clientset, service *v1.Service) {
 	_, _ = fake.CoreV1().Services("").Create(context.TODO(), service, metav1.CreateOptions{})
 }
 
-func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, annMap map[string]string) error {
+func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, annMap map[string]string, expectedTags []string) error {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: randString(),
@@ -341,7 +345,9 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, a
 		t.Logf("actual: %v", nb.ClientConnThrottle)
 	}
 
-	expectedTags := []string{"linodelb", "fake", "test", "yolo"}
+	if len(expectedTags) == 0 {
+		expectedTags = []string{"linodelb", "fake", "test", "yolo"}
+	}
 	if !reflect.DeepEqual(nb.Tags, expectedTags) {
 		t.Error("unexpected Tags")
 		t.Logf("expected: %v", expectedTags)
@@ -366,7 +372,7 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, a
 }
 
 func testCreateNodeBalancerWithOutFirewall(t *testing.T, client *linodego.Client, f *fakeAPI) {
-	err := testCreateNodeBalancer(t, client, f, nil)
+	err := testCreateNodeBalancer(t, client, f, nil, nil)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
@@ -377,7 +383,7 @@ func testCreateNodeBalanceWithNoAllowOrDenyList(t *testing.T, client *linodego.C
 		annotations.AnnLinodeCloudFirewallACL: `{}`,
 	}
 
-	err := testCreateNodeBalancer(t, client, f, annotations)
+	err := testCreateNodeBalancer(t, client, f, annotations, nil)
 	if err == nil || !stderrors.Is(err, firewall.ErrInvalidFWConfig) {
 		t.Fatalf("expected a %v error, got %v", firewall.ErrInvalidFWConfig, err)
 	}
@@ -395,7 +401,7 @@ func testCreateNodeBalanceWithBothAllowOrDenyList(t *testing.T, client *linodego
 		}`,
 	}
 
-	err := testCreateNodeBalancer(t, client, f, annotations)
+	err := testCreateNodeBalancer(t, client, f, annotations, nil)
 	if err == nil || !stderrors.Is(err, firewall.ErrInvalidFWConfig) {
 		t.Fatalf("expected a %v error, got %v", firewall.ErrInvalidFWConfig, err)
 	}
@@ -410,7 +416,7 @@ func testCreateNodeBalancerWithAllowList(t *testing.T, client *linodego.Client, 
 		}`,
 	}
 
-	err := testCreateNodeBalancer(t, client, f, annotations)
+	err := testCreateNodeBalancer(t, client, f, annotations, nil)
 	if err != nil {
 		t.Fatalf("expected a non-nil error, got %v", err)
 	}
@@ -425,7 +431,7 @@ func testCreateNodeBalancerWithDenyList(t *testing.T, client *linodego.Client, f
 		}`,
 	}
 
-	err := testCreateNodeBalancer(t, client, f, annotations)
+	err := testCreateNodeBalancer(t, client, f, annotations, nil)
 	if err != nil {
 		t.Fatalf("expected a non-nil error, got %v", err)
 	}
@@ -435,7 +441,7 @@ func testCreateNodeBalancerWithFirewall(t *testing.T, client *linodego.Client, f
 	annotations := map[string]string{
 		annotations.AnnLinodeCloudFirewallID: "123",
 	}
-	err := testCreateNodeBalancer(t, client, f, annotations)
+	err := testCreateNodeBalancer(t, client, f, annotations, nil)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
@@ -446,9 +452,22 @@ func testCreateNodeBalancerWithInvalidFirewall(t *testing.T, client *linodego.Cl
 		annotations.AnnLinodeCloudFirewallID: "qwerty",
 	}
 	expectedError := "strconv.Atoi: parsing \"qwerty\": invalid syntax"
-	err := testCreateNodeBalancer(t, client, f, annotations)
+	err := testCreateNodeBalancer(t, client, f, annotations, nil)
 	if err.Error() != expectedError {
 		t.Fatalf("expected a %s error, got %v", expectedError, err)
+	}
+}
+
+func testCreateNodeBalancerWithGlobalTags(t *testing.T, client *linodego.Client, f *fakeAPI) {
+	original := Options.NodeBalancerTags
+	defer func() {
+		Options.NodeBalancerTags = original
+	}()
+	Options.NodeBalancerTags = []string{"foobar"}
+	expectedTags := []string{"linodelb", "foobar", "fake", "test", "yolo"}
+	err := testCreateNodeBalancer(t, client, f, nil, expectedTags)
+	if err != nil {
+		t.Fatalf("expected a nil error, got %v", err)
 	}
 }
 
