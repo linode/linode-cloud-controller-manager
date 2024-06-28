@@ -37,6 +37,7 @@ var Options struct {
 	VPCName               string
 	LoadBalancerType      string
 	BGPNodeSelector       string
+	NodeBalancerTags      []string
 }
 
 // vpcDetails is set when VPCName options flag is set.
