@@ -34,3 +34,8 @@ linters:
     - musttag
     - exhaustive
     - nilnil
+
+issues:
+  exclude-rules:
+    - path: cloud/linode/fake_linode_test.go
+      text: 'SA1019: (.+).(NodeBalancersPagedResponse|NodeBalancerConfigsPagedResponse|NodeBalancerNodesPagedResponse|FirewallDevicesPagedResponse) is deprecated: (NodeBalancersPagedResponse|NodeBalancerConfigsPagedResponse|NodeBalancerNodesPagedResponse|FirewallDevicesPagedResponse) exists for historical compatibility and should not be used.'
