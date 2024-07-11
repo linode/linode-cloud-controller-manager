@@ -27,6 +27,14 @@ jobs:
         run: make helm-lint
       - name: Test
         run: make test
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.out
+          fail_ci_if_error: true
+          verbose: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: linode/linode-cloud-controller-manager
       - name: Build
         run: make build
   docker-build:
