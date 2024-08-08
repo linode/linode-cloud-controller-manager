@@ -3,7 +3,6 @@ package linode
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -63,7 +62,6 @@ var (
 		"ap-southeast": 16, // Sydney (Australia)
 		"ap-northeast": 11, // Tokyo (Japan)
 	}
-	errNoBGPSelector = errors.New("no BGP node selector set to configure IP sharing")
 )
 
 // getExistingSharedIPsInCluster determines the list of addresses to share on nodes by checking the
@@ -123,6 +121,9 @@ func (l *loadbalancers) shareIPs(ctx context.Context, addrs []string, node *v1.N
 	if err != nil {
 		return err
 	}
+	if node.Labels == nil {
+		node.Labels = make(map[string]string)
+	}
 	node.Labels[annotations.AnnLinodeNodeIPSharingUpdated] = "true"
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		_, err := l.kubeClient.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
@@ -148,16 +149,15 @@ func (l *loadbalancers) handleIPSharing(ctx context.Context, node *v1.Node) erro
 		klog.Info("skipping IP while providerID is unset")
 		return nil
 	}
-	if Options.BGPNodeSelector == "" {
-		return errNoBGPSelector
-	}
 	// If performing Service load-balancing via IP sharing + BGP, check for a special annotation
 	// added by the CCM gets set when load-balancer IPs have been successfully shared on the node
-	kv := strings.Split(Options.BGPNodeSelector, "=")
-	// Check if node should be participating in IP sharing via the given selector
-	if val, ok := node.Labels[kv[0]]; !ok || len(kv) != 2 || val != kv[1] {
-		// not a selected Node
-		return nil
+	if Options.BGPNodeSelector != "" {
+		kv := strings.Split(Options.BGPNodeSelector, "=")
+		// Check if node should be participating in IP sharing via the given selector
+		if val, ok := node.Labels[kv[0]]; !ok || len(kv) != 2 || val != kv[1] {
+			// not a selected Node
+			return nil
+		}
 	}
 	// check if node has been updated with IPs to share
 	if _, foundIpSharingUpdatedLabel := node.Labels[annotations.AnnLinodeNodeIPSharingUpdated]; foundIpSharingUpdatedLabel {
@@ -200,10 +200,6 @@ func (l *loadbalancers) handleIPSharing(ctx context.Context, node *v1.Node) erro
 // createSharedIP requests an additional IP that can be shared on Nodes to support
 // loadbalancing via Cilium LB IPAM + BGP Control Plane.
 func (l *loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node) (string, error) {
-	if Options.BGPNodeSelector == "" {
-		return "", errNoBGPSelector
-	}
-
 	ipHolder, err := l.ensureIPHolder(ctx)
 	if err != nil {
 		return "", err
@@ -237,11 +233,19 @@ func (l *loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node) (s
 	}
 
 	// share the IPs with nodes participating in Cilium BGP peering
-	kv := strings.Split(Options.BGPNodeSelector, "=")
-	for _, node := range nodes {
-		if val, ok := node.Labels[kv[0]]; ok && len(kv) == 2 && val == kv[1] {
+	if Options.BGPNodeSelector == "" {
+		for _, node := range nodes {
 			if err = l.shareIPs(ctx, addrs, node); err != nil {
 				return "", err
+			}
+		}
+	} else {
+		kv := strings.Split(Options.BGPNodeSelector, "=")
+		for _, node := range nodes {
+			if val, ok := node.Labels[kv[0]]; ok && len(kv) == 2 && val == kv[1] {
+				if err = l.shareIPs(ctx, addrs, node); err != nil {
+					return "", err
+				}
 			}
 		}
 	}
@@ -252,9 +256,6 @@ func (l *loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node) (s
 // deleteSharedIP cleans up the shared IP for a LoadBalancer Service if it was assigned
 // by Cilium LB IPAM, removing it from the ip-holder
 func (l *loadbalancers) deleteSharedIP(ctx context.Context, service *v1.Service) error {
-	if Options.BGPNodeSelector == "" {
-		return errNoBGPSelector
-	}
 	err := l.retrieveKubeClient()
 	if err != nil {
 		return err
@@ -421,9 +422,6 @@ func (l *loadbalancers) getCiliumLBIPPool(ctx context.Context, service *v1.Servi
 
 // NOTE: Cilium CRDs must be installed for this to work
 func (l *loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error {
-	if Options.BGPNodeSelector == "" {
-		return errNoBGPSelector
-	}
 	regionID, ok := regionIDMap[l.zone]
 	if !ok {
 		return fmt.Errorf("unsupported region for BGP: %s", l.zone)
@@ -443,16 +441,25 @@ func (l *loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error 
 	}
 
 	// otherwise create it
-	kv := strings.Split(Options.BGPNodeSelector, "=")
-	if len(kv) != 2 {
-		return fmt.Errorf("invalid node selector %s", Options.BGPNodeSelector)
+	var nodeSelector slimv1.LabelSelector
+	// If no BGPNodeSelector is specified, select all nodes by default.
+	if Options.BGPNodeSelector == "" {
+		nodeSelector = slimv1.LabelSelector{}
+	} else {
+		kv := strings.Split(Options.BGPNodeSelector, "=")
+		if len(kv) != 2 {
+			return fmt.Errorf("invalid node selector %s", Options.BGPNodeSelector)
+		}
+
+		nodeSelector = slimv1.LabelSelector{MatchLabels: map[string]string{kv[0]: kv[1]}}
 	}
+
 	ciliumBGPPeeringPolicy := &v2alpha1.CiliumBGPPeeringPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: ciliumBGPPeeringPolicyName,
 		},
 		Spec: v2alpha1.CiliumBGPPeeringPolicySpec{
-			NodeSelector: &slimv1.LabelSelector{MatchLabels: map[string]string{kv[0]: kv[1]}},
+			NodeSelector: &nodeSelector,
 			VirtualRouters: []v2alpha1.CiliumBGPVirtualRouter{{
 				LocalASN:      65001,
 				ExportPodCIDR: ptr.To(true),
