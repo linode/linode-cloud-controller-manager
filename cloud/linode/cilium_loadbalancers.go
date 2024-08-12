@@ -28,6 +28,8 @@ const (
 	ciliumLBClass              = "io.cilium/bgp-control-plane"
 	ipHolderLabelPrefix        = "linode-ccm-ip-holder"
 	ciliumBGPPeeringPolicyName = "linode-ccm-bgp-peering"
+
+	commonControlPlaneLabel = "node-role.kubernetes.io/control-plane"
 )
 
 // This mapping is unfortunately necessary since there is no way to get the
@@ -158,6 +160,9 @@ func (l *loadbalancers) handleIPSharing(ctx context.Context, node *v1.Node) erro
 			// not a selected Node
 			return nil
 		}
+	} else if _, ok := node.Labels[commonControlPlaneLabel]; ok {
+		// If there is no node selector specified, default to sharing across worker nodes only
+		return nil
 	}
 	// check if node has been updated with IPs to share
 	if _, foundIpSharingUpdatedLabel := node.Labels[annotations.AnnLinodeNodeIPSharingUpdated]; foundIpSharingUpdatedLabel {
@@ -235,8 +240,10 @@ func (l *loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node) (s
 	// share the IPs with nodes participating in Cilium BGP peering
 	if Options.BGPNodeSelector == "" {
 		for _, node := range nodes {
-			if err = l.shareIPs(ctx, addrs, node); err != nil {
-				return "", err
+			if _, ok := node.Labels[commonControlPlaneLabel]; !ok {
+				if err = l.shareIPs(ctx, addrs, node); err != nil {
+					return "", err
+				}
 			}
 		}
 	} else {
@@ -442,9 +449,16 @@ func (l *loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error 
 
 	// otherwise create it
 	var nodeSelector slimv1.LabelSelector
-	// If no BGPNodeSelector is specified, select all nodes by default.
+	// If no BGPNodeSelector is specified, select all worker nodes.
 	if Options.BGPNodeSelector == "" {
-		nodeSelector = slimv1.LabelSelector{}
+		nodeSelector = slimv1.LabelSelector{
+			MatchExpressions: []slimv1.LabelSelectorRequirement{
+				{
+					Key:      commonControlPlaneLabel,
+					Operator: slimv1.LabelSelectorOpDoesNotExist,
+				},
+			},
+		}
 	} else {
 		kv := strings.Split(Options.BGPNodeSelector, "=")
 		if len(kv) != 2 {

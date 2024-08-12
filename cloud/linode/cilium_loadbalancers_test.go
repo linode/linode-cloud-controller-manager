@@ -46,6 +46,17 @@ var (
 				ProviderID: fmt.Sprintf("%s%d", providerIDPrefix, 33333),
 			},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node-control",
+				Labels: map[string]string{
+					commonControlPlaneLabel: "",
+				},
+			},
+			Spec: v1.NodeSpec{
+				ProviderID: fmt.Sprintf("%s%d", providerIDPrefix, 44444),
+			},
+		},
 	}
 	publicIPv4       = net.ParseIP("45.76.101.25")
 	ipHolderInstance = linodego.Instance{
