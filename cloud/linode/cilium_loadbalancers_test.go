@@ -3,7 +3,6 @@ package linode
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"testing"
@@ -45,6 +44,17 @@ var (
 			},
 			Spec: v1.NodeSpec{
 				ProviderID: fmt.Sprintf("%s%d", providerIDPrefix, 33333),
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node-control",
+				Labels: map[string]string{
+					commonControlPlaneLabel: "",
+				},
+			},
+			Spec: v1.NodeSpec{
+				ProviderID: fmt.Sprintf("%s%d", providerIDPrefix, 44444),
 			},
 		},
 	}
@@ -139,19 +149,45 @@ func addNodes(t *testing.T, kubeClient kubernetes.Interface, nodes []*v1.Node) {
 }
 
 func testNoBGPNodeLabel(t *testing.T, mc *mocks.MockClient) {
+	Options.BGPNodeSelector = ""
 	svc := createTestService()
 
 	kubeClient, _ := k8sClient.NewFakeClientset()
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
 	addService(t, kubeClient, svc)
+	addNodes(t, kubeClient, nodes)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
+	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
+	rawFilter, _ := json.Marshal(filter)
+	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
+	dummySharedIP := "45.76.101.26"
+	mc.EXPECT().CreateInstance(gomock.Any(), gomock.Any()).Times(1).Return(&ipHolderInstance, nil)
+	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), ipHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
+		IPv4: &linodego.InstanceIPv4Response{
+			Shared: []*linodego.InstanceIP{{Address: dummySharedIP}},
+		},
+	}, nil)
+	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), ipHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
+		IPs:      []string{dummySharedIP},
+		LinodeID: 11111,
+	}).Times(1)
+	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
+		IPs:      []string{dummySharedIP},
+		LinodeID: 22222,
+	}).Times(1)
+	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
+		IPs:      []string{dummySharedIP},
+		LinodeID: 33333,
+	}).Times(1)
+
 	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
-	if !errors.Is(err, errNoBGPSelector) {
-		t.Fatalf("expected %v, got %v... %s", errNoBGPSelector, err, Options.BGPNodeSelector)
+	if err != nil {
+		t.Fatalf("expected a nil error, got %v", err)
 	}
-	if lbStatus != nil {
-		t.Fatalf("expected a nil lbStatus, got %v", lbStatus)
+	if lbStatus == nil {
+		t.Fatal("expected non-nil lbStatus")
 	}
 }
 
