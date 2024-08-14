@@ -23,6 +23,11 @@ import (
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 )
 
+const (
+	informerResyncPeriod = 1 * time.Minute
+	defaultMetadataTTL   = 300 * time.Second
+)
+
 type nodeController struct {
 	sync.RWMutex
 
@@ -38,10 +43,10 @@ type nodeController struct {
 }
 
 func newNodeController(kubeclient kubernetes.Interface, client client.Client, informer v1informers.NodeInformer) *nodeController {
-	timeout := 300
+	timeout := defaultMetadataTTL
 	if raw, ok := os.LookupEnv("LINODE_METADATA_TTL"); ok {
 		if t, _ := strconv.Atoi(raw); t > 0 {
-			timeout = t
+			timeout = time.Duration(t) * time.Second
 		}
 	}
 
@@ -50,24 +55,36 @@ func newNodeController(kubeclient kubernetes.Interface, client client.Client, in
 		instances:          newInstances(client),
 		kubeclient:         kubeclient,
 		informer:           informer,
-		ttl:                time.Duration(timeout) * time.Second,
+		ttl:                timeout,
 		metadataLastUpdate: make(map[string]time.Time),
 		queue:              workqueue.NewDelayingQueue(),
 	}
 }
 
 func (s *nodeController) Run(stopCh <-chan struct{}) {
-	if _, err := s.informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			node, ok := obj.(*v1.Node)
-			if !ok {
-				return
-			}
+	if _, err := s.informer.Informer().AddEventHandlerWithResyncPeriod(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				node, ok := obj.(*v1.Node)
+				if !ok {
+					return
+				}
 
-			klog.Infof("NodeController will handle newly created node (%s) metadata", node.Name)
-			s.queue.Add(node)
+				klog.Infof("NodeController will handle newly created node (%s) metadata", node.Name)
+				s.queue.Add(node)
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				node, ok := newObj.(*v1.Node)
+				if !ok {
+					return
+				}
+
+				klog.Infof("NodeController will handle newly updated node (%s) metadata", node.Name)
+				s.queue.Add(node)
+			},
 		},
-	}); err != nil {
+		informerResyncPeriod,
+	); err != nil {
 		klog.Errorf("NodeController can't handle newly created node's metadata. %s", err)
 	}
 
@@ -125,19 +142,27 @@ func (s *nodeController) SetLastMetadataUpdate(nodeName string) {
 }
 
 func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
-	klog.Infof("NodeController handling node (%s) metadata", node.Name)
+	klog.V(3).InfoS("NodeController handling node metadata",
+		"node", klog.KObj(node))
 
 	lastUpdate := s.LastMetadataUpdate(node.Name)
 
 	uuid, foundLabel := node.Labels[annotations.AnnLinodeHostUUID]
 	configuredPrivateIP, foundAnnotation := node.Annotations[annotations.AnnLinodeNodePrivateIP]
-	if foundLabel && foundAnnotation && time.Since(lastUpdate) < s.ttl {
+
+	metaAge := time.Since(lastUpdate)
+	if foundLabel && foundAnnotation && metaAge < s.ttl {
+		klog.V(3).InfoS("Skipping refresh, ttl not reached",
+			"node", klog.KObj(node),
+			"ttl", s.ttl,
+			"metadata_age", metaAge,
+		)
 		return nil
 	}
 
 	linode, err := s.instances.lookupLinode(ctx, node)
 	if err != nil {
-		klog.Infof("instance lookup error: %s", err.Error())
+		klog.V(1).ErrorS(err, "Instance lookup error")
 		return err
 	}
 
@@ -182,7 +207,7 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 		_, err = s.kubeclient.CoreV1().Nodes().Update(ctx, n, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
-		klog.Infof("node update error: %s", err.Error())
+		klog.V(1).ErrorS(err, "Node update error")
 		return err
 	}
 
