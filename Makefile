@@ -25,9 +25,9 @@ vet: fmt
 .PHONY: lint
 lint:
 	docker run --rm -v "$(shell pwd):/var/work:ro" -w /var/work \
-		golangci/golangci-lint:v1.57.2 golangci-lint run -v --timeout=5m
+		golangci/golangci-lint:v1.60.1 golangci-lint run -v --timeout=5m
 	docker run --rm -v "$(shell pwd):/var/work:ro" -w /var/work/e2e \
-		golangci/golangci-lint:v1.57.2 golangci-lint run -v --timeout=5m
+		golangci/golangci-lint:v1.60.1 golangci-lint run -v --timeout=5m
 
 .PHONY: fmt
 fmt:
