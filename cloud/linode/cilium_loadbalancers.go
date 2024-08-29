@@ -221,7 +221,6 @@ func (l *loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node) (s
 	if err != nil {
 		return "", err
 	}
-	inClusterAddrs = append(inClusterAddrs, newSharedIP.Address)
 	// if any of the addrs don't exist on the ip-holder (e.g. someone manually deleted it outside the CCM),
 	// we need to exclude that from the list
 	// TODO: also clean up the CiliumLoadBalancerIPPool for that missing IP if that happens
@@ -230,7 +229,7 @@ func (l *loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node) (s
 		klog.Infof("error getting shared IPs in cluster: %s", err.Error())
 		return "", err
 	}
-	addrs := []string{}
+	addrs := []string{newSharedIP.Address}
 	for _, i := range inClusterAddrs {
 		if slices.Contains(ipHolderAddrs, i) {
 			addrs = append(addrs, i)
