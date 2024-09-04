@@ -61,3 +61,6 @@ tolerations:
 # env:
   # - name: EXAMPLE_ENV_VAR
   #   value: "true"
+
+# Linode tags to apply to all NodeBalancers
+nodeBalancerTags: []
