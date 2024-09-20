@@ -96,8 +96,8 @@ func (l *loadbalancers) getExistingSharedIPs(ctx context.Context, ipHolder *lino
 	if err != nil {
 		return nil, err
 	}
-	addrs := make([]string, 0, len(ipHolderAddrs.IPv4.Shared))
-	for _, addr := range ipHolderAddrs.IPv4.Shared {
+	addrs := make([]string, 0, len(ipHolderAddrs.IPv4.Public))
+	for _, addr := range ipHolderAddrs.IPv4.Public {
 		addrs = append(addrs, addr.Address)
 	}
 	return addrs, nil
