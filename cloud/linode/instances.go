@@ -59,6 +59,7 @@ func (nc *nodeCache) getInstanceAddresses(instance linodego.Instance, vpcips []s
 		ips = append(ips, nodeIP{ip: strings.TrimSuffix(instance.IPv6, "/128"), ipType: v1.NodeExternalIP})
 	}
 
+	klog.Infof("Instance %s, assembled IP addresses: %v", instance.Label, ips)
 	return ips
 }
 
