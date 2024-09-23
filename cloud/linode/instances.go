@@ -6,7 +6,6 @@ import (
 	"os"
 	"slices"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -38,25 +37,24 @@ type nodeCache struct {
 }
 
 // getInstanceAddresses returns all addresses configured on a linode.
-func (nc *nodeCache) getInstanceAddresses(instance linodego.Instance, vpcips []string) []nodeIP {
+func (nc *nodeCache) getInstanceAddresses(instanceips *linodego.InstanceIPAddressResponse, vpcips []string) []nodeIP {
 	ips := []nodeIP{}
 
 	// If vpc ips are present, list them first
 	for _, ip := range vpcips {
-		ipType := v1.NodeInternalIP
-		ips = append(ips, nodeIP{ip: ip, ipType: ipType})
+		ips = append(ips, nodeIP{ip: ip, ipType: v1.NodeInternalIP})
 	}
 
-	for _, ip := range instance.IPv4 {
-		ipType := v1.NodeExternalIP
-		if ip.IsPrivate() {
-			ipType = v1.NodeInternalIP
-		}
-		ips = append(ips, nodeIP{ip: ip.String(), ipType: ipType})
+	for _, ip := range instanceips.IPv4.Public {
+		ips = append(ips, nodeIP{ip: ip.Address, ipType: v1.NodeExternalIP})
 	}
 
-	if instance.IPv6 != "" {
-		ips = append(ips, nodeIP{ip: strings.TrimSuffix(instance.IPv6, "/128"), ipType: v1.NodeExternalIP})
+	for _, ip := range instanceips.IPv4.Private {
+		ips = append(ips, nodeIP{ip: ip.Address, ipType: v1.NodeInternalIP})
+	}
+
+	if instanceips.IPv6.SLAAC.Address != "" {
+		ips = append(ips, nodeIP{ip: instanceips.IPv6.SLAAC.Address, ipType: v1.NodeExternalIP})
 	}
 
 	return ips
@@ -100,9 +98,13 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 		if vpcID != 0 && len(vpcNodes[instance.ID]) == 0 {
 			continue
 		}
+		ips, err := client.GetInstanceIPAddresses(ctx, instance.ID)
+		if err != nil {
+			return err
+		}
 		node := linodeInstance{
 			instance: &instances[i],
-			ips:      nc.getInstanceAddresses(instance, vpcNodes[instance.ID]),
+			ips:      nc.getInstanceAddresses(ips, vpcNodes[instance.ID]),
 		}
 		newNodes[instance.ID] = node
 	}

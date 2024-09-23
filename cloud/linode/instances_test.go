@@ -26,6 +26,28 @@ func nodeWithName(name string) *v1.Node {
 	return &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}}
 }
 
+func ipsResponse(privateIPs, publicIPs []*net.IP, ipv6SLAAC string) *linodego.InstanceIPAddressResponse {
+	privateInstanceIPs := []*linodego.InstanceIP{}
+	publicInstanceIPs := []*linodego.InstanceIP{}
+
+	for _, ip := range privateIPs {
+		privateInstanceIPs = append(privateInstanceIPs, &linodego.InstanceIP{Address: ip.String()})
+	}
+	for _, ip := range publicIPs {
+		publicInstanceIPs = append(publicInstanceIPs, &linodego.InstanceIP{Address: ip.String()})
+	}
+
+	return &linodego.InstanceIPAddressResponse{
+		IPv4: &linodego.InstanceIPv4Response{
+			Public:  publicInstanceIPs,
+			Private: privateInstanceIPs,
+		},
+		IPv6: &linodego.InstanceIPv6Response{
+			SLAAC: &linodego.InstanceIP{Address: ipv6SLAAC},
+		},
+	}
+}
+
 func TestInstanceExists(t *testing.T) {
 	ctx := context.TODO()
 	ctrl := gomock.NewController(t)
@@ -54,6 +76,7 @@ func TestInstanceExists(t *testing.T) {
 				Type:   "g6-standard-2",
 			},
 		}, nil)
+		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), gomock.Any()).Times(1).Return(ipsResponse(nil, nil, ""), nil)
 
 		exists, err := instances.InstanceExists(ctx, node)
 		assert.NoError(t, err)
@@ -68,6 +91,7 @@ func TestInstanceExists(t *testing.T) {
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
 			{ID: 123, Label: name},
 		}, nil)
+		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), gomock.Any()).Times(1).Return(ipsResponse(nil, nil, ""), nil)
 
 		exists, err := instances.InstanceExists(ctx, node)
 		assert.NoError(t, err)
@@ -88,6 +112,8 @@ func TestMetadataRetrieval(t *testing.T) {
 		privateIP := net.ParseIP("192.168.159.135")
 		expectedInstance := linodego.Instance{Label: "expected-instance", ID: 12345, IPv4: []*net.IP{&publicIP, &privateIP}}
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{{Label: "wrong-instance", ID: 3456, IPv4: []*net.IP{&publicIP, &privateIP}}, expectedInstance}, nil)
+		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), gomock.Any()).Times(2).Return(ipsResponse([]*net.IP{&privateIP}, []*net.IP{&publicIP}, ""), nil)
+
 		name := "expected-instance"
 		node := nodeWithName(name)
 
@@ -120,6 +146,7 @@ func TestMetadataRetrieval(t *testing.T) {
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
 			{ID: id, Label: name, Type: linodeType, Region: region, IPv4: []*net.IP{&publicIPv4, &privateIPv4}},
 		}, nil)
+		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), gomock.Any()).Times(1).Return(ipsResponse([]*net.IP{&privateIPv4}, []*net.IP{&publicIPv4}, ""), nil)
 
 		meta, err := instances.InstanceMetadata(ctx, node)
 		assert.NoError(t, err)
@@ -143,16 +170,18 @@ func TestMetadataRetrieval(t *testing.T) {
 	})
 
 	ipTests := []struct {
-		name            string
-		inputIPv4s      []string
-		inputIPv6       string
-		outputAddresses []v1.NodeAddress
-		expectedErr     error
+		name              string
+		inputPublicIPv4s  []string
+		inputPrivateIPv4s []string
+		inputIPv6         string
+		outputAddresses   []v1.NodeAddress
+		expectedErr       error
 	}{
-		{"no IPs", nil, "", nil, instanceNoIPAddressesError{192910}},
+		{"no IPs", nil, nil, "", nil, instanceNoIPAddressesError{192910}},
 		{
 			"one public, one private",
-			[]string{"32.74.121.25", "192.168.121.42"},
+			[]string{"32.74.121.25"},
+			[]string{"192.168.121.42"},
 			"",
 			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "32.74.121.25"}, {Type: v1.NodeInternalIP, Address: "192.168.121.42"}},
 			nil,
@@ -160,6 +189,7 @@ func TestMetadataRetrieval(t *testing.T) {
 		{
 			"one public ipv4, one public ipv6",
 			[]string{"32.74.121.25"},
+			[]string{},
 			"2600:3c06::f03c:94ff:fe1e:e072",
 			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "32.74.121.25"}, {Type: v1.NodeExternalIP, Address: "2600:3c06::f03c:94ff:fe1e:e072"}},
 			nil,
@@ -167,12 +197,14 @@ func TestMetadataRetrieval(t *testing.T) {
 		{
 			"one public, no private",
 			[]string{"32.74.121.25"},
+			[]string{},
 			"",
 			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "32.74.121.25"}},
 			nil,
 		},
 		{
 			"one private, no public",
+			[]string{},
 			[]string{"192.168.121.42"},
 			"",
 			[]v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "192.168.121.42"}},
@@ -181,15 +213,25 @@ func TestMetadataRetrieval(t *testing.T) {
 		{
 			"two public addresses",
 			[]string{"32.74.121.25", "32.74.121.22"},
+			[]string{},
 			"",
 			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "32.74.121.25"}, {Type: v1.NodeExternalIP, Address: "32.74.121.22"}},
 			nil,
 		},
 		{
 			"two private addresses",
+			[]string{},
 			[]string{"192.168.121.42", "10.0.2.15"},
 			"",
 			[]v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "192.168.121.42"}, {Type: v1.NodeInternalIP, Address: "10.0.2.15"}},
+			nil,
+		},
+		{
+			"private address as external IP address",
+			[]string{"192.168.121.42"},
+			[]string{},
+			"",
+			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "192.168.121.42"}},
 			nil,
 		},
 	}
@@ -202,12 +244,23 @@ func TestMetadataRetrieval(t *testing.T) {
 			providerID := providerIDPrefix + strconv.Itoa(id)
 			node := nodeWithProviderID(providerID)
 
-			ips := make([]*net.IP, 0, len(test.inputIPv4s))
-			for _, ip := range test.inputIPv4s {
+			ips := make([]*net.IP, 0, len(test.inputPrivateIPv4s)+len(test.inputPublicIPv4s))
+			privateIps := make([]*net.IP, 0, len(test.inputPrivateIPv4s))
+			for _, ip := range test.inputPrivateIPv4s {
 				parsed := net.ParseIP(ip)
 				if parsed == nil {
 					t.Fatalf("cannot parse %v as an ipv4", ip)
 				}
+				privateIps = append(privateIps, &parsed)
+				ips = append(ips, &parsed)
+			}
+			publicIps := make([]*net.IP, 0, len(test.inputPublicIPv4s))
+			for _, ip := range test.inputPublicIPv4s {
+				parsed := net.ParseIP(ip)
+				if parsed == nil {
+					t.Fatalf("cannot parse %v as an ipv4", ip)
+				}
+				publicIps = append(publicIps, &parsed)
 				ips = append(ips, &parsed)
 			}
 
@@ -216,6 +269,7 @@ func TestMetadataRetrieval(t *testing.T) {
 			client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
 				{ID: id, Label: name, Type: linodeType, Region: region, IPv4: ips, IPv6: test.inputIPv6},
 			}, nil)
+			client.EXPECT().GetInstanceIPAddresses(gomock.Any(), gomock.Any()).Times(1).Return(ipsResponse(privateIps, publicIps, test.inputIPv6), nil)
 
 			meta, err := instances.InstanceMetadata(ctx, node)
 
@@ -274,9 +328,10 @@ func TestMetadataRetrieval(t *testing.T) {
 		expectedInstance := linodego.Instance{Label: "expected-instance", ID: 12345, IPv4: []*net.IP{&publicIP, &privateIP}}
 
 		for _, test := range getByIPTests {
-			t.Run(fmt.Sprintf("gets lindoe by IP - %s", test.name), func(t *testing.T) {
+			t.Run(fmt.Sprintf("gets linode by IP - %s", test.name), func(t *testing.T) {
 				instances := newInstances(client)
 				client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{{ID: 3456, IPv4: []*net.IP{&wrongIP}}, expectedInstance}, nil)
+				client.EXPECT().GetInstanceIPAddresses(gomock.Any(), gomock.Any()).Times(2).Return(ipsResponse(nil, []*net.IP{&wrongIP}, ""), nil)
 				node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node-1"}, Status: v1.NodeStatus{Addresses: test.nodeAddresses}}
 				meta, err := instances.InstanceMetadata(ctx, &node)
 				if test.expectedErr != nil {
@@ -346,6 +401,7 @@ func TestInstanceShutdown(t *testing.T) {
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
 			{ID: id, Label: "offline-linode", Status: linodego.InstanceOffline},
 		}, nil)
+		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), gomock.Any()).Times(1).Return(ipsResponse(nil, nil, ""), nil)
 		shutdown, err := instances.InstanceShutdown(ctx, node)
 
 		assert.NoError(t, err)
@@ -359,6 +415,7 @@ func TestInstanceShutdown(t *testing.T) {
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
 			{ID: id, Label: "shutting-down-linode", Status: linodego.InstanceShuttingDown},
 		}, nil)
+		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), gomock.Any()).Times(1).Return(ipsResponse(nil, nil, ""), nil)
 		shutdown, err := instances.InstanceShutdown(ctx, node)
 
 		assert.NoError(t, err)
@@ -372,6 +429,7 @@ func TestInstanceShutdown(t *testing.T) {
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
 			{ID: id, Label: "running-linode", Status: linodego.InstanceRunning},
 		}, nil)
+		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), gomock.Any()).Times(1).Return(ipsResponse(nil, nil, ""), nil)
 		shutdown, err := instances.InstanceShutdown(ctx, node)
 
 		assert.NoError(t, err)

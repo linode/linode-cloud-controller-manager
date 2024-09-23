@@ -86,6 +86,7 @@ func TestListRoutes(t *testing.T) {
 		assert.NoError(t, err)
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
+		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), gomock.Any()).Times(1).Return(ipsResponse(nil, nil, ""), nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return(noRoutesInVPC, nil)
 		routes, err := routeController.ListRoutes(ctx, "abc")
 		assert.NoError(t, err)
@@ -127,6 +128,7 @@ func TestListRoutes(t *testing.T) {
 		assert.NoError(t, err)
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
+		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), gomock.Any()).Times(1).Return(ipsResponse(nil, nil, ""), nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return(routesInVPC, nil)
 		routes, err := routeController.ListRoutes(ctx, "abc")
 		assert.NoError(t, err)
@@ -168,6 +170,7 @@ func TestListRoutes(t *testing.T) {
 		assert.NoError(t, err)
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
+		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), gomock.Any()).Times(1).Return(ipsResponse(nil, nil, ""), nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return(routesInDifferentVPC, nil)
 		routes, err := routeController.ListRoutes(ctx, "abc")
 		assert.NoError(t, err)
@@ -227,6 +230,7 @@ func TestCreateRoute(t *testing.T) {
 		assert.NoError(t, err)
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
+		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), gomock.Any()).Times(1).Return(ipsResponse(nil, nil, ""), nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return(noRoutesInVPC, nil)
 		client.EXPECT().UpdateInstanceConfigInterface(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&instanceConfigIntfWithVPCAndRoute, nil)
 		err = routeController.CreateRoute(ctx, "dummy", "dummy", route)
@@ -259,6 +263,7 @@ func TestCreateRoute(t *testing.T) {
 		assert.NoError(t, err)
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
+		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), gomock.Any()).Times(1).Return(ipsResponse(nil, nil, ""), nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return(routesInVPC, nil)
 		err = routeController.CreateRoute(ctx, "dummy", "dummy", route)
 		assert.NoError(t, err)
@@ -346,6 +351,7 @@ func TestDeleteRoute(t *testing.T) {
 		assert.NoError(t, err)
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
+		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), gomock.Any()).Times(1).Return(ipsResponse(nil, nil, ""), nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return(noRoutesInVPC, nil)
 		client.EXPECT().UpdateInstanceConfigInterface(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&instanceConfigIntfWithVPCAndNoRoute, nil)
 		err = routeController.DeleteRoute(ctx, "dummy", route)
@@ -377,6 +383,7 @@ func TestDeleteRoute(t *testing.T) {
 		assert.NoError(t, err)
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
+		client.EXPECT().GetInstanceIPAddresses(gomock.Any(), gomock.Any()).Times(1).Return(ipsResponse(nil, nil, ""), nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return(routesInVPC, nil)
 		client.EXPECT().UpdateInstanceConfigInterface(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&instanceConfigIntfWithVPCAndNoRoute, nil)
 		err = routeController.DeleteRoute(ctx, "dummy", route)
