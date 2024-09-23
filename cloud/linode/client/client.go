@@ -24,9 +24,12 @@ type Client interface {
 	CreateInstance(ctx context.Context, opts linodego.InstanceCreateOptions) (*linodego.Instance, error)
 
 	GetInstanceIPAddresses(context.Context, int) (*linodego.InstanceIPAddressResponse, error)
-	AddInstanceIPAddress(ctx context.Context, linodeID int, public bool) (*linodego.InstanceIP, error)
 	DeleteInstanceIPAddress(ctx context.Context, linodeID int, ipAddress string) error
 	ShareIPAddresses(ctx context.Context, opts linodego.IPAddressesShareOptions) error
+
+	GetReservedIPAddress(context.Context, string) (*linodego.InstanceIP, error)
+	ReserveIPAddress(context.Context, linodego.ReserveIPOptions) (*linodego.InstanceIP, error)
+	DeleteReservedIPAddress(context.Context, string) error
 
 	UpdateInstanceConfigInterface(context.Context, int, int, int, linodego.InstanceConfigInterfaceUpdateOptions) (*linodego.InstanceConfigInterface, error)
 

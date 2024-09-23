@@ -2,9 +2,7 @@ package linode
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"net"
 	"testing"
 
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
@@ -58,14 +56,6 @@ var (
 			},
 		},
 	}
-	publicIPv4       = net.ParseIP("45.76.101.25")
-	ipHolderInstance = linodego.Instance{
-		ID:     12345,
-		Label:  fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone),
-		Type:   "g6-standard-1",
-		Region: "us-west",
-		IPv4:   []*net.IP{&publicIPv4},
-	}
 )
 
 func TestCiliumCCMLoadBalancers(t *testing.T) {
@@ -82,12 +72,8 @@ func TestCiliumCCMLoadBalancers(t *testing.T) {
 			f:    testUnsupportedRegion,
 		},
 		{
-			name: "Create Cilium Load Balancer With explicit loadBalancerClass and existing IP holder nanode",
-			f:    testCreateWithExistingIPHolder,
-		},
-		{
-			name: "Create Cilium Load Balancer With no existing IP holder nanode",
-			f:    testCreateWithNoExistingIPHolder,
+			name: "Create Cilium Load Balancer With explicit loadBalancerClass",
+			f:    testCreate,
 		},
 		{
 			name: "Delete Cilium Load Balancer",
@@ -158,17 +144,8 @@ func testNoBGPNodeLabel(t *testing.T, mc *mocks.MockClient) {
 	addNodes(t, kubeClient, nodes)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
-	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
-	rawFilter, _ := json.Marshal(filter)
-	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
 	dummySharedIP := "45.76.101.26"
-	mc.EXPECT().CreateInstance(gomock.Any(), gomock.Any()).Times(1).Return(&ipHolderInstance, nil)
-	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), ipHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
-		IPv4: &linodego.InstanceIPv4Response{
-			Shared: []*linodego.InstanceIP{{Address: dummySharedIP}},
-		},
-	}, nil)
-	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), ipHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().ReserveIPAddress(gomock.Any(), gomock.Any()).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
 		IPs:      []string{dummySharedIP},
 		LinodeID: 11111,
@@ -209,7 +186,7 @@ func testUnsupportedRegion(t *testing.T, mc *mocks.MockClient) {
 	}
 }
 
-func testCreateWithExistingIPHolder(t *testing.T, mc *mocks.MockClient) {
+func testCreate(t *testing.T, mc *mocks.MockClient) {
 	Options.BGPNodeSelector = "cilium-bgp-peering=true"
 	svc := createTestService()
 
@@ -219,55 +196,8 @@ func testCreateWithExistingIPHolder(t *testing.T, mc *mocks.MockClient) {
 	addNodes(t, kubeClient, nodes)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
-	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
-	rawFilter, _ := json.Marshal(filter)
-	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{ipHolderInstance}, nil)
 	dummySharedIP := "45.76.101.26"
-	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), ipHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
-	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), ipHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
-		IPv4: &linodego.InstanceIPv4Response{
-			Shared: []*linodego.InstanceIP{{Address: dummySharedIP}},
-		},
-	}, nil)
-	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
-		IPs:      []string{dummySharedIP},
-		LinodeID: 11111,
-	}).Times(1)
-	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
-		IPs:      []string{dummySharedIP},
-		LinodeID: 22222,
-	}).Times(1)
-
-	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
-	if err != nil {
-		t.Fatalf("expected a nil error, got %v", err)
-	}
-	if lbStatus == nil {
-		t.Fatal("expected non-nil lbStatus")
-	}
-}
-
-func testCreateWithNoExistingIPHolder(t *testing.T, mc *mocks.MockClient) {
-	Options.BGPNodeSelector = "cilium-bgp-peering=true"
-	svc := createTestService()
-
-	kubeClient, _ := k8sClient.NewFakeClientset()
-	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
-	addService(t, kubeClient, svc)
-	addNodes(t, kubeClient, nodes)
-	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
-
-	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
-	rawFilter, _ := json.Marshal(filter)
-	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
-	dummySharedIP := "45.76.101.26"
-	mc.EXPECT().CreateInstance(gomock.Any(), gomock.Any()).Times(1).Return(&ipHolderInstance, nil)
-	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), ipHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
-		IPv4: &linodego.InstanceIPv4Response{
-			Shared: []*linodego.InstanceIP{{Address: dummySharedIP}},
-		},
-	}, nil)
-	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), ipHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().ReserveIPAddress(gomock.Any(), gomock.Any()).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
 		IPs:      []string{dummySharedIP},
 		LinodeID: 11111,
@@ -299,12 +229,9 @@ func testEnsureCiliumLoadBalancerDeleted(t *testing.T, mc *mocks.MockClient) {
 	dummySharedIP := "45.76.101.26"
 	svc.Status.LoadBalancer = v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{{IP: dummySharedIP}}}
 
-	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
-	rawFilter, _ := json.Marshal(filter)
-	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{ipHolderInstance}, nil)
 	mc.EXPECT().DeleteInstanceIPAddress(gomock.Any(), 11111, dummySharedIP).Times(1).Return(nil)
 	mc.EXPECT().DeleteInstanceIPAddress(gomock.Any(), 22222, dummySharedIP).Times(1).Return(nil)
-	mc.EXPECT().DeleteInstanceIPAddress(gomock.Any(), ipHolderInstance.ID, dummySharedIP).Times(1).Return(nil)
+	mc.EXPECT().DeleteReservedIPAddress(gomock.Any(), dummySharedIP).Times(1).Return(nil)
 
 	err := lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
 	if err != nil {

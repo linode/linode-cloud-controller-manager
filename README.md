@@ -35,7 +35,7 @@ For general feature and usage notes, refer to the [Getting Started with Linode N
 #### Using IP Sharing instead of NodeBalancers
 Alternatively, the Linode CCM can integrate with [Cilium's BGP Control Plane](https://docs.cilium.io/en/stable/network/bgp-control-plane/)
 to perform load-balancing via IP sharing on labeled Nodes. This option does not create a backing NodeBalancer and instead
-provisions a new IP on an ip-holder Nanode to share for the desired region. See [Shared IP LoadBalancing](#shared-ip-load-balancing).
+provisions a new reserved IP to share for the desired region. See [Shared IP LoadBalancing](#shared-ip-load-balancing).
 
 #### Annotations
 The Linode CCM accepts several annotations which affect the properties of the underlying NodeBalancer deployment.

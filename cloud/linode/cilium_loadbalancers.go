@@ -2,16 +2,13 @@ package linode
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 
 	"github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2alpha1"
 	ciliumclient "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/typed/cilium.io/v2alpha1"
 	slimv1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/apis/meta/v1"
-	"github.com/google/uuid"
 	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
 	"github.com/linode/linodego"
 	v1 "k8s.io/api/core/v1"
@@ -26,10 +23,8 @@ import (
 
 const (
 	ciliumLBClass              = "io.cilium/bgp-control-plane"
-	ipHolderLabelPrefix        = "linode-ccm-ip-holder"
 	ciliumBGPPeeringPolicyName = "linode-ccm-bgp-peering"
-
-	commonControlPlaneLabel = "node-role.kubernetes.io/control-plane"
+	commonControlPlaneLabel    = "node-role.kubernetes.io/control-plane"
 )
 
 // This mapping is unfortunately necessary since there is no way to get the
@@ -84,21 +79,6 @@ func (l *loadbalancers) getExistingSharedIPsInCluster(ctx context.Context) ([]st
 		for _, block := range pool.Spec.Blocks {
 			addrs = append(addrs, strings.TrimSuffix(string(block.Cidr), "/32"))
 		}
-	}
-	return addrs, nil
-}
-
-func (l *loadbalancers) getExistingSharedIPs(ctx context.Context, ipHolder *linodego.Instance) ([]string, error) {
-	if ipHolder == nil {
-		return nil, nil
-	}
-	ipHolderAddrs, err := l.client.GetInstanceIPAddresses(ctx, ipHolder.ID)
-	if err != nil {
-		return nil, err
-	}
-	addrs := make([]string, 0, len(ipHolderAddrs.IPv4.Shared))
-	for _, addr := range ipHolderAddrs.IPv4.Shared {
-		addrs = append(addrs, addr.Address)
 	}
 	return addrs, nil
 }
@@ -176,25 +156,8 @@ func (l *loadbalancers) handleIPSharing(ctx context.Context, node *v1.Node) erro
 		klog.Infof("error getting shared IPs in cluster: %s", err.Error())
 		return err
 	}
-	// if any of the addrs don't exist on the ip-holder (e.g. someone manually deleted it outside the CCM),
-	// we need to exclude that from the list
-	// TODO: also clean up the CiliumLoadBalancerIPPool for that missing IP if that happens
-	ipHolder, err := l.getIPHolder(ctx)
-	if err != nil {
-		return err
-	}
-	ipHolderAddrs, err := l.getExistingSharedIPs(ctx, ipHolder)
-	if err != nil {
-		klog.Infof("error getting shared IPs in cluster: %s", err.Error())
-		return err
-	}
-	addrs := []string{}
-	for _, i := range inClusterAddrs {
-		if slices.Contains(ipHolderAddrs, i) {
-			addrs = append(addrs, i)
-		}
-	}
-	if err = l.shareIPs(ctx, addrs, node); err != nil {
+
+	if err = l.shareIPs(ctx, inClusterAddrs, node); err != nil {
 		klog.Infof("error sharing IPs: %s", err.Error())
 		return err
 	}
@@ -205,12 +168,9 @@ func (l *loadbalancers) handleIPSharing(ctx context.Context, node *v1.Node) erro
 // createSharedIP requests an additional IP that can be shared on Nodes to support
 // loadbalancing via Cilium LB IPAM + BGP Control Plane.
 func (l *loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node) (string, error) {
-	ipHolder, err := l.ensureIPHolder(ctx)
-	if err != nil {
-		return "", err
-	}
-
-	newSharedIP, err := l.client.AddInstanceIPAddress(ctx, ipHolder.ID, true)
+	newSharedIP, err := l.client.ReserveIPAddress(ctx, linodego.ReserveIPOptions{
+		Region: l.zone,
+	})
 	if err != nil {
 		return "", err
 	}
@@ -221,20 +181,8 @@ func (l *loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node) (s
 	if err != nil {
 		return "", err
 	}
-	// if any of the addrs don't exist on the ip-holder (e.g. someone manually deleted it outside the CCM),
-	// we need to exclude that from the list
-	// TODO: also clean up the CiliumLoadBalancerIPPool for that missing IP if that happens
-	ipHolderAddrs, err := l.getExistingSharedIPs(ctx, ipHolder)
-	if err != nil {
-		klog.Infof("error getting shared IPs in cluster: %s", err.Error())
-		return "", err
-	}
-	addrs := []string{newSharedIP.Address}
-	for _, i := range inClusterAddrs {
-		if slices.Contains(ipHolderAddrs, i) {
-			addrs = append(addrs, i)
-		}
-	}
+
+	addrs := append(inClusterAddrs, newSharedIP.Address)
 
 	// share the IPs with nodes participating in Cilium BGP peering
 	if Options.BGPNodeSelector == "" {
@@ -273,14 +221,9 @@ func (l *loadbalancers) deleteSharedIP(ctx context.Context, service *v1.Service)
 		return err
 	}
 	bgpNodes := nodeList.Items
-	ipHolder, err := l.getIPHolder(ctx)
-	if err != nil {
-		// return error or nil if not found since no IP holder means there
-		// is no IP to reclaim
-		return IgnoreLinodeAPIError(err, http.StatusNotFound)
-	}
+
 	svcIngress := service.Status.LoadBalancer.Ingress
-	if len(svcIngress) > 0 && ipHolder != nil {
+	if len(svcIngress) > 0 {
 		for _, ingress := range svcIngress {
 			// delete the shared IP on the Linodes it's shared on
 			for _, node := range bgpNodes {
@@ -294,8 +237,8 @@ func (l *loadbalancers) deleteSharedIP(ctx context.Context, service *v1.Service)
 				}
 			}
 
-			// finally delete the shared IP on the ip-holder
-			err = l.client.DeleteInstanceIPAddress(ctx, ipHolder.ID, ingress.IP)
+			// finally delete the shared IP
+			err = l.client.DeleteReservedIPAddress(ctx, ingress.IP)
 			if IgnoreLinodeAPIError(err, http.StatusNotFound) != nil {
 				return err
 			}
@@ -303,50 +246,6 @@ func (l *loadbalancers) deleteSharedIP(ctx context.Context, service *v1.Service)
 	}
 
 	return nil
-}
-
-// To hold the IP in lieu of a proper IP reservation system, a special Nanode is
-// created but not booted and used to hold all shared IPs.
-func (l *loadbalancers) ensureIPHolder(ctx context.Context) (*linodego.Instance, error) {
-	ipHolder, err := l.getIPHolder(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if ipHolder != nil {
-		return ipHolder, nil
-	}
-
-	ipHolder, err = l.client.CreateInstance(ctx, linodego.InstanceCreateOptions{
-		Region:   l.zone,
-		Type:     "g6-nanode-1",
-		Label:    fmt.Sprintf("%s-%s", ipHolderLabelPrefix, l.zone),
-		RootPass: uuid.NewString(),
-		Image:    "linode/ubuntu22.04",
-		Booted:   ptr.To(false),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return ipHolder, nil
-}
-
-func (l *loadbalancers) getIPHolder(ctx context.Context) (*linodego.Instance, error) {
-	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, l.zone)}
-	rawFilter, err := json.Marshal(filter)
-	if err != nil {
-		panic("this should not have failed")
-	}
-	var ipHolder *linodego.Instance
-	linodes, err := l.client.ListInstances(ctx, linodego.NewListOptions(1, string(rawFilter)))
-	if err != nil {
-		return nil, err
-	}
-	if len(linodes) > 0 {
-		ipHolder = &linodes[0]
-	}
-
-	return ipHolder, nil
 }
 
 func (l *loadbalancers) retrieveCiliumClientset() error {
