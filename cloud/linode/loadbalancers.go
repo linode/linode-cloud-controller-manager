@@ -903,6 +903,7 @@ func getNodePrivateIP(node *v1.Node) string {
 		return address
 	}
 
+	klog.Infof("Node %s, assigned IP addresses: %v", node.Name, node.Status.Addresses)
 	for _, addr := range node.Status.Addresses {
 		if addr.Type == v1.NodeInternalIP {
 			return addr.Address

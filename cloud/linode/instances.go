@@ -285,6 +285,7 @@ func (i *instances) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloud
 		addresses = append(addresses, v1.NodeAddress{Type: ip.ipType, Address: ip.ip})
 	}
 
+	klog.Infof("Instance %s, assembled IP addresses: %v", node.Name, addresses)
 	// note that Zone is omitted as it's not a thing in Linode
 	meta := &cloudprovider.InstanceMetadata{
 		ProviderID:    fmt.Sprintf("%v%v", providerIDPrefix, linode.ID),
