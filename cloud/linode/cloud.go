@@ -3,6 +3,7 @@ package linode
 import (
 	"fmt"
 	"io"
+	"net/netip"
 	"os"
 	"strconv"
 	"sync"
@@ -37,6 +38,7 @@ var Options struct {
 	VPCName               string
 	LoadBalancerType      string
 	BGPNodeSelector       string
+	LinodeExternalNetwork *netip.Prefix
 }
 
 // vpcDetails is set when VPCName options flag is set.

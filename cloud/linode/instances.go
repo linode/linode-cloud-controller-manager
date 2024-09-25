@@ -49,7 +49,7 @@ func (nc *nodeCache) getInstanceAddresses(instance linodego.Instance, vpcips []s
 
 	for _, ip := range instance.IPv4 {
 		ipType := v1.NodeExternalIP
-		if ip.IsPrivate() {
+		if isPrivate(ip) {
 			ipType = v1.NodeInternalIP
 		}
 		ips = append(ips, nodeIP{ip: ip.String(), ipType: ipType})
@@ -155,7 +155,7 @@ func (i *instances) linodeByIP(kNode *v1.Node) (*linodego.Instance, error) {
 	}
 	for _, node := range i.nodeCache.nodes {
 		for _, nodeIP := range node.instance.IPv4 {
-			if !nodeIP.IsPrivate() && slices.Contains(kNodeAddresses, nodeIP.String()) {
+			if !isPrivate(nodeIP) && slices.Contains(kNodeAddresses, nodeIP.String()) {
 				return node.instance, nil
 			}
 		}
