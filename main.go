@@ -4,7 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"net/netip"
+	"net"
 	"os"
 
 	"k8s.io/component-base/logs"
@@ -117,14 +117,14 @@ func main() {
 	}
 
 	if externalSubnet, ok := os.LookupEnv(linodeExternalSubnetVariable); ok && externalSubnet != "" {
-		network, err := netip.ParsePrefix(externalSubnet)
+		_, network, err := net.ParseCIDR(externalSubnet)
 		if err != nil {
 			msg := fmt.Sprintf("Unable to parse %s as network subnet: %v", externalSubnet, err)
 			sentry.CaptureError(ctx, fmt.Errorf(msg))
 			fmt.Fprintf(os.Stderr, "%v\n", msg)
 			os.Exit(1)
 		}
-		linode.Options.LinodeExternalNetwork = &network
+		linode.Options.LinodeExternalNetwork = network
 	}
 
 	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)

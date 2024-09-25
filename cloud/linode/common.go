@@ -3,7 +3,6 @@ package linode
 import (
 	"fmt"
 	"net"
-	"net/netip"
 	"strconv"
 	"strings"
 
@@ -49,9 +48,6 @@ func isPrivate(ip *net.IP) bool {
 	if Options.LinodeExternalNetwork == nil {
 		return ip.IsPrivate()
 	}
-	ipAddr, err := netip.ParseAddr(ip.String())
-	if err != nil {
-		panic(err)
-	}
-	return ip.IsPrivate() && !Options.LinodeExternalNetwork.Contains(ipAddr)
+
+	return ip.IsPrivate() && !Options.LinodeExternalNetwork.Contains(*ip)
 }
