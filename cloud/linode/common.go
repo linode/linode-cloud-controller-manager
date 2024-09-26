@@ -2,6 +2,7 @@ package linode
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 
@@ -41,4 +42,12 @@ func IgnoreLinodeAPIError(err error, code int) error {
 	}
 
 	return err
+}
+
+func isPrivate(ip *net.IP) bool {
+	if Options.LinodeExternalNetwork == nil {
+		return ip.IsPrivate()
+	}
+
+	return ip.IsPrivate() && !Options.LinodeExternalNetwork.Contains(*ip)
 }

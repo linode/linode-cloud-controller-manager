@@ -172,7 +172,7 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 	// supports other subnets with nodebalancer, this logic needs to be updated.
 	// https://www.linode.com/docs/api/linode-instances/#linode-view
 	for _, addr := range linode.IPv4 {
-		if addr.IsPrivate() {
+		if isPrivate(addr) {
 			expectedPrivateIP = addr.String()
 			break
 		}

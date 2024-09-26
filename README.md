@@ -294,6 +294,7 @@ Environment Variable | Default | Description
 `LINODE_INSTANCE_CACHE_TTL` | `15` | Default timeout of instance cache in seconds
 `LINODE_ROUTES_CACHE_TTL_SECONDS` | `60` | Default timeout of route cache in seconds
 `LINODE_REQUEST_TIMEOUT_SECONDS` | `120` | Default timeout in seconds for http requests to linode API
+`LINODE_EXTERNAL_SUBNET` | | Mark private network as external. Example - `172.24.0.0/16`
 
 ## Generating a Manifest for Deployment
 Use the script located at `./deploy/generate-manifest.sh` to generate a self-contained deployment manifest for the Linode CCM. Two arguments are required.

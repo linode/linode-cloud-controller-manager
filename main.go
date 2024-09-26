@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 
 	"k8s.io/component-base/logs"
@@ -25,9 +26,10 @@ import (
 )
 
 const (
-	sentryDSNVariable         = "SENTRY_DSN"
-	sentryEnvironmentVariable = "SENTRY_ENVIRONMENT"
-	sentryReleaseVariable     = "SENTRY_RELEASE"
+	sentryDSNVariable            = "SENTRY_DSN"
+	sentryEnvironmentVariable    = "SENTRY_ENVIRONMENT"
+	sentryReleaseVariable        = "SENTRY_RELEASE"
+	linodeExternalSubnetVariable = "LINODE_EXTERNAL_SUBNET"
 )
 
 func initializeSentry() {
@@ -112,6 +114,17 @@ func main() {
 		sentry.CaptureError(ctx, fmt.Errorf(msg))
 		fmt.Fprintf(os.Stderr, "kubeconfig missing from CCM flag set"+"\n")
 		os.Exit(1)
+	}
+
+	if externalSubnet, ok := os.LookupEnv(linodeExternalSubnetVariable); ok && externalSubnet != "" {
+		_, network, err := net.ParseCIDR(externalSubnet)
+		if err != nil {
+			msg := fmt.Sprintf("Unable to parse %s as network subnet: %v", externalSubnet, err)
+			sentry.CaptureError(ctx, fmt.Errorf(msg))
+			fmt.Fprintf(os.Stderr, "%v\n", msg)
+			os.Exit(1)
+		}
+		linode.Options.LinodeExternalNetwork = network
 	}
 
 	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
