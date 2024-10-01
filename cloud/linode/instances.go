@@ -285,6 +285,13 @@ func (i *instances) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloud
 		addresses = append(addresses, v1.NodeAddress{Type: ip.ipType, Address: ip.ip})
 	}
 
+	// include IPs set by kubelet for internal node IP
+	for _, addr := range node.Status.Addresses {
+		if addr.Type == v1.NodeInternalIP {
+			addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: addr.Address})
+		}
+	}
+
 	klog.Infof("Instance %s, assembled IP addresses: %v", node.Name, addresses)
 	// note that Zone is omitted as it's not a thing in Linode
 	meta := &cloudprovider.InstanceMetadata{
