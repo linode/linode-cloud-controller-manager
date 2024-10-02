@@ -143,19 +143,29 @@ func TestMetadataRetrieval(t *testing.T) {
 	})
 
 	ipTests := []struct {
-		name            string
-		inputIPv4s      []string
-		inputIPv6       string
-		externalNetwork string
-		outputAddresses []v1.NodeAddress
-		expectedErr     error
+		name              string
+		inputIPv4s        []string
+		inputIPv6         string
+		externalNetwork   string
+		existingAddresses []v1.NodeAddress
+		outputAddresses   []v1.NodeAddress
+		expectedErr       error
 	}{
-		{"no IPs", nil, "", "", nil, instanceNoIPAddressesError{192910}},
+		{
+			"no IPs",
+			nil,
+			"",
+			"",
+			nil,
+			nil,
+			instanceNoIPAddressesError{192910},
+		},
 		{
 			"one public, one private",
 			[]string{"32.74.121.25", "192.168.121.42"},
 			"",
 			"",
+			nil,
 			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "32.74.121.25"}, {Type: v1.NodeInternalIP, Address: "192.168.121.42"}},
 			nil,
 		},
@@ -164,6 +174,7 @@ func TestMetadataRetrieval(t *testing.T) {
 			[]string{"32.74.121.25"},
 			"2600:3c06::f03c:94ff:fe1e:e072",
 			"",
+			nil,
 			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "32.74.121.25"}, {Type: v1.NodeExternalIP, Address: "2600:3c06::f03c:94ff:fe1e:e072"}},
 			nil,
 		},
@@ -172,6 +183,7 @@ func TestMetadataRetrieval(t *testing.T) {
 			[]string{"32.74.121.25"},
 			"",
 			"",
+			nil,
 			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "32.74.121.25"}},
 			nil,
 		},
@@ -180,6 +192,7 @@ func TestMetadataRetrieval(t *testing.T) {
 			[]string{"192.168.121.42"},
 			"",
 			"",
+			nil,
 			[]v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "192.168.121.42"}},
 			nil,
 		},
@@ -188,6 +201,7 @@ func TestMetadataRetrieval(t *testing.T) {
 			[]string{"32.74.121.25", "32.74.121.22"},
 			"",
 			"",
+			nil,
 			[]v1.NodeAddress{{Type: v1.NodeExternalIP, Address: "32.74.121.25"}, {Type: v1.NodeExternalIP, Address: "32.74.121.22"}},
 			nil,
 		},
@@ -196,6 +210,7 @@ func TestMetadataRetrieval(t *testing.T) {
 			[]string{"192.168.121.42", "10.0.2.15"},
 			"",
 			"",
+			nil,
 			[]v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "192.168.121.42"}, {Type: v1.NodeInternalIP, Address: "10.0.2.15"}},
 			nil,
 		},
@@ -204,7 +219,17 @@ func TestMetadataRetrieval(t *testing.T) {
 			[]string{"192.168.121.42", "10.0.2.15"},
 			"",
 			"10.0.2.0/16",
+			nil,
 			[]v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "192.168.121.42"}, {Type: v1.NodeExternalIP, Address: "10.0.2.15"}},
+			nil,
+		},
+		{
+			"one private addresses, one existing internal IP set on the node",
+			[]string{"192.168.121.42"},
+			"",
+			"",
+			[]v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.0.1"}},
+			[]v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "192.168.121.42"}, {Type: v1.NodeInternalIP, Address: "10.0.0.1"}},
 			nil,
 		},
 	}
@@ -220,6 +245,9 @@ func TestMetadataRetrieval(t *testing.T) {
 				Options.LinodeExternalNetwork = nil
 			} else {
 				_, Options.LinodeExternalNetwork, _ = net.ParseCIDR(test.externalNetwork)
+			}
+			if test.existingAddresses != nil {
+				node.Status.Addresses = append(node.Status.Addresses, test.existingAddresses...)
 			}
 			ips := make([]*net.IP, 0, len(test.inputIPv4s))
 			for _, ip := range test.inputIPv4s {
