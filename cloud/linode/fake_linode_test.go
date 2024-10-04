@@ -75,6 +75,15 @@ func (f *fakeAPI) didRequestOccur(method, path, body string) bool {
 	return ok
 }
 
+// paginatedResponse represents a single response from a paginated
+// endpoint.
+type paginatedResponse[T any] struct {
+	Page    int `json:"page"    url:"page,omitempty"`
+	Pages   int `json:"pages"   url:"pages,omitempty"`
+	Results int `json:"results" url:"results,omitempty"`
+	Data    []T `json:"data"`
+}
+
 func (f *fakeAPI) setupRoutes() {
 	f.mux.HandleFunc("GET /v4/nodebalancers", func(w http.ResponseWriter, r *http.Request) {
 		res := 0
@@ -97,13 +106,12 @@ func (f *fakeAPI) setupRoutes() {
 				}
 			}
 		}
-		resp := linodego.NodeBalancersPagedResponse{
-			PageOptions: &linodego.PageOptions{
-				Page:    1,
-				Pages:   1,
-				Results: res,
-			},
-			Data: data,
+
+		resp := paginatedResponse[linodego.NodeBalancer]{
+			Page:    1,
+			Pages:   1,
+			Results: res,
+			Data:    data,
 		}
 		rr, _ := json.Marshal(resp)
 		_, _ = w.Write(rr)
@@ -178,13 +186,11 @@ func (f *fakeAPI) setupRoutes() {
 				}
 			}
 		}
-		resp := linodego.NodeBalancerConfigsPagedResponse{
-			PageOptions: &linodego.PageOptions{
-				Page:    1,
-				Pages:   1,
-				Results: res,
-			},
-			Data: data,
+		resp := paginatedResponse[linodego.NodeBalancerConfig]{
+			Page:    1,
+			Pages:   1,
+			Results: res,
+			Data:    data,
 		}
 		rr, err := json.Marshal(resp)
 		if err != nil {
@@ -208,13 +214,11 @@ func (f *fakeAPI) setupRoutes() {
 			}
 		}
 
-		resp := linodego.NodeBalancerNodesPagedResponse{
-			PageOptions: &linodego.PageOptions{
-				Page:    1,
-				Pages:   1,
-				Results: res,
-			},
-			Data: data,
+		resp := paginatedResponse[linodego.NodeBalancerNode]{
+			Page:    1,
+			Pages:   1,
+			Results: res,
+			Data:    data,
 		}
 		rr, _ := json.Marshal(resp)
 		_, _ = w.Write(rr)
@@ -243,10 +247,7 @@ func (f *fakeAPI) setupRoutes() {
 		for i := range firewallDevices {
 			firewallDeviceList = append(firewallDeviceList, *firewallDevices[i])
 		}
-		rr, _ := json.Marshal(linodego.FirewallDevicesPagedResponse{
-			PageOptions: &linodego.PageOptions{Page: 1, Pages: 1, Results: len(firewallDeviceList)},
-			Data:        firewallDeviceList,
-		})
+		rr, _ := json.Marshal(paginatedResponse[linodego.FirewallDevice]{Page: 1, Pages: 1, Results: len(firewallDeviceList), Data: firewallDeviceList})
 		_, _ = w.Write(rr)
 	})
 
