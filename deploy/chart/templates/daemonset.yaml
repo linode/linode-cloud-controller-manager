@@ -54,6 +54,9 @@ spec:
           volumeMounts:
             - mountPath: /etc/kubernetes
               name: k8s
+            {{- with .Values.volumeMounts}}
+            {{- toYaml . | nindent 12 }}
+            {{- end}}
           env:
             - name: LINODE_API_TOKEN
               valueFrom:
@@ -65,10 +68,13 @@ spec:
                 secretKeyRef:
                   name: {{ if .Values.secretRef }}{{ .Values.secretRef.name | default "ccm-linode" }}{{ else }}"ccm-linode"{{ end }}
                   key: {{ if .Values.secretRef }}{{ .Values.secretRef.regionRef | default "region" }}{{ else }}"region"{{ end }}
-            {{if .Values.env}}
-            {{- toYaml .Values.env | nindent 12 }}
-            {{end}}
+            {{- with .Values.env}}
+            {{- toYaml . | nindent 12 }}
+            {{- end}}
       volumes:
         - name: k8s
           hostPath:
             path: /etc/kubernetes
+        {{- with .Values.volumes}}
+        {{- toYaml . | nindent 8 }}
+        {{- end}}
