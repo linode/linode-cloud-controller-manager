@@ -10,16 +10,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/utils/ptr"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 )
 
 func TestListRoutes(t *testing.T) {
-	Options.VPCName = "test"
+	Options.VPCNames = "test"
+	vpcIDs["test"] = 1
 	Options.EnableRouteController = true
-
-	vpcInfo.id = 1
-	vpcid := vpcInfo.getID()
 
 	nodeID := 123
 	name := "mock-instance"
@@ -38,7 +37,7 @@ func TestListRoutes(t *testing.T) {
 
 		client.EXPECT().ListInstances(gomock.Any(), gomock.Any()).Times(1).Return([]linodego.Instance{}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCIP{}, nil)
-		routes, err := routeController.ListRoutes(ctx, "abc")
+		routes, err := routeController.ListRoutes(ctx, "test")
 		assert.NoError(t, err)
 		assert.Empty(t, routes)
 	})
@@ -61,7 +60,7 @@ func TestListRoutes(t *testing.T) {
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCIP{}, nil)
-		routes, err := routeController.ListRoutes(ctx, "abc")
+		routes, err := routeController.ListRoutes(ctx, "test")
 		assert.NoError(t, err)
 		assert.Empty(t, routes)
 	})
@@ -71,7 +70,7 @@ func TestListRoutes(t *testing.T) {
 		{
 			Address:      &vpcIP,
 			AddressRange: nil,
-			VPCID:        vpcid,
+			VPCID:        vpcIDs["test"],
 			NAT1To1:      nil,
 			LinodeID:     nodeID,
 		},
@@ -87,7 +86,7 @@ func TestListRoutes(t *testing.T) {
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return(noRoutesInVPC, nil)
-		routes, err := routeController.ListRoutes(ctx, "abc")
+		routes, err := routeController.ListRoutes(ctx, "test")
 		assert.NoError(t, err)
 		assert.Empty(t, routes)
 	})
@@ -98,21 +97,21 @@ func TestListRoutes(t *testing.T) {
 		{
 			Address:      &vpcIP,
 			AddressRange: nil,
-			VPCID:        vpcid,
+			VPCID:        vpcIDs["test"],
 			NAT1To1:      nil,
 			LinodeID:     nodeID,
 		},
 		{
 			Address:      nil,
 			AddressRange: &addressRange1,
-			VPCID:        vpcid,
+			VPCID:        vpcIDs["test"],
 			NAT1To1:      nil,
 			LinodeID:     nodeID,
 		},
 		{
 			Address:      nil,
 			AddressRange: &addressRange2,
-			VPCID:        vpcid,
+			VPCID:        vpcIDs["test"],
 			NAT1To1:      nil,
 			LinodeID:     nodeID,
 		},
@@ -128,7 +127,7 @@ func TestListRoutes(t *testing.T) {
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return(routesInVPC, nil)
-		routes, err := routeController.ListRoutes(ctx, "abc")
+		routes, err := routeController.ListRoutes(ctx, "test")
 		assert.NoError(t, err)
 		assert.NotEmpty(t, routes)
 		assert.Equal(t, addressRange1, routes[0].DestinationCIDR)
@@ -169,7 +168,7 @@ func TestListRoutes(t *testing.T) {
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return(routesInDifferentVPC, nil)
-		routes, err := routeController.ListRoutes(ctx, "abc")
+		routes, err := routeController.ListRoutes(ctx, "test")
 		assert.NoError(t, err)
 		assert.Empty(t, routes)
 	})
@@ -177,11 +176,9 @@ func TestListRoutes(t *testing.T) {
 
 func TestCreateRoute(t *testing.T) {
 	ctx := context.Background()
-	Options.VPCName = "test"
+	Options.VPCNames = "dummy"
+	vpcIDs["dummy"] = 1
 	Options.EnableRouteController = true
-
-	vpcInfo.id = 1
-	vpcid := vpcInfo.getID()
 
 	nodeID := 123
 	name := "mock-instance"
@@ -202,14 +199,14 @@ func TestCreateRoute(t *testing.T) {
 		{
 			Address:      &vpcIP,
 			AddressRange: nil,
-			VPCID:        vpcid,
+			VPCID:        vpcIDs["dummy"],
 			NAT1To1:      nil,
 			LinodeID:     nodeID,
 		},
 	}
 
 	instanceConfigIntfWithVPCAndRoute := linodego.InstanceConfigInterface{
-		VPCID:    &vpcid,
+		VPCID:    ptr.To(vpcIDs["dummy"]),
 		IPv4:     &linodego.VPCIPv4{VPC: vpcIP},
 		IPRanges: []string{"10.10.10.0/24"},
 	}
@@ -238,14 +235,14 @@ func TestCreateRoute(t *testing.T) {
 		{
 			Address:      &vpcIP,
 			AddressRange: nil,
-			VPCID:        vpcid,
+			VPCID:        vpcIDs["dummy"],
 			NAT1To1:      nil,
 			LinodeID:     nodeID,
 		},
 		{
 			Address:      nil,
 			AddressRange: &addressRange1,
-			VPCID:        vpcid,
+			VPCID:        vpcIDs["dummy"],
 			NAT1To1:      nil,
 			LinodeID:     nodeID,
 		},
@@ -279,13 +276,11 @@ func TestCreateRoute(t *testing.T) {
 }
 
 func TestDeleteRoute(t *testing.T) {
-	Options.VPCName = "test"
+	Options.VPCNames = "dummy"
+	vpcIDs["dummy"] = 1
 	Options.EnableRouteController = true
 
 	ctx := context.Background()
-
-	vpcInfo.id = 1
-	vpcid := vpcInfo.getID()
 
 	nodeID := 123
 	name := "mock-instance"
@@ -326,14 +321,14 @@ func TestDeleteRoute(t *testing.T) {
 		{
 			Address:      &vpcIP,
 			AddressRange: nil,
-			VPCID:        vpcid,
+			VPCID:        vpcIDs["dummy"],
 			NAT1To1:      nil,
 			LinodeID:     nodeID,
 		},
 	}
 
 	instanceConfigIntfWithVPCAndNoRoute := linodego.InstanceConfigInterface{
-		VPCID:    &vpcid,
+		VPCID:    ptr.To(vpcIDs["dummy"]),
 		IPv4:     &linodego.VPCIPv4{VPC: vpcIP},
 		IPRanges: []string{},
 	}
@@ -356,14 +351,14 @@ func TestDeleteRoute(t *testing.T) {
 		{
 			Address:      &vpcIP,
 			AddressRange: nil,
-			VPCID:        vpcid,
+			VPCID:        vpcIDs["dummy"],
 			NAT1To1:      nil,
 			LinodeID:     nodeID,
 		},
 		{
 			Address:      nil,
 			AddressRange: &addressRange1,
-			VPCID:        vpcid,
+			VPCID:        vpcIDs["dummy"],
 			NAT1To1:      nil,
 			LinodeID:     nodeID,
 		},

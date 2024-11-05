@@ -6,13 +6,13 @@ import (
 	"net"
 	"os"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/spf13/pflag"
 	"golang.org/x/exp/slices"
 	"k8s.io/client-go/informers"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog/v2"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 )
@@ -35,40 +35,13 @@ var Options struct {
 	KubeconfigFlag        *pflag.Flag
 	LinodeGoDebug         bool
 	EnableRouteController bool
+	// deprecated: use VPCNames instead
 	VPCName               string
+	VPCNames              string
 	LoadBalancerType      string
 	BGPNodeSelector       string
 	LinodeExternalNetwork *net.IPNet
 }
-
-// vpcDetails is set when VPCName options flag is set.
-// We use it to list instances running within the VPC if set
-type vpcDetails struct {
-	mu   sync.RWMutex
-	id   int
-	name string
-}
-
-func (v *vpcDetails) setDetails(client client.Client, name string) error {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-
-	id, err := getVPCID(client, Options.VPCName)
-	if err != nil {
-		return fmt.Errorf("failed finding VPC ID: %w", err)
-	}
-	v.id = id
-	v.name = name
-	return nil
-}
-
-func (v *vpcDetails) getID() int {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	return v.id
-}
-
-var vpcInfo vpcDetails = vpcDetails{id: 0, name: ""}
 
 type linodeCloud struct {
 	client        client.Client
@@ -114,11 +87,13 @@ func newCloud() (cloudprovider.Interface, error) {
 		linodeClient.SetDebug(true)
 	}
 
+	if Options.VPCName != "" && Options.VPCNames != "" {
+		return nil, fmt.Errorf("cannot have both vpc-name and vpc-names set")
+	}
+
 	if Options.VPCName != "" {
-		err := vpcInfo.setDetails(linodeClient, Options.VPCName)
-		if err != nil {
-			return nil, fmt.Errorf("failed finding VPC ID: %w", err)
-		}
+		klog.Warningf("vpc-name flag is deprecated. Use vpc-names instead")
+		Options.VPCNames = Options.VPCName
 	}
 
 	routes, err := newRoutes(linodeClient)
