@@ -39,10 +39,10 @@ spec:
             {{- if .Values.routeController }}
             - --enable-route-controller=true
             {{- if .Values.routeController.vpcName }}
-            - --vpc-name={{ "A valid .Values.routeController.vpcName is required" .Values.routeController.vpcName }}
+            - --vpc-name={{ .Values.routeController.vpcName }}
             {{- end }}
             {{- if .Values.routeController.vpcNames }}
-            - --vpc-names={{ "A valid .Values.routeController.vpcNames is required" .Values.routeController.vpcNames }}
+            - --vpc-names={{ .Values.routeController.vpcNames }}
             {{- end }}
             - --configure-cloud-routes={{ default true .Values.routeController.configureCloudRoutes }}
             - --cluster-cidr={{ required "A valid .Values.routeController.clusterCIDR is required" .Values.routeController.clusterCIDR }}
