@@ -1,0 +1,23 @@
+{
+  "packages": [
+    "ctlptl@latest",
+    "clusterctl@latest",
+    "docker@latest",
+    "envsubst@latest",
+    "go@1.22.2",
+    "golangci-lint@latest",
+    "jq@latest",
+    "kind@latest",
+    "kubectl@latest",
+    "kustomize@latest",
+    "kyverno-chainsaw@latest",
+    "mockgen@latest",
+    "yq-go@latest"
+  ],
+  "shell": {
+    "init_hook": [
+      "export \"GOROOT=$(go env GOROOT)\""
+    ],
+    "scripts": {}
+  }
+}
