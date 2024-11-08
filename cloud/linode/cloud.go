@@ -35,7 +35,7 @@ var Options struct {
 	KubeconfigFlag        *pflag.Flag
 	LinodeGoDebug         bool
 	EnableRouteController bool
-	// deprecated: use VPCNames instead
+	// Deprecated: use VPCNames instead
 	VPCName               string
 	VPCNames              string
 	LoadBalancerType      string

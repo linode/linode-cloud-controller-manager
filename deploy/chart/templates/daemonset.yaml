@@ -38,6 +38,12 @@ spec:
             {{- end }}
             {{- if .Values.routeController }}
             - --enable-route-controller=true
+            {{- if and .Values.routeController.vpcName .Values.routeController.vpcNames }}
+            {{- fail "Both vpcName and vpcNames are set. Please use only vpcNames." }}
+            {{- end }}
+            {{- if not (or .Values.routeController.vpcName .Values.routeController.vpcNames) }}
+            {{- fail "Neither vpcName nor vpcNames is set. Please set one of them." }}
+            {{- end }}
             {{- if .Values.routeController.vpcName }}
             - --vpc-name={{ .Values.routeController.vpcName }}
             {{- end }}
