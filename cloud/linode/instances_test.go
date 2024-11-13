@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"slices"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -273,6 +275,12 @@ func TestMetadataRetrieval(t *testing.T) {
 				addresses := append([]v1.NodeAddress{
 					{Type: v1.NodeHostName, Address: name},
 				}, test.outputAddresses...)
+				slices.SortFunc(meta.NodeAddresses, func(a v1.NodeAddress, b v1.NodeAddress) int {
+					return strings.Compare(a.Address, b.Address)
+				})
+				slices.SortFunc(addresses, func(a, b v1.NodeAddress) int {
+					return strings.Compare(a.Address, b.Address)
+				})
 				assert.Equal(t, meta.NodeAddresses, addresses)
 			}
 		})
