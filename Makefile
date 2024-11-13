@@ -2,6 +2,22 @@ IMG ?= linode/linode-cloud-controller-manager:canary
 RELEASE_DIR ?= release
 PLATFORM ?= linux/amd64
 
+# Use CACHE_BIN for tools that cannot use devbox and LOCALBIN for tools that can use either method
+CACHE_BIN ?= $(CURDIR)/bin
+LOCALBIN ?= $(CACHE_BIN)
+
+DEVBOX_BIN ?= $(DEVBOX_PACKAGES_DIR)/bin
+
+# if the $DEVBOX_PACKAGES_DIR env variable exists that means we are within a devbox shell and can safely
+# use devbox's bin for our tools
+ifdef DEVBOX_PACKAGES_DIR
+	LOCALBIN = $(DEVBOX_BIN)
+endif
+
+export PATH := $(CACHE_BIN):$(PATH)
+$(LOCALBIN):
+	mkdir -p $(LOCALBIN)
+
 export GO111MODULE=on
 
 .PHONY: all
@@ -13,6 +29,7 @@ clean:
 	@rm -rf ./.tmp
 	@rm -rf dist/*
 	@rm -rf $(RELEASE_DIR)
+	@rm -rf $(LOCALBIN)
 
 .PHONY: codegen
 codegen:
@@ -90,33 +107,38 @@ run-debug: build
 		--stderrthreshold=INFO \
 		--kubeconfig=${KUBECONFIG} \
 		--linodego-debug
+
 # Set the host's OS. Only linux and darwin supported for now
 HOSTOS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
 ifeq ($(filter darwin linux,$(HOSTOS)),)
 $(error build only supported on linux and darwin host currently)
 endif
+ARCH=$(shell uname -m)
+ARCH_SHORT=$(ARCH)
+ifeq ($(ARCH_SHORT),x86_64)
+ARCH_SHORT := amd64
+else ifeq ($(ARCH_SHORT),aarch64)
+ARCH_SHORT := arm64
+endif
 
+HELM         ?= $(LOCALBIN)/helm
 HELM_VERSION ?= v3.9.1
-TOOLS_HOST_DIR ?= .tmp/tools
-HELM := $(TOOLS_HOST_DIR)/helm-$(HELM_VERSION)
 
-.PHONY: $(HELM)
-$(HELM):
-	@echo installing helm $(HELM_VERSION)
-	@mkdir -p $(TOOLS_HOST_DIR)/tmp-helm
-	@curl -fsSL https://get.helm.sh/helm-$(HELM_VERSION)-$(HOSTOS)-amd64.tar.gz | tar -xz -C $(TOOLS_HOST_DIR)/tmp-helm
-	@mv $(TOOLS_HOST_DIR)/tmp-helm/$(HOSTOS)-amd64/helm $(HELM)
-	@rm -fr $(TOOLS_HOST_DIR)/tmp-helm
-	@echo installing helm $(HELM_VERSION)
+.PHONY: helm
+helm: $(HELM) ## Download helm locally if necessary
+$(HELM): $(LOCALBIN)
+	@curl -fsSL https://get.helm.sh/helm-$(HELM_VERSION)-$(HOSTOS)-$(ARCH_SHORT).tar.gz | tar -xz
+	@mv $(HOSTOS)-$(ARCH_SHORT)/helm $(HELM)
+	@rm -rf helm.tgz $(HOSTOS)-$(ARCH_SHORT)
 
 .PHONY: helm-lint
-helm-lint: $(HELM)
+helm-lint: helm
 #Verify lint works when region and apiToken are passed, and when it is passed as reference.
 	@$(HELM) lint deploy/chart --set apiToken="apiToken",region="us-east"
 	@$(HELM) lint deploy/chart --set secretRef.apiTokenRef="apiToken",secretRef.name="api",secretRef.regionRef="us-east"
 
 .PHONY: helm-template
-helm-template: $(HELM)
+helm-template: helm
 #Verify template works when region and apiToken are passed, and when it is passed as reference.
 	@$(HELM) template foo deploy/chart --set apiToken="apiToken",region="us-east" > /dev/null
 	@$(HELM) template foo deploy/chart --set secretRef.apiTokenRef="apiToken",secretRef.name="api",secretRef.regionRef="us-east" > /dev/null
