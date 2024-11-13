@@ -279,17 +279,27 @@ func (i *instances) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloud
 		return nil, err
 	}
 
-	addresses := []v1.NodeAddress{{Type: v1.NodeHostName, Address: linode.Label}}
-
+	uniqueAddrs := make(map[string]v1.NodeAddressType, len(node.Status.Addresses)+len(ips))
 	for _, ip := range ips {
-		addresses = append(addresses, v1.NodeAddress{Type: ip.ipType, Address: ip.ip})
+		if _, ok := uniqueAddrs[ip.ip]; ok {
+			continue
+		}
+		uniqueAddrs[ip.ip] = ip.ipType
 	}
 
 	// include IPs set by kubelet for internal node IP
 	for _, addr := range node.Status.Addresses {
-		if addr.Type == v1.NodeInternalIP {
-			addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: addr.Address})
+		if _, ok := uniqueAddrs[addr.Address]; ok {
+			continue
 		}
+		if addr.Type == v1.NodeInternalIP {
+			uniqueAddrs[addr.Address] = v1.NodeInternalIP
+		}
+	}
+
+	addresses := []v1.NodeAddress{{Type: v1.NodeHostName, Address: linode.Label}}
+	for k, v := range uniqueAddrs {
+		addresses = append(addresses, v1.NodeAddress{Type: v, Address: k})
 	}
 
 	klog.Infof("Instance %s, assembled IP addresses: %v", node.Name, addresses)
