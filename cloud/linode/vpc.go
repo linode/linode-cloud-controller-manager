@@ -3,6 +3,7 @@ package linode
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 
@@ -66,7 +67,7 @@ func GetVPCIPAddresses(ctx context.Context, client client.Client, vpcName string
 	}
 	resp, err := client.ListVPCIPAddresses(ctx, vpcID, linodego.NewListOptions(0, ""))
 	if err != nil {
-		if strings.Contains(err.Error(), "Not found") {
+		if linodego.ErrHasStatus(err, http.StatusNotFound) {
 			Mu.Lock()
 			defer Mu.Unlock()
 			klog.Errorf("vpc %s not found. Deleting entry from cache", vpcName)
