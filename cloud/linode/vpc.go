@@ -3,10 +3,12 @@ package linode
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 	"github.com/linode/linodego"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -35,7 +37,7 @@ func GetAllVPCIDs() []int {
 }
 
 // GetVPCID returns the VPC id of given VPC label
-func GetVPCID(client client.Client, vpcName string) (int, error) {
+func GetVPCID(ctx context.Context, client client.Client, vpcName string) (int, error) {
 	Mu.Lock()
 	defer Mu.Unlock()
 
@@ -43,7 +45,7 @@ func GetVPCID(client client.Client, vpcName string) (int, error) {
 	if vpcid, ok := vpcIDs[vpcName]; ok {
 		return vpcid, nil
 	}
-	vpcs, err := client.ListVPCs(context.TODO(), &linodego.ListOptions{})
+	vpcs, err := client.ListVPCs(ctx, &linodego.ListOptions{})
 	if err != nil {
 		return 0, err
 	}
@@ -54,4 +56,23 @@ func GetVPCID(client client.Client, vpcName string) (int, error) {
 		}
 	}
 	return 0, vpcLookupError{vpcName}
+}
+
+// GetVPCIPAddresses returns vpc ip's for given VPC label
+func GetVPCIPAddresses(ctx context.Context, client client.Client, vpcName string) ([]linodego.VPCIP, error) {
+	vpcID, err := GetVPCID(ctx, client, strings.TrimSpace(vpcName))
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.ListVPCIPAddresses(ctx, vpcID, linodego.NewListOptions(0, ""))
+	if err != nil {
+		if strings.Contains(err.Error(), "Not found") {
+			Mu.Lock()
+			defer Mu.Unlock()
+			klog.Errorf("vpc %s not found. Deleting entry from cache", vpcName)
+			delete(vpcIDs, vpcName)
+		}
+		return nil, err
+	}
+	return resp, nil
 }

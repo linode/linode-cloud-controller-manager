@@ -85,22 +85,16 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 		if vpcName == "" {
 			continue
 		}
-		vpcID, err := GetVPCID(client, strings.TrimSpace(vpcName))
+		resp, err := GetVPCIPAddresses(ctx, client, vpcName)
 		if err != nil {
 			klog.Errorf("failed updating instances cache for VPC %s. Error: %s", vpcName, err.Error())
 			continue
 		}
-		if vpcID != 0 {
-			resp, err := client.ListVPCIPAddresses(ctx, vpcID, linodego.NewListOptions(0, ""))
-			if err != nil {
-				return err
+		for _, r := range resp {
+			if r.Address == nil {
+				continue
 			}
-			for _, r := range resp {
-				if r.Address == nil {
-					continue
-				}
-				vpcNodes[r.LinodeID] = append(vpcNodes[r.LinodeID], *r.Address)
-			}
+			vpcNodes[r.LinodeID] = append(vpcNodes[r.LinodeID], *r.Address)
 		}
 	}
 
