@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,37 +20,43 @@ import (
 )
 
 type routeCache struct {
-	sync.RWMutex
+	Mu         sync.RWMutex
 	routes     map[int][]linodego.VPCIP
 	lastUpdate time.Time
 	ttl        time.Duration
 }
 
-func (rc *routeCache) refreshRoutes(ctx context.Context, client client.Client) error {
-	rc.Lock()
-	defer rc.Unlock()
+// RefreshCache checks if cache has expired and updates it accordingly
+func (rc *routeCache) refreshRoutes(ctx context.Context, client client.Client) {
+	rc.Mu.Lock()
+	defer rc.Mu.Unlock()
 
 	if time.Since(rc.lastUpdate) < rc.ttl {
-		return nil
+		return
 	}
 
 	vpcNodes := map[int][]linodego.VPCIP{}
-	vpcID := vpcInfo.getID()
-	resp, err := client.ListVPCIPAddresses(ctx, vpcID, linodego.NewListOptions(0, ""))
-	if err != nil {
-		return err
-	}
-	for _, r := range resp {
-		vpcNodes[r.LinodeID] = append(vpcNodes[r.LinodeID], r)
+	vpcNames := strings.Split(Options.VPCNames, ",")
+	for _, v := range vpcNames {
+		vpcName := strings.TrimSpace(v)
+		if vpcName == "" {
+			continue
+		}
+		resp, err := GetVPCIPAddresses(ctx, client, vpcName)
+		if err != nil {
+			klog.Errorf("failed updating cache for VPC %s. Error: %s", vpcName, err.Error())
+			continue
+		}
+		for _, r := range resp {
+			vpcNodes[r.LinodeID] = append(vpcNodes[r.LinodeID], r)
+		}
 	}
 
 	rc.routes = vpcNodes
 	rc.lastUpdate = time.Now()
-	return nil
 }
 
 type routes struct {
-	vpcid      int
 	client     client.Client
 	instances  *instances
 	routeCache *routeCache
@@ -64,13 +71,11 @@ func newRoutes(client client.Client) (cloudprovider.Routes, error) {
 	}
 	klog.V(3).Infof("TTL for routeCache set to %d seconds", timeout)
 
-	vpcid := vpcInfo.getID()
-	if Options.EnableRouteController && vpcid == 0 {
-		return nil, fmt.Errorf("cannot enable route controller as vpc [%s] not found", Options.VPCName)
+	if Options.EnableRouteController && Options.VPCNames == "" {
+		return nil, fmt.Errorf("cannot enable route controller as vpc-names is empty")
 	}
 
 	return &routes{
-		vpcid:     vpcid,
 		client:    client,
 		instances: newInstances(client),
 		routeCache: &routeCache{
@@ -82,8 +87,8 @@ func newRoutes(client client.Client) (cloudprovider.Routes, error) {
 
 // instanceRoutesByID returns routes for given instance id
 func (r *routes) instanceRoutesByID(id int) ([]linodego.VPCIP, error) {
-	r.routeCache.RLock()
-	defer r.routeCache.RUnlock()
+	r.routeCache.Mu.RLock()
+	defer r.routeCache.Mu.RUnlock()
 	instanceRoutes, ok := r.routeCache.routes[id]
 	if !ok {
 		return nil, fmt.Errorf("no routes found for instance %d", id)
@@ -94,10 +99,7 @@ func (r *routes) instanceRoutesByID(id int) ([]linodego.VPCIP, error) {
 // getInstanceRoutes returns routes for given instance id
 // It refreshes routeCache if it has expired
 func (r *routes) getInstanceRoutes(ctx context.Context, id int) ([]linodego.VPCIP, error) {
-	if err := r.routeCache.refreshRoutes(ctx, r.client); err != nil {
-		return nil, err
-	}
-
+	r.routeCache.refreshRoutes(ctx, r.client)
 	return r.instanceRoutesByID(id)
 }
 
@@ -135,22 +137,25 @@ func (r *routes) CreateRoute(ctx context.Context, clusterName string, nameHint s
 	// check already configured routes
 	intfRoutes := []string{}
 	intfVPCIP := linodego.VPCIP{}
-	for _, ir := range instanceRoutes {
-		if ir.VPCID != r.vpcid {
-			continue
-		}
 
-		if ir.Address != nil {
-			intfVPCIP = ir
-			continue
-		}
+	for _, vpcid := range GetAllVPCIDs() {
+		for _, ir := range instanceRoutes {
+			if ir.VPCID != vpcid {
+				continue
+			}
 
-		if ir.AddressRange != nil && *ir.AddressRange == route.DestinationCIDR {
-			klog.V(4).Infof("Route already exists for node %s", route.TargetNode)
-			return nil
-		}
+			if ir.Address != nil {
+				intfVPCIP = ir
+				continue
+			}
 
-		intfRoutes = append(intfRoutes, *ir.AddressRange)
+			if ir.AddressRange != nil && *ir.AddressRange == route.DestinationCIDR {
+				klog.V(4).Infof("Route already exists for node %s", route.TargetNode)
+				return nil
+			}
+
+			intfRoutes = append(intfRoutes, *ir.AddressRange)
+		}
 	}
 
 	if intfVPCIP.Address == nil {
@@ -185,21 +190,24 @@ func (r *routes) DeleteRoute(ctx context.Context, clusterName string, route *clo
 	// check already configured routes
 	intfRoutes := []string{}
 	intfVPCIP := linodego.VPCIP{}
-	for _, ir := range instanceRoutes {
-		if ir.VPCID != r.vpcid {
-			continue
-		}
 
-		if ir.Address != nil {
-			intfVPCIP = ir
-			continue
-		}
+	for _, vpcid := range GetAllVPCIDs() {
+		for _, ir := range instanceRoutes {
+			if ir.VPCID != vpcid {
+				continue
+			}
 
-		if ir.AddressRange != nil && *ir.AddressRange == route.DestinationCIDR {
-			continue
-		}
+			if ir.Address != nil {
+				intfVPCIP = ir
+				continue
+			}
 
-		intfRoutes = append(intfRoutes, *ir.AddressRange)
+			if ir.AddressRange != nil && *ir.AddressRange == route.DestinationCIDR {
+				continue
+			}
+
+			intfRoutes = append(intfRoutes, *ir.AddressRange)
+		}
 	}
 
 	if intfVPCIP.Address == nil {
@@ -234,17 +242,19 @@ func (r *routes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpr
 		}
 
 		// check for configured routes
-		for _, ir := range instanceRoutes {
-			if ir.Address != nil || ir.VPCID != r.vpcid {
-				continue
-			}
-
-			if ir.AddressRange != nil {
-				route := &cloudprovider.Route{
-					TargetNode:      types.NodeName(instance.Label),
-					DestinationCIDR: *ir.AddressRange,
+		for _, vpcid := range GetAllVPCIDs() {
+			for _, ir := range instanceRoutes {
+				if ir.Address != nil || ir.VPCID != vpcid {
+					continue
 				}
-				configuredRoutes = append(configuredRoutes, route)
+
+				if ir.AddressRange != nil {
+					route := &cloudprovider.Route{
+						TargetNode:      types.NodeName(instance.Label),
+						DestinationCIDR: *ir.AddressRange,
+					}
+					configuredRoutes = append(configuredRoutes, route)
+				}
 			}
 		}
 	}

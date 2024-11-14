@@ -38,7 +38,18 @@ spec:
             {{- end }}
             {{- if .Values.routeController }}
             - --enable-route-controller=true
-            - --vpc-name={{ required "A valid .Values.routeController.vpcName is required" .Values.routeController.vpcName }}
+            {{- if and .Values.routeController.vpcName .Values.routeController.vpcNames }}
+            {{- fail "Both vpcName and vpcNames are set. Please use only vpcNames." }}
+            {{- end }}
+            {{- if not (or .Values.routeController.vpcName .Values.routeController.vpcNames) }}
+            {{- fail "Neither vpcName nor vpcNames is set. Please set one of them." }}
+            {{- end }}
+            {{- if .Values.routeController.vpcName }}
+            - --vpc-name={{ .Values.routeController.vpcName }}
+            {{- end }}
+            {{- if .Values.routeController.vpcNames }}
+            - --vpc-names={{ .Values.routeController.vpcNames }}
+            {{- end }}
             - --configure-cloud-routes={{ default true .Values.routeController.configureCloudRoutes }}
             - --cluster-cidr={{ required "A valid .Values.routeController.clusterCIDR is required" .Values.routeController.clusterCIDR }}
             {{- if .Values.routeController.routeReconciliationPeriod }}

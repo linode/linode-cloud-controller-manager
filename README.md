@@ -176,7 +176,7 @@ When running k8s clusters within VPC, node specific podCIDRs need to be allowed 
 ##### Example usage in values.yaml
 ```yaml
 routeController:
-  vpcName: <name of VPC>
+  vpcNames: <comma separated names of VPCs managed by CCM>
   clusterCIDR: 10.0.0.0/8
   configureCloudRoutes: true
 ```

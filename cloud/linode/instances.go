@@ -79,11 +79,16 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 
 	// If running within VPC, find instances and store their ips
 	vpcNodes := map[int][]string{}
-	vpcID := vpcInfo.getID()
-	if vpcID != 0 {
-		resp, err := client.ListVPCIPAddresses(ctx, vpcID, linodego.NewListOptions(0, ""))
+	vpcNames := strings.Split(Options.VPCNames, ",")
+	for _, v := range vpcNames {
+		vpcName := strings.TrimSpace(v)
+		if vpcName == "" {
+			continue
+		}
+		resp, err := GetVPCIPAddresses(ctx, client, vpcName)
 		if err != nil {
-			return err
+			klog.Errorf("failed updating instances cache for VPC %s. Error: %s", vpcName, err.Error())
+			continue
 		}
 		for _, r := range resp {
 			if r.Address == nil {
@@ -97,7 +102,7 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 	for i, instance := range instances {
 
 		// if running within VPC, only store instances in cache which are part of VPC
-		if vpcID != 0 && len(vpcNodes[instance.ID]) == 0 {
+		if Options.VPCNames != "" && len(vpcNodes[instance.ID]) == 0 {
 			continue
 		}
 		node := linodeInstance{

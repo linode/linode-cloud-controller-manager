@@ -51,7 +51,8 @@ tolerations:
 
 # This section adds ability to enable route-controller for ccm
 # routeController:
-#   vpcName: <name of VPC>
+#   vpcName: <name of VPC> [Deprecated: use vpcNames instead]
+#   vpcNames: <comma separated list of vpc names>
 #   clusterCIDR: 10.0.0.0/8
 #   configureCloudRoutes: true
 
