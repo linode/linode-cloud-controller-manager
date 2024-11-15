@@ -46,16 +46,21 @@ var (
 		// "us-west":       3,  // Fremont, CA (USA) Undergoing network upgrades
 		"id-cgk":       29, // Jakarta (Indonesia)
 		"eu-west":      7,  // London (United Kingdom)
+		"gb-lon":       44, // London 2 (United Kingdom)
 		"us-lax":       30, // Los Angeles, CA (USA)
+		"es-mad":       24, // Madrid (Spain)
+		"au-mel":       45, // Melbourne (Australia)
 		"us-mia":       28, // Miami, FL (USA)
 		"it-mil":       27, // Milan (Italy)
 		"ap-west":      14, // Mumbai (India)
+		"in-bom-2":     46, // Mumbai 2 (India)
 		"us-east":      6,  // Newark, NJ (USA)
 		"jp-osa":       26, // Osaka (Japan)
 		"fr-par":       19, // Paris (France)
 		"br-gru":       21, // São Paulo (Brazil)
 		"us-sea":       20, // Seattle, WA (USA)
 		"ap-south":     9,  // Singapore
+		"sg-sin-2":     48, // Singapore 2
 		"se-sto":       23, // Stockholm (Sweden)
 		"ap-southeast": 16, // Sydney (Australia)
 		"ap-northeast": 11, // Tokyo (Japan)
