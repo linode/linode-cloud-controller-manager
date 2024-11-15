@@ -37,32 +37,35 @@ const (
 // These values come from https://www.linode.com/docs/products/compute/compute-instances/guides/failover/#ip-sharing-availability
 var (
 	regionIDMap = map[string]int{
+		"nl-ams":       22, // Amsterdam (Netherlands)
 		"us-southeast": 4,  // Atlanta, GA (USA)
+		"in-maa":       25, // Chennai (India)
 		"us-ord":       18, // Chicago, IL (USA)
 		"us-central":   2,  // Dallas, TX (USA)
-		// "us-west"   : 3,  // Fremont, CA (USA) UNDERGOING NETWORK UPGRADES
-		"us-lax":     30, // Los Angeles, CA (USA)
-		"us-mia":     28, // Miami, FL (USA)
-		"us-east":    6,  // Newark, NJ (USA)
-		"us-sea":     20, // Seattle, WA (USA)
-		"us-iad":     17, // Washington, DC (USA)
-		"ca-central": 15, // Toronto (Canada)
-		"br-gru":     21, // São Paulo (Brazil)
-		// EMEA
-		"nl-ams":     22, // Amsterdam (Netherlands)
-		"eu-central": 10, // Frankfurt (Germany)
-		"eu-west":    7,  // London (United Kingdom)
-		"it-mil":     27, // Milan (Italy)
-		"ap-west":    14, // Mumbai (India)
-		"fr-par":     19, // Paris (France)
-		"se-sto":     23, // Stockholm (Sweden)
-		// APAC
-		"in-maa":       25, // Chennai (India)
+		"eu-central":   10, // Frankfurt (Germany)
+		// "us-west":       3,  // Fremont, CA (USA) Undergoing network upgrades
 		"id-cgk":       29, // Jakarta (Indonesia)
+		"eu-west":      7,  // London (United Kingdom)
+		"gb-lon":       44, // London 2 (United Kingdom)
+		"us-lax":       30, // Los Angeles, CA (USA)
+		"es-mad":       24, // Madrid (Spain)
+		"au-mel":       45, // Melbourne (Australia)
+		"us-mia":       28, // Miami, FL (USA)
+		"it-mil":       27, // Milan (Italy)
+		"ap-west":      14, // Mumbai (India)
+		"in-bom-2":     46, // Mumbai 2 (India)
+		"us-east":      6,  // Newark, NJ (USA)
 		"jp-osa":       26, // Osaka (Japan)
+		"fr-par":       19, // Paris (France)
+		"br-gru":       21, // São Paulo (Brazil)
+		"us-sea":       20, // Seattle, WA (USA)
 		"ap-south":     9,  // Singapore
+		"sg-sin-2":     48, // Singapore 2
+		"se-sto":       23, // Stockholm (Sweden)
 		"ap-southeast": 16, // Sydney (Australia)
 		"ap-northeast": 11, // Tokyo (Japan)
+		"ca-central":   15, // Toronto (Canada)
+		"us-iad":       17, // Washington, DC (USA)
 	}
 )
 
