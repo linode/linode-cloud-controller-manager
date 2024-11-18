@@ -40,6 +40,7 @@ var Options struct {
 	VPCNames              string
 	LoadBalancerType      string
 	BGPNodeSelector       string
+	IpHolderSuffix        string
 	LinodeExternalNetwork *net.IPNet
 }
 
@@ -107,6 +108,16 @@ func newCloud() (cloudprovider.Interface, error) {
 			Options.LoadBalancerType,
 			supportedLoadBalancerTypes,
 		)
+	}
+
+	if Options.IpHolderSuffix != "" {
+		klog.Infof("Using IP holder suffix '%s'\n", Options.IpHolderSuffix)
+	}
+
+	if len(Options.IpHolderSuffix) > 23 {
+		msg := fmt.Sprintf("ip-holder-suffix must be 23 characters or less: %s is %d characters\n", Options.IpHolderSuffix, len(Options.IpHolderSuffix))
+		klog.Error(msg)
+		return nil, fmt.Errorf(msg)
 	}
 
 	// create struct that satisfies cloudprovider.Interface

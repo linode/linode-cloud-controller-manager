@@ -148,7 +148,7 @@ func (l *loadbalancers) shareIPs(ctx context.Context, addrs []string, node *v1.N
 // perform IP sharing (via a specified node selector) have the expected IPs shared
 // in the event that a Node joins the cluster after the LoadBalancer Service already
 // exists
-func (l *loadbalancers) handleIPSharing(ctx context.Context, node *v1.Node) error {
+func (l *loadbalancers) handleIPSharing(ctx context.Context, node *v1.Node, ipHolderSuffix string) error {
 	// ignore cases where the provider ID has been set
 	if node.Spec.ProviderID == "" {
 		klog.Info("skipping IP while providerID is unset")
@@ -182,7 +182,7 @@ func (l *loadbalancers) handleIPSharing(ctx context.Context, node *v1.Node) erro
 	// if any of the addrs don't exist on the ip-holder (e.g. someone manually deleted it outside the CCM),
 	// we need to exclude that from the list
 	// TODO: also clean up the CiliumLoadBalancerIPPool for that missing IP if that happens
-	ipHolder, err := l.getIPHolder(ctx)
+	ipHolder, err := l.getIPHolder(ctx, ipHolderSuffix)
 	if err != nil {
 		return err
 	}
@@ -207,8 +207,8 @@ func (l *loadbalancers) handleIPSharing(ctx context.Context, node *v1.Node) erro
 
 // createSharedIP requests an additional IP that can be shared on Nodes to support
 // loadbalancing via Cilium LB IPAM + BGP Control Plane.
-func (l *loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node) (string, error) {
-	ipHolder, err := l.ensureIPHolder(ctx)
+func (l *loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node, ipHolderSuffix string) (string, error) {
+	ipHolder, err := l.ensureIPHolder(ctx, ipHolderSuffix)
 	if err != nil {
 		return "", err
 	}
@@ -276,7 +276,15 @@ func (l *loadbalancers) deleteSharedIP(ctx context.Context, service *v1.Service)
 		return err
 	}
 	bgpNodes := nodeList.Items
-	ipHolder, err := l.getIPHolder(ctx)
+
+	serviceNn := getServiceNn(service)
+	var ipHolderSuffix string
+	if Options.IpHolderSuffix != "" {
+		ipHolderSuffix = Options.IpHolderSuffix
+		klog.V(3).Infof("using parameter-based IP Holder suffix %s for Service %s", ipHolderSuffix, serviceNn)
+	}
+
+	ipHolder, err := l.getIPHolder(ctx, ipHolderSuffix)
 	if err != nil {
 		// return error or nil if not found since no IP holder means there
 		// is no IP to reclaim
@@ -310,46 +318,88 @@ func (l *loadbalancers) deleteSharedIP(ctx context.Context, service *v1.Service)
 
 // To hold the IP in lieu of a proper IP reservation system, a special Nanode is
 // created but not booted and used to hold all shared IPs.
-func (l *loadbalancers) ensureIPHolder(ctx context.Context) (*linodego.Instance, error) {
-	ipHolder, err := l.getIPHolder(ctx)
+func (l *loadbalancers) ensureIPHolder(ctx context.Context, suffix string) (*linodego.Instance, error) {
+	ipHolder, err := l.getIPHolder(ctx, suffix)
 	if err != nil {
 		return nil, err
 	}
 	if ipHolder != nil {
 		return ipHolder, nil
 	}
-
+	label := generateClusterScopedIPHolderLinodeName(l.zone, suffix)
 	ipHolder, err = l.client.CreateInstance(ctx, linodego.InstanceCreateOptions{
 		Region:   l.zone,
 		Type:     "g6-nanode-1",
-		Label:    fmt.Sprintf("%s-%s", ipHolderLabelPrefix, l.zone),
+		Label:    label,
 		RootPass: uuid.NewString(),
 		Image:    "linode/ubuntu22.04",
 		Booted:   ptr.To(false),
 	})
 	if err != nil {
+		if linodego.ErrHasStatus(err, http.StatusBadRequest) && strings.Contains(err.Error(), "Label must be unique") {
+			// TODO (rk): should we handle more status codes on error?
+			klog.Errorf("failed to create new IP Holder instance %s since it already exists: %s", label, err.Error())
+			return nil, err
+		}
 		return nil, err
 	}
+	klog.Infof("created new IP Holder instance %s", label)
 
 	return ipHolder, nil
 }
 
-func (l *loadbalancers) getIPHolder(ctx context.Context) (*linodego.Instance, error) {
+func (l *loadbalancers) getIPHolder(ctx context.Context, suffix string) (*linodego.Instance, error) {
+	// even though we have updated the naming convention, leaving this in ensures we have backwards compatibility
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, l.zone)}
 	rawFilter, err := json.Marshal(filter)
 	if err != nil {
 		panic("this should not have failed")
 	}
 	var ipHolder *linodego.Instance
+	// TODO (rk): should we switch to using GET instead of LIST? we would be able to wrap logic around errors
 	linodes, err := l.client.ListInstances(ctx, linodego.NewListOptions(1, string(rawFilter)))
 	if err != nil {
 		return nil, err
 	}
+	if len(linodes) == 0 {
+		// since a list that returns 0 results has a 200/OK status code (no error)
+
+		// we assume that either
+		// a) an ip holder instance does not exist yet
+		// or
+		// b) another cluster already holds the linode grant to an ip holder using the old naming convention
+		filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(l.zone, suffix)}
+		rawFilter, err = json.Marshal(filter)
+		if err != nil {
+			panic("this should not have failed")
+		}
+		linodes, err = l.client.ListInstances(ctx, linodego.NewListOptions(1, string(rawFilter)))
+		if err != nil {
+			return nil, err
+		}
+	}
 	if len(linodes) > 0 {
 		ipHolder = &linodes[0]
 	}
-
 	return ipHolder, nil
+}
+
+// generateClusterScopedIPHolderLinodeName attempts to generate a unique name for the IP Holder
+// instance used alongside Cilium LoadBalancers and Shared IPs for Kubernetes Services.
+// If the `--ip-holder-suffix` arg is passed when running Linode CCM, `suffix` is set to that value.
+func generateClusterScopedIPHolderLinodeName(zone, suffix string) (label string) {
+	// since Linode CCM consumers are varied, we require a method of providing a
+	// suffix that does not rely on the use of a specific product (ex. LKE) to
+	// have a specific piece of metadata (ex. annotation(s), label(s) ) present to key off of.
+
+	if suffix == "" {
+		// this avoids a trailing hyphen if suffix is empty (ex. linode-ccm-ip-holder-us-ord-)
+		label = fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)
+	} else {
+		label = fmt.Sprintf("%s-%s-%s", ipHolderLabelPrefix, zone, suffix)
+	}
+	klog.V(5).Infof("generated IP Holder Linode label: %s", label)
+	return label
 }
 
 func (l *loadbalancers) retrieveCiliumClientset() error {

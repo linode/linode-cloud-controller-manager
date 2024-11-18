@@ -48,6 +48,7 @@ tolerations:
 # sharedIPLoadBalancing:
 #   loadBalancerType: cilium-bgp
 #   bgpNodeSelector: <node label (e.g. cilium-bgp-peering=true)>
+#   ipHolderSuffix: <cluster name or other identifier (e.g. myclustername1)>
 
 # This section adds ability to enable route-controller for ccm
 # routeController:

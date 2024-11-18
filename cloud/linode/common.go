@@ -9,7 +9,10 @@ import (
 	"github.com/linode/linodego"
 )
 
-const providerIDPrefix = "linode://"
+const (
+	providerIDPrefix          = "linode://"
+	DNS1123LabelMaxLength int = 63
+)
 
 type invalidProviderIDError struct {
 	value string

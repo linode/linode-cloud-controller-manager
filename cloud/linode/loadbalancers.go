@@ -222,9 +222,15 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 			}, nil
 		}
 
+		var ipHolderSuffix string
+		if Options.IpHolderSuffix != "" {
+			ipHolderSuffix = Options.IpHolderSuffix
+			klog.Infof("using parameter-based IP Holder suffix %s for Service %s", ipHolderSuffix, serviceNn)
+		}
+
 		// CiliumLoadBalancerIPPool does not yet exist for the service
 		var sharedIP string
-		if sharedIP, err = l.createSharedIP(ctx, nodes); err != nil {
+		if sharedIP, err = l.createSharedIP(ctx, nodes, ipHolderSuffix); err != nil {
 			klog.Errorf("Failed to request shared instance IP: %s", err.Error())
 			return nil, err
 		}
@@ -428,9 +434,16 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 	// handle LoadBalancers backed by Cilium
 	if l.loadBalancerType == ciliumLBType {
 		klog.Infof("handling update for LoadBalancer Service %s/%s as %s", service.Namespace, service.Name, ciliumLBClass)
+		serviceNn := getServiceNn(service)
+		var ipHolderSuffix string
+		if Options.IpHolderSuffix != "" {
+			ipHolderSuffix = Options.IpHolderSuffix
+			klog.V(3).Infof("using parameter-based IP Holder suffix %s for Service %s", ipHolderSuffix, serviceNn)
+		}
+
 		// make sure that IPs are shared properly on the Node if using load-balancers not backed by NodeBalancers
 		for _, node := range nodes {
-			if err := l.handleIPSharing(ctx, node); err != nil {
+			if err := l.handleIPSharing(ctx, node, ipHolderSuffix); err != nil {
 				return err
 			}
 		}

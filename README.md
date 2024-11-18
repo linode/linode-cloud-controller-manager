@@ -40,37 +40,37 @@ provisions a new IP on an ip-holder Nanode to share for the desired region. See 
 #### Annotations
 The Linode CCM accepts several annotations which affect the properties of the underlying NodeBalancer deployment.
 
-All of the Service annotation names listed below have been shortened for readability.  The values, such as `http`, are case-sensitive.
+All the Service annotation names listed below have been shortened for readability.  The values, such as `http`, are case-sensitive.
 
 Each *Service* annotation **MUST** be prefixed with:<br />
 **`service.beta.kubernetes.io/linode-loadbalancer-`**
 
-Annotation (Suffix) | Values | Default | Description
----|---|---|---
-`throttle` | `0`-`20` (`0` to disable) | `0` | Client Connection Throttle, which limits the number of subsequent new connections per second from the same client IP
-`default-protocol` | `tcp`, `http`, `https` | `tcp` | This annotation is used to specify the default protocol for Linode NodeBalancer.
-`default-proxy-protocol` | `none`, `v1`, `v2` | `none` | Specifies whether to use a version of Proxy Protocol on the underlying NodeBalancer.
-`port-*` | json (e.g. `{ "tls-secret-name": "prod-app-tls", "protocol": "https", "proxy-protocol": "v2"}`) | | Specifies port specific NodeBalancer configuration. See [Port Specific Configuration](#port-specific-configuration). `*` is the port being configured, e.g. `linode-loadbalancer-port-443`
-`check-type` | `none`, `connection`, `http`, `http_body` | | The type of health check to perform against back-ends to ensure they are serving requests
-`check-path` | string | | The URL path to check on each back-end during health checks
-`check-body` | string | | Text which must be present in the response body to pass the NodeBalancer health check
-`check-interval` | int | | Duration, in seconds, to wait between health checks
-`check-timeout` | int (1-30) | | Duration, in seconds, to wait for a health check to succeed before considering it a failure
-`check-attempts` | int (1-30) | | Number of health check failures necessary to remove a back-end from the service
-`check-passive` | [bool](#annotation-bool-values) | `false` | When `true`, `5xx` status codes will cause the health check to fail
-`preserve` | [bool](#annotation-bool-values) | `false` | When `true`, deleting a `LoadBalancer` service does not delete the underlying NodeBalancer. This will also prevent deletion of the former LoadBalancer when another one is specified with the `nodebalancer-id` annotation.
-`nodebalancer-id` | string | | The ID of the NodeBalancer to front the service. When not specified, a new NodeBalancer will be created. This can be configured on service creation or patching
-`hostname-only-ingress` | [bool](#annotation-bool-values) | `false` | When `true`, the LoadBalancerStatus for the service will only contain the Hostname. This is useful for bypassing kube-proxy's rerouting of in-cluster requests originally intended for the external LoadBalancer to the service's constituent pod IPs.
-`tags` | string | | A comma seperated list of tags to be applied to the createad NodeBalancer instance
-`firewall-id` | string | | An existing Cloud Firewall ID to be attached to the NodeBalancer instance. See [Firewalls](#firewalls).
-`firewall-acl` | string | | The Firewall rules to be applied to the NodeBalancer. Adding this annotation creates a new CCM managed Linode CloudFirewall instance. See [Firewalls](#firewalls).
+| Annotation (Suffix)      | Values                                                                                          | Default | Description                                                                                                                                                                                                                                            |
+|--------------------------|-------------------------------------------------------------------------------------------------|---------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `throttle`               | `0`-`20` (`0` to disable)                                                                       | `0`     | Client Connection Throttle, which limits the number of subsequent new connections per second from the same client IP                                                                                                                                   |
+| `default-protocol`       | `tcp`, `http`, `https`                                                                          | `tcp`   | This annotation is used to specify the default protocol for Linode NodeBalancer.                                                                                                                                                                       |
+| `default-proxy-protocol` | `none`, `v1`, `v2`                                                                              | `none`  | Specifies whether to use a version of Proxy Protocol on the underlying NodeBalancer.                                                                                                                                                                   |
+| `port-*`                 | json (e.g. `{ "tls-secret-name": "prod-app-tls", "protocol": "https", "proxy-protocol": "v2"}`) |         | Specifies port specific NodeBalancer configuration. See [Port Specific Configuration](#port-specific-configuration). `*` is the port being configured, e.g. `linode-loadbalancer-port-443`                                                             |
+| `check-type`             | `none`, `connection`, `http`, `http_body`                                                       |         | The type of health check to perform against back-ends to ensure they are serving requests                                                                                                                                                              |
+| `check-path`             | string                                                                                          |         | The URL path to check on each back-end during health checks                                                                                                                                                                                            |
+| `check-body`             | string                                                                                          |         | Text which must be present in the response body to pass the NodeBalancer health check                                                                                                                                                                  |
+| `check-interval`         | int                                                                                             |         | Duration, in seconds, to wait between health checks                                                                                                                                                                                                    |
+| `check-timeout`          | int (1-30)                                                                                      |         | Duration, in seconds, to wait for a health check to succeed before considering it a failure                                                                                                                                                            |
+| `check-attempts`         | int (1-30)                                                                                      |         | Number of health check failures necessary to remove a back-end from the service                                                                                                                                                                        |
+| `check-passive`          | [bool](#annotation-bool-values)                                                                 | `false` | When `true`, `5xx` status codes will cause the health check to fail                                                                                                                                                                                    |
+| `preserve`               | [bool](#annotation-bool-values)                                                                 | `false` | When `true`, deleting a `LoadBalancer` service does not delete the underlying NodeBalancer. This will also prevent deletion of the former LoadBalancer when another one is specified with the `nodebalancer-id` annotation.                            |
+| `nodebalancer-id`        | string                                                                                          |         | The ID of the NodeBalancer to front the service. When not specified, a new NodeBalancer will be created. This can be configured on service creation or patching                                                                                        |
+| `hostname-only-ingress`  | [bool](#annotation-bool-values)                                                                 | `false` | When `true`, the LoadBalancerStatus for the service will only contain the Hostname. This is useful for bypassing kube-proxy's rerouting of in-cluster requests originally intended for the external LoadBalancer to the service's constituent pod IPs. |
+| `tags`                   | string                                                                                          |         | A comma seperated list of tags to be applied to the createad NodeBalancer instance                                                                                                                                                                     |
+| `firewall-id`            | string                                                                                          |         | An existing Cloud Firewall ID to be attached to the NodeBalancer instance. See [Firewalls](#firewalls).                                                                                                                                                |
+| `firewall-acl`           | string                                                                                          |         | The Firewall rules to be applied to the NodeBalancer. Adding this annotation creates a new CCM managed Linode CloudFirewall instance. See [Firewalls](#firewalls).                                                                                     |
 
 #### Deprecated Annotations
 These annotations are deprecated, and will be removed in a future release.
 
-Annotation (Suffix) | Values | Default | Description | Scheduled Removal
----|---|---|---|---
-`proxy-protcol` | `none`, `v1`, `v2` | `none` | Specifies whether to use a version of Proxy Protocol on the underlying NodeBalancer | Q4 2021
+| Annotation (Suffix) | Values             | Default | Description                                                                         | Scheduled Removal |
+|---------------------|--------------------|---------|-------------------------------------------------------------------------------------|-------------------|
+| `proxy-protcol`     | `none`, `v1`, `v2` | `none`  | Specifies whether to use a version of Proxy Protocol on the underlying NodeBalancer | Q4 2021           |
 
 #### Annotation bool values
 For annotations with bool value types, `"1"`, `"t"`,  `"T"`, `"True"`, `"true"` and `"True"` are valid string representations of `true`. Any other values will be interpreted as false. For more details, see [strconv.ParseBool](https://golang.org/pkg/strconv/#ParseBool).
@@ -78,16 +78,20 @@ For annotations with bool value types, `"1"`, `"t"`,  `"T"`, `"True"`, `"true"` 
 #### Port Specific Configuration
 These configuration options can be specified via the `port-*` annotation, encoded in JSON.
 
-Key | Values | Default | Description
----|---|---|---
-`protocol` | `tcp`, `http`, `https` | `tcp` | Specifies protocol of the NodeBalancer port. Overwrites `default-protocol`.
-`proxy-protocol` | `none`, `v1`, `v2` | `none` | Specifies whether to use a version of Proxy Protocol on the underlying NodeBalancer. Overwrites `default-proxy-protocol`.
-`tls-secret-name` | string | | Specifies a secret to use for TLS. The secret type should be `kubernetes.io/tls`.
+| Key               | Values                 | Default | Description                                                                                                               |
+|-------------------|------------------------|---------|---------------------------------------------------------------------------------------------------------------------------|
+| `protocol`        | `tcp`, `http`, `https` | `tcp`   | Specifies protocol of the NodeBalancer port. Overwrites `default-protocol`.                                               |
+| `proxy-protocol`  | `none`, `v1`, `v2`     | `none`  | Specifies whether to use a version of Proxy Protocol on the underlying NodeBalancer. Overwrites `default-proxy-protocol`. |
+| `tls-secret-name` | string                 |         | Specifies a secret to use for TLS. The secret type should be `kubernetes.io/tls`.                                         |
 
 #### Shared IP Load-Balancing
 **NOTE:** This feature requires contacting [Customer Support](https://www.linode.com/support/contact/) to enable provisioning additional IPs.
 
-Services of `type: LoadBalancer` can receive an external IP not backed by a NodeBalancer if `--bgp-node-selector` is set on the Linode CCM and `--load-balancer-type` is set to `cilium-bgp`. Additionally, the `LINODE_URL` environment variable in the linode CCM needs to be set to "https://api.linode.com/v4beta" for IP sharing to work.
+Services of `type: LoadBalancer` can receive an external IP not backed by a NodeBalancer if `--bgp-node-selector` is set on the Linode CCM and `--load-balancer-type` is set to `cilium-bgp`. 
+
+If you plan to run multiple clusters within a single API Region, setting `--ip-holder-suffix` on the Linode CCM to a unique value per cluster will create an ip-holder nanode for each cluster that is created within that API Region (ex. `linode-ccm-ip-holder-<region>-<ip-holder-suffix>`).
+
+If you do not set `--ip-holder-suffix` on the Linode CCM, it will use the following naming convention for the ip-holder nanode (ex. `linode-ccm-ip-holder-<region>`).
 
 This feature requires the Kubernetes cluster to be using [Cilium](https://cilium.io/) as the CNI with the `bgp-control-plane` feature enabled.
 
@@ -107,10 +111,11 @@ spec:
           name: ccm-linode
           env:
             - name: LINODE_URL
-              value: https://api.linode.com/v4beta
+              value: https://api.linode.com/v4
           args:
           - --bgp-node-selector=cilium-bgp-peering=true
           - --load-balancer-type=cilium-bgp
+          - --ip-holder-suffix=myclustername1
 ...
 ```
 
@@ -120,6 +125,7 @@ spec:
 sharedIPLoadBalancing:
   loadBalancerType: cilium-bgp
   bgpNodeSelector: cilium-bgp-peering=true
+  ipHolderSuffix: myclustername1
 ```
 
 #### Firewalls
@@ -187,10 +193,9 @@ Kubernetes Nodes can be configured with the following annotations.
 Each *Node* annotation **MUST** be prefixed with:<br />
 **`node.k8s.linode.com/`**
 
-Key | Values | Default | Description
----|---|---|---
-`private-ip` | `IPv4` | `none` | Specifies the Linode Private IP overriding default detection of the Node InternalIP.<br />When using a [VLAN] or [VPC], the Node InternalIP may not be a Linode Private IP as [required for NodeBalancers] and should be specified.
-
+| Key          | Values | Default | Description                                                                                                                                                                                                                         |
+|--------------|--------|---------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `private-ip` | `IPv4` | `none`  | Specifies the Linode Private IP overriding default detection of the Node InternalIP.<br />When using a [VLAN] or [VPC], the Node InternalIP may not be a Linode Private IP as [required for NodeBalancers] and should be specified. |
 
 [required for NodeBalancers]: https://www.linode.com/docs/api/nodebalancers/#nodebalancer-create__request-body-schema
 [VLAN]: https://www.linode.com/products/vlan/
@@ -289,12 +294,12 @@ sessionAffinityConfig:
 ## Additional environment variables
 To tweak CCM based on needs, one can overwrite the default values set for caches and requests by setting appropriate environment variables when applying the manifest or helm chart.
 
-Environment Variable | Default | Description
----|---|---
-`LINODE_INSTANCE_CACHE_TTL` | `15` | Default timeout of instance cache in seconds
-`LINODE_ROUTES_CACHE_TTL_SECONDS` | `60` | Default timeout of route cache in seconds
-`LINODE_REQUEST_TIMEOUT_SECONDS` | `120` | Default timeout in seconds for http requests to linode API
-`LINODE_EXTERNAL_SUBNET` | | Mark private network as external. Example - `172.24.0.0/16`
+| Environment Variable              | Default | Description                                                 |
+|-----------------------------------|---------|-------------------------------------------------------------|
+| `LINODE_INSTANCE_CACHE_TTL`       | `15`    | Default timeout of instance cache in seconds                |
+| `LINODE_ROUTES_CACHE_TTL_SECONDS` | `60`    | Default timeout of route cache in seconds                   |
+| `LINODE_REQUEST_TIMEOUT_SECONDS`  | `120`   | Default timeout in seconds for http requests to linode API  |
+| `LINODE_EXTERNAL_SUBNET`          |         | Mark private network as external. Example - `172.24.0.0/16` |
 
 ## Generating a Manifest for Deployment
 Use the script located at `./deploy/generate-manifest.sh` to generate a self-contained deployment manifest for the Linode CCM. Two arguments are required.
