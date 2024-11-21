@@ -284,12 +284,18 @@ func (i *instances) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloud
 		return nil, err
 	}
 
-	uniqueAddrs := make(map[string]v1.NodeAddressType, len(node.Status.Addresses)+len(ips))
+	addresses := []v1.NodeAddress{{Type: v1.NodeHostName, Address: linode.Label}}
 	for _, ip := range ips {
-		if _, ok := uniqueAddrs[ip.ip]; ok {
+		addresses = append(addresses, v1.NodeAddress{Type: ip.ipType, Address: ip.ip})
+	}
+
+	// create temporary uniqueAddrs cache just for reference
+	uniqueAddrs := make(map[string]v1.NodeAddressType, len(node.Status.Addresses)+len(ips))
+	for _, ip := range addresses {
+		if _, ok := uniqueAddrs[ip.Address]; ok {
 			continue
 		}
-		uniqueAddrs[ip.ip] = ip.ipType
+		uniqueAddrs[ip.Address] = ip.Type
 	}
 
 	// include IPs set by kubelet for internal node IP
@@ -299,12 +305,8 @@ func (i *instances) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloud
 		}
 		if addr.Type == v1.NodeInternalIP {
 			uniqueAddrs[addr.Address] = v1.NodeInternalIP
+			addresses = append(addresses, v1.NodeAddress{Type: addr.Type, Address: addr.Address})
 		}
-	}
-
-	addresses := []v1.NodeAddress{{Type: v1.NodeHostName, Address: linode.Label}}
-	for k, v := range uniqueAddrs {
-		addresses = append(addresses, v1.NodeAddress{Type: v, Address: k})
 	}
 
 	klog.Infof("Instance %s, assembled IP addresses: %v", node.Name, addresses)
