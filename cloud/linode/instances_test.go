@@ -144,6 +144,90 @@ func TestMetadataRetrieval(t *testing.T) {
 		}, meta.NodeAddresses)
 	})
 
+	t.Run("should return data when linode is found (by name) and addresses must be in order", func(t *testing.T) {
+		instances := newInstances(client)
+		id := 123
+		name := "mock-instance"
+		node := nodeWithName(name)
+		publicIPv4 := net.ParseIP("45.76.101.25")
+		privateIPv4 := net.ParseIP("192.168.133.65")
+		ipv6Addr := "2001::8a2e:370:7348"
+		linodeType := "g6-standard-1"
+		region := "us-east"
+
+		Options.VPCNames = "test"
+		vpcIDs["test"] = 1
+		Options.EnableRouteController = true
+
+		instance := linodego.Instance{
+			ID:     id,
+			Label:  name,
+			Type:   linodeType,
+			Region: region,
+			IPv4:   []*net.IP{&publicIPv4, &privateIPv4},
+			IPv6:   ipv6Addr,
+		}
+		vpcIP := "10.0.0.2"
+		addressRange1 := "10.192.0.0/24"
+		addressRange2 := "10.192.10.0/24"
+		routesInVPC := []linodego.VPCIP{
+			{
+				Address:      &vpcIP,
+				AddressRange: nil,
+				VPCID:        vpcIDs["test"],
+				NAT1To1:      nil,
+				LinodeID:     id,
+			},
+			{
+				Address:      nil,
+				AddressRange: &addressRange1,
+				VPCID:        vpcIDs["test"],
+				NAT1To1:      nil,
+				LinodeID:     id,
+			},
+			{
+				Address:      nil,
+				AddressRange: &addressRange2,
+				VPCID:        vpcIDs["test"],
+				NAT1To1:      nil,
+				LinodeID:     id,
+			},
+		}
+
+		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{instance}, nil)
+		client.EXPECT().ListVPCIPAddresses(gomock.Any(), vpcIDs["test"], gomock.Any()).Return(routesInVPC, nil)
+
+		meta, err := instances.InstanceMetadata(ctx, node)
+		assert.NoError(t, err)
+		assert.Equal(t, providerIDPrefix+strconv.Itoa(id), meta.ProviderID)
+		assert.Equal(t, region, meta.Region)
+		assert.Equal(t, linodeType, meta.InstanceType)
+		assert.Equal(t, []v1.NodeAddress{
+			{
+				Type:    v1.NodeHostName,
+				Address: name,
+			},
+			{
+				Type:    v1.NodeInternalIP,
+				Address: vpcIP,
+			},
+			{
+				Type:    v1.NodeExternalIP,
+				Address: publicIPv4.String(),
+			},
+			{
+				Type:    v1.NodeInternalIP,
+				Address: privateIPv4.String(),
+			},
+			{
+				Type:    v1.NodeExternalIP,
+				Address: ipv6Addr,
+			},
+		}, meta.NodeAddresses)
+
+		Options.VPCNames = ""
+	})
+
 	ipTests := []struct {
 		name              string
 		inputIPv4s        []string
@@ -226,7 +310,7 @@ func TestMetadataRetrieval(t *testing.T) {
 			nil,
 		},
 		{
-			"one private addresses, one existing internal IP set on the node",
+			"one private address, one existing internal IP set on the node",
 			[]string{"192.168.121.42"},
 			"",
 			"",
@@ -329,7 +413,7 @@ func TestMetadataRetrieval(t *testing.T) {
 		expectedInstance := linodego.Instance{Label: "expected-instance", ID: 12345, IPv4: []*net.IP{&publicIP, &privateIP}}
 
 		for _, test := range getByIPTests {
-			t.Run(fmt.Sprintf("gets lindoe by IP - %s", test.name), func(t *testing.T) {
+			t.Run(fmt.Sprintf("gets linode by IP - %s", test.name), func(t *testing.T) {
 				instances := newInstances(client)
 				client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{{ID: 3456, IPv4: []*net.IP{&wrongIP}}, expectedInstance}, nil)
 				node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node-1"}, Status: v1.NodeStatus{Addresses: test.nodeAddresses}}
