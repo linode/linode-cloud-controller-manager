@@ -60,6 +60,9 @@ spec:
             {{- if .Values.sharedIPLoadBalancing.bgpNodeSelector }}
             - --bgp-node-selector={{ .Values.sharedIPLoadBalancing.bgpNodeSelector }}
             {{- end }}
+            {{- if .Values.sharedIPLoadBalancing.ipHolderSuffix }}
+            - --ip-holder-suffix={{ .Values.sharedIPLoadBalancing.ipHolderSuffix }}
+            {{- end}}
             - --load-balancer-type={{ required "A valid .Values.sharedIPLoadBalancing.loadBalancerType is required for shared IP load-balancing" .Values.sharedIPLoadBalancing.loadBalancerType }}
             {{- end }}
           volumeMounts:

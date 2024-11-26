@@ -69,14 +69,15 @@ var (
 			},
 		},
 	}
-	publicIPv4       = net.ParseIP("45.76.101.25")
-	ipHolderInstance = linodego.Instance{
+	publicIPv4          = net.ParseIP("45.76.101.25")
+	oldIpHolderInstance = linodego.Instance{
 		ID:     12345,
 		Label:  fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone),
 		Type:   "g6-standard-1",
 		Region: "us-west",
 		IPv4:   []*net.IP{&publicIPv4},
 	}
+	newIpHolderInstance = linodego.Instance{}
 )
 
 func TestCiliumCCMLoadBalancers(t *testing.T) {
@@ -93,20 +94,44 @@ func TestCiliumCCMLoadBalancers(t *testing.T) {
 			f:    testUnsupportedRegion,
 		},
 		{
-			name: "Create Cilium Load Balancer With explicit loadBalancerClass and existing IP holder nanode",
-			f:    testCreateWithExistingIPHolder,
+			name: "Create Cilium Load Balancer With explicit loadBalancerClass and existing IP holder nanode with old IP Holder naming convention",
+			f:    testCreateWithExistingIPHolderWithOldIpHolderNamingConvention,
 		},
 		{
-			name: "Create Cilium Load Balancer With no existing IP holder nanode",
-			f:    testCreateWithNoExistingIPHolder,
+			name: "Create Cilium Load Balancer With explicit loadBalancerClass and existing IP holder nanode with new IP Holder naming convention",
+			f:    testCreateWithExistingIPHolderWithNewIpHolderNamingConvention,
 		},
 		{
-			name: "Delete Cilium Load Balancer",
-			f:    testEnsureCiliumLoadBalancerDeleted,
+			name: "Create Cilium Load Balancer With explicit loadBalancerClass and existing IP holder nanode with new IP Holder naming convention and 63 char long suffix",
+			f:    testCreateWithExistingIPHolderWithNewIpHolderNamingConventionUsingLongSuffix,
 		},
 		{
-			name: "Add node to existing Cilium Load Balancer",
-			f:    testCiliumUpdateLoadBalancerAddNode,
+			name: "Create Cilium Load Balancer With no existing IP holder nanode and short suffix",
+			f:    testCreateWithNoExistingIPHolderUsingShortSuffix,
+		},
+		{
+			name: "Create Cilium Load Balancer With no existing IP holder nanode and no suffix",
+			f:    testCreateWithNoExistingIPHolderUsingNoSuffix,
+		},
+		{
+			name: "Create Cilium Load Balancer With no existing IP holder nanode and 63 char long suffix",
+			f:    testCreateWithNoExistingIPHolderUsingLongSuffix,
+		},
+		{
+			name: "Delete Cilium Load Balancer With Old IP Holder Naming Convention",
+			f:    testEnsureCiliumLoadBalancerDeletedWithOldIpHolderNamingConvention,
+		},
+		{
+			name: "Delete Cilium Load Balancer With New IP Holder Naming Convention",
+			f:    testEnsureCiliumLoadBalancerDeletedWithNewIpHolderNamingConvention,
+		},
+		{
+			name: "Add node to existing Cilium Load Balancer With Old IP Holder Naming Convention",
+			f:    testCiliumUpdateLoadBalancerAddNodeWithOldIpHolderNamingConvention,
+		},
+		{
+			name: "Add node to existing Cilium Load Balancer With New IP Holder Naming Convention",
+			f:    testCiliumUpdateLoadBalancerAddNodeWithNewIpHolderNamingConvention,
 		},
 	}
 	for _, tc := range testCases {
@@ -163,9 +188,21 @@ func addNodes(t *testing.T, kubeClient kubernetes.Interface, nodes []*v1.Node) {
 	}
 }
 
+func createNewIpHolderInstance() linodego.Instance {
+	return linodego.Instance{
+		ID:     123456,
+		Label:  generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix),
+		Type:   "g6-standard-1",
+		Region: "us-west",
+		IPv4:   []*net.IP{&publicIPv4},
+	}
+}
+
 func testNoBGPNodeLabel(t *testing.T, mc *mocks.MockClient) {
 	Options.BGPNodeSelector = ""
+	Options.IpHolderSuffix = "linodelb"
 	svc := createTestService()
+	newIpHolderInstance = createNewIpHolderInstance()
 
 	kubeClient, _ := k8sClient.NewFakeClientset()
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
@@ -176,14 +213,17 @@ func testNoBGPNodeLabel(t *testing.T, mc *mocks.MockClient) {
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
 	rawFilter, _ := json.Marshal(filter)
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
+	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix)}
+	rawFilter, _ = json.Marshal(filter)
+	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
 	dummySharedIP := "45.76.101.26"
-	mc.EXPECT().CreateInstance(gomock.Any(), gomock.Any()).Times(1).Return(&ipHolderInstance, nil)
-	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), ipHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
+	mc.EXPECT().CreateInstance(gomock.Any(), gomock.Any()).Times(1).Return(&newIpHolderInstance, nil)
+	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), newIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
 		IPv4: &linodego.InstanceIPv4Response{
 			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
 		},
 	}, nil)
-	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), ipHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), newIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
 		IPs:      []string{dummySharedIP},
 		LinodeID: 11111,
@@ -224,9 +264,10 @@ func testUnsupportedRegion(t *testing.T, mc *mocks.MockClient) {
 	}
 }
 
-func testCreateWithExistingIPHolder(t *testing.T, mc *mocks.MockClient) {
+func testCreateWithExistingIPHolderWithOldIpHolderNamingConvention(t *testing.T, mc *mocks.MockClient) {
 	Options.BGPNodeSelector = "cilium-bgp-peering=true"
 	svc := createTestService()
+	newIpHolderInstance = createNewIpHolderInstance()
 
 	kubeClient, _ := k8sClient.NewFakeClientset()
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
@@ -236,10 +277,10 @@ func testCreateWithExistingIPHolder(t *testing.T, mc *mocks.MockClient) {
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
 	rawFilter, _ := json.Marshal(filter)
-	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{ipHolderInstance}, nil)
+	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{oldIpHolderInstance}, nil)
 	dummySharedIP := "45.76.101.26"
-	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), ipHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
-	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), ipHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
+	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), oldIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), oldIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
 		IPv4: &linodego.InstanceIPv4Response{
 			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
 		},
@@ -262,9 +303,91 @@ func testCreateWithExistingIPHolder(t *testing.T, mc *mocks.MockClient) {
 	}
 }
 
-func testCreateWithNoExistingIPHolder(t *testing.T, mc *mocks.MockClient) {
+func testCreateWithExistingIPHolderWithNewIpHolderNamingConvention(t *testing.T, mc *mocks.MockClient) {
 	Options.BGPNodeSelector = "cilium-bgp-peering=true"
+	Options.IpHolderSuffix = "linodelb"
 	svc := createTestService()
+	newIpHolderInstance = createNewIpHolderInstance()
+
+	kubeClient, _ := k8sClient.NewFakeClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
+	addService(t, kubeClient, svc)
+	addNodes(t, kubeClient, nodes)
+	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
+
+	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
+	rawFilter, _ := json.Marshal(filter)
+	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{oldIpHolderInstance}, nil)
+	dummySharedIP := "45.76.101.26"
+	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), oldIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), oldIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
+		IPv4: &linodego.InstanceIPv4Response{
+			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
+		},
+	}, nil)
+	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
+		IPs:      []string{dummySharedIP},
+		LinodeID: 11111,
+	}).Times(1)
+	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
+		IPs:      []string{dummySharedIP},
+		LinodeID: 22222,
+	}).Times(1)
+
+	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Fatalf("expected a nil error, got %v", err)
+	}
+	if lbStatus == nil {
+		t.Fatal("expected non-nil lbStatus")
+	}
+}
+
+func testCreateWithExistingIPHolderWithNewIpHolderNamingConventionUsingLongSuffix(t *testing.T, mc *mocks.MockClient) {
+	Options.BGPNodeSelector = "cilium-bgp-peering=true"
+	Options.IpHolderSuffix = "OaTJrRuufacHVougjwkpBpmstiqvswvBNEMWXsRYfMBTCkKIUTXpbGIcIbDWSQp"
+	svc := createTestService()
+	newIpHolderInstance = createNewIpHolderInstance()
+
+	kubeClient, _ := k8sClient.NewFakeClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
+	addService(t, kubeClient, svc)
+	addNodes(t, kubeClient, nodes)
+	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
+
+	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
+	rawFilter, _ := json.Marshal(filter)
+	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{oldIpHolderInstance}, nil)
+	dummySharedIP := "45.76.101.26"
+	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), oldIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), oldIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
+		IPv4: &linodego.InstanceIPv4Response{
+			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
+		},
+	}, nil)
+	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
+		IPs:      []string{dummySharedIP},
+		LinodeID: 11111,
+	}).Times(1)
+	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
+		IPs:      []string{dummySharedIP},
+		LinodeID: 22222,
+	}).Times(1)
+
+	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Fatalf("expected a nil error, got %v", err)
+	}
+	if lbStatus == nil {
+		t.Fatal("expected non-nil lbStatus")
+	}
+}
+
+func testCreateWithNoExistingIPHolderUsingNoSuffix(t *testing.T, mc *mocks.MockClient) {
+	Options.BGPNodeSelector = "cilium-bgp-peering=true"
+	Options.IpHolderSuffix = ""
+	svc := createTestService()
+	newIpHolderInstance = createNewIpHolderInstance()
 
 	kubeClient, _ := k8sClient.NewFakeClientset()
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
@@ -275,14 +398,17 @@ func testCreateWithNoExistingIPHolder(t *testing.T, mc *mocks.MockClient) {
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
 	rawFilter, _ := json.Marshal(filter)
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
+	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix)}
+	rawFilter, _ = json.Marshal(filter)
+	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
 	dummySharedIP := "45.76.101.26"
-	mc.EXPECT().CreateInstance(gomock.Any(), gomock.Any()).Times(1).Return(&ipHolderInstance, nil)
-	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), ipHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
+	mc.EXPECT().CreateInstance(gomock.Any(), gomock.Any()).Times(1).Return(&newIpHolderInstance, nil)
+	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), newIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
 		IPv4: &linodego.InstanceIPv4Response{
 			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
 		},
 	}, nil)
-	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), ipHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), newIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
 		IPs:      []string{dummySharedIP},
 		LinodeID: 11111,
@@ -301,7 +427,95 @@ func testCreateWithNoExistingIPHolder(t *testing.T, mc *mocks.MockClient) {
 	}
 }
 
-func testEnsureCiliumLoadBalancerDeleted(t *testing.T, mc *mocks.MockClient) {
+func testCreateWithNoExistingIPHolderUsingShortSuffix(t *testing.T, mc *mocks.MockClient) {
+	Options.BGPNodeSelector = "cilium-bgp-peering=true"
+	Options.IpHolderSuffix = "linodelb"
+	svc := createTestService()
+	newIpHolderInstance = createNewIpHolderInstance()
+
+	kubeClient, _ := k8sClient.NewFakeClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
+	addService(t, kubeClient, svc)
+	addNodes(t, kubeClient, nodes)
+	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
+
+	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
+	rawFilter, _ := json.Marshal(filter)
+	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
+	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix)}
+	rawFilter, _ = json.Marshal(filter)
+	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
+	dummySharedIP := "45.76.101.26"
+	mc.EXPECT().CreateInstance(gomock.Any(), gomock.Any()).Times(1).Return(&newIpHolderInstance, nil)
+	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), newIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
+		IPv4: &linodego.InstanceIPv4Response{
+			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
+		},
+	}, nil)
+	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), newIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
+		IPs:      []string{dummySharedIP},
+		LinodeID: 11111,
+	}).Times(1)
+	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
+		IPs:      []string{dummySharedIP},
+		LinodeID: 22222,
+	}).Times(1)
+
+	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Fatalf("expected a nil error, got %v", err)
+	}
+	if lbStatus == nil {
+		t.Fatal("expected non-nil lbStatus")
+	}
+}
+
+func testCreateWithNoExistingIPHolderUsingLongSuffix(t *testing.T, mc *mocks.MockClient) {
+	Options.BGPNodeSelector = "cilium-bgp-peering=true"
+	Options.IpHolderSuffix = "OaTJrRuufacHVougjwkpBpmstiqvswvBNEMWXsRYfMBTCkKIUTXpbGIcIbDWSQp"
+	svc := createTestService()
+	newIpHolderInstance = createNewIpHolderInstance()
+
+	kubeClient, _ := k8sClient.NewFakeClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
+	addService(t, kubeClient, svc)
+	addNodes(t, kubeClient, nodes)
+	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
+
+	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
+	rawFilter, _ := json.Marshal(filter)
+	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
+	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix)}
+	rawFilter, _ = json.Marshal(filter)
+	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
+	dummySharedIP := "45.76.101.26"
+	mc.EXPECT().CreateInstance(gomock.Any(), gomock.Any()).Times(1).Return(&newIpHolderInstance, nil)
+	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), newIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
+		IPv4: &linodego.InstanceIPv4Response{
+			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
+		},
+	}, nil)
+	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), newIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
+		IPs:      []string{dummySharedIP},
+		LinodeID: 11111,
+	}).Times(1)
+	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
+		IPs:      []string{dummySharedIP},
+		LinodeID: 22222,
+	}).Times(1)
+
+	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Fatalf("expected a nil error, got %v", err)
+	}
+	if lbStatus == nil {
+		t.Fatal("expected non-nil lbStatus")
+	}
+}
+
+func testEnsureCiliumLoadBalancerDeletedWithOldIpHolderNamingConvention(t *testing.T, mc *mocks.MockClient) {
 	Options.BGPNodeSelector = "cilium-bgp-peering=true"
 	svc := createTestService()
 
@@ -316,10 +530,10 @@ func testEnsureCiliumLoadBalancerDeleted(t *testing.T, mc *mocks.MockClient) {
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
 	rawFilter, _ := json.Marshal(filter)
-	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{ipHolderInstance}, nil)
+	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{oldIpHolderInstance}, nil)
 	mc.EXPECT().DeleteInstanceIPAddress(gomock.Any(), 11111, dummySharedIP).Times(1).Return(nil)
 	mc.EXPECT().DeleteInstanceIPAddress(gomock.Any(), 22222, dummySharedIP).Times(1).Return(nil)
-	mc.EXPECT().DeleteInstanceIPAddress(gomock.Any(), ipHolderInstance.ID, dummySharedIP).Times(1).Return(nil)
+	mc.EXPECT().DeleteInstanceIPAddress(gomock.Any(), oldIpHolderInstance.ID, dummySharedIP).Times(1).Return(nil)
 
 	err := lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
 	if err != nil {
@@ -327,7 +541,38 @@ func testEnsureCiliumLoadBalancerDeleted(t *testing.T, mc *mocks.MockClient) {
 	}
 }
 
-func testCiliumUpdateLoadBalancerAddNode(t *testing.T, mc *mocks.MockClient) {
+func testEnsureCiliumLoadBalancerDeletedWithNewIpHolderNamingConvention(t *testing.T, mc *mocks.MockClient) {
+	Options.BGPNodeSelector = "cilium-bgp-peering=true"
+	Options.IpHolderSuffix = "linodelb"
+	svc := createTestService()
+	newIpHolderInstance = createNewIpHolderInstance()
+
+	kubeClient, _ := k8sClient.NewFakeClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
+	addService(t, kubeClient, svc)
+	addNodes(t, kubeClient, nodes)
+	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
+
+	dummySharedIP := "45.76.101.26"
+	svc.Status.LoadBalancer = v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{{IP: dummySharedIP}}}
+
+	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
+	rawFilter, _ := json.Marshal(filter)
+	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
+	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix)}
+	rawFilter, _ = json.Marshal(filter)
+	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{newIpHolderInstance}, nil)
+	mc.EXPECT().DeleteInstanceIPAddress(gomock.Any(), 11111, dummySharedIP).Times(1).Return(nil)
+	mc.EXPECT().DeleteInstanceIPAddress(gomock.Any(), 22222, dummySharedIP).Times(1).Return(nil)
+	mc.EXPECT().DeleteInstanceIPAddress(gomock.Any(), newIpHolderInstance.ID, dummySharedIP).Times(1).Return(nil)
+
+	err := lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+	if err != nil {
+		t.Fatalf("expected a nil error, got %v", err)
+	}
+}
+
+func testCiliumUpdateLoadBalancerAddNodeWithOldIpHolderNamingConvention(t *testing.T, mc *mocks.MockClient) {
 	Options.BGPNodeSelector = "cilium-bgp-peering=true"
 	svc := createTestService()
 
@@ -339,10 +584,10 @@ func testCiliumUpdateLoadBalancerAddNode(t *testing.T, mc *mocks.MockClient) {
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
 	rawFilter, _ := json.Marshal(filter)
-	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{ipHolderInstance}, nil)
+	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{oldIpHolderInstance}, nil)
 	dummySharedIP := "45.76.101.26"
-	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), ipHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
-	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), ipHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
+	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), oldIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), oldIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
 		IPv4: &linodego.InstanceIPv4Response{
 			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
 		},
@@ -365,8 +610,75 @@ func testCiliumUpdateLoadBalancerAddNode(t *testing.T, mc *mocks.MockClient) {
 	}
 
 	// Now add another node to the cluster and assert that it gets the shared IP
-	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{ipHolderInstance}, nil)
-	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), ipHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
+	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{oldIpHolderInstance}, nil)
+	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), oldIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
+		IPv4: &linodego.InstanceIPv4Response{
+			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
+		},
+	}, nil)
+	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
+		IPs:      []string{dummySharedIP},
+		LinodeID: 55555,
+	}).Times(1)
+	addNodes(t, kubeClient, additionalNodes)
+
+	err = lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, additionalNodes)
+	if err != nil {
+		t.Fatalf("expected a nil error, got %v", err)
+	}
+}
+
+func testCiliumUpdateLoadBalancerAddNodeWithNewIpHolderNamingConvention(t *testing.T, mc *mocks.MockClient) {
+	Options.BGPNodeSelector = "cilium-bgp-peering=true"
+	Options.IpHolderSuffix = "linodelb"
+	svc := createTestService()
+	newIpHolderInstance = createNewIpHolderInstance()
+
+	kubeClient, _ := k8sClient.NewFakeClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
+	addService(t, kubeClient, svc)
+	addNodes(t, kubeClient, nodes)
+	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
+
+	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
+	rawFilter, _ := json.Marshal(filter)
+	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
+	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix)}
+	rawFilter, _ = json.Marshal(filter)
+	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{newIpHolderInstance}, nil)
+	dummySharedIP := "45.76.101.26"
+	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), newIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), newIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
+		IPv4: &linodego.InstanceIPv4Response{
+			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
+		},
+	}, nil)
+	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
+		IPs:      []string{dummySharedIP},
+		LinodeID: 11111,
+	}).Times(1)
+	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
+		IPs:      []string{dummySharedIP},
+		LinodeID: 22222,
+	}).Times(1)
+
+	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Fatalf("expected a nil error, got %v", err)
+	}
+	if lbStatus == nil {
+		t.Fatal("expected non-nil lbStatus")
+	}
+
+	// Now add another node to the cluster and assert that it gets the shared IP
+	filter = map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
+	rawFilter, _ = json.Marshal(filter)
+	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
+	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix)}
+	rawFilter, _ = json.Marshal(filter)
+	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{newIpHolderInstance}, nil)
+
+	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), newIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
 		IPv4: &linodego.InstanceIPv4Response{
 			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
 		},
