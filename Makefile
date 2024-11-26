@@ -14,7 +14,7 @@ HELM_VERSION            ?= v3.16.3
 # Dev Setup
 #####################################################################
 CLUSTER_NAME            ?= ccm-$(shell git rev-parse --short HEAD)
-K8S_VERSION             ?= "v1.29.1"
+K8S_VERSION             ?= "v1.31.2"
 CAPI_VERSION            ?= "v1.6.3"
 CAAPH_VERSION           ?= "v0.2.1"
 CAPL_VERSION            ?= "v0.7.1"
