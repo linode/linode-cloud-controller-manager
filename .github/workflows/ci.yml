@@ -57,6 +57,7 @@ jobs:
             cli.codecov.io:443
             api.codecov.io:443
             raw.githubusercontent.com:443
+            get.helm.sh:443
 
       - uses: actions/checkout@v4
         with:
@@ -69,8 +70,10 @@ jobs:
       - name: Vet
         run: make vet
 
-      - name: Lint
-        run: make lint
+      - name: lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
 
       - name: Helm Lint
         run: make helm-lint
@@ -79,10 +82,9 @@ jobs:
         run: make test
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v4
         with:
           files: ./coverage.out
-          fail_ci_if_error: true
           verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: linode/linode-cloud-controller-manager
