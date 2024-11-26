@@ -7,6 +7,8 @@ CACHE_BIN               ?= $(CURDIR)/bin
 LOCALBIN                ?= $(CACHE_BIN)
 
 DEVBOX_BIN              ?= $(DEVBOX_PACKAGES_DIR)/bin
+HELM                    ?= $(LOCALBIN)/helm
+HELM_VERSION            ?= v3.16.3
 
 #####################################################################
 # Dev Setup
@@ -14,7 +16,7 @@ DEVBOX_BIN              ?= $(DEVBOX_PACKAGES_DIR)/bin
 CLUSTER_NAME            ?= ccm-$(shell git rev-parse --short HEAD)
 K8S_VERSION             ?= "v1.29.1"
 CAPI_VERSION            ?= "v1.6.3"
-HELM_VERSION            ?= "v0.2.1"
+CAAPH_VERSION           ?= "v0.2.1"
 CAPL_VERSION            ?= "v0.7.1"
 CONTROLPLANE_NODES      ?= 1
 WORKER_NODES            ?= 1
@@ -55,10 +57,15 @@ vet: fmt
 
 .PHONY: lint
 lint:
-	docker run --rm -v "$(shell pwd):/var/work:ro" -w /var/work \
-		golangci/golangci-lint:v1.57.2 golangci-lint run -v --timeout=5m
-	docker run --rm -v "$(shell pwd):/var/work:ro" -w /var/work/e2e \
-		golangci/golangci-lint:v1.57.2 golangci-lint run -v --timeout=5m
+	docker run --rm -v "$(PWD):/var/work:ro" -w /var/work \
+		golangci/golangci-lint:latest golangci-lint run -v --timeout=5m
+	docker run --rm -v "$(PWD):/var/work:ro" -w /var/work/e2e \
+		golangci/golangci-lint:latest golangci-lint run -v --timeout=5m
+
+.PHONY: gosec
+gosec: ## Run gosec against code.
+	docker run --rm -v "$(PWD):/var/work:ro" -w /var/work securego/gosec:2.19.0 \
+		-exclude-dir=bin -exclude-generated ./...
 
 .PHONY: fmt
 fmt:
@@ -150,13 +157,14 @@ create-capl-cluster:
 	kubectl wait --for=condition=NodeHealthy=true machines -l cluster.x-k8s.io/cluster-name=$(CLUSTER_NAME) --timeout=900s
 	clusterctl get kubeconfig $(CLUSTER_NAME) > $(KUBECONFIG_PATH)
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl wait --for=condition=Ready nodes --all --timeout=600s
-	# Remove all taints so that pods can be scheduled anywhere (without this, some tests fail)
+	# Remove all taints from control plane node so that pods scheduled on it by tests can run (without this, some tests fail)
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl taint nodes -l node-role.kubernetes.io/control-plane node-role.kubernetes.io/control-plane-
 
 .PHONY: patch-linode-ccm
 patch-linode-ccm:
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl patch -n kube-system daemonset ccm-linode --type='json' -p="[{'op': 'replace', 'path': '/spec/template/spec/containers/0/image', 'value': '${IMG}'}]"
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl rollout status -n kube-system daemonset/ccm-linode --timeout=600s
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl -n kube-system get daemonset/ccm-linode -o yaml
 
 .PHONY: mgmt-cluster
 mgmt-cluster:
@@ -166,7 +174,7 @@ mgmt-cluster:
 		--wait-providers \
 		--wait-provider-timeout 600 \
 		--core cluster-api:$(CAPI_VERSION) \
-		--addon helm:$(HELM_VERSION) \
+		--addon helm:$(CAAPH_VERSION) \
 		--infrastructure linode-linode:$(CAPL_VERSION)
 
 .PHONY: cleanup-cluster
@@ -196,9 +204,6 @@ ARCH_SHORT := amd64
 else ifeq ($(ARCH_SHORT),aarch64)
 ARCH_SHORT := arm64
 endif
-
-HELM         ?= $(LOCALBIN)/helm
-HELM_VERSION ?= v3.9.1
 
 .PHONY: helm
 helm: $(HELM) ## Download helm locally if necessary
