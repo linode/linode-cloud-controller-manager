@@ -1,12 +1,26 @@
-IMG ?= linode/linode-cloud-controller-manager:canary
-RELEASE_DIR ?= release
-PLATFORM ?= linux/amd64
+IMG                     ?= linode/linode-cloud-controller-manager:canary
+RELEASE_DIR             ?= release
+PLATFORM                ?= linux/amd64
 
 # Use CACHE_BIN for tools that cannot use devbox and LOCALBIN for tools that can use either method
-CACHE_BIN ?= $(CURDIR)/bin
-LOCALBIN ?= $(CACHE_BIN)
+CACHE_BIN               ?= $(CURDIR)/bin
+LOCALBIN                ?= $(CACHE_BIN)
 
-DEVBOX_BIN ?= $(DEVBOX_PACKAGES_DIR)/bin
+DEVBOX_BIN              ?= $(DEVBOX_PACKAGES_DIR)/bin
+
+#####################################################################
+# Dev Setup
+#####################################################################
+CLUSTER_NAME            ?= ccm-$(shell git rev-parse --short HEAD)
+K8S_VERSION             ?= "v1.29.1"
+CAPI_VERSION            ?= "v1.6.3"
+HELM_VERSION            ?= "v0.2.1"
+CAPL_VERSION            ?= "v0.7.1"
+CONTROLPLANE_NODES      ?= 1
+WORKER_NODES            ?= 1
+LINODE_FIREWALL_ENABLED ?= true
+LINODE_REGION           ?= us-lax
+KUBECONFIG_PATH         ?= $(CURDIR)/test-cluster-kubeconfig.yaml
 
 # if the $DEVBOX_PACKAGES_DIR env variable exists that means we are within a devbox shell and can safely
 # use devbox's bin for our tools
@@ -88,8 +102,10 @@ docker-build: build-linux
 .PHONY: docker-push
 # must run the docker build before pushing the image
 docker-push:
-	echo "[reminder] Did you run `make docker-build`?"
 	docker push ${IMG}
+
+.PHONY: docker-setup
+docker-setup: docker-build docker-push
 
 .PHONY: run
 # run the ccm locally, really only makes sense on linux anyway
@@ -107,6 +123,66 @@ run-debug: build
 		--stderrthreshold=INFO \
 		--kubeconfig=${KUBECONFIG} \
 		--linodego-debug
+
+#####################################################################
+# E2E Test Setup
+#####################################################################
+
+.PHONY: mgmt-and-capl-cluster
+mgmt-and-capl-cluster: docker-setup mgmt-cluster capl-cluster
+
+.PHONY: capl-cluster
+capl-cluster: generate-capl-cluster-manifests create-capl-cluster patch-linode-ccm
+
+.PHONY: generate-capl-cluster-manifests
+generate-capl-cluster-manifests:
+	# Create the CAPL cluster manifests without any CSI driver stuff
+	LINODE_FIREWALL_ENABLED=$(LINODE_FIREWALL_ENABLED) clusterctl generate cluster $(CLUSTER_NAME) \
+		--kubernetes-version $(K8S_VERSION) \
+		--infrastructure linode-linode:$(CAPL_VERSION) \
+		--control-plane-machine-count $(CONTROLPLANE_NODES) --worker-machine-count $(WORKER_NODES) > capl-cluster-manifests.yaml
+
+.PHONY: create-capl-cluster
+create-capl-cluster:
+	# Create a CAPL cluster with updated CCM and wait for it to be ready
+	kubectl apply -f capl-cluster-manifests.yaml
+	kubectl wait --for=condition=ControlPlaneReady cluster/$(CLUSTER_NAME) --timeout=600s || (kubectl get cluster -o yaml; kubectl get linodecluster -o yaml; kubectl get linodemachines -o yaml)
+	kubectl wait --for=condition=NodeHealthy=true machines -l cluster.x-k8s.io/cluster-name=$(CLUSTER_NAME) --timeout=900s
+	clusterctl get kubeconfig $(CLUSTER_NAME) > $(KUBECONFIG_PATH)
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl wait --for=condition=Ready nodes --all --timeout=600s
+	# Remove all taints so that pods can be scheduled anywhere (without this, some tests fail)
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl taint nodes -l node-role.kubernetes.io/control-plane node-role.kubernetes.io/control-plane-
+
+.PHONY: patch-linode-ccm
+patch-linode-ccm:
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl patch -n kube-system daemonset ccm-linode --type='json' -p="[{'op': 'replace', 'path': '/spec/template/spec/containers/0/image', 'value': '${IMG}'}]"
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl rollout status -n kube-system daemonset/ccm-linode --timeout=600s
+
+.PHONY: mgmt-cluster
+mgmt-cluster:
+	# Create a mgmt cluster
+	ctlptl apply -f e2e/setup/ctlptl-config.yaml
+	clusterctl init \
+		--wait-providers \
+		--wait-provider-timeout 600 \
+		--core cluster-api:$(CAPI_VERSION) \
+		--addon helm:$(HELM_VERSION) \
+		--infrastructure linode-linode:$(CAPL_VERSION)
+
+.PHONY: cleanup-cluster
+cleanup-cluster:
+	kubectl delete cluster --all
+	kubectl delete linodefirewalls --all
+	kubectl delete lvpc --all
+	kind delete cluster -n caplccm
+
+.PHONY: e2e-test
+e2e-test:
+	$(MAKE) -C e2e test LINODE_API_TOKEN=$(LINODE_TOKEN) SUITE_ARGS="--region=$(LINODE_REGION) --use-existing --timeout=5m --kubeconfig=$(KUBECONFIG_PATH) --image=$(IMG) --linode-url https://api.linode.com/"
+
+#####################################################################
+# OS / ARCH
+#####################################################################
 
 # Set the host's OS. Only linux and darwin supported for now
 HOSTOS := $(shell uname -s | tr '[:upper:]' '[:lower:]')

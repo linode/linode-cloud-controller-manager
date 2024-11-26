@@ -18,6 +18,13 @@
     "init_hook": [
       "export \"GOROOT=$(go env GOROOT)\""
     ],
-    "scripts": {}
+    "scripts": {
+      "mgmt-and-capl-cluster": "make mgmt-and-capl-cluster",
+      "e2e-test": "make e2e-test",
+      "cleanup-cluster": "make cleanup-cluster"
+    }
+  },
+  "env": {
+    "EXP_CLUSTER_RESOURCE_SET": "true"
   }
 }

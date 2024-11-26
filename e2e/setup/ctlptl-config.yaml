@@ -1,0 +1,9 @@
+---
+apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+product: kind
+kindV1Alpha4Cluster:
+  name: caplccm
+  nodes:
+    - role: control-plane
+      image: kindest/node:v1.29.2
