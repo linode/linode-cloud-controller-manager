@@ -28,16 +28,15 @@ jobs:
           filters: .github/filters.yml
   ci:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: [ 'stable', '1.22' ]
+    needs: changes
+    if: ${{ contains(fromJSON(needs.changes.outputs.paths), 'src') }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version-file: go.mod
       - name: Vet
         run: make vet
       - name: Lint
@@ -47,7 +46,7 @@ jobs:
       - name: Test
         run: make test
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: ./coverage.out
           fail_ci_if_error: true
