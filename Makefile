@@ -22,6 +22,7 @@ CONTROLPLANE_NODES      ?= 1
 WORKER_NODES            ?= 1
 LINODE_FIREWALL_ENABLED ?= true
 LINODE_REGION           ?= us-lax
+LINODE_OS               ?= linode/ubuntu22.04
 KUBECONFIG_PATH         ?= $(CURDIR)/test-cluster-kubeconfig.yaml
 
 # if the $DEVBOX_PACKAGES_DIR env variable exists that means we are within a devbox shell and can safely
@@ -144,9 +145,8 @@ capl-cluster: generate-capl-cluster-manifests create-capl-cluster patch-linode-c
 .PHONY: generate-capl-cluster-manifests
 generate-capl-cluster-manifests:
 	# Create the CAPL cluster manifests without any CSI driver stuff
-	LINODE_FIREWALL_ENABLED=$(LINODE_FIREWALL_ENABLED) clusterctl generate cluster $(CLUSTER_NAME) \
-		--kubernetes-version $(K8S_VERSION) \
-		--infrastructure linode-linode:$(CAPL_VERSION) \
+	LINODE_FIREWALL_ENABLED=$(LINODE_FIREWALL_ENABLED) LINODE_OS=$(LINODE_OS) clusterctl generate cluster $(CLUSTER_NAME) \
+		--kubernetes-version $(K8S_VERSION) --infrastructure linode-linode:$(CAPL_VERSION) \
 		--control-plane-machine-count $(CONTROLPLANE_NODES) --worker-machine-count $(WORKER_NODES) > capl-cluster-manifests.yaml
 
 .PHONY: create-capl-cluster
@@ -179,9 +179,9 @@ mgmt-cluster:
 
 .PHONY: cleanup-cluster
 cleanup-cluster:
-	kubectl delete cluster --all
-	kubectl delete linodefirewalls --all
-	kubectl delete lvpc --all
+	kubectl delete cluster -A --all --timeout=180s
+	kubectl delete linodefirewalls -A --all --timeout=60s
+	kubectl delete lvpc -A --all --timeout=60s
 	kind delete cluster -n caplccm
 
 .PHONY: e2e-test
