@@ -1,12 +1,29 @@
-IMG ?= linode/linode-cloud-controller-manager:canary
-RELEASE_DIR ?= release
-PLATFORM ?= linux/amd64
+IMG                     ?= linode/linode-cloud-controller-manager:canary
+RELEASE_DIR             ?= release
+PLATFORM                ?= linux/amd64
 
 # Use CACHE_BIN for tools that cannot use devbox and LOCALBIN for tools that can use either method
-CACHE_BIN ?= $(CURDIR)/bin
-LOCALBIN ?= $(CACHE_BIN)
+CACHE_BIN               ?= $(CURDIR)/bin
+LOCALBIN                ?= $(CACHE_BIN)
 
-DEVBOX_BIN ?= $(DEVBOX_PACKAGES_DIR)/bin
+DEVBOX_BIN              ?= $(DEVBOX_PACKAGES_DIR)/bin
+HELM                    ?= $(LOCALBIN)/helm
+HELM_VERSION            ?= v3.16.3
+
+#####################################################################
+# Dev Setup
+#####################################################################
+CLUSTER_NAME            ?= ccm-$(shell git rev-parse --short HEAD)
+K8S_VERSION             ?= "v1.31.2"
+CAPI_VERSION            ?= "v1.6.3"
+CAAPH_VERSION           ?= "v0.2.1"
+CAPL_VERSION            ?= "v0.7.1"
+CONTROLPLANE_NODES      ?= 1
+WORKER_NODES            ?= 1
+LINODE_FIREWALL_ENABLED ?= true
+LINODE_REGION           ?= us-lax
+LINODE_OS               ?= linode/ubuntu22.04
+KUBECONFIG_PATH         ?= $(CURDIR)/test-cluster-kubeconfig.yaml
 
 # if the $DEVBOX_PACKAGES_DIR env variable exists that means we are within a devbox shell and can safely
 # use devbox's bin for our tools
@@ -41,10 +58,15 @@ vet: fmt
 
 .PHONY: lint
 lint:
-	docker run --rm -v "$(shell pwd):/var/work:ro" -w /var/work \
-		golangci/golangci-lint:v1.57.2 golangci-lint run -v --timeout=5m
-	docker run --rm -v "$(shell pwd):/var/work:ro" -w /var/work/e2e \
-		golangci/golangci-lint:v1.57.2 golangci-lint run -v --timeout=5m
+	docker run --rm -v "$(PWD):/var/work:ro" -w /var/work \
+		golangci/golangci-lint:latest golangci-lint run -v --timeout=5m
+	docker run --rm -v "$(PWD):/var/work:ro" -w /var/work/e2e \
+		golangci/golangci-lint:latest golangci-lint run -v --timeout=5m
+
+.PHONY: gosec
+gosec: ## Run gosec against code.
+	docker run --rm -v "$(PWD):/var/work:ro" -w /var/work securego/gosec:2.19.0 \
+		-exclude-dir=bin -exclude-generated ./...
 
 .PHONY: fmt
 fmt:
@@ -88,8 +110,10 @@ docker-build: build-linux
 .PHONY: docker-push
 # must run the docker build before pushing the image
 docker-push:
-	echo "[reminder] Did you run `make docker-build`?"
 	docker push ${IMG}
+
+.PHONY: docker-setup
+docker-setup: docker-build docker-push
 
 .PHONY: run
 # run the ccm locally, really only makes sense on linux anyway
@@ -108,6 +132,66 @@ run-debug: build
 		--kubeconfig=${KUBECONFIG} \
 		--linodego-debug
 
+#####################################################################
+# E2E Test Setup
+#####################################################################
+
+.PHONY: mgmt-and-capl-cluster
+mgmt-and-capl-cluster: docker-setup mgmt-cluster capl-cluster
+
+.PHONY: capl-cluster
+capl-cluster: generate-capl-cluster-manifests create-capl-cluster patch-linode-ccm
+
+.PHONY: generate-capl-cluster-manifests
+generate-capl-cluster-manifests:
+	# Create the CAPL cluster manifests without any CSI driver stuff
+	LINODE_FIREWALL_ENABLED=$(LINODE_FIREWALL_ENABLED) LINODE_OS=$(LINODE_OS) clusterctl generate cluster $(CLUSTER_NAME) \
+		--kubernetes-version $(K8S_VERSION) --infrastructure linode-linode:$(CAPL_VERSION) \
+		--control-plane-machine-count $(CONTROLPLANE_NODES) --worker-machine-count $(WORKER_NODES) > capl-cluster-manifests.yaml
+
+.PHONY: create-capl-cluster
+create-capl-cluster:
+	# Create a CAPL cluster with updated CCM and wait for it to be ready
+	kubectl apply -f capl-cluster-manifests.yaml
+	kubectl wait --for=condition=ControlPlaneReady cluster/$(CLUSTER_NAME) --timeout=600s || (kubectl get cluster -o yaml; kubectl get linodecluster -o yaml; kubectl get linodemachines -o yaml)
+	kubectl wait --for=condition=NodeHealthy=true machines -l cluster.x-k8s.io/cluster-name=$(CLUSTER_NAME) --timeout=900s
+	clusterctl get kubeconfig $(CLUSTER_NAME) > $(KUBECONFIG_PATH)
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl wait --for=condition=Ready nodes --all --timeout=600s
+	# Remove all taints from control plane node so that pods scheduled on it by tests can run (without this, some tests fail)
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl taint nodes -l node-role.kubernetes.io/control-plane node-role.kubernetes.io/control-plane-
+
+.PHONY: patch-linode-ccm
+patch-linode-ccm:
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl patch -n kube-system daemonset ccm-linode --type='json' -p="[{'op': 'replace', 'path': '/spec/template/spec/containers/0/image', 'value': '${IMG}'}]"
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl rollout status -n kube-system daemonset/ccm-linode --timeout=600s
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl -n kube-system get daemonset/ccm-linode -o yaml
+
+.PHONY: mgmt-cluster
+mgmt-cluster:
+	# Create a mgmt cluster
+	ctlptl apply -f e2e/setup/ctlptl-config.yaml
+	clusterctl init \
+		--wait-providers \
+		--wait-provider-timeout 600 \
+		--core cluster-api:$(CAPI_VERSION) \
+		--addon helm:$(CAAPH_VERSION) \
+		--infrastructure linode-linode:$(CAPL_VERSION)
+
+.PHONY: cleanup-cluster
+cleanup-cluster:
+	kubectl delete cluster -A --all --timeout=180s
+	kubectl delete linodefirewalls -A --all --timeout=60s
+	kubectl delete lvpc -A --all --timeout=60s
+	kind delete cluster -n caplccm
+
+.PHONY: e2e-test
+e2e-test:
+	$(MAKE) -C e2e test LINODE_API_TOKEN=$(LINODE_TOKEN) SUITE_ARGS="--region=$(LINODE_REGION) --use-existing --timeout=5m --kubeconfig=$(KUBECONFIG_PATH) --image=$(IMG) --linode-url https://api.linode.com/"
+
+#####################################################################
+# OS / ARCH
+#####################################################################
+
 # Set the host's OS. Only linux and darwin supported for now
 HOSTOS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
 ifeq ($(filter darwin linux,$(HOSTOS)),)
@@ -120,9 +204,6 @@ ARCH_SHORT := amd64
 else ifeq ($(ARCH_SHORT),aarch64)
 ARCH_SHORT := arm64
 endif
-
-HELM         ?= $(LOCALBIN)/helm
-HELM_VERSION ?= v3.9.1
 
 .PHONY: helm
 helm: $(HELM) ## Download helm locally if necessary

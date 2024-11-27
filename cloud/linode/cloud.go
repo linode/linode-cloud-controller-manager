@@ -117,7 +117,7 @@ func newCloud() (cloudprovider.Interface, error) {
 	if len(Options.IpHolderSuffix) > 23 {
 		msg := fmt.Sprintf("ip-holder-suffix must be 23 characters or less: %s is %d characters\n", Options.IpHolderSuffix, len(Options.IpHolderSuffix))
 		klog.Error(msg)
-		return nil, fmt.Errorf(msg)
+		return nil, fmt.Errorf("%s", msg)
 	}
 
 	// create struct that satisfies cloudprovider.Interface

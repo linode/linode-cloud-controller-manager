@@ -113,7 +113,7 @@ func main() {
 	linode.Options.KubeconfigFlag = command.Flags().Lookup("kubeconfig")
 	if linode.Options.KubeconfigFlag == nil {
 		msg := "kubeconfig missing from CCM flag set"
-		sentry.CaptureError(ctx, fmt.Errorf(msg))
+		sentry.CaptureError(ctx, fmt.Errorf("%s", msg))
 		fmt.Fprintf(os.Stderr, "kubeconfig missing from CCM flag set"+"\n")
 		os.Exit(1)
 	}
@@ -122,7 +122,7 @@ func main() {
 		_, network, err := net.ParseCIDR(externalSubnet)
 		if err != nil {
 			msg := fmt.Sprintf("Unable to parse %s as network subnet: %v", externalSubnet, err)
-			sentry.CaptureError(ctx, fmt.Errorf(msg))
+			sentry.CaptureError(ctx, fmt.Errorf("%s", msg))
 			fmt.Fprintf(os.Stderr, "%v\n", msg)
 			os.Exit(1)
 		}

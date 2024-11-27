@@ -6,37 +6,92 @@ on:
       - main
   pull_request: null
 
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  ci:
+  changes:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: [ 'stable', '1.22' ]
+    outputs:
+      paths: ${{ steps.filter.outputs.changes }}
     steps:
+      - uses: actions/checkout@v4
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          base: ${{ github.ref }}
+          filters: .github/filters.yml
+
+  build-test:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ contains(fromJSON(needs.changes.outputs.paths), 'src') }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            golang.org:443
+            proxy.golang.org:443
+            sum.golang.org:443
+            objects.githubusercontent.com:443
+            storage.googleapis.com:443
+            cli.codecov.io:443
+            api.codecov.io:443
+            raw.githubusercontent.com:443
+            get.helm.sh:443
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version-file: go.mod
+          check-latest: true
+
       - name: Vet
         run: make vet
-      - name: Lint
-        run: make lint
+
+      - name: lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+
       - name: Helm Lint
         run: make helm-lint
+
       - name: Test
         run: make test
+
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
         with:
           files: ./coverage.out
-          fail_ci_if_error: true
           verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: linode/linode-cloud-controller-manager
+
       - name: Build
         run: make build
+
   docker-build:
     runs-on: ubuntu-latest
     steps:
@@ -61,3 +116,45 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             REV=${{ github.ref_name }}
+
+  e2e-tests:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ contains(fromJSON(needs.changes.outputs.paths), 'src') }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.github_token }}
+      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      IMG: linode/linode-cloud-controller-manager:${{ github.ref == 'refs/heads/main' && 'latest' || format('pr-{0}', github.event.number) || github.ref_name }}
+      LINODE_REGION: us-lax
+      LINODE_CONTROL_PLANE_MACHINE_TYPE: g6-standard-2
+      LINODE_MACHINE_TYPE: g6-standard-2
+      WORKER_NODES: '2'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          check-latest: true
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Install devbox
+        uses: jetify-com/devbox-install-action@v0.11.0
+
+      - name: Setup CAPL Management Kind Cluster and CAPL Child Cluster For Testing
+        run: devbox run mgmt-and-capl-cluster
+
+      - name: Run E2E Tests
+        run: devbox run e2e-test
+
+      - name: Cleanup Resources
+        if: always()
+        run: devbox run cleanup-cluster
