@@ -23,6 +23,9 @@ rules:
 - apiGroups: [""]
   resources: ["endpoints"]
   verbs: ["get", "watch", "list", "update", "create"]
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "watch", "list", "update", "create"]
 - apiGroups: [""]
   resources: ["nodes"]
   verbs: ["get", "watch", "list", "update", "delete", "patch"]
@@ -101,10 +104,10 @@ spec:
           imagePullPolicy: Always
           name: ccm-linode
           args:
-          - --leader-elect-resource-lock=endpoints
+          - --leader-elect-resource-lock=leases
           - --v=3
-          - --port=0
           - --secure-port=10253
+          - --webhook-secure-port=0
           volumeMounts:
           - mountPath: /etc/kubernetes
             name: k8s
