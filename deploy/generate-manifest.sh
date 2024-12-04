@@ -4,6 +4,11 @@ set -o pipefail -o noclobber -o nounset
 
 die() { echo "$*" 1>&2; exit 1; }
 
+echo -e "\n********************************************************************"
+echo -e "WARNING: This script is deprecated and may be removed in future."
+echo -e "Please use helm for installs, or refer to the docs for alternatives."
+echo -e "********************************************************************\n"
+
 [ "$#" -eq 2 ] || die "First argument must be a Linode APIv4 Personal Access Token with all permissions.
 (https://cloud.linode.com/profile/tokens)
 
