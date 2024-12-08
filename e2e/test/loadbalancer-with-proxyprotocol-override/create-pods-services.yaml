@@ -1,0 +1,54 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: proxyprotocol-override
+  name: test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: proxyprotocol-override
+  template:
+    metadata:
+      labels:
+        app: proxyprotocol-override
+    spec:
+      containers:
+      - image: appscode/test-server:2.3
+        name: test
+        ports:
+        - name: http-1
+          containerPort: 80
+          protocol: TCP
+        - name: http-2
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-test
+  labels:
+    app: proxyprotocol-override
+spec:
+  type: LoadBalancer
+  selector:
+    app: proxyprotocol-override
+  ports:
+    - name: http-1
+      protocol: TCP
+      port: 80
+      targetPort: 80
+    - name: http-2
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+  sessionAffinity: None

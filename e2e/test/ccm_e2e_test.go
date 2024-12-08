@@ -256,63 +256,6 @@ var _ = Describe("e2e tests", func() {
 	}
 
 	Describe("Test", func() {
-		Context("Simple", func() {
-			Context("Load Balancer", func() {
-				var (
-					pods   []string
-					labels map[string]string
-				)
-
-				BeforeEach(func() {
-					pods = []string{"test-pod-1", "test-pod-2"}
-					ports := []core.ContainerPort{
-						{
-							Name:          "http-1",
-							ContainerPort: 8080,
-						},
-					}
-					servicePorts := []core.ServicePort{
-						{
-							Name:       "http-1",
-							Port:       80,
-							TargetPort: intstr.FromInt(8080),
-							Protocol:   "TCP",
-						},
-					}
-					labels = map[string]string{
-						"app": "test-loadbalancer",
-					}
-
-					By("Creating Pods")
-					createPodWithLabel(pods, ports, framework.TestServerImage, labels, true)
-
-					By("Creating Service")
-					createServiceWithSelector(labels, servicePorts, false)
-				})
-
-				AfterEach(func() {
-					By("Deleting the Pods")
-					deletePods(pods)
-
-					By("Deleting the Service")
-					deleteService()
-				})
-
-				It("should reach all pods", func() {
-					By("Checking TCP Response")
-					var eps []string
-					Eventually(func() error {
-						eps, err = f.LoadBalancer.GetLoadBalancerIps()
-						return err
-					}).Should(BeNil())
-					Eventually(framework.GetResponseFromCurl).WithArguments(eps[0]).Should(ContainSubstring(pods[0]))
-					Eventually(framework.GetResponseFromCurl).WithArguments(eps[0]).Should(ContainSubstring(pods[1]))
-				})
-			})
-		})
-	})
-
-	Describe("Test", func() {
 		Context("LoadBalancer", func() {
 			AfterEach(func() {
 				err := root.Recycle()

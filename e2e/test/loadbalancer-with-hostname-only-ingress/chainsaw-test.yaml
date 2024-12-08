@@ -1,0 +1,62 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: lb-hostname-only-ingress
+spec:
+  namespace: "lb-hostname-only-ingress"
+  steps:
+    - name: Check if CCM is deployed
+      try:
+        - assert:
+            file: assert-ccm-resources.yaml
+    - name: Create pods and services
+      try:
+        - apply:
+            file: create-pods-services.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that svc-test-1 loadbalancer ingress contains only hostname
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test-1
+            status:
+              (loadBalancer.ingress[0].ip != null): false
+              (loadBalancer.ingress[0].hostname != null): true
+    - name: Check that svc-test-2 loadbalancer ingress contains ip
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test-2
+            status:
+              (loadBalancer.ingress[0].ip != null): true
+              (loadBalancer.ingress[0].hostname != null): true
+    - name: Annotate service
+      try:
+        - script:
+            content: |
+              set -e
+              kubectl annotate svc svc-test-2 -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-hostname-only-ingress=true
+    - name: Check and make sure svc-test-2 ingress only contains hostname
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test-2
+            status:
+              (loadBalancer.ingress[0].ip != null): false
+              (loadBalancer.ingress[0].hostname != null): true

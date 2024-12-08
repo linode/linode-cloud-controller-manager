@@ -1,0 +1,81 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: lb-with-multiple-http-https-ports
+spec:
+  namespace: "lb-with-multiple-http-https-ports"
+  steps:
+    - name: Check if CCM is deployed
+      try:
+        - assert:
+            file: ../assert-ccm-resources.yaml
+    - name: Create pods and services
+      try:
+        - apply:
+            file: create-pods-services.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Create secrets
+      try:
+        - script:
+            content: |
+              set -e
+              kubectl -n $NAMESPACE create secret tls tls-secret-1 --cert=../certificates/server.crt --key=../certificates/server.key
+              kubectl -n $NAMESPACE create secret tls tls-secret-2 --cert=../certificates/server.crt --key=../certificates/server.key
+              sleep 2
+    - name: Check endpoints exist
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Endpoints
+            metadata:
+              name: svc-test
+            (subsets[0].addresses != null): true
+            (subsets[0].ports != null): true
+            (length(subsets[0].ports)): 4
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that loadbalancer ip is assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test
+            status:
+              (loadBalancer.ingress[0].ip != null): true
+    - name: Fetch loadbalancer ip and check if pod reachable on different ports with different protocols
+      try:
+        - script:
+            content: |
+              set -e
+              IP=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].ip)
+
+              for i in {1..10}; do
+                  port_80=$(curl -s $IP:80 | grep "test-")
+                  port_8080=$(curl -s $IP:8080 | grep "test-")
+                  port_443=$(curl --resolve linode.test:443:$IP --cacert ../certificates/ca.crt -s https://linode.test:443 | grep "test-")
+                  port_8443=$(curl --resolve linode.test:8443:$IP --cacert ../certificates/ca.crt -s https://linode.test:8443 | grep "test-")
+
+                  if [[ -z $port_80 || -z $port_8080 || -z $port_443 || -z $port_8443 ]]; then
+                      sleep 10
+                  else
+                      echo "all pods responded"
+                      break
+                  fi
+              done
+            check:
+              (contains($stdout, 'all pods responded')): true

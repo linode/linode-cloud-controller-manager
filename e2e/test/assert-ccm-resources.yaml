@@ -1,0 +1,8 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ccm-linode
+  namespace: kube-system
+status:
+  numberAvailable: 1
+  numberReady: 1

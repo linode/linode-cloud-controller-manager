@@ -1,0 +1,49 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: preserve-annotation-new-nb-specified
+  name: test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: preserve-annotation-new-nb-specified
+  template:
+    metadata:
+      labels:
+        app: preserve-annotation-new-nb-specified
+    spec:
+      containers:
+      - image: appscode/test-server:2.3
+        name: test
+        ports:
+        - name: http-1
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-test
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-preserve: "true"
+  labels:
+    app: preserve-annotation-new-nb-specified
+spec:
+  type: LoadBalancer
+  selector:
+    app: preserve-annotation-new-nb-specified
+  ports:
+    - name: http-1
+      protocol: TCP
+      port: 80
+      targetPort: 8080
+  sessionAffinity: None

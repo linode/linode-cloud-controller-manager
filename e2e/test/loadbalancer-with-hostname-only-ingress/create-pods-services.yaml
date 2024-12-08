@@ -1,0 +1,66 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: hostname-ingress
+  name: test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hostname-ingress
+  template:
+    metadata:
+      labels:
+        app: hostname-ingress
+    spec:
+      containers:
+      - image: appscode/test-server:2.3
+        name: test
+        ports:
+        - name: http-1
+          containerPort: 80
+          protocol: TCP
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-test-1
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-hostname-only-ingress: "true"
+  labels:
+    app: hostname-ingress
+spec:
+  type: LoadBalancer
+  selector:
+    app: hostname-ingress
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 80
+  sessionAffinity: None
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-test-2
+  labels:
+    app: hostname-ingress
+spec:
+  type: LoadBalancer
+  selector:
+    app: hostname-ingress
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 80
+  sessionAffinity: None

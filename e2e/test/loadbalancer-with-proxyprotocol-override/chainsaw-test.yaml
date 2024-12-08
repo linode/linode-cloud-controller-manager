@@ -1,0 +1,124 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: lb-with-proxyprotocol-override
+spec:
+  namespace: "lb-with-proxyprotocol-override"
+  steps:
+    - name: Check if CCM is deployed
+      try:
+        - assert:
+            file: ../assert-ccm-resources.yaml
+    - name: Create pods and services
+      try:
+        - apply:
+            file: create-pods-services.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check endpoints exist
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Endpoints
+            metadata:
+              name: svc-test
+            (subsets[0].addresses != null): true
+            (subsets[0].ports != null): true
+    - name: Annotate service port 80 with v1 and 8080 with v2
+      try:
+        - script:
+            content: |
+              set -e
+              kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-port-80='{"proxy-protocol": "v1"}'
+              kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-port-8080='{"proxy-protocol": "v2"}'
+              sleep 10
+    - name: Check NodeBalancerConfig for port 80 to have ProxyProtocol v1 and port 8080 to have ProxyProtocol v2
+      try:
+        - script:
+            content: |
+              set -e
+
+              re='^[0-9]+$'
+
+              hostname=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].hostname)
+              ip=$(echo $hostname | awk -F'.' '{gsub("-", ".", $1); print $1}')
+              nbid=$(curl -s \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                -H "X-Filter: {\"ipv4\": \"$ip\"}" \
+                "https://api.linode.com/v4/nodebalancers"  | jq .data[].id)
+
+              if ! [[ $nbid =~ $re ]]; then
+                  echo "Nodebalancer id [$nbid] is incorrect, doesn't meet regex requirements"
+                  exit 1
+              fi
+
+              nbconfig=$(curl -s \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                "https://api.linode.com/v4/nodebalancers/$nbid/configs")
+
+              port_80_v1=$(echo $nbconfig | jq -r '.data[] | select(.port == 80) | .proxy_protocol == "v1"')
+              port_8080_v2=$(echo $nbconfig | jq -r '.data[] | select(.port == 8080) | .proxy_protocol == "v2"')
+
+              if [[ $port_80_v1 == "true" && $port_8080_v2 == "true" ]]; then
+                  echo "Conditions met"
+              else
+                  echo "Conditions not met"
+              fi
+            check:
+              ($error): ~
+              (contains($stdout, 'Conditions met')): true
+    - name: Update service annotation for port 80 to v2 and 8080 with v1
+      try:
+        - script:
+            content: |
+              set -e
+              kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-default-proxy-protocol=v2
+              kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-port-80-
+              kubectl annotate --overwrite svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-port-8080='{"proxy-protocol": "v1"}'
+              sleep 10
+    - name: Check NodeBalancerConfig for port 80 to have ProxyProtocol v2 and port 8080 to have ProxyProtocol v1
+      try:
+        - script:
+            content: |
+              set -e
+
+              re='^[0-9]+$'
+
+              hostname=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].hostname)
+              ip=$(echo $hostname | awk -F'.' '{gsub("-", ".", $1); print $1}')
+              nbid=$(curl -s \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                -H "X-Filter: {\"ipv4\": \"$ip\"}" \
+                "https://api.linode.com/v4/nodebalancers"  | jq .data[].id)
+
+              if ! [[ $nbid =~ $re ]]; then
+                  echo "Nodebalancer id [$nbid] is incorrect, doesn't meet regex requirements"
+                  exit 1
+              fi
+
+              nbconfig=$(curl -s \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                "https://api.linode.com/v4/nodebalancers/$nbid/configs")
+
+              port_80_v2=$(echo $nbconfig | jq -r '.data[] | select(.port == 80) | .proxy_protocol == "v2"')
+              port_8080_v1=$(echo $nbconfig | jq -r '.data[] | select(.port == 8080) | .proxy_protocol == "v1"')
+
+              if [[ $port_80_v2 == "true" && $port_8080_v1 == "true" ]]; then
+                  echo "Conditions met"
+              else
+                  echo "Conditions not met"
+              fi
+            check:
+              ($error): ~
+              (contains($stdout, 'Conditions met')): true

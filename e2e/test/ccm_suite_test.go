@@ -4,7 +4,6 @@ import (
 	"e2e_test/test/framework"
 	"flag"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -19,8 +18,6 @@ import (
 )
 
 var (
-	useExisting = false
-	reuse       = false
 	clusterName string
 	region      = "us-east"
 	k8s_version string
@@ -30,8 +27,6 @@ var (
 func init() {
 	flag.StringVar(&framework.Image, "image", framework.Image, "registry/repository:tag")
 	flag.StringVar(&framework.ApiToken, "api-token", os.Getenv("LINODE_API_TOKEN"), "linode api token")
-	flag.BoolVar(&reuse, "reuse", reuse, "Create a cluster and continue to use it")
-	flag.BoolVar(&useExisting, "use-existing", useExisting, "Use an existing kubernetes cluster")
 	flag.StringVar(&framework.KubeConfigFile, "kubeconfig", os.Getenv("TEST_KUBECONFIG"), "To use existing cluster provide kubeconfig file")
 	flag.StringVar(&region, "region", region, "Region to create load balancers")
 	flag.StringVar(&k8s_version, "k8s_version", k8s_version, "k8s_version for child cluster")
@@ -59,28 +54,7 @@ var getLinodeClient = func() *linodego.Client {
 }
 
 var _ = BeforeSuite(func() {
-	if reuse {
-		clusterName = "ccm-linode-for-reuse"
-	} else {
-		clusterName = rand.WithUniqSuffix("ccm-linode")
-	}
-
-	dir, err := os.Getwd()
-	Expect(err).NotTo(HaveOccurred())
-	kubeConfigFile := filepath.Join(dir, clusterName+".conf")
-
-	if reuse {
-		if _, err := os.Stat(kubeConfigFile); !os.IsNotExist(err) {
-			useExisting = true
-			framework.KubeConfigFile = kubeConfigFile
-		}
-	}
-
-	if !useExisting {
-		err := framework.CreateCluster(clusterName, region, k8s_version)
-		Expect(err).NotTo(HaveOccurred())
-		framework.KubeConfigFile = kubeConfigFile
-	}
+	clusterName = rand.WithUniqSuffix("ccm-linode")
 
 	By("Using kubeconfig from " + framework.KubeConfigFile)
 	config, err := clientcmd.BuildConfigFromFlags("", framework.KubeConfigFile)
@@ -99,15 +73,9 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
-	if !(useExisting || reuse) {
-		By("Deleting cluster")
-		err := framework.DeleteCluster(clusterName)
-		Expect(err).NotTo(HaveOccurred())
-	} else {
-		By("Deleting Namespace " + root.Namespace())
-		err := root.DeleteNamespace()
-		Expect(err).NotTo(HaveOccurred())
+	By("Deleting Namespace " + root.Namespace())
+	err := root.DeleteNamespace()
+	Expect(err).NotTo(HaveOccurred())
 
-		By("Not deleting cluster")
-	}
+	By("Not deleting cluster")
 })
