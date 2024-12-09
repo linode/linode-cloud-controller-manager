@@ -1,0 +1,50 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: http-to-https
+  name: test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: http-to-https
+  template:
+    metadata:
+      labels:
+        app: http-to-https
+    spec:
+      containers:
+      - image: appscode/test-server:2.3
+        name: test
+        ports:
+        - name: alpha
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-default-protocol: https
+    service.beta.kubernetes.io/linode-loadbalancer-port-80: '{"protocol": "http"}'
+  name: svc-test
+  labels:
+    app: http-to-https
+spec:
+  type: LoadBalancer
+  selector:
+    app: http-to-https
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 8080
+  sessionAffinity: None

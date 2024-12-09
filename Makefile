@@ -24,6 +24,7 @@ LINODE_FIREWALL_ENABLED ?= true
 LINODE_REGION           ?= us-lax
 LINODE_OS               ?= linode/ubuntu22.04
 KUBECONFIG_PATH         ?= $(CURDIR)/test-cluster-kubeconfig.yaml
+MGMT_KUBECONFIG_PATH    ?= $(CURDIR)/mgmt-cluster-kubeconfig.yaml
 
 # if the $DEVBOX_PACKAGES_DIR env variable exists that means we are within a devbox shell and can safely
 # use devbox's bin for our tools
@@ -176,6 +177,7 @@ mgmt-cluster:
 		--core cluster-api:$(CAPI_VERSION) \
 		--addon helm:$(CAAPH_VERSION) \
 		--infrastructure linode-linode:$(CAPL_VERSION)
+	kind get kubeconfig --name=caplccm > $(MGMT_KUBECONFIG_PATH)
 
 .PHONY: cleanup-cluster
 cleanup-cluster:
@@ -186,7 +188,12 @@ cleanup-cluster:
 
 .PHONY: e2e-test
 e2e-test:
-	$(MAKE) -C e2e test LINODE_API_TOKEN=$(LINODE_TOKEN) SUITE_ARGS="--region=$(LINODE_REGION) --use-existing --timeout=5m --kubeconfig=$(KUBECONFIG_PATH) --image=$(IMG) --linode-url https://api.linode.com/"
+	CLUSTER_NAME=$(CLUSTER_NAME) \
+	MGMT_KUBECONFIG=$(MGMT_KUBECONFIG_PATH) \
+	KUBECONFIG=$(KUBECONFIG_PATH) \
+	REGION=$(LINODE_REGION) \
+	LINODE_TOKEN=$(LINODE_TOKEN) \
+	chainsaw test e2e/test
 
 #####################################################################
 # OS / ARCH

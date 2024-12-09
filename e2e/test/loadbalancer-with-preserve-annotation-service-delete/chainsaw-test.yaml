@@ -1,0 +1,79 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: lb-preserve-annotation-svc-delete
+spec:
+  namespace: "lb-preserve-annotation-svc-delete"
+  steps:
+    - name: Check if CCM is deployed
+      try:
+        - assert:
+            file: ../assert-ccm-resources.yaml
+    - name: Create resources
+      try:
+        - apply:
+            file: create-pods-services.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that loadbalancer ip is assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test
+            status:
+              (loadBalancer.ingress[0].ip != null): true
+    - name: Delete pods, delete service and validate nb still exists
+      try:
+        - script:
+            content: |
+              set -e
+
+              re='^[0-9]+$'
+
+              hostname=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].hostname)
+              ip=$(echo $hostname | awk -F'.' '{gsub("-", ".", $1); print $1}')
+              nbid=$(curl -s \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                -H "X-Filter: {\"ipv4\": \"$ip\"}" \
+                "https://api.linode.com/v4/nodebalancers"  | jq .data[].id)
+
+              if ! [[ $nbid =~ $re ]]; then
+                  echo "Nodebalancer id [$nbid] is incorrect"
+                  exit 1
+              fi
+
+              kubectl -n $NAMESPACE delete deploy test --timeout=60s
+              kubectl -n $NAMESPACE delete svc svc-test --timeout=60s
+
+              get_resp=$(curl --write-out "%{http_code}\n" \
+                --silent --output /dev/null \
+                -X GET \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                "https://api.linode.com/v4/nodebalancers/$nbid")
+
+              if [[ $get_resp == "200" ]]; then
+                  echo "nodebalancer exists"
+              fi
+
+              # cleanup remaining nodebalancer
+              delete_resp=$(curl --write-out "%{http_code}\n" \
+                --silent --output /dev/null \
+                -X DELETE \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                "https://api.linode.com/v4/nodebalancers/$nbid")
+
+              if ! [[ $delete_resp == "200" ]]; then
+                  echo "failed deleting nodebalancer"
+              fi
+            check:
+              (contains($stdout, 'nodebalancer exists')): true

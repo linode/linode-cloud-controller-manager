@@ -1,0 +1,85 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: lb-delete-svc-use-specified-nb
+spec:
+  namespace: "lb-delete-svc-use-specified-nb"
+  steps:
+    - name: Check if CCM is deployed
+      try:
+        - assert:
+            file: ../assert-ccm-resources.yaml
+    - name: Create nodebalancer and create resources
+      try:
+        - script:
+            outputs:
+              - name: nbconf
+                value: (json_parse($stdout))
+            content: |
+              set -e
+
+              re='^[0-9]+$'
+              LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
+
+              nbid=$(curl -s --request POST \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                -H "accept: application/json" \
+                "https://api.linode.com/v4/nodebalancers" \
+                --data "{\"label\": \"$LABEL\", \"region\": \"$REGION\"}" | jq .id)
+
+              if ! [[ $nbid =~ $re ]]; then
+                  echo "Nodebalancer id [$nbid] is incorrect, failed to create nodebalancer"
+                  exit 1
+              fi
+
+              echo "{\"id\": \"$nbid\"}"
+            check:
+              ($error == null): true
+        - apply:
+            file: create-pods-services.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that loadbalancer ip is assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test
+            status:
+              (loadBalancer.ingress[0].ip != null): true
+    - name: Validate nodebalancer id
+      try:
+        - script:
+            content: |
+              set -e
+
+              re='^[0-9]+$'
+
+              expectedId=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .metadata.annotations[])
+              hostname=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].hostname)
+              ip=$(echo $hostname | awk -F'.' '{gsub("-", ".", $1); print $1}')
+              nbid=$(curl -s \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                -H "X-Filter: {\"ipv4\": \"$ip\"}" \
+                "https://api.linode.com/v4/nodebalancers"  | jq .data[].id)
+
+              if ! [[ $nbid =~ $re ]]; then
+                  echo "Nodebalancer id [$nbid] is incorrect"
+                  exit 1
+              fi
+
+              if [[ $nbid == $expectedId ]]; then
+                  echo "Condition met"
+              fi
+            check:
+              (contains($stdout, 'Condition met')): true
