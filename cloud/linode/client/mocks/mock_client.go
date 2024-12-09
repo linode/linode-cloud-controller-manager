@@ -255,6 +255,21 @@ func (mr *MockClientMockRecorder) GetNodeBalancer(arg0, arg1 interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeBalancer", reflect.TypeOf((*MockClient)(nil).GetNodeBalancer), arg0, arg1)
 }
 
+// GetProfile mocks base method.
+func (m *MockClient) GetProfile(arg0 context.Context) (*linodego.Profile, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProfile", arg0)
+	ret0, _ := ret[0].(*linodego.Profile)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProfile indicates an expected call of GetProfile.
+func (mr *MockClientMockRecorder) GetProfile(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProfile", reflect.TypeOf((*MockClient)(nil).GetProfile), arg0)
+}
+
 // ListFirewallDevices mocks base method.
 func (m *MockClient) ListFirewallDevices(arg0 context.Context, arg1 int, arg2 *linodego.ListOptions) ([]linodego.FirewallDevice, error) {
 	m.ctrl.T.Helper()
