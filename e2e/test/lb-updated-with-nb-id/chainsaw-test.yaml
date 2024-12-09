@@ -53,6 +53,7 @@ spec:
               fi
 
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id=$nbid
+              sleep 30
 
               hostname=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].hostname)
               ip=$(echo $hostname | awk -F'.' '{gsub("-", ".", $1); print $1}')

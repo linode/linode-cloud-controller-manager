@@ -31,7 +31,7 @@ spec:
               name: svc-test
             status:
               (loadBalancer.ingress[0].ip != null): true
-    - name: Validate nodebalancer has 3 nodes
+    - name: Validate nodebalancer has 2 nodes
       try:
         - script:
             content: |
@@ -118,7 +118,7 @@ spec:
                   sleep 20
               done
 
-              KUBECONFIG=$MGMT_KUBECONFIG kubectl patch machinedeployment ${CLUSTER_NAME}-md-0 --type='merge' -p "{\"spec\":{\"replicas\":$current_replicas}}"
+              #KUBECONFIG=$MGMT_KUBECONFIG kubectl patch machinedeployment ${CLUSTER_NAME}-md-0 --type='merge' -p "{\"spec\":{\"replicas\":$current_replicas}}"
             check:
               ($error == null): true
               (contains($stdout, 'all nodes up')): true

@@ -3,17 +3,17 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: simple-lb
+    app: lb-simple
   name: test
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: simple-lb
+      app: lb-simple
   template:
     metadata:
       labels:
-        app: simple-lb
+        app: lb-simple
     spec:
       affinity:
         podAntiAffinity:
@@ -46,11 +46,11 @@ kind: Service
 metadata:
   name: svc-test
   labels:
-    app: simple-lb
+    app: lb-simple
 spec:
   type: LoadBalancer
   selector:
-    app: simple-lb
+    app: lb-simple
   ports:
     - name: http-1
       protocol: TCP

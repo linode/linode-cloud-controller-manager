@@ -9,7 +9,7 @@ spec:
     - name: Check if CCM is deployed
       try:
         - assert:
-            file: assert-ccm-resources.yaml
+            file: ../assert-ccm-resources.yaml
     - name: Create pods and services
       try:
         - apply:

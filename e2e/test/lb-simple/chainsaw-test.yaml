@@ -2,9 +2,9 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  name: simple-loadbalancer
+  name: lb-simple
 spec:
-  namespace: "simple-lb"
+  namespace: "lb-simple"
   steps:
     - name: Check if CCM is deployed
       try:
