@@ -126,6 +126,7 @@ spec:
                       sleep 5
                   else
                       echo "service is deleted"
+                      break
                   fi
               done
             check:

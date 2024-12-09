@@ -31,6 +31,16 @@ spec:
               name: svc-test
             (subsets[0].addresses != null): true
             (subsets[0].ports != null): true
+    - name: Check that loadbalancer ip is assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test
+            status:
+              (loadBalancer.ingress[0].ip != null): true
     - name: Annotate service port 80 with v1 and 8080 with v2
       try:
         - script:

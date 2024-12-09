@@ -34,6 +34,7 @@ spec:
               set -e
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-port-443='{"tls-secret-name": "tls-secret-1", "protocol": "https"}'
               kubectl patch svc svc-test -n $NAMESPACE --type='json' -p='[{"op": "add", "path": "/spec/ports/-", "value": {"name": "https", "port": 443, "targetPort": 8080, "protocol": "TCP"}}]'
+              sleep 10
     - name: Check endpoints
       try:
       - assert:
