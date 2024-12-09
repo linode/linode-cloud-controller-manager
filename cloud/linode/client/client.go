@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/linode/linodego"
@@ -52,6 +53,8 @@ type Client interface {
 	DeleteFirewall(ctx context.Context, fwid int) error
 	GetFirewall(context.Context, int) (*linodego.Firewall, error)
 	UpdateFirewallRules(context.Context, int, linodego.FirewallRuleSet) (*linodego.FirewallRuleSet, error)
+
+	GetProfile(ctx context.Context) (*linodego.Profile, error)
 }
 
 // linodego.Client implements Client
@@ -72,4 +75,17 @@ func New(token string, timeout time.Duration) (*linodego.Client, error) {
 
 	klog.V(3).Infof("Linode client created with default timeout of %v", timeout)
 	return client, nil
+}
+
+func CheckClientAuthenticated(ctx context.Context, client Client) (bool, error) {
+	_, err := client.GetProfile(ctx)
+	if err == nil {
+		return true, nil
+	}
+
+	if strings.Contains(err.Error(), "Invalid Token") {
+		return false, nil
+	}
+
+	return false, err
 }

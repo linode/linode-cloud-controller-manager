@@ -1,6 +1,7 @@
 package linode
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -32,9 +33,10 @@ var supportedLoadBalancerTypes = []string{ciliumLBType, nodeBalancerLBType}
 // We expect it to be initialized with flags external to this package, likely in
 // main.go
 var Options struct {
-	KubeconfigFlag        *pflag.Flag
-	LinodeGoDebug         bool
-	EnableRouteController bool
+	KubeconfigFlag           *pflag.Flag
+	LinodeGoDebug            bool
+	EnableRouteController    bool
+	EnableTokenHealthChecker bool
 	// Deprecated: use VPCNames instead
 	VPCName               string
 	VPCNames              string
@@ -43,13 +45,15 @@ var Options struct {
 	IpHolderSuffix        string
 	LinodeExternalNetwork *net.IPNet
 	NodeBalancerTags      []string
+	GlobalStopChannel     chan<- struct{}
 }
 
 type linodeCloud struct {
-	client        client.Client
-	instances     cloudprovider.InstancesV2
-	loadbalancers cloudprovider.LoadBalancer
-	routes        cloudprovider.Routes
+	client                   client.Client
+	instances                cloudprovider.InstancesV2
+	loadbalancers            cloudprovider.LoadBalancer
+	routes                   cloudprovider.Routes
+	linodeTokenHealthChecker *healthChecker
 }
 
 var instanceCache *instances
@@ -91,6 +95,24 @@ func newCloud() (cloudprovider.Interface, error) {
 		linodeClient.SetDebug(true)
 	}
 
+	var healthChecker *healthChecker
+
+	if Options.EnableTokenHealthChecker {
+		authenticated, err := client.CheckClientAuthenticated(context.TODO(), linodeClient)
+		if err != nil {
+			return nil, fmt.Errorf("linode client authenticated connection error: %w", err)
+		}
+
+		if !authenticated {
+			return nil, fmt.Errorf("linode api token '%s' is invalid", accessTokenEnv)
+		}
+
+		healthChecker, err = newHealthChecker(apiToken, timeout, time.Minute, Options.GlobalStopChannel)
+		if err != nil {
+			return nil, fmt.Errorf("unable to initialize healthchecker: %w", err)
+		}
+	}
+
 	if Options.VPCName != "" && Options.VPCNames != "" {
 		return nil, fmt.Errorf("cannot have both vpc-name and vpc-names set")
 	}
@@ -126,10 +148,11 @@ func newCloud() (cloudprovider.Interface, error) {
 
 	// create struct that satisfies cloudprovider.Interface
 	lcloud := &linodeCloud{
-		client:        linodeClient,
-		instances:     instanceCache,
-		loadbalancers: newLoadbalancers(linodeClient, region),
-		routes:        routes,
+		client:                   linodeClient,
+		instances:                instanceCache,
+		loadbalancers:            newLoadbalancers(linodeClient, region),
+		routes:                   routes,
+		linodeTokenHealthChecker: healthChecker,
 	}
 	return lcloud, nil
 }
@@ -139,6 +162,10 @@ func (c *linodeCloud) Initialize(clientBuilder cloudprovider.ControllerClientBui
 	sharedInformer := informers.NewSharedInformerFactory(kubeclient, 0)
 	serviceInformer := sharedInformer.Core().V1().Services()
 	nodeInformer := sharedInformer.Core().V1().Nodes()
+
+	if c.linodeTokenHealthChecker != nil {
+		go c.linodeTokenHealthChecker.Run(stopCh)
+	}
 
 	serviceController := newServiceController(c.loadbalancers.(*loadbalancers), serviceInformer)
 	go serviceController.Run(stopCh)

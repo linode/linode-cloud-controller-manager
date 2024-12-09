@@ -25,6 +25,7 @@ type fakeAPI struct {
 	nbn map[string]*linodego.NodeBalancerNode
 	fw  map[int]*linodego.Firewall               // map of firewallID -> firewall
 	fwd map[int]map[int]*linodego.FirewallDevice // map of firewallID -> firewallDeviceID:FirewallDevice
+	tkn string
 
 	requests map[fakeRequest]struct{}
 	mux      *http.ServeMux
@@ -671,6 +672,29 @@ func (f *fakeAPI) setupRoutes() {
 				{Reason: "Not Found"},
 			},
 		}
+		rr, _ := json.Marshal(resp)
+		_, _ = w.Write(rr)
+	})
+
+	f.mux.HandleFunc("GET /v4/profile", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer "+f.tkn {
+			errors := make([]linodego.APIErrorReason, 1)
+			errors[0] = linodego.APIErrorReason{Reason: "Invalid Token"}
+			resp := linodego.APIError{Errors: errors}
+
+			w.WriteHeader(401)
+			rr, _ := json.Marshal(resp)
+			_, _ = w.Write(rr)
+			return
+		}
+
+		resp := linodego.Profile{
+			UID:      0,
+			Username: "foo",
+			Email:    "fake@example.com",
+		}
+
+		w.WriteHeader(200)
 		rr, _ := json.Marshal(resp)
 		_, _ = w.Write(rr)
 	})

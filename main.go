@@ -12,7 +12,6 @@ import (
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode"
 	"github.com/linode/linode-cloud-controller-manager/sentry"
 	"github.com/spf13/pflag"
-	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	"k8s.io/cloud-provider/app/config"
@@ -76,11 +75,13 @@ func main() {
 	}
 	fss := utilflag.NamedFlagSets{}
 	controllerAliases := names.CCMControllerAliases()
-	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, app.DefaultInitFuncConstructors, controllerAliases, fss, wait.NeverStop)
+	stopCh := make(chan struct{})
+	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, app.DefaultInitFuncConstructors, controllerAliases, fss, stopCh)
 
 	// Add Linode-specific flags
 	command.Flags().BoolVar(&linode.Options.LinodeGoDebug, "linodego-debug", false, "enables debug output for the LinodeAPI wrapper")
 	command.Flags().BoolVar(&linode.Options.EnableRouteController, "enable-route-controller", false, "enables route_controller for ccm")
+	command.Flags().BoolVar(&linode.Options.EnableTokenHealthChecker, "enable-token-health-checker", false, "enables linode api token health checker")
 	command.Flags().StringVar(&linode.Options.VPCName, "vpc-name", "", "[deprecated: use vpc-names instead] vpc name whose routes will be managed by route-controller")
 	command.Flags().StringVar(&linode.Options.VPCNames, "vpc-names", "", "comma separated vpc names whose routes will be managed by route-controller")
 	command.Flags().StringVar(&linode.Options.LoadBalancerType, "load-balancer-type", "nodebalancer", "configures which type of load-balancing to use for LoadBalancer Services (options: nodebalancer, cilium-bgp)")
@@ -129,6 +130,9 @@ func main() {
 		}
 		linode.Options.LinodeExternalNetwork = network
 	}
+
+	// Provide stop channel for linode authenticated client healthchecker
+	linode.Options.GlobalStopChannel = stopCh
 
 	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
