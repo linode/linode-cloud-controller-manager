@@ -1,0 +1,52 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: http-body-health-check
+  name: test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: http-body-health-check
+  template:
+    metadata:
+      labels:
+        app: http-body-health-check
+    spec:
+      containers:
+      - image: nginx
+        name: test
+        ports:
+        - name: http
+          containerPort: 80
+          protocol: TCP
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-check-body: nginx
+    service.beta.kubernetes.io/linode-loadbalancer-check-path: /
+    service.beta.kubernetes.io/linode-loadbalancer-check-type: http_body
+    service.beta.kubernetes.io/linode-loadbalancer-default-protocol: http
+  name: svc-test
+  labels:
+    app: http-body-health-check
+spec:
+  type: LoadBalancer
+  selector:
+    app: http-body-health-check
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 80
+  sessionAffinity: None
