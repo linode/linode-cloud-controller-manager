@@ -193,7 +193,7 @@ e2e-test:
 	KUBECONFIG=$(KUBECONFIG_PATH) \
 	REGION=$(LINODE_REGION) \
 	LINODE_TOKEN=$(LINODE_TOKEN) \
-	chainsaw test e2e/test
+	chainsaw test e2e/test --parallel 2
 
 #####################################################################
 # OS / ARCH

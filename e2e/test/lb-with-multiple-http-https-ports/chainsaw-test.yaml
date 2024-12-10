@@ -71,7 +71,7 @@ spec:
                   port_8443=$(curl --resolve linode.test:8443:$IP --cacert ../certificates/ca.crt -s https://linode.test:8443 | grep "test-")
 
                   if [[ -z $port_80 || -z $port_8080 || -z $port_443 || -z $port_8443 ]]; then
-                      sleep 10
+                      sleep 15
                   else
                       echo "all pods responded"
                       break

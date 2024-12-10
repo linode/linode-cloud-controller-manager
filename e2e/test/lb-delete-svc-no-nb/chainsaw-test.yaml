@@ -62,21 +62,8 @@ spec:
             content: |
               set -e
 
-              re='^[0-9]+$'
-
               expectedId=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .metadata.annotations[])
-              hostname=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].hostname)
-              ip=$(echo $hostname | awk -F'.' '{gsub("-", ".", $1); print $1}')
-              nbid=$(curl -s \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
-                -H "X-Filter: {\"ipv4\": \"$ip\"}" \
-                "https://api.linode.com/v4/nodebalancers"  | jq .data[].id)
-
-              if ! [[ $nbid =~ $re ]]; then
-                  echo "Nodebalancer id [$nbid] is incorrect"
-                  exit 1
-              fi
+              nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
               if [[ $nbid == $expectedId ]]; then
                   echo "Condition met"
@@ -119,7 +106,7 @@ spec:
               fi
 
               # Delete service and make sure its deleted
-              kubectl delete svc svc-test -n $NAMESPACE --timeout=60s
+              kubectl --timeout=60s delete svc svc-test -n $NAMESPACE
 
               for i in {1..10}; do
                   if kubectl get svc svc-test -n $NAMESPACE > /dev/null 2>&1; then

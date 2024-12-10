@@ -40,18 +40,7 @@ spec:
               re='^[0-9]+$'
 
               # Get existing nodebalancer id
-              hostname=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].hostname)
-              ip=$(echo $hostname | awk -F'.' '{gsub("-", ".", $1); print $1}')
-              old_nbid=$(curl -s \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
-                -H "X-Filter: {\"ipv4\": \"$ip\"}" \
-                "https://api.linode.com/v4/nodebalancers"  | jq .data[].id)
-
-              if ! [[ $old_nbid =~ $re ]]; then
-                  echo "Nodebalancer id [$old_nbid] is incorrect"
-                  exit 1
-              fi
+              old_nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
               # Create new nodebalancer and use it
               LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
@@ -71,18 +60,7 @@ spec:
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id=$nbid
 
               for i in {1..10}; do
-                  hostname=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].hostname)
-                  ip=$(echo $hostname | awk -F'.' '{gsub("-", ".", $1); print $1}')
-                  nbid2=$(curl -s \
-                    -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "Content-Type: application/json" \
-                    -H "X-Filter: {\"ipv4\": \"$ip\"}" \
-                    "https://api.linode.com/v4/nodebalancers" | jq .data[].id)
-
-                  if ! [[ $nbid2 =~ $re ]]; then
-                      echo "Nodebalancer id [$nbid2] is incorrect, failed to fetch nodebalancer"
-                      exit 1
-                  fi
+                  nbid2=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
                   if [[ $nbid == $nbid2 ]]; then
                       echo "updated nodebalancer used"
@@ -97,8 +75,6 @@ spec:
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 "https://api.linode.com/v4/nodebalancers/$old_nbid")
 
-              echo $old_nbid
-              echo $old_nb_resp
               if [[ $old_nb_resp == "200" ]]; then
                   echo "old nodebalancer found"
               fi

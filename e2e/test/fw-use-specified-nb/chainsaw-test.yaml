@@ -1,0 +1,123 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: fw-use-specified-nb
+spec:
+  bindings:
+    - name: fwname
+      value: (join('-', ['ccm-fwtest', env('CLUSTER_NAME')]))
+  namespace: "fw-use-specified-nb"
+  steps:
+    - name: Check if CCM is deployed
+      try:
+        - assert:
+            file: ../assert-ccm-resources.yaml
+    - name: Create firewall, Create pods and services
+      try:
+        - script:
+            env:
+              - name: FWLABEL
+                value: ($fwname)
+            content: |
+              set -e
+
+              create_fw=$(curl -s --write-out "%{http_code}\n" --output /dev/null --request POST \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                -H "accept: application/json" \
+                "https://api.linode.com/v4/networking/firewalls" \
+                --data "
+              {
+                \"label\": \"$FWLABEL\",
+                \"rules\": {
+                  \"inbound\": [{
+                    \"action\": \"ACCEPT\",
+                    \"label\": \"inbound-rule123\",
+                    \"description\": \"inbound rule123\",
+                    \"ports\": \"4321\",
+                    \"protocol\": \"TCP\",
+                    \"addresses\": {
+                      \"ipv4\": [\"0.0.0.0/0\"]
+                    }
+                  }],
+                  \"inbound_policy\": \"ACCEPT\",
+                  \"outbound_policy\": \"ACCEPT\"
+                }
+              }
+              "
+              )
+
+              if [[ $create_fw == "200" ]]; then
+                  echo "fw created"
+              fi
+            check:
+              ($error == null): true
+              (contains($stdout, 'fw created')): true
+        - apply:
+            file: create-pods-services.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that loadbalancer ip is assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test
+            status:
+              (loadBalancer.ingress[0].ip != null): true
+    - name: Annotate service with nodebalancer id
+      try:
+        - script:
+            env:
+              - name: FWLABEL
+                value: ($fwname)
+            content: |
+              set -e
+              re='^[0-9]+$'
+
+              fwid=$(curl -s \
+                    -H "Authorization: Bearer $LINODE_TOKEN" \
+                    -H "Content-Type: application/json" \
+                    -H "X-Filter: {\"label\": \"$FWLABEL\"}" \
+                    "https://api.linode.com/v4/networking/firewalls" | jq .data[].id)
+
+              if ! [[ $fwid =~ $re ]]; then
+                  echo "Firewall id [$fwid] is incorrect, failed to fetch firewall"
+                  exit 1
+              fi
+
+              kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-firewall-id=$fwid
+              sleep 5
+
+              for i in {1..10}; do
+                  nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+
+                  fwconfig=$(curl -s \
+                    -H "Authorization: Bearer $LINODE_TOKEN" \
+                    -H "Content-Type: application/json" \
+                    "https://api.linode.com/v4/networking/firewalls/$fwid")
+
+                  fw_attached_to_nb=$(echo $fwconfig | jq ".entities[] | select(.id == $nbid) | .id == $nbid")
+
+                  if [[ $fw_attached_to_nb == "true" ]]; then
+                      echo "Conditions met"
+                      break
+                  fi
+
+                  sleep 10
+              done
+
+              curl -s -X DELETE \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                "https://api.linode.com/v4/networking/firewalls/$fwid"
+            check:
+              (contains($stdout, 'Conditions met')): true
