@@ -48,28 +48,21 @@ spec:
                 --data "{\"label\": \"$LABEL\", \"region\": \"$REGION\"}" | jq .id)
 
               if ! [[ $nbid =~ $re ]]; then
-                  echo "Nodebalancer id [$nbid] is incorrect, failed to create nodebalancer"
+                  echo "Nodebalancer id [$nbid] for label [$lABEL] is incorrect, failed to create nodebalancer"
                   exit 1
               fi
 
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id=$nbid
-              sleep 30
+              sleep 5
 
-              hostname=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].hostname)
-              ip=$(echo $hostname | awk -F'.' '{gsub("-", ".", $1); print $1}')
-              nbid2=$(curl -s \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
-                -H "X-Filter: {\"ipv4\": \"$ip\"}" \
-                "https://api.linode.com/v4/nodebalancers"  | jq .data[].id)
+              for i in {1..10}; do
+                  nbid2=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
-              if ! [[ $nbid2 =~ $re ]]; then
-                  echo "Nodebalancer id [$nbid2] is incorrect, failed to fetch nodebalancer"
-                  exit 1
-              fi
-
-              if [[ $nbid == $nbid2 ]]; then
-                  echo "Condition met"
-              fi
+                  if [[ $nbid == $nbid2 ]]; then
+                      echo "Condition met"
+                      break
+                  fi
+                  sleep 10
+              done
             check:
               (contains($stdout, 'Condition met')): true
