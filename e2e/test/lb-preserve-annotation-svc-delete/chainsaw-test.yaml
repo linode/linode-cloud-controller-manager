@@ -64,4 +64,5 @@ spec:
                   echo "failed deleting nodebalancer"
               fi
             check:
+              ($error == null): true
               (contains($stdout, 'nodebalancer exists')): true

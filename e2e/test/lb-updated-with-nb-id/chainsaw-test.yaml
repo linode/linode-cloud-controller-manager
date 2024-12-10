@@ -65,4 +65,5 @@ spec:
                   sleep 10
               done
             check:
+              ($error == null): true
               (contains($stdout, 'Condition met')): true

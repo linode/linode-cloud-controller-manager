@@ -38,26 +38,15 @@ spec:
               set -e
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-proxy-protocol=v2
               sleep 10
+            check:
+              ($error == null): true
     - name: Check NodeBalancerConfig for port 80 and 8080 have ProxyProtocol v2
       try:
         - script:
             content: |
               set -e
 
-              re='^[0-9]+$'
-
-              hostname=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].hostname)
-              ip=$(echo $hostname | awk -F'.' '{gsub("-", ".", $1); print $1}')
-              nbid=$(curl -s \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
-                -H "X-Filter: {\"ipv4\": \"$ip\"}" \
-                "https://api.linode.com/v4/nodebalancers"  | jq .data[].id)
-
-              if ! [[ $nbid =~ $re ]]; then
-                  echo "Nodebalancer id [$nbid] is incorrect, doesn't meet regex requirements"
-                  exit 1
-              fi
+              nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
               nbconfig=$(curl -s \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
@@ -82,6 +71,8 @@ spec:
               set -e
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-default-proxy-protocol=v1
               sleep 10
+            check:
+              ($error == null): true
     - name: Check NodeBalancerConfig for port 80 and 8080 have ProxyProtocol v1
       try:
         - script:

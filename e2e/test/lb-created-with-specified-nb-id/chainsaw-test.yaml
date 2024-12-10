@@ -69,4 +69,5 @@ spec:
                   echo "Condition met"
               fi
             check:
+              ($error == null): true
               (contains($stdout, 'Condition met')): true

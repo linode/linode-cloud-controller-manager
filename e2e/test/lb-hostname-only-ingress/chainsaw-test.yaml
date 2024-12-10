@@ -49,6 +49,8 @@ spec:
             content: |
               set -e
               kubectl annotate svc svc-test-2 -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-hostname-only-ingress=true
+            check:
+              ($error == null): true
     - name: Check and make sure svc-test-2 ingress only contains hostname
       try:
       - assert:

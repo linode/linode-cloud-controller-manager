@@ -68,6 +68,7 @@ spec:
                   echo "all pods responded"
               fi
             check:
+              ($error == null): true
               (contains($stdout, 'all pods responded')): true
     - name: Delete Pods
       try:

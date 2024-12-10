@@ -69,6 +69,7 @@ spec:
                   echo "Condition met"
               fi
             check:
+              ($error == null): true
               (contains($stdout, 'Condition met')): true
     - name: Create new nodebalancer and update service to use it
       try:

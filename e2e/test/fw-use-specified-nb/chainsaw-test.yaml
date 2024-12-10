@@ -120,4 +120,5 @@ spec:
                 -H "Content-Type: application/json" \
                 "https://api.linode.com/v4/networking/firewalls/$fwid"
             check:
+              ($error == null): true
               (contains($stdout, 'Conditions met')): true

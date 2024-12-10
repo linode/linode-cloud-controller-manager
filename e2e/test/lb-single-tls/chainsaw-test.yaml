@@ -16,6 +16,8 @@ spec:
             content: |
               set -e
               kubectl -n $NAMESPACE create secret tls tls-secret --cert=../certificates/server.crt --key=../certificates/server.key
+            check:
+              ($error == null): true
     - name: Create pods and services
       try:
         - apply:
@@ -74,6 +76,7 @@ spec:
                   echo "all pods responded"
               fi
             check:
+              ($error == null): true
               (contains($stdout, 'all pods responded')): true
     - name: Delete Pods
       try:

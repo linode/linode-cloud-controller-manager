@@ -27,6 +27,8 @@ spec:
             content: |
               set -e
               kubectl -n $NAMESPACE create secret tls tls-secret-1 --cert=../certificates/server.crt --key=../certificates/server.key
+            check:
+              ($error == null): true
     - name: Update service to have another annotation and port
       try:
         - script:
@@ -35,6 +37,8 @@ spec:
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-port-443='{"tls-secret-name": "tls-secret-1", "protocol": "https"}'
               kubectl patch svc svc-test -n $NAMESPACE --type='json' -p='[{"op": "add", "path": "/spec/ports/-", "value": {"name": "https", "port": 443, "targetPort": 8080, "protocol": "TCP"}}]'
               sleep 10
+            check:
+              ($error == null): true
     - name: Check endpoints
       try:
       - assert:
@@ -82,4 +86,5 @@ spec:
                   fi
               done
             check:
+              ($error == null): true
               (contains($stdout, 'all pods responded')): true

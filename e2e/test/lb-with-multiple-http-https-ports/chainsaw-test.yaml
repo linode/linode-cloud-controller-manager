@@ -29,6 +29,8 @@ spec:
               kubectl -n $NAMESPACE create secret tls tls-secret-1 --cert=../certificates/server.crt --key=../certificates/server.key
               kubectl -n $NAMESPACE create secret tls tls-secret-2 --cert=../certificates/server.crt --key=../certificates/server.key
               sleep 2
+            check:
+              ($error == null): true
     - name: Check endpoints exist
       try:
       - assert:
@@ -78,4 +80,5 @@ spec:
                   fi
               done
             check:
+              ($error == null): true
               (contains($stdout, 'all pods responded')): true

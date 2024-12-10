@@ -58,6 +58,7 @@ spec:
                   sleep 15
               done
             check:
+              ($error == null): true
               (contains($stdout, 'all nodes up')): true
     - name: Add new node and check nodebalancer gets updated
       try:

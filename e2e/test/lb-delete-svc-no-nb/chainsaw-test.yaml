@@ -69,6 +69,7 @@ spec:
                   echo "Condition met"
               fi
             check:
+              ($error == null): true
               (contains($stdout, 'Condition met')): true
     - name: Delete nodebalancer, delete service and make sure its deleted
       try:
@@ -117,6 +118,7 @@ spec:
                   fi
               done
             check:
+              ($error == null): true
               (contains($stdout, 'nodebalancer deleted')): true
               (contains($stdout, 'old nodebalancer not found')): true
               (contains($stdout, 'service is deleted')): true
