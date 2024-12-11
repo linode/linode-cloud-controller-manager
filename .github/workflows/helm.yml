@@ -26,7 +26,7 @@ jobs:
           sed -ie "s/version: 0.0.0/version: ${TAG#helm-}/g" deploy/chart/Chart.yaml
 
       - name: Set up Helm
-        uses: azure/setup-helm@v3
+        uses: azure/setup-helm@v4
 
       - uses: actions/setup-python@v4
         with:
@@ -70,7 +70,7 @@ jobs:
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
       - name: Set up Helm
-        uses: azure/setup-helm@v3
+        uses: azure/setup-helm@v4
 
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.6.0
