@@ -1,0 +1,121 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: lb-created-with-new-nb-id
+spec:
+  namespace: "lb-created-with-new-nb-id"
+  steps:
+    - name: Check if CCM is deployed
+      try:
+        - assert:
+            file: ../assert-ccm-resources.yaml
+    - name: Create nodebalancer and create resources
+      try:
+        - script:
+            outputs:
+              - name: nbconf
+                value: (json_parse($stdout))
+            content: |
+              set -e
+
+              re='^[0-9]+$'
+              LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
+
+              nbid=$(curl -s --request POST \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                -H "accept: application/json" \
+                "https://api.linode.com/v4/nodebalancers" \
+                --data "{\"label\": \"$LABEL\", \"region\": \"$REGION\"}" | jq .id)
+
+              if ! [[ $nbid =~ $re ]]; then
+                  echo "Nodebalancer id [$nbid] is incorrect, failed to create nodebalancer"
+                  exit 1
+              fi
+
+              echo "{\"id\": \"$nbid\"}"
+            check:
+              ($error == null): true
+        - apply:
+            file: create-pods-services.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that loadbalancer ip is assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test
+            status:
+              (loadBalancer.ingress[0].ip != null): true
+    - name: Validate nodebalancer id
+      try:
+        - script:
+            content: |
+              set -e
+
+              expectedId=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .metadata.annotations[])
+              nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+
+              if [[ $nbid == $expectedId ]]; then
+                  echo "Condition met"
+              fi
+            check:
+              ($error == null): true
+              (contains($stdout, 'Condition met')): true
+    - name: Create new nodebalancer and update service to use it
+      try:
+        - script:
+            content: |
+              set -e
+
+              re='^[0-9]+$'
+
+              old_nbid=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .metadata.annotations[])
+
+              LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
+
+              nbid=$(curl -s --request POST \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                -H "accept: application/json" \
+                "https://api.linode.com/v4/nodebalancers" \
+                --data "{\"label\": \"$LABEL\", \"region\": \"$REGION\"}" | jq .id)
+
+              if ! [[ $nbid =~ $re ]]; then
+                  echo "Nodebalancer id [$nbid] is incorrect, failed to create nodebalancer"
+                  exit 1
+              fi
+
+              kubectl annotate --overwrite svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id=$nbid
+
+              for i in {1..10}; do
+                  nbid2=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+
+                  if [[ $nbid == $nbid2 ]]; then
+                      echo "Condition met"
+                      break
+                  fi
+                  sleep 5
+              done
+
+              old_nb_resp=$(curl --write-out "%{http_code}\n" \
+                --silent --output /dev/null \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                "https://api.linode.com/v4/nodebalancers/$old_nbid")
+
+              if [[ $old_nb_resp == "404" ]]; then
+                  echo "old nodebalancer not found"
+              fi
+            check:
+              ($error == null): true
+              (contains($stdout, 'Condition met')): true
+              (contains($stdout, 'old nodebalancer not found')): true

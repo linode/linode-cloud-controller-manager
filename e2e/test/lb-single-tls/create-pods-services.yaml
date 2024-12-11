@@ -1,0 +1,50 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: lb-single-tls
+  name: test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lb-single-tls
+  template:
+    metadata:
+      labels:
+        app: lb-single-tls
+    spec:
+      containers:
+      - image: appscode/test-server:2.3
+        name: test
+        ports:
+        - name: https
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-test
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-default-protocol: https
+    service.beta.kubernetes.io/linode-loadbalancer-port-80: '{ "tls-secret-name": "tls-secret" }'
+  labels:
+    app: lb-single-tls
+spec:
+  type: LoadBalancer
+  selector:
+    app: lb-single-tls
+  ports:
+    - name: https
+      protocol: TCP
+      port: 80
+      targetPort: 8080
+  sessionAffinity: None

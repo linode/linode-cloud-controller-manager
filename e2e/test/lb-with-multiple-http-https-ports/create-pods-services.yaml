@@ -1,0 +1,68 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: multiple-http-https-ports
+  name: test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: multiple-http-https-ports
+  template:
+    metadata:
+      labels:
+        app: multiple-http-https-ports
+    spec:
+      containers:
+      - image: appscode/test-server:2.3
+        name: test
+        ports:
+        - name: alpha
+          containerPort: 8080
+          protocol: TCP
+        - name: beta
+          containerPort: 8989
+          protocol: TCP
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-default-protocol: https
+    service.beta.kubernetes.io/linode-loadbalancer-port-80: '{"protocol": "http"}'
+    service.beta.kubernetes.io/linode-loadbalancer-port-443: '{"tls-secret-name": "tls-secret-1"}'
+    service.beta.kubernetes.io/linode-loadbalancer-port-8080: '{"protocol": "http"}'
+    service.beta.kubernetes.io/linode-loadbalancer-port-8443: '{"tls-secret-name": "tls-secret-2", "protocol": "https"}'
+  name: svc-test
+  labels:
+    app: multiple-http-https-ports
+spec:
+  type: LoadBalancer
+  selector:
+    app: multiple-http-https-ports
+  ports:
+    - name: http-1
+      protocol: TCP
+      port: 80
+      targetPort: 8989
+    - name: http-2
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+    - name: https-1
+      protocol: TCP
+      port: 443
+      targetPort: 8080
+    - name: https-2
+      protocol: TCP
+      port: 8443
+      targetPort: 8989
+  sessionAffinity: None
