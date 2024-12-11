@@ -57,7 +57,7 @@ spec:
             content: |
               set -e
 
-              nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh
+              nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
               nbconfig=$(curl -s \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
