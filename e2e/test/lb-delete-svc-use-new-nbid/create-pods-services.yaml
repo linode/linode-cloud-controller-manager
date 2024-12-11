@@ -1,0 +1,49 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: delete-svc-use-new-nbid
+  name: test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: delete-svc-use-new-nbid
+  template:
+    metadata:
+      labels:
+        app: delete-svc-use-new-nbid
+    spec:
+      containers:
+      - image: appscode/test-server:2.3
+        name: test
+        ports:
+        - name: http-1
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-test
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id: ($nbconf.id)
+  labels:
+    app: delete-svc-use-new-nbid
+spec:
+  type: LoadBalancer
+  selector:
+    app: delete-svc-use-new-nbid
+  ports:
+    - name: http-1
+      protocol: TCP
+      port: 80
+      targetPort: 8080
+  sessionAffinity: None

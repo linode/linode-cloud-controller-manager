@@ -1,0 +1,53 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: tcp-connection-health-check
+  name: test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tcp-connection-health-check
+  template:
+    metadata:
+      labels:
+        app: tcp-connection-health-check
+    spec:
+      containers:
+      - image: nginx
+        name: test
+        ports:
+        - name: http
+          containerPort: 80
+          protocol: TCP
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-check-attempts: "4"
+    service.beta.kubernetes.io/linode-loadbalancer-check-interval: "10"
+    service.beta.kubernetes.io/linode-loadbalancer-check-timeout: "5"
+    service.beta.kubernetes.io/linode-loadbalancer-check-type: connection
+    service.beta.kubernetes.io/linode-loadbalancer-default-protocol: tcp
+  name: svc-test
+  labels:
+    app: tcp-connection-health-check
+spec:
+  type: LoadBalancer
+  selector:
+    app: tcp-connection-health-check
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 80
+  sessionAffinity: None

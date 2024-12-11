@@ -1,0 +1,92 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: lb-single-tls
+spec:
+  namespace: "lb-single-tls"
+  steps:
+    - name: Check if CCM is deployed
+      try:
+        - assert:
+            file: ../assert-ccm-resources.yaml
+    - name: Create secret
+      try:
+        - script:
+            content: |
+              set -e
+              kubectl -n $NAMESPACE create secret tls tls-secret --cert=../certificates/server.crt --key=../certificates/server.key
+            check:
+              ($error == null): true
+    - name: Create pods and services
+      try:
+        - apply:
+            file: create-pods-services.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that loadbalancer ip is assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test
+            status:
+              (loadBalancer.ingress[0].ip != null): true
+    - name: Fetch loadbalancer ip and check if pod is reachable
+      try:
+        - script:
+            content: |
+              set -e
+              IP=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].ip)
+
+              podnames=()
+
+              for i in {1..10}; do
+                  if [[ ${#podnames[@]} -lt 1 ]]; then
+                      output=$(curl --resolve linode.test:80:$IP --cacert ../certificates/ca.crt -s https://linode.test:80 | jq -e .podName || true)
+
+                      if [[ "$output" == *"test-"* ]]; then
+                          unique=true
+                          for i in "${array[@]}"; do
+                              if [[ "$i" == "$output" ]]; then
+                                  unique=false
+                                  break
+                              fi
+                          done
+                          if [[ "$unique" == true ]]; then
+                              podnames+=($output)
+                          fi
+                      fi
+                  else
+                      break
+                  fi
+                  sleep 10
+              done
+
+              if [[ ${#podnames[@]} -lt 1 ]]; then
+                  echo "all pods failed to respond"
+              else
+                  echo "all pods responded"
+              fi
+            check:
+              ($error == null): true
+              (contains($stdout, 'all pods responded')): true
+    - name: Delete Pods
+      try:
+        - delete:
+            ref:
+              apiVersion: v1
+              kind: Pod
+    - name: Delete Service
+      try:
+        - delete:
+            ref:
+              apiVersion: v1
+              kind: Service
