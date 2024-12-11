@@ -15,7 +15,7 @@ HELM_VERSION            ?= v3.16.3
 #####################################################################
 CLUSTER_NAME            ?= ccm-$(shell git rev-parse --short HEAD)
 K8S_VERSION             ?= "v1.31.2"
-CAPI_VERSION            ?= "v1.6.3"
+CAPI_VERSION            ?= "v1.8.5"
 CAAPH_VERSION           ?= "v0.2.1"
 CAPL_VERSION            ?= "v0.7.1"
 CONTROLPLANE_NODES      ?= 1
@@ -175,6 +175,8 @@ mgmt-cluster:
 		--wait-providers \
 		--wait-provider-timeout 600 \
 		--core cluster-api:$(CAPI_VERSION) \
+		--bootstrap kubeadm:$(CAPI_VERSION) \
+		--control-plane kubeadm:$(CAPI_VERSION) \
 		--addon helm:$(CAAPH_VERSION) \
 		--infrastructure linode-linode:$(CAPL_VERSION)
 	kind get kubeconfig --name=caplccm > $(MGMT_KUBECONFIG_PATH)
