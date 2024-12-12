@@ -141,13 +141,11 @@ func (f *fakeAPI) setupRoutes() {
 			f.t.Fatal(err)
 		}
 
-		data := linodego.NodeBalancerFirewallsPagedResponse{
-			Data: []linodego.Firewall{},
-			PageOptions: &linodego.PageOptions{
-				Page:    1,
-				Pages:   1,
-				Results: 0,
-			},
+		data := paginatedResponse[linodego.Firewall]{
+			Page:    1,
+			Pages:   1,
+			Results: 0,
+			Data:    []linodego.Firewall{},
 		}
 
 	out:
@@ -155,7 +153,7 @@ func (f *fakeAPI) setupRoutes() {
 			for _, device := range devices {
 				if device.Entity.ID == nodebalancerID {
 					data.Data = append(data.Data, *f.fw[fwid])
-					data.PageOptions.Results = 1
+					data.Results = 1
 					break out
 				}
 			}

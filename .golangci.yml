@@ -15,7 +15,7 @@ linters:
     # cherry picked from https://golangci-lint.run/usage/linters/
     # - ginkgolinter # to be enabled once #158 is merged
     - bodyclose
-    - exportloopref
+    - copyloopvar
     - gocheckcompilerdirectives
     - gofmt
     - goimports
