@@ -1,0 +1,67 @@
+name-template: 'v$NEXT_PATCH_VERSION'
+tag-template: 'v$NEXT_PATCH_VERSION'
+exclude-labels:
+  - ignore-for-release
+categories:
+  - title: ⚠️ Breaking Change
+    labels:
+      - breaking-change
+  - title: 🐛 Bug Fixes
+    labels:
+      - bugfix
+  - title: 🚀 New Features
+    labels:
+      - new-feature
+  - title: 💡 Improvements
+    labels:
+      - improvement
+  - title: 🧪 Testing Improvements
+    labels:
+      - testing
+  - title: ⚙️ Repo/CI Improvements
+    labels:
+      - repo-ci-improvement
+  - title: 📖 Documentation
+    labels:
+      - documentation
+  - title: 📦 Dependency Updates
+    labels:
+      - dependencies
+  - title: Other Changes
+    labels:
+      - "*"
+autolabeler:
+  - label: 'breaking-change'
+    title:
+      - '/.*\[breaking\].+/'
+  - label: 'deprecation'
+    title:
+      - '/.*\[deprecation\].+/'
+  - label: 'bugfix'
+    title:
+      - '/.*\[fix\].+/'
+  - label: 'new-feature'
+    title:
+      - '/.*\[feat\].+/'
+  - label: 'improvement'
+    title:
+      - '/.*\[improvement\].+/'
+  - label: 'testing'
+    title:
+      - '/.*\[test\].+/'
+  - label: 'repo-ci-improvement'
+    title:
+      - '/.*\[CI\].+/'
+      - '/.*\[ci\].+/'
+  - label: 'documentation'
+    title:
+      - '/.*\[docs\].+/'
+  - label: 'dependencies'
+    title:
+      - '/.*\[deps\].+/'
+
+change-template: '- $TITLE by @$AUTHOR in #$NUMBER'
+no-changes-template: "- No changes"
+template: |
+  ## What's Changed
+  $CHANGES
