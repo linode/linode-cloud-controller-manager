@@ -1,4 +1,4 @@
-FROM golang:1.22-alpine as builder
+FROM golang:1.23-alpine AS builder
 RUN mkdir -p /linode
 WORKDIR /linode
 
