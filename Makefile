@@ -60,9 +60,7 @@ vet: fmt
 .PHONY: lint
 lint:
 	docker run --rm -v "$(PWD):/var/work:ro" -w /var/work \
-		golangci/golangci-lint:latest golangci-lint run -v --timeout=5m
-	docker run --rm -v "$(PWD):/var/work:ro" -w /var/work/e2e \
-		golangci/golangci-lint:latest golangci-lint run -v --timeout=5m
+		golangci/golangci-lint:latest golangci-lint run -c .golangci.yml
 
 .PHONY: gosec
 gosec: ## Run gosec against code.

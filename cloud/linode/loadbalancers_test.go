@@ -543,7 +543,6 @@ func testUpdateLoadBalancerAddNode(t *testing.T, client *linodego.Client, f *fak
 	checkIDs := func() (int, int) {
 		var req *fakeRequest
 		for request := range f.requests {
-			request := request
 			if rx.MatchString(request.Path) {
 				req = &request
 				break
