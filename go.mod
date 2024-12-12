@@ -7,7 +7,7 @@ toolchain go1.22.2
 require (
 	github.com/appscode/go v0.0.0-20200323182826-54e98e09185a
 	github.com/cilium/cilium v1.15.5
-	github.com/getsentry/sentry-go v0.4.0
+	github.com/getsentry/sentry-go v0.30.0
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
 	github.com/linode/linodego v1.36.2
