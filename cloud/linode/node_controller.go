@@ -39,7 +39,7 @@ type nodeController struct {
 	metadataLastUpdate map[string]time.Time
 	ttl                time.Duration
 
-	queue workqueue.DelayingInterface
+	queue workqueue.TypedDelayingInterface[any]
 }
 
 func newNodeController(kubeclient kubernetes.Interface, client client.Client, informer v1informers.NodeInformer) *nodeController {
@@ -57,7 +57,7 @@ func newNodeController(kubeclient kubernetes.Interface, client client.Client, in
 		informer:           informer,
 		ttl:                timeout,
 		metadataLastUpdate: make(map[string]time.Time),
-		queue:              workqueue.NewDelayingQueue(),
+		queue:              workqueue.NewTypedDelayingQueue[any](),
 	}
 }
 
