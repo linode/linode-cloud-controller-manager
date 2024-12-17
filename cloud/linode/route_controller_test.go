@@ -33,7 +33,8 @@ func TestListRoutes(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		routeController, err := newRoutes(client)
+		instances := newInstances(client)
+		routeController, err := newRoutes(client, instances)
 		assert.NoError(t, err)
 
 		client.EXPECT().ListInstances(gomock.Any(), gomock.Any()).Times(1).Return([]linodego.Instance{}, nil)
@@ -56,7 +57,8 @@ func TestListRoutes(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		routeController, err := newRoutes(client)
+		instances := newInstances(client)
+		routeController, err := newRoutes(client, instances)
 		assert.NoError(t, err)
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
@@ -82,7 +84,8 @@ func TestListRoutes(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		routeController, err := newRoutes(client)
+		instances := newInstances(client)
+		routeController, err := newRoutes(client, instances)
 		assert.NoError(t, err)
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
@@ -123,7 +126,8 @@ func TestListRoutes(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		routeController, err := newRoutes(client)
+		instances := newInstances(client)
+		routeController, err := newRoutes(client, instances)
 		assert.NoError(t, err)
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
@@ -164,7 +168,8 @@ func TestListRoutes(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		routeController, err := newRoutes(client)
+		instances := newInstances(client)
+		routeController, err := newRoutes(client, instances)
 		assert.NoError(t, err)
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
@@ -179,7 +184,8 @@ func TestListRoutes(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		routeController, err := newRoutes(client)
+		instances := newInstances(client)
+		routeController, err := newRoutes(client, instances)
 		assert.NoError(t, err)
 
 		vpcIP2 := "10.0.0.3"
@@ -283,7 +289,8 @@ func TestCreateRoute(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		routeController, err := newRoutes(client)
+		instances := newInstances(client)
+		routeController, err := newRoutes(client, instances)
 		assert.NoError(t, err)
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
@@ -315,7 +322,8 @@ func TestCreateRoute(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		routeController, err := newRoutes(client)
+		instances := newInstances(client)
+		routeController, err := newRoutes(client, instances)
 		assert.NoError(t, err)
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
@@ -328,7 +336,8 @@ func TestCreateRoute(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		routeController, err := newRoutes(client)
+		instances := newInstances(client)
+		routeController, err := newRoutes(client, instances)
 		assert.NoError(t, err)
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
@@ -370,7 +379,8 @@ func TestDeleteRoute(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		routeController, err := newRoutes(client)
+		instances := newInstances(client)
+		routeController, err := newRoutes(client, instances)
 		assert.NoError(t, err)
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
@@ -400,7 +410,8 @@ func TestDeleteRoute(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		routeController, err := newRoutes(client)
+		instances := newInstances(client)
+		routeController, err := newRoutes(client, instances)
 		assert.NoError(t, err)
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
@@ -431,7 +442,8 @@ func TestDeleteRoute(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		routeController, err := newRoutes(client)
+		instances := newInstances(client)
+		routeController, err := newRoutes(client, instances)
 		assert.NoError(t, err)
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)

@@ -62,7 +62,7 @@ type routes struct {
 	routeCache *routeCache
 }
 
-func newRoutes(client client.Client) (cloudprovider.Routes, error) {
+func newRoutes(client client.Client, instances *instances) (cloudprovider.Routes, error) {
 	timeout := 60
 	if raw, ok := os.LookupEnv("LINODE_ROUTES_CACHE_TTL_SECONDS"); ok {
 		if t, _ := strconv.Atoi(raw); t > 0 {
@@ -77,7 +77,7 @@ func newRoutes(client client.Client) (cloudprovider.Routes, error) {
 
 	return &routes{
 		client:    client,
-		instances: newInstances(client),
+		instances: instances,
 		routeCache: &routeCache{
 			routes: make(map[int][]linodego.VPCIP, 0),
 			ttl:    time.Duration(timeout) * time.Second,

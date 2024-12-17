@@ -97,7 +97,9 @@ func newCloud() (cloudprovider.Interface, error) {
 		Options.VPCNames = Options.VPCName
 	}
 
-	routes, err := newRoutes(linodeClient)
+	instances := newInstances(linodeClient)
+
+	routes, err := newRoutes(linodeClient, instances)
 	if err != nil {
 		return nil, fmt.Errorf("routes client was not created successfully: %w", err)
 	}
@@ -123,7 +125,7 @@ func newCloud() (cloudprovider.Interface, error) {
 	// create struct that satisfies cloudprovider.Interface
 	lcloud := &linodeCloud{
 		client:        linodeClient,
-		instances:     newInstances(linodeClient),
+		instances:     instances,
 		loadbalancers: newLoadbalancers(linodeClient, region),
 		routes:        routes,
 	}
