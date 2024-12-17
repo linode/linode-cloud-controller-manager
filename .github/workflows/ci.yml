@@ -73,7 +73,7 @@ jobs:
       - name: lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          version: v1.62.2
 
       - name: Helm Lint
         run: make helm-lint
