@@ -21,7 +21,7 @@
     "scripts": {
       "mgmt-and-capl-cluster": "make mgmt-and-capl-cluster",
       "e2e-test": "make e2e-test",
-      "cleanup-cluster": "make cleanup-cluster"
+      "cleanup-cluster": "echo abc"
     }
   },
   "env": {

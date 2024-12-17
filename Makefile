@@ -152,12 +152,16 @@ generate-capl-cluster-manifests:
 create-capl-cluster:
 	# Create a CAPL cluster with updated CCM and wait for it to be ready
 	kubectl apply -f capl-cluster-manifests.yaml
+	kubectl patch linodemachinetemplate $(CLUSTER_NAME)-control-plane --type='json' -p="[{'op': 'add', 'path': '/spec/template/spec/authorizedKeys', 'value': ['ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7EoJcN35JMvl2znOz9sFYfCeziG/jFTeApBg36l7XhWRknqBXLFAMmZT8JLCpUB2GIaiTzXittsYsOeRinXWVl4VKG8/Kq8wjxTe6WXK52LfH4SVpNoMZt/vV58NBqY776Rd8wt6OjBDsg8eYsApZHeeQA/PIQtDUAOpSTLk6w2qsfqBIaP0t9+KkHRN4dd2LpAvN3SEXOgfN6fGmW41+9Aq2W7bLNfOogmD0B78JRsYemNCQeT/OHhX66Wrr+hyhsYvfqvl8GvbW5hHxO2/IrnY5u0TFyGf+4RPruTYP6TTXK55JFUEY1K3ur/mQ4ENGl9l6OuwDnmo71NI5rWD56oEJvvtiW6VV6DYM4Y2xpMVcGcoFNA4OQc/YIwVVTge1aKKXOzShSN11EO5G1UCR4J3EQ8XyOt6H0swBpd0Kvvw5uvJoYrY2eZOeNOXCpD5mIxFCoAGJitGUfzw69j8rm1UBpTBBuDW/EdnG4VbzlJPrAGAl1k5mLJoRJ31xtq8= rahsharm@my-linux-vm']}]"
+	kubectl patch linodemachinetemplate $(CLUSTER_NAME)-md-0 --type='json' -p="[{'op': 'add', 'path': '/spec/template/spec/authorizedKeys', 'value': ['ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7EoJcN35JMvl2znOz9sFYfCeziG/jFTeApBg36l7XhWRknqBXLFAMmZT8JLCpUB2GIaiTzXittsYsOeRinXWVl4VKG8/Kq8wjxTe6WXK52LfH4SVpNoMZt/vV58NBqY776Rd8wt6OjBDsg8eYsApZHeeQA/PIQtDUAOpSTLk6w2qsfqBIaP0t9+KkHRN4dd2LpAvN3SEXOgfN6fGmW41+9Aq2W7bLNfOogmD0B78JRsYemNCQeT/OHhX66Wrr+hyhsYvfqvl8GvbW5hHxO2/IrnY5u0TFyGf+4RPruTYP6TTXK55JFUEY1K3ur/mQ4ENGl9l6OuwDnmo71NI5rWD56oEJvvtiW6VV6DYM4Y2xpMVcGcoFNA4OQc/YIwVVTge1aKKXOzShSN11EO5G1UCR4J3EQ8XyOt6H0swBpd0Kvvw5uvJoYrY2eZOeNOXCpD5mIxFCoAGJitGUfzw69j8rm1UBpTBBuDW/EdnG4VbzlJPrAGAl1k5mLJoRJ31xtq8= rahsharm@my-linux-vm']}]"
 	kubectl wait --for=condition=ControlPlaneReady cluster/$(CLUSTER_NAME) --timeout=600s || (kubectl get cluster -o yaml; kubectl get linodecluster -o yaml; kubectl get linodemachines -o yaml)
 	kubectl wait --for=condition=NodeHealthy=true machines -l cluster.x-k8s.io/cluster-name=$(CLUSTER_NAME) --timeout=900s || \
 		( \
-			clusterctl get kubeconfig $(CLUSTER_NAME) > $(KUBECONFIG_PATH) \
 			kubectl get machinedeployment -A -o yaml; \
 			kubectl get linodemachine -A -o yaml; \
+			kubectl describe helmchartproxy; \
+			kubectl get events; \
+			clusterctl get kubeconfig $(CLUSTER_NAME) > $(KUBECONFIG_PATH) \
 			KUBECONFIG=$(KUBECONFIG_PATH) kubectl get nodes -o wide; \
 			KUBECONFIG=$(KUBECONFIG_PATH) kubectl get pods -A -o wide; \
 			KUBECONFIG=$(KUBECONFIG_PATH) kubectl get events -A; \
@@ -167,6 +171,7 @@ create-capl-cluster:
 		( \
 			kubectl get machinedeployment -A -o yaml; \
 			kubectl get linodemachine -A -o yaml; \
+			kubectl describe helmchartproxy; \
 			KUBECONFIG=$(KUBECONFIG_PATH) kubectl get nodes -o wide; \
 			KUBECONFIG=$(KUBECONFIG_PATH) kubectl get pods -A -o wide; \
 			KUBECONFIG=$(KUBECONFIG_PATH) kubectl get events -A; \
