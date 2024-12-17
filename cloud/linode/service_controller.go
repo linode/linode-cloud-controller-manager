@@ -21,14 +21,14 @@ type serviceController struct {
 	loadbalancers *loadbalancers
 	informer      v1informers.ServiceInformer
 
-	queue workqueue.DelayingInterface
+	queue workqueue.TypedDelayingInterface[any]
 }
 
 func newServiceController(loadbalancers *loadbalancers, informer v1informers.ServiceInformer) *serviceController {
 	return &serviceController{
 		loadbalancers: loadbalancers,
 		informer:      informer,
-		queue:         workqueue.NewDelayingQueue(),
+		queue:         workqueue.NewTypedDelayingQueue[any](),
 	}
 }
 
