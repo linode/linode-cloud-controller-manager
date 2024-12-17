@@ -51,6 +51,8 @@ type linodeCloud struct {
 	routes        cloudprovider.Routes
 }
 
+var instanceCache *instances
+
 func init() {
 	cloudprovider.RegisterCloudProvider(
 		ProviderName,
@@ -97,9 +99,8 @@ func newCloud() (cloudprovider.Interface, error) {
 		Options.VPCNames = Options.VPCName
 	}
 
-	instances := newInstances(linodeClient)
-
-	routes, err := newRoutes(linodeClient, instances)
+	instanceCache = newInstances(linodeClient)
+	routes, err := newRoutes(linodeClient, instanceCache)
 	if err != nil {
 		return nil, fmt.Errorf("routes client was not created successfully: %w", err)
 	}
@@ -125,7 +126,7 @@ func newCloud() (cloudprovider.Interface, error) {
 	// create struct that satisfies cloudprovider.Interface
 	lcloud := &linodeCloud{
 		client:        linodeClient,
-		instances:     instances,
+		instances:     instanceCache,
 		loadbalancers: newLoadbalancers(linodeClient, region),
 		routes:        routes,
 	}
@@ -141,7 +142,7 @@ func (c *linodeCloud) Initialize(clientBuilder cloudprovider.ControllerClientBui
 	serviceController := newServiceController(c.loadbalancers.(*loadbalancers), serviceInformer)
 	go serviceController.Run(stopCh)
 
-	nodeController := newNodeController(kubeclient, c.client, nodeInformer)
+	nodeController := newNodeController(kubeclient, c.client, nodeInformer, instanceCache)
 	go nodeController.Run(stopCh)
 }
 

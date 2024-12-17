@@ -42,7 +42,7 @@ type nodeController struct {
 	queue workqueue.TypedDelayingInterface[any]
 }
 
-func newNodeController(kubeclient kubernetes.Interface, client client.Client, informer v1informers.NodeInformer) *nodeController {
+func newNodeController(kubeclient kubernetes.Interface, client client.Client, informer v1informers.NodeInformer, instanceCache *instances) *nodeController {
 	timeout := defaultMetadataTTL
 	if raw, ok := os.LookupEnv("LINODE_METADATA_TTL"); ok {
 		if t, _ := strconv.Atoi(raw); t > 0 {
@@ -52,7 +52,7 @@ func newNodeController(kubeclient kubernetes.Interface, client client.Client, in
 
 	return &nodeController{
 		client:             client,
-		instances:          newInstances(client),
+		instances:          instanceCache,
 		kubeclient:         kubeclient,
 		informer:           informer,
 		ttl:                timeout,
