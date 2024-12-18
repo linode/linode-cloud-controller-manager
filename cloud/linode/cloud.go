@@ -42,6 +42,7 @@ var Options struct {
 	BGPNodeSelector       string
 	IpHolderSuffix        string
 	LinodeExternalNetwork *net.IPNet
+	NodeBalancerTags      []string
 }
 
 type linodeCloud struct {

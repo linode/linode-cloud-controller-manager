@@ -612,6 +612,8 @@ func (l *loadbalancers) GetLoadBalancerTags(_ context.Context, clusterName strin
 		tags = append(tags, clusterName)
 	}
 
+	tags = append(tags, Options.NodeBalancerTags...)
+
 	tagStr, ok := service.GetAnnotations()[annotations.AnnLinodeLoadBalancerTags]
 	if ok {
 		return append(tags, strings.Split(tagStr, ",")...)
