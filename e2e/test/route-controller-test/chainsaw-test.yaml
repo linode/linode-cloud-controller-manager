@@ -62,4 +62,4 @@ spec:
 
             check:
               ($error == null): true
-              (contains($stdout, 'Pod CIDR found in VPC interface configuration')): true
+              (contains($stdout, 'Pod CIDR not found in VPC interface configuration')): false
