@@ -44,8 +44,6 @@ func TestGetAllVPCIDs(t *testing.T) {
 }
 
 func TestGetVPCID(t *testing.T) {
-	t.Parallel()
-
 	t.Run("vpcID in cache", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -102,8 +100,6 @@ func TestGetVPCID(t *testing.T) {
 }
 
 func TestGetVPCIPAddresses(t *testing.T) {
-	t.Parallel()
-
 	t.Run("vpc id not found", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
