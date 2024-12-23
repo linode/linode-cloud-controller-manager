@@ -141,7 +141,10 @@ func TestNodeController_handleNode(t *testing.T) {
 	assert.NoError(t, err, "expected no error during node creation")
 
 	instCache := newInstances(client)
+
+	t.Setenv("LINODE_METADATA_TTL", "30")
 	nodeCtrl := newNodeController(kubeClient, client, nil, instCache)
+	assert.Equal(t, 30*time.Second, nodeCtrl.ttl, "expected ttl to be 30 seconds")
 
 	// Test: Successful metadata update
 	publicIP := net.ParseIP("172.234.31.123")
