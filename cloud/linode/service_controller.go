@@ -15,7 +15,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const retryInterval = time.Minute * 1
+var retryInterval = time.Minute * 1
 
 type serviceController struct {
 	loadbalancers *loadbalancers
