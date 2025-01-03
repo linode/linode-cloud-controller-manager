@@ -75,8 +75,8 @@ spec:
               IP=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].ip)
 
               for i in {1..10}; do
-                  port_80=$(curl -s $IP:80 | grep "test-")
-                  port_443=$(curl --resolve linode.test:443:$IP --cacert ../certificates/ca.crt -s https://linode.test:443 | grep "test-")
+                  port_80=$(curl -s $IP:80 | grep "test-" || true)
+                  port_443=$(curl --resolve linode.test:443:$IP --cacert ../certificates/ca.crt -s https://linode.test:443 | grep "test-" || true)
 
                   if [[ -z $port_80 || -z $port_443 ]]; then
                       sleep 20
