@@ -1,0 +1,2 @@
+ignore:
+  - "cloud/linode/client/mocks/mock_client.go"
