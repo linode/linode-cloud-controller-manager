@@ -103,7 +103,7 @@ spec:
                   fwconfig=$(curl -s \
                     -H "Authorization: Bearer $LINODE_TOKEN" \
                     -H "Content-Type: application/json" \
-                    "https://api.linode.com/v4/networking/firewalls/$fwid")
+                    "https://api.linode.com/v4/networking/firewalls/$fwid" || true)
 
                   fw_attached_to_nb=$(echo $fwconfig | jq ".entities[] | select(.id == $nbid) | .id == $nbid")
 

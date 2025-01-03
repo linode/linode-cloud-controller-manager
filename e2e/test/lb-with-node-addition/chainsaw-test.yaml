@@ -78,7 +78,7 @@ spec:
                   nbconfig=$(curl -s \
                     -H "Authorization: Bearer $LINODE_TOKEN" \
                     -H "Content-Type: application/json" \
-                    "https://api.linode.com/v4/nodebalancers/$nbid/configs" | jq '.data[]? | select(.port == 80)')
+                    "https://api.linode.com/v4/nodebalancers/$nbid/configs" | jq '.data[]? | select(.port == 80)' || true)
 
                   if [[ -z $nbconfig ]]; then
                       echo "Failed fetching nodebalancer config for port 80"
