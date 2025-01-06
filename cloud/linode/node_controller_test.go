@@ -15,9 +15,51 @@ import (
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/util/workqueue"
 )
+
+func TestNodeController_Run(t *testing.T) {
+	// Mock dependencies
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	client := mocks.NewMockClient(ctrl)
+	kubeClient := fake.NewSimpleClientset()
+	informer := informers.NewSharedInformerFactory(kubeClient, 0).Core().V1().Nodes()
+	mockQueue := workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[any]{Name: "test"})
+
+	nodeCtrl := newNodeController(kubeClient, client, informer, newInstances(client))
+	nodeCtrl.queue = mockQueue
+	nodeCtrl.ttl = 1 * time.Second
+
+	// Add test node
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "nodeA",
+			Labels:      map[string]string{},
+			Annotations: map[string]string{},
+		},
+		Spec: v1.NodeSpec{},
+	}
+	_, err := kubeClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+	assert.NoError(t, err, "expected no error during node creation")
+
+	// Start the controller
+	stopCh := make(chan struct{})
+	go nodeCtrl.Run(stopCh)
+
+	client.EXPECT().ListInstances(gomock.Any(), nil).AnyTimes().Return([]linodego.Instance{}, &linodego.Error{Code: http.StatusTooManyRequests, Message: "Too many requests"})
+	// Add the node to the informer
+	err = nodeCtrl.informer.Informer().GetStore().Add(node)
+	assert.NoError(t, err, "expected no error when adding node to informer")
+
+	// Allow some time for the queue to process
+	time.Sleep(1 * time.Second)
+
+	// Stop the controller
+	close(stopCh)
+}
 
 func TestNodeController_processNext(t *testing.T) {
 	// Mock dependencies
