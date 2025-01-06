@@ -294,12 +294,14 @@ sessionAffinityConfig:
 ## Additional environment variables
 To tweak CCM based on needs, one can overwrite the default values set for caches and requests by setting appropriate environment variables when applying the manifest or helm chart.
 
-| Environment Variable              | Default | Description                                                 |
-|-----------------------------------|---------|-------------------------------------------------------------|
-| `LINODE_INSTANCE_CACHE_TTL`       | `15`    | Default timeout of instance cache in seconds                |
-| `LINODE_ROUTES_CACHE_TTL_SECONDS` | `60`    | Default timeout of route cache in seconds                   |
-| `LINODE_REQUEST_TIMEOUT_SECONDS`  | `120`   | Default timeout in seconds for http requests to linode API  |
-| `LINODE_EXTERNAL_SUBNET`          |         | Mark private network as external. Example - `172.24.0.0/16` |
+| Environment Variable              | Default     | Description                                                 |
+|-----------------------------------|-------------|-------------------------------------------------------------|
+| `LINODE_INSTANCE_CACHE_TTL`       | `15`        | Default timeout of instance cache in seconds                |
+| `LINODE_ROUTES_CACHE_TTL_SECONDS` | `60`        | Default timeout of route cache in seconds                   |
+| `LINODE_REQUEST_TIMEOUT_SECONDS`  | `120`       | Default timeout in seconds for http requests to linode API  |
+| `LINODE_EXTERNAL_SUBNET`          |             | Mark private network as external. Example - `172.24.0.0/16` |
+| `BGP_CUSTOM_ID_MAP`               |             | Use your own map instead of default region map for BGP      |
+| `BGP_PEER_PREFIX`                 | `2600:3c0f` | Use your own BGP peer prefix instead of default one         |
 
 ## Generating a Manifest for Deployment
 Use the script located at `./deploy/generate-manifest.sh` to generate a self-contained deployment manifest for the Linode CCM. Two arguments are required.
