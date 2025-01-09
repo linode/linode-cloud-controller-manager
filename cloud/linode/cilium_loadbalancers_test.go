@@ -201,6 +201,7 @@ func createNewIpHolderInstance() linodego.Instance {
 func testNoBGPNodeLabel(t *testing.T, mc *mocks.MockClient) {
 	Options.BGPNodeSelector = ""
 	Options.IpHolderSuffix = "linodelb"
+	t.Setenv("BGP_PEER_PREFIX", "2600:3cef")
 	svc := createTestService()
 	newIpHolderInstance = createNewIpHolderInstance()
 
@@ -257,7 +258,18 @@ func testUnsupportedRegion(t *testing.T, mc *mocks.MockClient) {
 
 	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
 	if err == nil {
-		t.Fatal("expected nil error")
+		t.Fatal("expected not nil error")
+	}
+	if lbStatus != nil {
+		t.Fatalf("expected a nil lbStatus, got %v", lbStatus)
+	}
+
+	// Use BGP custom id map
+	t.Setenv("BGP_CUSTOM_ID_MAP", "{'us-foobar': 2}")
+	lb = &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
+	lbStatus, err = lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err == nil {
+		t.Fatal("expected not nil error")
 	}
 	if lbStatus != nil {
 		t.Fatalf("expected a nil lbStatus, got %v", lbStatus)
