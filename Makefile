@@ -197,7 +197,7 @@ e2e-test:
 
 .PHONY: e2e-test-bgp
 e2e-test-bgp:
-	kubectl -n kube-system patch daemonset ccm-linode --patch '\
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl -n kube-system patch daemonset ccm-linode --patch '\
 	spec:\
 	  template:\
 	    spec:\
@@ -215,7 +215,7 @@ e2e-test-bgp:
 			- --load-balancer-type=cilium-bgp\
         	- --bgp-node-selector=cilium-bgp-peering=true\
         	- --ip-holder-suffix=e2e-test
-	kubectl patch clusterrole ccm-linode-clusterrole --type='json' \
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl patch clusterrole ccm-linode-clusterrole --type='json' \
 	-p='[{\
 		"op": "add",\
 		"path": "/rules/-",\
