@@ -100,6 +100,10 @@ spec:
                 echo "LoadBalancer IP not found in nanode (IP placeholder) IPs"
                 exit 1
               fi
+
+              # Delete the nanode
+              curl -X DELETE -H "Authorization: Bearer $LINODE_TOKEN" \
+                "https://api.linode.com/v4/linode/instances/$NANODE_ID"
               
               done
             check:
