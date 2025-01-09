@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"slices"
 	"strings"
 
@@ -28,8 +29,8 @@ const (
 	ciliumLBClass              = "io.cilium/bgp-control-plane"
 	ipHolderLabelPrefix        = "linode-ccm-ip-holder"
 	ciliumBGPPeeringPolicyName = "linode-ccm-bgp-peering"
-
-	commonControlPlaneLabel = "node-role.kubernetes.io/control-plane"
+	defaultBGPPeerPrefix       = "2600:3c0f"
+	commonControlPlaneLabel    = "node-role.kubernetes.io/control-plane"
 )
 
 // This mapping is unfortunately necessary since there is no way to get the
@@ -481,6 +482,12 @@ func (l *loadbalancers) getCiliumLBIPPool(ctx context.Context, service *v1.Servi
 
 // NOTE: Cilium CRDs must be installed for this to work
 func (l *loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error {
+	if raw, ok := os.LookupEnv("BGP_CUSTOM_ID_MAP"); ok {
+		klog.Info("BGP_CUSTOM_ID_MAP env variable specified, using it instead of the default region map")
+		if err := json.Unmarshal([]byte(raw), &regionIDMap); err != nil {
+			return err
+		}
+	}
 	regionID, ok := regionIDMap[l.zone]
 	if !ok {
 		return fmt.Errorf("unsupported region for BGP: %s", l.zone)
@@ -543,10 +550,15 @@ func (l *loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error 
 			}},
 		},
 	}
+	bgpPeerPrefix := defaultBGPPeerPrefix
+	if raw, ok := os.LookupEnv("BGP_PEER_PREFIX"); ok {
+		klog.Info("BGP_PEER_PREFIX env variable specified, using it instead of the default bgpPeer prefix")
+		bgpPeerPrefix = raw
+	}
 	// As in https://github.com/linode/lelastic, there are 4 peers per DC
 	for i := 1; i <= 4; i++ {
 		neighbor := v2alpha1.CiliumBGPNeighbor{
-			PeerAddress:             fmt.Sprintf("2600:3c0f:%d:34::%d/64", regionID, i),
+			PeerAddress:             fmt.Sprintf("%s:%d:34::%d/64", bgpPeerPrefix, regionID, i),
 			PeerASN:                 65000,
 			EBGPMultihopTTL:         ptr.To(int32(10)),
 			ConnectRetryTimeSeconds: ptr.To(int32(5)),
