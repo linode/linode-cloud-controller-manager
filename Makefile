@@ -197,7 +197,7 @@ e2e-test:
 
 .PHONY: e2e-test-bgp
 e2e-test-bgp:
-	# Patch CCM to enable BGPkubectl -n kube-system patch daemonset ccm-linode --patch '\
+	kubectl -n kube-system patch daemonset ccm-linode --patch '\
 	spec:\
 	  template:\
 	    spec:\
@@ -225,7 +225,6 @@ e2e-test-bgp:
 			"verbs": ["get", "list", "watch", "create", "update", "patch", "delete"]\
 		}\
 	}]'
-	# Run the test
 	CLUSTER_NAME=$(CLUSTER_NAME) \
 	MGMT_KUBECONFIG=$(MGMT_KUBECONFIG_PATH) \
 	KUBECONFIG=$(KUBECONFIG_PATH) \
