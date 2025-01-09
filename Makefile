@@ -195,6 +195,44 @@ e2e-test:
 	LINODE_TOKEN=$(LINODE_TOKEN) \
 	chainsaw test e2e/test --parallel 2
 
+.PHONY: e2e-test-bgp
+e2e-test-bgp:
+	# Patch CCM to enable BGPkubectl -n kube-system patch daemonset ccm-linode --patch '\
+	spec:\
+	  template:\
+	    spec:\
+	      containers:\
+	      - name: ccm-linode\
+	        args:\
+	        - --leader-elect-resource-lock=leases\
+	        - --v=3\
+	        - --secure-port=10253\
+	        - --webhook-secure-port=0\
+	        - --enable-route-controller=true\
+	        - --vpc-name=capl-cluster\
+	        - --configure-cloud-routes=true\
+	        - --cluster-cidr=10.0.0.0/8\
+			- --load-balancer-type=cilium-bgp\
+        	- --bgp-node-selector=cilium-bgp-peering=true\
+        	- --ip-holder-suffix=e2e-test
+	kubectl patch clusterrole ccm-linode-clusterrole --type='json' \
+	-p='[{\
+		"op": "add",\
+		"path": "/rules/-",\
+		"value": {\
+			"apiGroups": ["cilium.io"],\
+			"resources": ["ciliumloadbalancerippools", "ciliumbgppeeringpolicies"],\
+			"verbs": ["get", "list", "watch", "create", "update", "patch", "delete"]\
+		}\
+	}]'
+	# Run the test
+	CLUSTER_NAME=$(CLUSTER_NAME) \
+	MGMT_KUBECONFIG=$(MGMT_KUBECONFIG_PATH) \
+	KUBECONFIG=$(KUBECONFIG_PATH) \
+	REGION=$(LINODE_REGION) \
+	LINODE_TOKEN=$(LINODE_TOKEN) \
+	chainsaw test e2e/test/lb-cilium-bgp
+
 #####################################################################
 # OS / ARCH
 #####################################################################

@@ -156,6 +156,9 @@ jobs:
       - name: Run E2E Tests
         run: devbox run e2e-test
 
+      - name: Run Cilium BGP e2e test
+        run: devbox run e2e-test-bgp
+
       - name: Cleanup Resources
         if: always()
         run: devbox run cleanup-cluster
