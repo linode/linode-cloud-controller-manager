@@ -207,16 +207,9 @@ e2e-test-bgp:
 	 awk '{print $$1}' | xargs -I {} env KUBECONFIG=$(KUBECONFIG_PATH) kubectl label nodes {} cilium-bgp-peering=true --overwrite
 
 	# First patch: Add the necessary RBAC permissions
-	KUBECONFIG=$(KUBECONFIG_PATH) kubectl patch clusterrole ccm-linode-clusterrole --type='json' \
-		-p='[{\
-			"op": "add",\
-			"path": "/rules/-",\
-			"value": {\
-				"apiGroups": ["cilium.io"],\
-				"resources": ["ciliumloadbalancerippools", "ciliumbgppeeringpolicies"],\
-				"verbs": ["get", "list", "watch", "create", "update", "patch", "delete"]\
-			}\
-		}]'
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl patch clusterrole ccm-linode-clusterrole --type='json'\
+	 -p='[{"op": "add", "path": "/rules/-", "value": {"apiGroups": ["cilium.io"], "resources": ["ciliumloadbalancerippools", "ciliumbgppeeringpolicies"], "verbs": ["get", "list", "watch", "create", "update", "patch", "delete"]}}]'
+
 	
 	# Patch: Append new args to the existing ones
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl patch daemonset ccm-linode -n kube-system --type='json' \
