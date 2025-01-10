@@ -197,6 +197,11 @@ e2e-test:
 
 .PHONY: e2e-test-bgp
 e2e-test-bgp:
+	# Debugging: Print the nodes in the cluster
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl get nodes -o wide
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl get nodes --no-headers |\
+	 grep -v control-plane | awk '{print $$1}'
+
 	# Add bgp peering label to non control plane nodes
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl label nodes $$(kubectl get nodes --no-headers |\
 	 grep -v control-plane | awk '{print $$1}') cilium-bgp-peering=true --overwrite
