@@ -153,8 +153,8 @@ jobs:
       - name: Setup CAPL Management Kind Cluster and CAPL Child Cluster For Testing
         run: devbox run mgmt-and-capl-cluster
 
-      # - name: Run E2E Tests
-      #   run: devbox run e2e-test
+      - name: Run E2E Tests
+        run: devbox run e2e-test
 
       - name: Run Cilium BGP e2e test
         run: devbox run e2e-test-bgp

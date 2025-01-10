@@ -197,13 +197,8 @@ e2e-test:
 
 .PHONY: e2e-test-bgp
 e2e-test-bgp:
-	# Setup Cilium BGP peering
 	KUBECONFIG=$(KUBECONFIG_PATH) CLUSTER_SUFFIX=$(CLUSTER_NAME) ./e2e/setup/cilium-setup.sh
-
-	# Wait for rollout
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl -n kube-system rollout status daemonset/ccm-linode --timeout=300s
-	
-	# Run the tests
 	CLUSTER_NAME=$(CLUSTER_NAME) \
 		MGMT_KUBECONFIG=$(MGMT_KUBECONFIG_PATH) \
 		KUBECONFIG=$(KUBECONFIG_PATH) \

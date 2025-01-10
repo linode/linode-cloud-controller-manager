@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Add bgp peering label to non control plane nodes
+# Add bgp peering label to non control plane nodes. Needed to update the shared IP on the nodes
 kubectl get nodes --no-headers | grep -v control-plane |\
  awk '{print $1}' | xargs -I {} kubectl label nodes {} cilium-bgp-peering=true --overwrite
 
