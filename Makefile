@@ -197,51 +197,9 @@ e2e-test:
 
 .PHONY: e2e-test-bgp
 e2e-test-bgp:
-	# Debugging: Print the nodes in the cluster
-	KUBECONFIG=$(KUBECONFIG_PATH) kubectl get nodes -o wide
-	KUBECONFIG=$(KUBECONFIG_PATH) kubectl get nodes --no-headers |\
-	 grep -v control-plane | awk '{print $$1}'
+	# Setup Cilium BGP peering
+	KUBECONFIG=$(KUBECONFIG_PATH) CLUSTER_SUFFIX=$(CLUSTER_NAME) ./e2e/setup/cilium-setup.sh
 
-	# Add bgp peering label to non control plane nodes
-	KUBECONFIG=$(KUBECONFIG_PATH) kubectl get nodes --no-headers | grep -v control-plane |\
-	 awk '{print $$1}' | xargs -I {} env KUBECONFIG=$(KUBECONFIG_PATH) kubectl label nodes {} cilium-bgp-peering=true --overwrite
-
-	# First patch: Add the necessary RBAC permissions
-	KUBECONFIG=$(KUBECONFIG_PATH) kubectl patch clusterrole ccm-linode-clusterrole \
-		--type='json' \
-		-p='[\
-			{\
-				"op": "add",\
-				"path": "/rules/-",\
-				"value": {\
-					"apiGroups": ["cilium.io"],\
-					"resources": ["ciliumloadbalancerippools", "ciliumbgppeeringpolicies"],\
-					"verbs": ["get", "list", "watch", "create", "update", "patch", "delete"]\
-				}\
-			}\
-		]'
-	
-	# Patch: Append new args to the existing ones
-	KUBECONFIG=$(KUBECONFIG_PATH) kubectl patch daemonset ccm-linode -n kube-system \
-		--type='json' \
-		-p='[\
-			{\
-				"op": "add",\
-				"path": "/spec/template/spec/containers/0/args/-",\
-				"value": "--bgp-node-selector=cilium-bgp-peering=true"\
-			},\
-			{\
-				"op": "add",\
-				"path": "/spec/template/spec/containers/0/args/-",\
-				"value": "--load-balancer-type=cilium-bgp"\
-			},\
-			{\
-				"op": "add",\
-				"path": "/spec/template/spec/containers/0/args/-",\
-				"value": "--ip-holder-suffix=ccm-8039dcf"\
-			}\
-		]'
-		
 	# Wait for rollout
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl -n kube-system rollout status daemonset/ccm-linode --timeout=300s
 	
