@@ -203,8 +203,8 @@ e2e-test-bgp:
 	 grep -v control-plane | awk '{print $$1}'
 
 	# Add bgp peering label to non control plane nodes
-	KUBECONFIG=$(KUBECONFIG_PATH) kubectl label nodes $$(kubectl get nodes --no-headers |\
-	 grep -v control-plane | awk '{print $$1}' | paste -sd " " -) cilium-bgp-peering=true --overwrite
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl get nodes --no-headers | grep -v control-plane |\
+	 awk '{print $1}' | xargs -I {} kubectl label nodes {} cilium-bgp-peering=true --overwrite
 
 	# First patch: Add the necessary RBAC permissions
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl patch clusterrole ccm-linode-clusterrole --type='json' \
