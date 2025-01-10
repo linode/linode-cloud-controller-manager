@@ -197,40 +197,38 @@ e2e-test:
 
 .PHONY: e2e-test-bgp
 e2e-test-bgp:
-	KUBECONFIG=$(KUBECONFIG_PATH) kubectl -n kube-system patch daemonset ccm-linode --patch '\
-	spec:\
-	  template:\
-	    spec:\
-	      containers:\
-	      - name: ccm-linode\
-	        args:\
-	        - --leader-elect-resource-lock=leases\
-	        - --v=3\
-	        - --secure-port=10253\
-	        - --webhook-secure-port=0\
-	        - --enable-route-controller=true\
-	        - --vpc-name=capl-cluster\
-	        - --configure-cloud-routes=true\
-	        - --cluster-cidr=10.0.0.0/8\
-			- --load-balancer-type=cilium-bgp\
-        	- --bgp-node-selector=cilium-bgp-peering=true\
-        	- --ip-holder-suffix=e2e-test
+	# Add bgp peering label to non control plane nodes
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl label nodes $$(kubectl get nodes --no-headers |\
+	 grep -v control-plane | awk '{print $$1}') cilium-bgp-peering=true --overwrite
+
+	# First patch: Add the necessary RBAC permissions
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl patch clusterrole ccm-linode-clusterrole --type='json' \
-	-p='[{\
-		"op": "add",\
-		"path": "/rules/-",\
-		"value": {\
-			"apiGroups": ["cilium.io"],\
-			"resources": ["ciliumloadbalancerippools", "ciliumbgppeeringpolicies"],\
-			"verbs": ["get", "list", "watch", "create", "update", "patch", "delete"]\
-		}\
-	}]'
+		-p='[{\
+			"op": "add",\
+			"path": "/rules/-",\
+			"value": {\
+				"apiGroups": ["cilium.io"],\
+				"resources": ["ciliumloadbalancerippools", "ciliumbgppeeringpolicies"],\
+				"verbs": ["get", "list", "watch", "create", "update", "patch", "delete"]\
+			}\
+		}]'
+	
+	# Patch: Append new args to the existing ones
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl patch daemonset ccm-linode -n kube-system --type='json' \
+		-p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--bgp-node-selector=cilium-bgp-peering=true"},\
+			{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--load-balancer-type=cilium-bgp"},\
+			{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--ip-holder-suffix=$(CLUSTER_NAME)"}]'
+	
+	# Wait for rollout
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl -n kube-system rollout status daemonset/ccm-linode --timeout=300s
+	
+	# Run the tests
 	CLUSTER_NAME=$(CLUSTER_NAME) \
-	MGMT_KUBECONFIG=$(MGMT_KUBECONFIG_PATH) \
-	KUBECONFIG=$(KUBECONFIG_PATH) \
-	REGION=$(LINODE_REGION) \
-	LINODE_TOKEN=$(LINODE_TOKEN) \
-	chainsaw test e2e/test/lb-cilium-bgp
+		MGMT_KUBECONFIG=$(MGMT_KUBECONFIG_PATH) \
+		KUBECONFIG=$(KUBECONFIG_PATH) \
+		REGION=$(LINODE_REGION) \
+		LINODE_TOKEN=$(LINODE_TOKEN) \
+		chainsaw test e2e/lb-cilium-bgp
 
 #####################################################################
 # OS / ARCH

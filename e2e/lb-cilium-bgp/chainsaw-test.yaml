@@ -77,35 +77,42 @@ spec:
                 NODE_ID=$(kubectl get $node -o jsonpath='{.spec.providerID}' | sed 's|linode://||')
                 echo "Node ID: $NODE_ID"
 
-                SHARED_IPS=$(curl -H "Authorization: Bearer $LINODE_TOKEN" \
-                            "https://api.linode.com/v4/linode/instances/$NODE_ID/ips" | \
-                            jq -r '.ipv4.shared[].address')
+                # Get node IPs with error handling
+                NODE_IP_RESPONSE=$(curl -s -H "Authorization: Bearer $LINODE_TOKEN" \
+                                 "https://api.linode.com/v4/linode/instances/$NODE_ID/ips")
+                
+                # Check if shared IPs exist, if not use empty array
+                SHARED_IPS=$(echo "$NODE_IP_RESPONSE" | jq -r '.ipv4.shared[]?.address // empty')
                 echo "shared IPs: $SHARED_IPS"
 
-                if ! echo "$SHARED_IPS" | grep -q "$LB_IP"; then
+                if [ -n "$SHARED_IPS" ] && ! echo "$SHARED_IPS" | grep -q "$LB_IP"; then
                   echo "LoadBalancer IP $LB_IP not found in shared IPs of node $node"
                   exit 1
                 fi
+              done
 
               # Check if the nanode has the shared IP
-              NANODE_ID=$(curl -H "Authorization: Bearer $LINODE_TOKEN" \
-                "https://api.linode.com/v4/linode/instances" | \
-                jq -r '.data[] | select(.label | endswith("e2e-test")) | .id')
+              NANODE_RESPONSE=$(curl -s -H "Authorization: Bearer $LINODE_TOKEN" \
+                "https://api.linode.com/v4/linode/instances")
               
-              NANODE_IPS=$(curl -H "Authorization: Bearer $LINODE_TOKEN" \
-                "https://api.linode.com/v4/linode/instances/$NANODE_ID/ips" | \
-                jq -r '.ipv4.public[].address')
-              
-              if ! echo "$NANODE_IPS" | grep -q "$LB_IP"; then
-                echo "LoadBalancer IP not found in nanode (IP placeholder) IPs"
-                exit 1
-              fi
+              NANODE_ID=$(echo "$NANODE_RESPONSE" | \
+                jq -r '.data[] | select(.label | endswith("$CLUSTER_NAME")) | .id')
 
-              # Delete the nanode
-              curl -X DELETE -H "Authorization: Bearer $LINODE_TOKEN" \
-                "https://api.linode.com/v4/linode/instances/$NANODE_ID"
-              
-              done
+              if [ -n "$NANODE_ID" ]; then
+                NANODE_IP_RESPONSE=$(curl -s -H "Authorization: Bearer $LINODE_TOKEN" \
+                  "https://api.linode.com/v4/linode/instances/$NANODE_ID/ips")
+                
+                NANODE_IPS=$(echo "$NANODE_IP_RESPONSE" | jq -r '.ipv4.public[]?.address // empty')
+                
+                if [ -n "$NANODE_IPS" ] && ! echo "$NANODE_IPS" | grep -q "$LB_IP"; then
+                  echo "LoadBalancer IP not found in nanode (IP placeholder) IPs"
+                  exit 1
+                fi
+
+                # Delete the nanode
+                curl -s -X DELETE -H "Authorization: Bearer $LINODE_TOKEN" \
+                  "https://api.linode.com/v4/linode/instances/$NANODE_ID"
+              fi
             check:
               ($error == null): true
               (contains($stdout, 'LoadBalancer IP not found in shared IPs of node')): false
