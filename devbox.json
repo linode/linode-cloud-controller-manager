@@ -21,6 +21,7 @@
     "scripts": {
       "mgmt-and-capl-cluster": "make mgmt-and-capl-cluster",
       "e2e-test": "make e2e-test",
+      "e2e-test-bgp": "make e2e-test-bgp",
       "cleanup-cluster": "make cleanup-cluster"
     }
   },

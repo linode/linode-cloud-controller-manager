@@ -1,0 +1,139 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: cilium-bgp-test
+spec:
+  namespace: "cilium-bgp-test"
+  steps:
+    - name: Check if CCM is deployed
+      try:
+        - assert:
+            file: ../../test/assert-ccm-resources.yaml
+    - name: Create a pod and service with load balancer type cilium-bgp
+      try:
+        - apply:
+            file: create-pod-service.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Verify CiliumLoadBalancerIPPool creation
+      try:
+        - assert:
+            resource:
+              apiVersion: cilium.io/v2alpha1
+              kind: CiliumLoadBalancerIPPool
+              metadata:
+                name: cilium-bgp-test-test-bgp-svc-pool
+              spec:
+                disabled: false
+    - name: Verify CiliumBGPPeeringPolicy
+      try:
+        - assert:
+            resource:
+              apiVersion: cilium.io/v2alpha1
+              kind: CiliumBGPPeeringPolicy
+              metadata:
+                name: linode-ccm-bgp-peering
+              spec:
+                nodeSelector:
+                  matchLabels:
+                    cilium-bgp-peering: "true"
+    - name: Check LoadBalancer IP assignment
+      try:
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: test-bgp-svc
+              status:
+                conditions:
+                - status: "True"
+                  type: cilium.io/IPAMRequestSatisfied
+    - name: Verify IP sharing on labeled nodes
+      try:
+        - script:
+            content: |
+              set -e
+
+              delete_nanode() {
+                local NANODE_RESPONSE=$(curl -s -H "Authorization: Bearer $LINODE_TOKEN" \
+                  "https://api.linode.com/v4/linode/instances")
+                
+                local NANODE_ID=$(echo "$NANODE_RESPONSE" | \
+                  jq -r --arg cluster "$CLUSTER_NAME" '.data[] | select(.label | endswith($cluster)) | .id')
+                
+                if [ -n "$NANODE_ID" ]; then
+                  curl -s -X DELETE -H "Authorization: Bearer $LINODE_TOKEN" \
+                    "https://api.linode.com/v4/linode/instances/$NANODE_ID" || true
+                fi
+              }
+
+              # Get the LoadBalancer IP
+              LB_IP=$(kubectl get svc test-bgp-svc -n cilium-bgp-test -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+              
+              # Get nodes with BGP label
+              BGP_NODES=$(kubectl get nodes -l cilium-bgp-peering=true -o name)
+              
+              if [ -z "$BGP_NODES" ]; then
+                echo "No nodes found with label cilium-bgp-peering=true"
+                delete_nanode
+                exit 1
+              fi
+
+              # Check if IP is shared on each BGP node
+              for node in $BGP_NODES; do
+                NODE_ID=$(kubectl get $node -o jsonpath='{.spec.providerID}' | sed 's|linode://||')
+                echo "Node ID: $NODE_ID"
+
+                NODE_IP_RESPONSE=$(curl -s -H "Authorization: Bearer $LINODE_TOKEN" \
+                                 "https://api.linode.com/v4/linode/instances/$NODE_ID/ips")
+                
+                SHARED_IPS=$(echo "$NODE_IP_RESPONSE" | jq -r '.ipv4.shared[]?.address // empty')
+                echo "shared IPs: $SHARED_IPS"
+
+                if [ -n "$SHARED_IPS" ] && ! echo "$SHARED_IPS" | grep -q "$LB_IP"; then
+                  echo "LoadBalancer IP $LB_IP not found in shared IPs of node $node"
+                  delete_nanode
+                  exit 1
+                fi
+              done
+
+              # Check if the nanode has the shared IP
+              NANODE_RESPONSE=$(curl -s -H "Authorization: Bearer $LINODE_TOKEN" \
+                "https://api.linode.com/v4/linode/instances")
+              
+              NANODE_ID=$(echo "$NANODE_RESPONSE" | \
+                jq -r --arg cluster "$CLUSTER_NAME" '.data[] | select(.label | endswith($cluster)) | .id')
+              
+              if [ -z "$NANODE_ID" ]; then
+                echo "No nanode found for cluster $CLUSTER_NAME"
+                exit 0
+              fi
+
+              NANODE_IP_RESPONSE=$(curl -s -H "Authorization: Bearer $LINODE_TOKEN" \
+                "https://api.linode.com/v4/linode/instances/$NANODE_ID/ips")
+              
+              NANODE_IPS=$(echo "$NANODE_IP_RESPONSE" | jq -r '.ipv4.public[]?.address // empty')
+              
+              if [ -n "$NANODE_IPS" ] && ! echo "$NANODE_IPS" | grep -q "$LB_IP"; then
+                echo "LoadBalancer IP not found in nanode IPs"
+                delete_nanode
+                exit 1
+              fi
+
+              echo "Successfully found LoadBalancer IP in nanode IPs"
+
+              # Delete the nanode on success
+              delete_nanode
+            check:
+              ($error == null): true
+              (contains($stdout, 'LoadBalancer IP not found in shared IPs of node')): false
+              (contains($stdout, 'LoadBalancer IP not found in nanode IPs')): false
+              (contains($stdout, 'Successfully found LoadBalancer IP in nanode IPs')): true
+    
