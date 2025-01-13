@@ -195,6 +195,17 @@ e2e-test:
 	LINODE_TOKEN=$(LINODE_TOKEN) \
 	chainsaw test e2e/test --parallel 2
 
+.PHONY: e2e-test-bgp
+e2e-test-bgp:
+	KUBECONFIG=$(KUBECONFIG_PATH) CLUSTER_SUFFIX=$(CLUSTER_NAME) ./e2e/setup/cilium-setup.sh
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl -n kube-system rollout status daemonset/ccm-linode --timeout=300s
+	CLUSTER_NAME=$(CLUSTER_NAME) \
+		MGMT_KUBECONFIG=$(MGMT_KUBECONFIG_PATH) \
+		KUBECONFIG=$(KUBECONFIG_PATH) \
+		REGION=$(LINODE_REGION) \
+		LINODE_TOKEN=$(LINODE_TOKEN) \
+		chainsaw test e2e/bgp-test/lb-cilium-bgp
+
 #####################################################################
 # OS / ARCH
 #####################################################################
