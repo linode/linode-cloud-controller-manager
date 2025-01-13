@@ -61,6 +61,19 @@ spec:
             content: |
               set -e
 
+              delete_nanode() {
+                local NANODE_RESPONSE=$(curl -s -H "Authorization: Bearer $LINODE_TOKEN" \
+                  "https://api.linode.com/v4/linode/instances")
+                
+                local NANODE_ID=$(echo "$NANODE_RESPONSE" | \
+                  jq -r --arg cluster "$CLUSTER_NAME" '.data[] | select(.label | endswith($cluster)) | .id')
+                
+                if [ -n "$NANODE_ID" ]; then
+                  curl -s -X DELETE -H "Authorization: Bearer $LINODE_TOKEN" \
+                    "https://api.linode.com/v4/linode/instances/$NANODE_ID" || true
+                fi
+              }
+
               # Get the LoadBalancer IP
               LB_IP=$(kubectl get svc test-bgp-svc -n cilium-bgp-test -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
               
@@ -69,6 +82,7 @@ spec:
               
               if [ -z "$BGP_NODES" ]; then
                 echo "No nodes found with label cilium-bgp-peering=true"
+                delete_nanode
                 exit 1
               fi
 
@@ -77,16 +91,15 @@ spec:
                 NODE_ID=$(kubectl get $node -o jsonpath='{.spec.providerID}' | sed 's|linode://||')
                 echo "Node ID: $NODE_ID"
 
-                # Get node IPs with error handling
                 NODE_IP_RESPONSE=$(curl -s -H "Authorization: Bearer $LINODE_TOKEN" \
                                  "https://api.linode.com/v4/linode/instances/$NODE_ID/ips")
                 
-                # Check if shared IPs exist, if not use empty array
                 SHARED_IPS=$(echo "$NODE_IP_RESPONSE" | jq -r '.ipv4.shared[]?.address // empty')
                 echo "shared IPs: $SHARED_IPS"
 
                 if [ -n "$SHARED_IPS" ] && ! echo "$SHARED_IPS" | grep -q "$LB_IP"; then
                   echo "LoadBalancer IP $LB_IP not found in shared IPs of node $node"
+                  delete_nanode
                   exit 1
                 fi
               done
@@ -110,14 +123,14 @@ spec:
               
               if [ -n "$NANODE_IPS" ] && ! echo "$NANODE_IPS" | grep -q "$LB_IP"; then
                 echo "LoadBalancer IP not found in nanode IPs"
+                delete_nanode
                 exit 1
               fi
 
               echo "Successfully found LoadBalancer IP in nanode IPs"
 
-              # Delete the nanode
-              curl -s -X DELETE -H "Authorization: Bearer $LINODE_TOKEN" \
-                "https://api.linode.com/v4/linode/instances/$NANODE_ID"
+              # Delete the nanode on success
+              delete_nanode
             check:
               ($error == null): true
               (contains($stdout, 'LoadBalancer IP not found in shared IPs of node')): false
