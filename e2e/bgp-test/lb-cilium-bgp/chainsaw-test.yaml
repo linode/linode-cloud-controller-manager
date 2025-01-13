@@ -9,7 +9,7 @@ spec:
     - name: Check if CCM is deployed
       try:
         - assert:
-            file: ../test/assert-ccm-resources.yaml
+            file: ../../test/assert-ccm-resources.yaml
     - name: Create a pod and service with load balancer type cilium-bgp
       try:
         - apply:

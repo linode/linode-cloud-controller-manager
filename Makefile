@@ -204,7 +204,7 @@ e2e-test-bgp:
 		KUBECONFIG=$(KUBECONFIG_PATH) \
 		REGION=$(LINODE_REGION) \
 		LINODE_TOKEN=$(LINODE_TOKEN) \
-		chainsaw test e2e/lb-cilium-bgp
+		chainsaw test e2e/bgp-test/lb-cilium-bgp
 
 #####################################################################
 # OS / ARCH
