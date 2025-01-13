@@ -10,7 +10,7 @@ require (
 	github.com/getsentry/sentry-go v0.31.1
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
-	github.com/linode/linodego v1.44.0
+	github.com/linode/linodego v1.44.1
 	github.com/spf13/pflag v1.0.6-0.20210604193023-d5e0c0615ace
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/exp v0.0.0-20241215155358-4a5509556b9e
@@ -129,7 +129,7 @@ require (
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba // indirect
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/mod v0.22.0 // indirect
-	golang.org/x/net v0.32.0 // indirect
+	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/oauth2 v0.24.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect

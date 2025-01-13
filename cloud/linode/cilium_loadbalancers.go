@@ -482,7 +482,7 @@ func (l *loadbalancers) getCiliumLBIPPool(ctx context.Context, service *v1.Servi
 
 // NOTE: Cilium CRDs must be installed for this to work
 func (l *loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error {
-	if raw, ok := os.LookupEnv("BGP_CUSTOM_ID_MAP"); ok {
+	if raw, ok := os.LookupEnv("BGP_CUSTOM_ID_MAP"); ok && raw != "" {
 		klog.Info("BGP_CUSTOM_ID_MAP env variable specified, using it instead of the default region map")
 		if err := json.Unmarshal([]byte(raw), &regionIDMap); err != nil {
 			return err
@@ -551,7 +551,7 @@ func (l *loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error 
 		},
 	}
 	bgpPeerPrefix := defaultBGPPeerPrefix
-	if raw, ok := os.LookupEnv("BGP_PEER_PREFIX"); ok {
+	if raw, ok := os.LookupEnv("BGP_PEER_PREFIX"); ok && raw != "" {
 		klog.Info("BGP_PEER_PREFIX env variable specified, using it instead of the default bgpPeer prefix")
 		bgpPeerPrefix = raw
 	}
