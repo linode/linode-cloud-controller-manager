@@ -86,7 +86,7 @@ spec:
                 echo "shared IPs: $SHARED_IPS"
 
                 if [ -n "$SHARED_IPS" ] && ! echo "$SHARED_IPS" | grep -q "$LB_IP"; then
-                  echo "LoadBalancer IP $LB_IP not found in shared IPs of node $node"
+                  echo "LoadBalancer IP not found in shared IPs of node"
                   exit 1
                 fi
               done
@@ -98,23 +98,31 @@ spec:
               NANODE_ID=$(echo "$NANODE_RESPONSE" | \
                 jq -r '.data[] | select(.label | endswith("$CLUSTER_NAME")) | .id')
 
-              if [ -n "$NANODE_ID" ]; then
-                NANODE_IP_RESPONSE=$(curl -s -H "Authorization: Bearer $LINODE_TOKEN" \
-                  "https://api.linode.com/v4/linode/instances/$NANODE_ID/ips")
-                
-                NANODE_IPS=$(echo "$NANODE_IP_RESPONSE" | jq -r '.ipv4.public[]?.address // empty')
-                
-                if [ -n "$NANODE_IPS" ] && ! echo "$NANODE_IPS" | grep -q "$LB_IP"; then
-                  echo "LoadBalancer IP not found in nanode (IP placeholder) IPs"
-                  exit 1
-                fi
-
-                # Delete the nanode
-                curl -s -X DELETE -H "Authorization: Bearer $LINODE_TOKEN" \
-                  "https://api.linode.com/v4/linode/instances/$NANODE_ID"
+              # Validate NANODE_ID is not null or empty
+              if [ -z "$NANODE_ID" ]; then
+                echo "No nanode found"
+                exit 1
               fi
+
+              NANODE_IP_RESPONSE=$(curl -s -H "Authorization: Bearer $LINODE_TOKEN" \
+                "https://api.linode.com/v4/linode/instances/$NANODE_ID/ips")
+              
+              NANODE_IPS=$(echo "$NANODE_IP_RESPONSE" | jq -r '.ipv4.public[]?.address // empty')
+              
+              if [ -n "$NANODE_IPS" ] && ! echo "$NANODE_IPS" | grep -q "$LB_IP"; then
+                echo "LoadBalancer IP not found in nanode IPs"
+                exit 1
+              else
+                echo "Successfully found LoadBalancer IP in nanode IPs"
+              fi
+
+              # Delete the nanode
+              curl -s -X DELETE -H "Authorization: Bearer $LINODE_TOKEN" \
+                "https://api.linode.com/v4/linode/instances/$NANODE_ID"
             check:
               ($error == null): true
               (contains($stdout, 'LoadBalancer IP not found in shared IPs of node')): false
               (contains($stdout, 'LoadBalancer IP not found in nanode IPs')): false
-    
+              (contains($stdout, 'No nanode found')): false
+              (contains($stdout, 'Successfully found LoadBalancer IP in nanode IPs')): true
+              (contains($stdout, 'No nodes found with label cilium-bgp-peering=true')): false
