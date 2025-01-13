@@ -1,0 +1,43 @@
+import (
+  "github.com/prometheus/client_golang/prometheus"
+  "github.com/prometheus/client_golang/prometheus/promauto"
+)
+
+{{ $decorator := (or .Vars.DecoratorName (printf "%sWithPrometheus" .Interface.Name)) }}
+{{ $metric_name := (or .Vars.MetricName (printf "ccm_linode_%s_requests_total" (down .Interface.Name))) }}
+
+// {{$decorator}} implements {{.Interface.Type}} interface with all methods wrapped
+// with Prometheus counters
+type {{$decorator}} struct {
+  base {{.Interface.Type}}
+}
+
+var {{upFirst .Interface.Name}}MethodCounterVec = promauto.NewCounterVec(
+  prometheus.CounterOpts{
+    Name: "{{$metric_name}}",
+    Help: "{{ down .Interface.Name }} counters for each operation and its result",
+  },
+  []string{"method", "result"})
+
+// New{{.Interface.Name}}WithPrometheus returns an instance of the {{.Interface.Type}} decorated with prometheus metrics
+func New{{$decorator}}(base {{.Interface.Type}}) {{$decorator}} {
+  return {{$decorator}} {
+    base: base,
+  }
+}
+
+{{range $method := .Interface.Methods}}
+  // {{$method.Name}} implements {{$.Interface.Type}}
+  func (_d {{$decorator}}) {{$method.Declaration}} {
+      defer func() {
+        result := "ok"
+        {{- if $method.ReturnsError}}
+          if err != nil {
+            result = "error"
+          }
+        {{end}}
+        {{upFirst $.Interface.Name}}MethodCounterVec.WithLabelValues("{{$method.Name}}", result).Inc()
+      }()
+    {{$method.Pass "_d.base."}}
+  }
+{{end}}
