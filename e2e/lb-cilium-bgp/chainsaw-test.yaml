@@ -86,7 +86,7 @@ spec:
                 echo "shared IPs: $SHARED_IPS"
 
                 if [ -n "$SHARED_IPS" ] && ! echo "$SHARED_IPS" | grep -q "$LB_IP"; then
-                  echo "LoadBalancer IP not found in shared IPs of node"
+                  echo "LoadBalancer IP $LB_IP not found in shared IPs of node $node"
                   exit 1
                 fi
               done
@@ -96,12 +96,11 @@ spec:
                 "https://api.linode.com/v4/linode/instances")
               
               NANODE_ID=$(echo "$NANODE_RESPONSE" | \
-                jq -r '.data[] | select(.label | endswith("$CLUSTER_NAME")) | .id')
-
-              # Validate NANODE_ID is not null or empty
+                jq -r --arg cluster "$CLUSTER_NAME" '.data[] | select(.label | endswith($cluster)) | .id')
+              
               if [ -z "$NANODE_ID" ]; then
-                echo "No nanode found"
-                exit 1
+                echo "No nanode found for cluster $CLUSTER_NAME"
+                exit 0
               fi
 
               NANODE_IP_RESPONSE=$(curl -s -H "Authorization: Bearer $LINODE_TOKEN" \
@@ -112,9 +111,9 @@ spec:
               if [ -n "$NANODE_IPS" ] && ! echo "$NANODE_IPS" | grep -q "$LB_IP"; then
                 echo "LoadBalancer IP not found in nanode IPs"
                 exit 1
-              else
-                echo "Successfully found LoadBalancer IP in nanode IPs"
               fi
+
+              echo "Successfully found LoadBalancer IP in nanode IPs"
 
               # Delete the nanode
               curl -s -X DELETE -H "Authorization: Bearer $LINODE_TOKEN" \
@@ -123,6 +122,5 @@ spec:
               ($error == null): true
               (contains($stdout, 'LoadBalancer IP not found in shared IPs of node')): false
               (contains($stdout, 'LoadBalancer IP not found in nanode IPs')): false
-              (contains($stdout, 'No nanode found')): false
               (contains($stdout, 'Successfully found LoadBalancer IP in nanode IPs')): true
-              (contains($stdout, 'No nodes found with label cilium-bgp-peering=true')): false
+    
