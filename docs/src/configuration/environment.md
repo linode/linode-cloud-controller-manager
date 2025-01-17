@@ -56,7 +56,7 @@ spec:
 ### Cache Settings
 - Adjust cache TTL based on cluster size and update frequency
 - Monitor memory usage when modifying cache settings
-- Consider API rate limits when decreasing TTL
+- Consider API rate limits when decreasing TTL (see [Linode API Rate Limits](@https://techdocs.akamai.com/linode-api/reference/rate-limits))
 
 ### API Settings
 - Increase timeout for slower network conditions
