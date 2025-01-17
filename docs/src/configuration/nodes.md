@@ -43,7 +43,7 @@ metadata:
 ```
 
 #### VPC Configuration
-When using [Linode VPC](https://www.linode.com/docs/products/networking/vpc/), you may need to manually configure the node's InternalIP:
+When using CCM with [Linode VPC](https://www.linode.com/docs/products/networking/vpc/), internal ip will be set to VPC ip. To use a different ip-address as internal ip, you may need to manually configure the node's InternalIP:
 ```yaml
 apiVersion: v1
 kind: Node
