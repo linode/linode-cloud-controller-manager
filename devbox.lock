@@ -633,6 +633,102 @@
         }
       }
     },
+    "mdbook-admonish@latest": {
+      "last_modified": "2024-12-23T21:10:33Z",
+      "resolved": "github:NixOS/nixpkgs/de1864217bfa9b5845f465e771e0ecb48b30e02d#mdbook-admonish",
+      "source": "devbox-search",
+      "version": "1.18.0",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/hrmry6gcyxq576yyvvv2vsl05sycmi1y-mdbook-admonish-1.18.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/hrmry6gcyxq576yyvvv2vsl05sycmi1y-mdbook-admonish-1.18.0"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/fg3pqy6459lx562bq6gdf8hdhf2wh0h5-mdbook-admonish-1.18.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/fg3pqy6459lx562bq6gdf8hdhf2wh0h5-mdbook-admonish-1.18.0"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/0vddbww043c8w1d4sfk2wpb5ljyq45x7-mdbook-admonish-1.18.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/0vddbww043c8w1d4sfk2wpb5ljyq45x7-mdbook-admonish-1.18.0"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/hs7z4g4v6acd9km5kaw7gibxdpcdijbj-mdbook-admonish-1.18.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/hs7z4g4v6acd9km5kaw7gibxdpcdijbj-mdbook-admonish-1.18.0"
+        }
+      }
+    },
+    "mdbook@latest": {
+      "last_modified": "2024-12-23T21:10:33Z",
+      "resolved": "github:NixOS/nixpkgs/de1864217bfa9b5845f465e771e0ecb48b30e02d#mdbook",
+      "source": "devbox-search",
+      "version": "0.4.43",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/5yibli76rfaq70cv0lyasndswbf3hjw8-mdbook-0.4.43",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/5yibli76rfaq70cv0lyasndswbf3hjw8-mdbook-0.4.43"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/130z9032izdwxdishjkvjrdfacyd1fkq-mdbook-0.4.43",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/130z9032izdwxdishjkvjrdfacyd1fkq-mdbook-0.4.43"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/4lcz6mj30f40k08q2s2phdfnydmkk8w2-mdbook-0.4.43",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/4lcz6mj30f40k08q2s2phdfnydmkk8w2-mdbook-0.4.43"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/izq6ww5isq00l6l02i4yhad2ykn45djm-mdbook-0.4.43",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/izq6ww5isq00l6l02i4yhad2ykn45djm-mdbook-0.4.43"
+        }
+      }
+    },
     "mockgen@latest": {
       "last_modified": "2024-11-03T14:18:04Z",
       "resolved": "github:NixOS/nixpkgs/4ae2e647537bcdbb82265469442713d066675275#mockgen",
