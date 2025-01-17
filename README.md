@@ -25,7 +25,7 @@ The Linode Cloud Controller Manager (CCM) integrates Kubernetes with Linode's in
 
 ## Requirements
 
-- Kubernetes 1.9+
+- Kubernetes 1.22+
 - Kubelets, controller-manager, and apiserver with `--cloud-provider=external`
 - Linode APIv4 Token
 - Supported Linode region

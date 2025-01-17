@@ -3,7 +3,7 @@
 ## Kubernetes Cluster Requirements
 
 ### Version Compatibility
-- Kubernetes version 1.9 or higher
+- Kubernetes version 1.22 or higher
 - Kubernetes cluster running on Linode infrastructure
 
 ### Kubernetes Components Configuration
