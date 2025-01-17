@@ -98,7 +98,7 @@ spec:
             containerPort: 80
             protocol: TCP
           - name: https
-            containerPort: 80
+            containerPort: 443
             protocol: TCP
 ```
 
