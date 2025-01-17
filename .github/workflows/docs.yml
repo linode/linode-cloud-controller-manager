@@ -48,7 +48,20 @@ jobs:
         with:
           path: 'docs/book'
 
-  deploy-page:
+  deploy-preview:
+    needs: generate-docs
+    if: github.event_name == 'pull_request'
+    environment:
+      name: pr-preview
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Deploy PR Preview
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  deploy-production:
     needs: generate-docs
     if: github.event_name == 'push'
     environment:
