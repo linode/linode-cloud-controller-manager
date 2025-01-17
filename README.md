@@ -33,8 +33,11 @@ The Linode Cloud Controller Manager (CCM) integrates Kubernetes with Linode's in
 ## Quick Links
 
 - [Getting Started](docs/src/getting-started/README.md)
+  - [Overview](docs/src/getting-started/overview.md)
   - [Requirements](docs/src/getting-started/requirements.md)
   - [Installation](docs/src/getting-started/installation.md)
+    - [Helm Installation](docs/src/getting-started/helm-installation.md)
+    - [Manual Installation](docs/src/getting-started/manual-installation.md)
   - [Verification](docs/src/getting-started/verification.md)
   - [Troubleshooting](docs/src/getting-started/troubleshooting.md)
 
@@ -42,12 +45,18 @@ The Linode Cloud Controller Manager (CCM) integrates Kubernetes with Linode's in
   - [LoadBalancer Services](docs/src/configuration/loadbalancer.md)
   - [Service Annotations](docs/src/configuration/annotations.md)
   - [Node Configuration](docs/src/configuration/nodes.md)
+  - [Environment Variables](docs/src/configuration/environment.md)
+  - [Firewall Setup](docs/src/configuration/firewall.md)
+  - [Route Configuration](docs/src/configuration/routes.md)
+  - [Session Affinity](docs/src/configuration/session-affinity.md)
 
 - [Examples](docs/src/examples/README.md)
   - [Basic Services](docs/src/examples/basic.md)
   - [Advanced Configuration](docs/src/examples/advanced.md)
 
 - [Development Guide](docs/src/development/README.md)
+
+- [Getting Help](docs/src/help.md)
 
 ## Getting Help
 
