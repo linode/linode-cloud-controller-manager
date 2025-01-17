@@ -39,3 +39,5 @@ coverage.txt
 junit.xml
 
 .DS_Store
+
+docs/book

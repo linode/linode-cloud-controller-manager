@@ -25,6 +25,8 @@ LINODE_REGION           ?= us-lax
 LINODE_OS               ?= linode/ubuntu22.04
 KUBECONFIG_PATH         ?= $(CURDIR)/test-cluster-kubeconfig.yaml
 MGMT_KUBECONFIG_PATH    ?= $(CURDIR)/mgmt-cluster-kubeconfig.yaml
+MDBOOK_DEV_HOST         ?= 0.0.0.0
+MDBOOK_DEV_PORT         ?= 3000
 
 # if the $DEVBOX_PACKAGES_DIR env variable exists that means we are within a devbox shell and can safely
 # use devbox's bin for our tools
@@ -130,6 +132,10 @@ run-debug: build
 		--stderrthreshold=INFO \
 		--kubeconfig=${KUBECONFIG} \
 		--linodego-debug
+
+.PHONY: docs
+docs:
+	@cd docs && mdbook serve -n $(MDBOOK_DEV_HOST) -p $(MDBOOK_DEV_PORT)
 
 #####################################################################
 # E2E Test Setup
