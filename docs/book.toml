@@ -8,6 +8,14 @@ description = "Documentation for the Kubernetes Cloud Controller Manager for Lin
 
 [output.html]
 git-repository-url = "https://github.com/linode/linode-cloud-controller-manager"
+site-url = "/linode-cloud-controller-manager/"
+edit-url-template = "https://github.com/linode/linode-cloud-controller-manager/edit/master/docs/{path}"
+
+[preprocessor]
+
+[preprocessor.admonish]
+command = "mdbook-admonish"
+assets_version = "3.0.2" # do not edit: managed by `mdbook-admonish install`
 
 [output.html.playground]
 editable = true
