@@ -367,6 +367,16 @@ Values can be set/overrided by using the '--set var=value,...' flag or by passin
 
 Recommendation: Use custom-values.yaml to override the variables to avoid any errors with template rendering
 
+### Prometheus metrics
+
+Cloud Controller Manager exposes metrics by default on port given by
+`--secure-port` flag. The endpoint is protected from unauthenticated access by
+default.  To allow unauthenticated clients (`system:anonymous`) access
+Prometheus metrics, use `--authorization-always-allow-paths="/metrics"` command
+line flag.
+
+Linode API calls can be monitored using `ccm_linode_client_requests_total` metric.
+
 ### Upstream Documentation Including Deployment Instructions
 
 [Kubernetes Cloud Controller Manager](https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/).

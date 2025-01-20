@@ -55,6 +55,7 @@ type linodeCloud struct {
 var instanceCache *instances
 
 func init() {
+	registerMetrics()
 	cloudprovider.RegisterCloudProvider(
 		ProviderName,
 		func(io.Reader) (cloudprovider.Interface, error) {
@@ -62,16 +63,11 @@ func init() {
 		})
 }
 
-func newCloud() (cloudprovider.Interface, error) {
+func initLinodeClient() (client.Client, error) {
 	// Read environment variables (from secrets)
 	apiToken := os.Getenv(accessTokenEnv)
 	if apiToken == "" {
 		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", accessTokenEnv)
-	}
-
-	region := os.Getenv(regionEnv)
-	if region == "" {
-		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", regionEnv)
 	}
 
 	// set timeout used by linodeclient for API calls
@@ -98,6 +94,20 @@ func newCloud() (cloudprovider.Interface, error) {
 	if Options.VPCName != "" {
 		klog.Warningf("vpc-name flag is deprecated. Use vpc-names instead")
 		Options.VPCNames = Options.VPCName
+	}
+
+	return client.NewClientWithPrometheus(linodeClient), nil
+}
+
+func newCloud() (cloudprovider.Interface, error) {
+	region := os.Getenv(regionEnv)
+	if region == "" {
+		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", regionEnv)
+	}
+
+	linodeClient, err := initLinodeClient()
+	if err != nil {
+		return nil, err
 	}
 
 	instanceCache = newInstances(linodeClient)
