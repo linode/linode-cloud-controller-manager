@@ -56,7 +56,7 @@ metadata:
 ## Node Networking
 
 ### Private Network Requirements
-- NodeBalancers require nodes to have private IP addresses
+- NodeBalancers require nodes to have linode specific [private IP addresses](https://techdocs.akamai.com/cloud-computing/docs/managing-ip-addresses-on-a-compute-instance#types-of-ip-addresses)
 - Private IPs must be configured in the Linode Cloud Manager or via the API
 - The CCM will use private IPs for inter-node communication
 
