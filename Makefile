@@ -133,10 +133,6 @@ run-debug: build
 		--kubeconfig=${KUBECONFIG} \
 		--linodego-debug
 
-.PHONY: docs
-docs:
-	@cd docs && mdbook serve -n $(MDBOOK_DEV_HOST) -p $(MDBOOK_DEV_PORT)
-
 #####################################################################
 # E2E Test Setup
 #####################################################################
