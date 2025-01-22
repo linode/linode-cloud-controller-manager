@@ -12,9 +12,7 @@
     "kustomize@latest",
     "kyverno-chainsaw@latest",
     "mockgen@latest",
-    "yq-go@latest",
-    "mdbook@latest",
-    "mdbook-admonish@latest"
+    "yq-go@latest"
   ],
   "shell": {
     "init_hook": [
