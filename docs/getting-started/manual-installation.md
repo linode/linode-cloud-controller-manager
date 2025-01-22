@@ -9,7 +9,7 @@
 
 1. Generate the manifest:
 ```bash
-./deploy/generate-manifest.sh $LINODE_API_TOKEN us-east
+./deploy/generate-manifest.sh $LINODE_API_TOKEN $REGION
 ```
 
 2. Review the generated manifest:

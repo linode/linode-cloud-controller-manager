@@ -67,7 +67,7 @@ The Route Controller:
 ## Best Practices
 
 ### CIDR Planning
-- Ensure pod CIDR range doesn't overlap with VPC ranges
+- Ensure pod CIDR range doesn't overlap with node's VPC ip-address
 - Plan for future cluster growth
 - Document CIDR allocations
 

@@ -23,6 +23,8 @@ You need a Linode APIv4 Personal Access Token with the following scopes:
 - IPs - Read/Write
 - Volumes - Read/Write
 - Firewalls - Read/Write (if using firewall features)
+- VPCs - Read/Write (if using VPC features)
+- VLANs - Read/Write (if using VLAN features)
 
 To create a token:
 1. Log into the [Linode Cloud Manager](https://cloud.linode.com)

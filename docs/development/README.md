@@ -4,7 +4,7 @@
 
 The Linode Cloud Controller Manager development requires:
 - A fairly up-to-date GNU tools environment
-- Go 1.8.3 or higher
+- Go 1.23 or higher
 
 ### Setting Up Development Environment
 
@@ -35,12 +35,6 @@ brew install golang
 ```bash
 go get github.com/linode/linode-cloud-controller-manager
 cd $(go env GOPATH)/src/github.com/linode/linode-cloud-controller-manager
-```
-
-### Install Development Tools
-To install various dev tools for the Cloud Controller Manager:
-```bash
-./hack/builddeps.sh
 ```
 
 ### Building the Project
