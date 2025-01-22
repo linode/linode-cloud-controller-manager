@@ -38,12 +38,13 @@ For implementation details, see:
 The `port-*` annotation allows per-port configuration, encoded in JSON. For detailed examples, see [LoadBalancer SSL/TLS Setup](loadbalancer.md#ssltls-configuration).
 
 ```yaml
-service.beta.kubernetes.io/linode-loadbalancer-port-443: |
-  {
-    "protocol": "https",
-    "tls-secret-name": "my-tls-secret",
-    "proxy-protocol": "v2"
-  }
+metadata:
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-port-443: |
+      "protocol": "https",
+      "tls-secret-name": "my-tls-secret",
+      "proxy-protocol": "v2"
+    }
 ```
 
 Available port options:

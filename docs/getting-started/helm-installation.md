@@ -25,7 +25,7 @@ routeController:
   clusterCIDR: "10.0.0.0/8"
   configureCloudRoutes: true
 
-# Optional: Configure shared IP load balancing
+# Optional: Configure shared IP load balancing instead of NodeBalancers (requires Cilium CNI and BGP Control Plane enabled)
 sharedIPLoadBalancing:
   loadBalancerType: cilium-bgp
   bgpNodeSelector: cilium-bgp-peering=true
