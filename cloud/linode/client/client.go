@@ -1,6 +1,7 @@
 package client
 
 //go:generate go run github.com/golang/mock/mockgen -destination mocks/mock_client.go -package mocks github.com/linode/linode-cloud-controller-manager/cloud/linode/client Client
+//go:generate go run github.com/hexdigest/gowrap/cmd/gowrap gen -g -p github.com/linode/linode-cloud-controller-manager/cloud/linode/client -i Client -t ../../../hack/templates/prometheus.go.gotpl -o client_with_metrics.go -l ""
 
 import (
 	"context"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	_ "github.com/hexdigest/gowrap"
 	"github.com/linode/linodego"
 	"k8s.io/klog/v2"
 )
