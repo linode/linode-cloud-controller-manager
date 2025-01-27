@@ -393,10 +393,12 @@ func testCreateNodeBalanceWithBothAllowOrDenyList(t *testing.T, client *linodego
 	annotations := map[string]string{
 		annotations.AnnLinodeCloudFirewallACL: `{
 			"allowList": {
-				"ipv4": ["2.2.2.2"]
+				"ipv4": ["2.2.2.2/32"],
+				"ipv6": ["2001:db8::/128"]
 			},
 			"denyList": {
-				"ipv4": ["2.2.2.2"]
+				"ipv4": ["2.2.2.2/32"],
+				"ipv6": ["2001:db8::/128"]
 			}
 		}`,
 	}
@@ -411,14 +413,15 @@ func testCreateNodeBalancerWithAllowList(t *testing.T, client *linodego.Client, 
 	annotations := map[string]string{
 		annotations.AnnLinodeCloudFirewallACL: `{
 			"allowList": {
-				"ipv4": ["2.2.2.2"]
+				"ipv4": ["2.2.2.2/32"],
+				"ipv6": ["2001:db8::/128"]
 			}
 		}`,
 	}
 
 	err := testCreateNodeBalancer(t, client, f, annotations, nil)
 	if err != nil {
-		t.Fatalf("expected a non-nil error, got %v", err)
+		t.Fatalf("expected a nil error, got %v", err)
 	}
 }
 
@@ -426,14 +429,15 @@ func testCreateNodeBalancerWithDenyList(t *testing.T, client *linodego.Client, f
 	annotations := map[string]string{
 		annotations.AnnLinodeCloudFirewallACL: `{
 			"denyList": {
-				"ipv4": ["2.2.2.2"]
+				"ipv4": ["2.2.2.2/32"],
+				"ipv6": ["2001:db8::/128"]
 			}
 		}`,
 	}
 
 	err := testCreateNodeBalancer(t, client, f, annotations, nil)
 	if err != nil {
-		t.Fatalf("expected a non-nil error, got %v", err)
+		t.Fatalf("expected a nil error, got %v", err)
 	}
 }
 
@@ -1680,7 +1684,7 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 			Annotations: map[string]string{
 				annotations.AnnLinodeCloudFirewallACL: `{
 					"allowList": {
-						"ipv4": ["2.2.2.2"]
+						"ipv4": ["2.2.2.2/32", "3.3.3.3/32"]
 					}
 				}`,
 			},
@@ -1744,16 +1748,17 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 
 	fwIPs := firewalls[0].Rules.Inbound[0].Addresses.IPv4
 	if fwIPs == nil {
-		t.Errorf("expected 2.2.2.2, got %v", fwIPs)
+		t.Errorf("expected ips, got %v", fwIPs)
 	}
 
 	fmt.Printf("got %v", fwIPs)
 
+	// Add ipv6 ips in allowList
 	svc.ObjectMeta.SetAnnotations(map[string]string{
 		annotations.AnnLinodeCloudFirewallACL: `{
 			"allowList": {
-				"ipv4": ["2.2.2.2"],
-				"ipv6": ["dead:beef::/128"]
+				"ipv4": ["2.2.2.2/32", "3.3.3.3/32"],
+				"ipv6": ["dead:beef::/128", "dead:bee::/128"]
 			}
 		}`,
 	})
@@ -1782,6 +1787,98 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 		t.Errorf("expected non nil IPv4, got %v", fwIPs)
 	}
 
+	if len(*fwIPs) != 2 {
+		t.Errorf("expected two IPv4 ips, got %v", fwIPs)
+	}
+
+	if firewallsNew[0].Rules.Inbound[0].Addresses.IPv6 == nil {
+		t.Errorf("expected non nil IPv6, got %v", firewallsNew[0].Rules.Inbound[0].Addresses.IPv6)
+	}
+
+	if len(*firewallsNew[0].Rules.Inbound[0].Addresses.IPv6) != 2 {
+		t.Errorf("expected two IPv6 ips, got %v", firewallsNew[0].Rules.Inbound[0].Addresses.IPv6)
+	}
+
+	// Update ips in allowList
+	svc.ObjectMeta.SetAnnotations(map[string]string{
+		annotations.AnnLinodeCloudFirewallACL: `{
+			"allowList": {
+				"ipv4": ["2.2.2.1/32", "3.3.3.3/32"],
+				"ipv6": ["dead::/128", "dead:bee::/128"]
+			}
+		}`,
+	})
+
+	err = lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("UpdateLoadBalancer returned an error: %s", err)
+	}
+
+	nbUpdated, err = lb.getNodeBalancerByStatus(context.TODO(), svc)
+	if err != nil {
+		t.Fatalf("failed to get NodeBalancer via status: %s", err)
+	}
+
+	firewallsNew, err = lb.client.ListNodeBalancerFirewalls(context.TODO(), nbUpdated.ID, &linodego.ListOptions{})
+	if err != nil {
+		t.Fatalf("failed to List Firewalls %s", err)
+	}
+
+	if len(firewallsNew) == 0 {
+		t.Fatalf("No attached firewalls found")
+	}
+
+	fwIPs = firewallsNew[0].Rules.Inbound[0].Addresses.IPv4
+	if fwIPs == nil {
+		t.Errorf("expected non nil IPv4, got %v", fwIPs)
+	}
+
+	if len(*fwIPs) != 2 {
+		t.Errorf("expected two IPv4 ips, got %v", fwIPs)
+	}
+
+	if firewallsNew[0].Rules.Inbound[0].Addresses.IPv6 == nil {
+		t.Errorf("expected non nil IPv6, got %v", firewallsNew[0].Rules.Inbound[0].Addresses.IPv6)
+	}
+
+	if len(*firewallsNew[0].Rules.Inbound[0].Addresses.IPv6) != 2 {
+		t.Errorf("expected two IPv6 ips, got %v", firewallsNew[0].Rules.Inbound[0].Addresses.IPv6)
+	}
+
+	// remove one ipv4 and one ipv6 ip from allowList
+	svc.ObjectMeta.SetAnnotations(map[string]string{
+		annotations.AnnLinodeCloudFirewallACL: `{
+			"allowList": {
+				"ipv4": ["3.3.3.3/32"],
+				"ipv6": ["dead:beef::/128"]
+			}
+		}`,
+	})
+
+	err = lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("UpdateLoadBalancer returned an error: %s", err)
+	}
+
+	nbUpdated, err = lb.getNodeBalancerByStatus(context.TODO(), svc)
+	if err != nil {
+		t.Fatalf("failed to get NodeBalancer via status: %s", err)
+	}
+
+	firewallsNew, err = lb.client.ListNodeBalancerFirewalls(context.TODO(), nbUpdated.ID, &linodego.ListOptions{})
+	if err != nil {
+		t.Fatalf("failed to List Firewalls %s", err)
+	}
+
+	if len(firewallsNew) == 0 {
+		t.Fatalf("No attached firewalls found")
+	}
+
+	fwIPs = firewallsNew[0].Rules.Inbound[0].Addresses.IPv4
+	if fwIPs == nil {
+		t.Errorf("expected non nil IPv4, got %v", fwIPs)
+	}
+
 	if len(*fwIPs) != 1 {
 		t.Errorf("expected one IPv4, got %v", fwIPs)
 	}
@@ -1792,6 +1889,12 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 
 	if len(*firewallsNew[0].Rules.Inbound[0].Addresses.IPv6) != 1 {
 		t.Errorf("expected one IPv6, got %v", firewallsNew[0].Rules.Inbound[0].Addresses.IPv6)
+	}
+
+	// Run update with same ACL
+	err = lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("UpdateLoadBalancer returned an error: %s", err)
 	}
 }
 
