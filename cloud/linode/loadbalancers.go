@@ -559,8 +559,7 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 	}
 
 	fwClient := firewall.LinodeClient{Client: l.client}
-	err = fwClient.DeleteNodeBalancerFirewall(ctx, service, nb)
-	if err != nil {
+	if err = fwClient.DeleteNodeBalancerFirewall(ctx, service, nb); err != nil {
 		return err
 	}
 
