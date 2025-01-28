@@ -69,6 +69,9 @@ func ipsChanged(ips *linodego.NetworkAddresses, rules []linodego.FirewallRule) b
 	}
 
 	if ips.IPv4 != nil {
+		if len(*ips.IPv4) != len(ruleIPv4s) {
+			return true
+		}
 		for _, ipv4 := range *ips.IPv4 {
 			if !slices.Contains(ruleIPv4s, ipv4) {
 				return true
@@ -77,6 +80,9 @@ func ipsChanged(ips *linodego.NetworkAddresses, rules []linodego.FirewallRule) b
 	}
 
 	if ips.IPv6 != nil {
+		if len(*ips.IPv6) != len(ruleIPv6s) {
+			return true
+		}
 		for _, ipv6 := range *ips.IPv6 {
 			if !slices.Contains(ruleIPv6s, ipv6) {
 				return true
