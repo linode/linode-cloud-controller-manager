@@ -108,30 +108,6 @@ func newCloud() (cloudprovider.Interface, error) {
 		return nil, err
 	}
 
-	instanceCache = newInstances(linodeClient)
-	routes, err := newRoutes(linodeClient, instanceCache)
-	if err != nil {
-		return nil, fmt.Errorf("routes client was not created successfully: %w", err)
-	}
-
-	if Options.LoadBalancerType != "" && !slices.Contains(supportedLoadBalancerTypes, Options.LoadBalancerType) {
-		return nil, fmt.Errorf(
-			"unsupported default load-balancer type %s. Options are %v",
-			Options.LoadBalancerType,
-			supportedLoadBalancerTypes,
-		)
-	}
-
-	if Options.IpHolderSuffix != "" {
-		klog.Infof("Using IP holder suffix '%s'\n", Options.IpHolderSuffix)
-	}
-
-	if len(Options.IpHolderSuffix) > 23 {
-		msg := fmt.Sprintf("ip-holder-suffix must be 23 characters or less: %s is %d characters\n", Options.IpHolderSuffix, len(Options.IpHolderSuffix))
-		klog.Error(msg)
-		return nil, fmt.Errorf("%s", msg)
-	}
-
 	var healthChecker *healthChecker
 
 	if Options.EnableTokenHealthChecker {
@@ -157,6 +133,30 @@ func newCloud() (cloudprovider.Interface, error) {
 	if Options.VPCName != "" {
 		klog.Warningf("vpc-name flag is deprecated. Use vpc-names instead")
 		Options.VPCNames = Options.VPCName
+	}
+
+	instanceCache = newInstances(linodeClient)
+	routes, err := newRoutes(linodeClient, instanceCache)
+	if err != nil {
+		return nil, fmt.Errorf("routes client was not created successfully: %w", err)
+	}
+
+	if Options.LoadBalancerType != "" && !slices.Contains(supportedLoadBalancerTypes, Options.LoadBalancerType) {
+		return nil, fmt.Errorf(
+			"unsupported default load-balancer type %s. Options are %v",
+			Options.LoadBalancerType,
+			supportedLoadBalancerTypes,
+		)
+	}
+
+	if Options.IpHolderSuffix != "" {
+		klog.Infof("Using IP holder suffix '%s'\n", Options.IpHolderSuffix)
+	}
+
+	if len(Options.IpHolderSuffix) > 23 {
+		msg := fmt.Sprintf("ip-holder-suffix must be 23 characters or less: %s is %d characters\n", Options.IpHolderSuffix, len(Options.IpHolderSuffix))
+		klog.Error(msg)
+		return nil, fmt.Errorf("%s", msg)
 	}
 
 	// create struct that satisfies cloudprovider.Interface
