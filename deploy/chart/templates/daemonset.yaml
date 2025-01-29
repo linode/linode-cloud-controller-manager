@@ -71,6 +71,9 @@ spec:
             {{- if .Values.nodeBalancerTags }}
             - --nodebalancer-tags={{ join " " .Values.nodeBalancerTags }}
             {{- end }}
+            {{- if .Values.allowUnauthorizedMetrics }}
+            - --authorization-always-allow-paths="/metrics"
+            {{- end }}
           volumeMounts:
             - mountPath: /etc/kubernetes
               name: k8s
