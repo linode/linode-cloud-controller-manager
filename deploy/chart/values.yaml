@@ -57,6 +57,9 @@ tolerations:
 #   clusterCIDR: 10.0.0.0/8
 #   configureCloudRoutes: true
 
+# Enable Linode token health checker
+# tokenHealthChecker: true
+
 # This section adds the ability to pass environment variables to adjust CCM defaults
 # https://github.com/linode/linode-cloud-controller-manager/blob/master/cloud/linode/loadbalancers.go
 # LINODE_HOSTNAME_ONLY_INGRESS type bool is supported
