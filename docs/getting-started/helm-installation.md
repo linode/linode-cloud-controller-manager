@@ -30,6 +30,9 @@ sharedIPLoadBalancing:
   loadBalancerType: cilium-bgp
   bgpNodeSelector: cilium-bgp-peering=true
   ipHolderSuffix: ""
+
+# Optional: Allow /metrics scraping without authorization on secure HTTPS port (10253 by default)
+allowUnauthorizedMetrics=true
 ```
 
 3. Install the CCM:
