@@ -558,6 +558,11 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 		return nil
 	}
 
+	fwClient := firewall.LinodeClient{Client: l.client}
+	if err = fwClient.DeleteNodeBalancerFirewall(ctx, service, nb); err != nil {
+		return err
+	}
+
 	if err = l.client.DeleteNodeBalancer(ctx, nb.ID); err != nil {
 		klog.Errorf("failed to delete NodeBalancer (%d) for service (%s): %s", nb.ID, serviceNn, err)
 		sentry.CaptureError(ctx, err)

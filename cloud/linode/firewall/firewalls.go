@@ -44,7 +44,42 @@ func (l *LinodeClient) CreateFirewall(ctx context.Context, opts linodego.Firewal
 }
 
 func (l *LinodeClient) DeleteFirewall(ctx context.Context, firewall *linodego.Firewall) error {
+	fwDevices, err := l.Client.ListFirewallDevices(ctx, firewall.ID, &linodego.ListOptions{})
+	if err != nil {
+		klog.Errorf("Error in listing firewall devices: %v", err)
+		return err
+	}
+	if len(fwDevices) > 1 {
+		klog.Errorf("Found more than one device attached to firewall ID: %d, devices: %+v. Skipping delete of firewall", firewall.ID, fwDevices)
+		return nil
+	}
 	return l.Client.DeleteFirewall(ctx, firewall.ID)
+}
+
+func (l *LinodeClient) DeleteNodeBalancerFirewall(
+	ctx context.Context,
+	service *v1.Service,
+	nb *linodego.NodeBalancer,
+) error {
+	_, fwACLExists := service.GetAnnotations()[annotations.AnnLinodeCloudFirewallACL]
+	if fwACLExists { // if an ACL exists, check if firewall exists and delete it.
+		firewalls, err := l.Client.ListNodeBalancerFirewalls(ctx, nb.ID, &linodego.ListOptions{})
+		if err != nil {
+			return err
+		}
+
+		switch len(firewalls) {
+		case 0:
+			klog.Info("No firewall attached to nodebalancer, nothing to clean")
+		case 1:
+			return l.DeleteFirewall(ctx, &firewalls[0])
+		default:
+			klog.Errorf("Found more than one firewall attached to nodebalancer: %d, firewall IDs: %v", nb.ID, firewalls)
+			return ErrTooManyNBFirewalls
+		}
+	}
+
+	return nil
 }
 
 func ipsChanged(ips *linodego.NetworkAddresses, rules []linodego.FirewallRule) bool {
