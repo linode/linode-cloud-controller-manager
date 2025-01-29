@@ -68,7 +68,27 @@ func init() {
 		})
 }
 
-func initLinodeClient() (client.Client, error) {
+// newLinodeClientWithPrometheus creates a new client kept in its own local
+// scope and returns an instrumented one that should be used and passed around
+func newLinodeClientWithPrometheus(apiToken string, timeout time.Duration) (client.Client, error) {
+	linodeClient, err := client.New(apiToken, timeout)
+	if err != nil {
+		return nil, fmt.Errorf("client was not created succesfully: %w", err)
+	}
+
+	if Options.LinodeGoDebug {
+		linodeClient.SetDebug(true)
+	}
+
+	return client.NewClientWithPrometheus(linodeClient), nil
+}
+
+func newCloud() (cloudprovider.Interface, error) {
+	region := os.Getenv(regionEnv)
+	if region == "" {
+		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", regionEnv)
+	}
+
 	// Read environment variables (from secrets)
 	apiToken := os.Getenv(accessTokenEnv)
 	if apiToken == "" {
@@ -83,52 +103,7 @@ func initLinodeClient() (client.Client, error) {
 		}
 	}
 
-	linodeClient, err := client.New(apiToken, timeout)
-	if err != nil {
-		return nil, fmt.Errorf("client was not created succesfully: %w", err)
-	}
-
-	if Options.LinodeGoDebug {
-		linodeClient.SetDebug(true)
-	}
-
-	var healthChecker *healthChecker
-
-	if Options.EnableTokenHealthChecker {
-		authenticated, err := client.CheckClientAuthenticated(context.TODO(), linodeClient)
-		if err != nil {
-			return nil, fmt.Errorf("linode client authenticated connection error: %w", err)
-		}
-
-		if !authenticated {
-			return nil, fmt.Errorf("linode api token %q is invalid", accessTokenEnv)
-		}
-
-		healthChecker, err = newHealthChecker(apiToken, timeout, tokenHealthCheckPeriod, Options.GlobalStopChannel)
-		if err != nil {
-			return nil, fmt.Errorf("unable to initialize healthchecker: %w", err)
-		}
-	}
-
-	if Options.VPCName != "" && Options.VPCNames != "" {
-		return nil, fmt.Errorf("cannot have both vpc-name and vpc-names set")
-	}
-
-	if Options.VPCName != "" {
-		klog.Warningf("vpc-name flag is deprecated. Use vpc-names instead")
-		Options.VPCNames = Options.VPCName
-	}
-
-	return client.NewClientWithPrometheus(linodeClient), nil
-}
-
-func newCloud() (cloudprovider.Interface, error) {
-	region := os.Getenv(regionEnv)
-	if region == "" {
-		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", regionEnv)
-	}
-
-	linodeClient, err := initLinodeClient()
+	linodeClient, err := newLinodeClientWithPrometheus(apiToken, timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -155,6 +130,33 @@ func newCloud() (cloudprovider.Interface, error) {
 		msg := fmt.Sprintf("ip-holder-suffix must be 23 characters or less: %s is %d characters\n", Options.IpHolderSuffix, len(Options.IpHolderSuffix))
 		klog.Error(msg)
 		return nil, fmt.Errorf("%s", msg)
+	}
+
+	var healthChecker *healthChecker
+
+	if Options.EnableTokenHealthChecker {
+		authenticated, err := client.CheckClientAuthenticated(context.TODO(), linodeClient)
+		if err != nil {
+			return nil, fmt.Errorf("linode client authenticated connection error: %w", err)
+		}
+
+		if !authenticated {
+			return nil, fmt.Errorf("linode api token %q is invalid", accessTokenEnv)
+		}
+
+		healthChecker, err = newHealthChecker(linodeClient, timeout, tokenHealthCheckPeriod, Options.GlobalStopChannel)
+		if err != nil {
+			return nil, fmt.Errorf("unable to initialize healthchecker: %w", err)
+		}
+	}
+
+	if Options.VPCName != "" && Options.VPCNames != "" {
+		return nil, fmt.Errorf("cannot have both vpc-name and vpc-names set")
+	}
+
+	if Options.VPCName != "" {
+		klog.Warningf("vpc-name flag is deprecated. Use vpc-names instead")
+		Options.VPCNames = Options.VPCName
 	}
 
 	// create struct that satisfies cloudprovider.Interface

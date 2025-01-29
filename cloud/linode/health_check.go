@@ -15,12 +15,7 @@ type healthChecker struct {
 	stopCh       chan<- struct{}
 }
 
-func newHealthChecker(apiToken string, timeout time.Duration, period time.Duration, stopCh chan<- struct{}) (*healthChecker, error) {
-	client, err := client.New(apiToken, timeout)
-	if err != nil {
-		return nil, err
-	}
-
+func newHealthChecker(client client.Client, timeout time.Duration, period time.Duration, stopCh chan<- struct{}) (*healthChecker, error) {
 	return &healthChecker{
 		period:       period,
 		linodeClient: client,

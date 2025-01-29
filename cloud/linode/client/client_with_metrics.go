@@ -228,6 +228,19 @@ func (_d ClientWithPrometheus) GetNodeBalancer(ctx context.Context, i1 int) (np1
 	return _d.base.GetNodeBalancer(ctx, i1)
 }
 
+// GetProfile implements Client
+func (_d ClientWithPrometheus) GetProfile(ctx context.Context) (pp1 *linodego.Profile, err error) {
+	defer func() {
+		result := "ok"
+		if err != nil {
+			result = "error"
+		}
+
+		ClientMethodCounterVec.WithLabelValues("GetProfile", result).Inc()
+	}()
+	return _d.base.GetProfile(ctx)
+}
+
 // ListFirewallDevices implements Client
 func (_d ClientWithPrometheus) ListFirewallDevices(ctx context.Context, firewallID int, opts *linodego.ListOptions) (fa1 []linodego.FirewallDevice, err error) {
 	defer func() {
