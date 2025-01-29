@@ -45,12 +45,10 @@ func testSucceedingCallsToLinodeAPIHappenStopSignalNotFired(t *testing.T, client
 
 	client.EXPECT().GetProfile(gomock.Any()).Times(2).Return(&linodego.Profile{}, nil)
 
-	hc, err := newHealthChecker("validToken", 1*time.Second, 1*time.Second, writableStopCh)
+	hc, err := newHealthChecker(client, 1*time.Second, 1*time.Second, writableStopCh)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
-	// inject mocked linodego.Client
-	hc.linodeClient = client
 
 	defer close(readableStopCh)
 	go hc.Run(readableStopCh)
@@ -71,12 +69,10 @@ func testFailingCallsToLinodeAPIHappenStopSignalFired(t *testing.T, client *mock
 
 	client.EXPECT().GetProfile(gomock.Any()).Times(1).Return(&linodego.Profile{}, nil)
 
-	hc, err := newHealthChecker("validToken", 1*time.Second, 1*time.Second, writableStopCh)
+	hc, err := newHealthChecker(client, 1*time.Second, 1*time.Second, writableStopCh)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
-	// inject mocked linodego.Client
-	hc.linodeClient = client
 
 	defer close(readableStopCh)
 	go hc.Run(readableStopCh)
@@ -109,12 +105,10 @@ func testErrorCallsToLinodeAPIHappenStopSignalNotFired(t *testing.T, client *moc
 
 	client.EXPECT().GetProfile(gomock.Any()).Times(1).Return(&linodego.Profile{}, nil)
 
-	hc, err := newHealthChecker("validToken", 1*time.Second, 1*time.Second, writableStopCh)
+	hc, err := newHealthChecker(client, 1*time.Second, 1*time.Second, writableStopCh)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
-	// inject mocked linodego.Client
-	hc.linodeClient = client
 
 	defer close(readableStopCh)
 	go hc.Run(readableStopCh)
