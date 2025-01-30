@@ -80,3 +80,6 @@ volumes:
 volumeMounts:
 #  - mountPath: /tmp/
 #    name: test-volume
+
+# This flag allows to scrape /metrics endpoint without authorization
+allowUnauthorizedMetrics: false

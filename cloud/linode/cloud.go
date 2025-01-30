@@ -60,6 +60,7 @@ type linodeCloud struct {
 var instanceCache *instances
 
 func init() {
+	registerMetrics()
 	cloudprovider.RegisterCloudProvider(
 		ProviderName,
 		func(io.Reader) (cloudprovider.Interface, error) {
@@ -67,16 +68,31 @@ func init() {
 		})
 }
 
+// newLinodeClientWithPrometheus creates a new client kept in its own local
+// scope and returns an instrumented one that should be used and passed around
+func newLinodeClientWithPrometheus(apiToken string, timeout time.Duration) (client.Client, error) {
+	linodeClient, err := client.New(apiToken, timeout)
+	if err != nil {
+		return nil, fmt.Errorf("client was not created succesfully: %w", err)
+	}
+
+	if Options.LinodeGoDebug {
+		linodeClient.SetDebug(true)
+	}
+
+	return client.NewClientWithPrometheus(linodeClient), nil
+}
+
 func newCloud() (cloudprovider.Interface, error) {
+	region := os.Getenv(regionEnv)
+	if region == "" {
+		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", regionEnv)
+	}
+
 	// Read environment variables (from secrets)
 	apiToken := os.Getenv(accessTokenEnv)
 	if apiToken == "" {
 		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", accessTokenEnv)
-	}
-
-	region := os.Getenv(regionEnv)
-	if region == "" {
-		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", regionEnv)
 	}
 
 	// set timeout used by linodeclient for API calls
@@ -87,13 +103,9 @@ func newCloud() (cloudprovider.Interface, error) {
 		}
 	}
 
-	linodeClient, err := client.New(apiToken, timeout)
+	linodeClient, err := newLinodeClientWithPrometheus(apiToken, timeout)
 	if err != nil {
-		return nil, fmt.Errorf("client was not created succesfully: %w", err)
-	}
-
-	if Options.LinodeGoDebug {
-		linodeClient.SetDebug(true)
+		return nil, err
 	}
 
 	var healthChecker *healthChecker
@@ -108,10 +120,7 @@ func newCloud() (cloudprovider.Interface, error) {
 			return nil, fmt.Errorf("linode api token %q is invalid", accessTokenEnv)
 		}
 
-		healthChecker, err = newHealthChecker(apiToken, timeout, tokenHealthCheckPeriod, Options.GlobalStopChannel)
-		if err != nil {
-			return nil, fmt.Errorf("unable to initialize healthchecker: %w", err)
-		}
+		healthChecker = newHealthChecker(linodeClient, tokenHealthCheckPeriod, Options.GlobalStopChannel)
 	}
 
 	if Options.VPCName != "" && Options.VPCNames != "" {

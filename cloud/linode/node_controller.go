@@ -57,7 +57,7 @@ func newNodeController(kubeclient kubernetes.Interface, client client.Client, in
 		informer:           informer,
 		ttl:                timeout,
 		metadataLastUpdate: make(map[string]time.Time),
-		queue:              workqueue.NewTypedDelayingQueue[any](),
+		queue:              workqueue.NewTypedDelayingQueueWithConfig[any](workqueue.TypedDelayingQueueConfig[any]{Name: "ccm_node"}),
 	}
 }
 
