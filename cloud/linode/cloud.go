@@ -120,10 +120,7 @@ func newCloud() (cloudprovider.Interface, error) {
 			return nil, fmt.Errorf("linode api token %q is invalid", accessTokenEnv)
 		}
 
-		healthChecker, err = newHealthChecker(linodeClient, tokenHealthCheckPeriod, Options.GlobalStopChannel)
-		if err != nil {
-			return nil, fmt.Errorf("unable to initialize healthchecker: %w", err)
-		}
+		healthChecker = newHealthChecker(linodeClient, tokenHealthCheckPeriod, Options.GlobalStopChannel)
 	}
 
 	if Options.VPCName != "" && Options.VPCNames != "" {

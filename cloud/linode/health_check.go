@@ -15,12 +15,12 @@ type healthChecker struct {
 	stopCh       chan<- struct{}
 }
 
-func newHealthChecker(client client.Client, period time.Duration, stopCh chan<- struct{}) (*healthChecker, error) {
+func newHealthChecker(client client.Client, period time.Duration, stopCh chan<- struct{}) *healthChecker {
 	return &healthChecker{
 		period:       period,
 		linodeClient: client,
 		stopCh:       stopCh,
-	}, nil
+	}
 }
 
 func (r *healthChecker) Run(stopCh <-chan struct{}) {
