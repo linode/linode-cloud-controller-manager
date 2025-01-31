@@ -120,6 +120,7 @@ jobs:
 
   e2e-tests:
     runs-on: ubuntu-latest
+    environment: ${{ github.event.pull_request.head.repo.fork == true && 'prod-external' || 'prod' }}
     needs: changes
     if: ${{ contains(fromJSON(needs.changes.outputs.paths), 'src') }}
     env:
