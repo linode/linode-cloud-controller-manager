@@ -18,6 +18,7 @@ import (
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 )
 
+
 const (
 	// The name of this cloudprovider
 	ProviderName           = "linode"
@@ -218,6 +219,7 @@ func (c *linodeCloud) ProviderName() string {
 func (c *linodeCloud) ScrubDNS(_, _ []string) (nsOut, srchOut []string) {
 	return nil, nil
 }
+
 
 func (c *linodeCloud) HasClusterID() bool {
 	return true
