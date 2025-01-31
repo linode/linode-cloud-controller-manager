@@ -117,6 +117,9 @@ spec:
             content: |
               set -e
 
+              nbid=0
+              fwid=0
+
               for i in {1..10}; do
                   nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
@@ -128,6 +131,18 @@ spec:
                   
                   fwid=$(echo $fw | jq -r '.data[].id')
 
+                  if [[ $nbid -ne 0 && $fwid -ne 0 ]]; then
+                      break
+                  fi
+                  sleep 2
+              done
+
+              if [[ $nbid -eq 0 || $fwid -eq 0 ]]; then
+                  echo "nb or fw not found"
+                  exit 1
+              fi
+
+              for i in {1..10}; do
                   # Remove service
                   kubectl delete service svc-test -n $NAMESPACE --ignore-not-found
                   sleep 5
@@ -145,6 +160,7 @@ spec:
                     -H "Authorization: Bearer $LINODE_TOKEN" \
                     -H "accept: application/json" \
                     "https://api.linode.com/v4/networking/firewalls/${fwid}" || true)
+
                   if [[ $nbRespCode == "404" && $fwRespCode == "404" ]]; then
                       echo "nb and fw deleted"
                       break
