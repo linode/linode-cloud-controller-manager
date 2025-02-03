@@ -11,7 +11,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
 	github.com/hexdigest/gowrap v1.4.1
-	github.com/linode/linodego v1.46.0
+	github.com/linode/linodego v1.47.0
 	github.com/prometheus/client_golang v1.20.5
 	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
