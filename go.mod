@@ -13,7 +13,7 @@ require (
 	github.com/hexdigest/gowrap v1.4.1
 	github.com/linode/linodego v1.46.0
 	github.com/prometheus/client_golang v1.20.5
-	github.com/spf13/pflag v1.0.6-0.20210604193023-d5e0c0615ace
+	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/exp v0.0.0-20241215155358-4a5509556b9e
 	k8s.io/api v0.32.1
