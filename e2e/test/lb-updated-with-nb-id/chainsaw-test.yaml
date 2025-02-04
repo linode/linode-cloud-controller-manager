@@ -1,0 +1,69 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: lb-updated-with-nb-id
+spec:
+  namespace: "lb-updated-with-nb-id"
+  steps:
+    - name: Check if CCM is deployed
+      try:
+        - assert:
+            file: ../assert-ccm-resources.yaml
+    - name: Create pods and services
+      try:
+        - apply:
+            file: create-pods-services.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that loadbalancer ip is assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test
+            status:
+              (loadBalancer.ingress[0].ip != null): true
+    - name: Create nodebalancer, annotate svc with nodebalancer id and validate
+      try:
+        - script:
+            content: |
+              set -e
+
+              re='^[0-9]+$'
+              LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
+
+              nbid=$(curl -s --request POST \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                -H "accept: application/json" \
+                "https://api.linode.com/v4/nodebalancers" \
+                --data "{\"label\": \"$LABEL\", \"region\": \"$REGION\"}" | jq .id)
+
+              if ! [[ $nbid =~ $re ]]; then
+                  echo "Nodebalancer id [$nbid] for label [$lABEL] is incorrect, failed to create nodebalancer"
+                  exit 1
+              fi
+
+              kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id=$nbid
+              sleep 5
+
+              for i in {1..10}; do
+                  nbid2=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+
+                  if [[ $nbid == $nbid2 ]]; then
+                      echo "Condition met"
+                      break
+                  fi
+                  sleep 10
+              done
+            check:
+              ($error == null): true
+              (contains($stdout, 'Condition met')): true

@@ -1,0 +1,172 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: lb-fw-delete-acl
+spec:
+  namespace: "lb-fw-delete-acl"
+  steps:
+    - name: Check if CCM is deployed
+      try:
+        - assert:
+            file: ../assert-ccm-resources.yaml
+    - name: Create pods and services
+      try:
+        - apply:
+            file: create-pods-services.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that loadbalancer ip is assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test
+            status:
+              (loadBalancer.ingress[0].ip != null): true
+    - name: Fetch Nodebalancer ID, make sure it has firewall attached
+      try:
+        - script:
+            content: |
+              set -e
+
+              for i in {1..10}; do
+                  nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+
+                  fw=$(curl -s --request GET \
+                    -H "Authorization: Bearer $LINODE_TOKEN" \
+                    -H "Content-Type: application/json" \
+                    -H "accept: application/json" \
+                    "https://api.linode.com/v4/nodebalancers/${nbid}/firewalls" || true)
+                  
+                  fwCount=$(echo $fw | jq '.data | length')
+                  ips=$(echo $fw | jq '.data[].rules.inbound[].addresses.ipv4[]')
+                  if [[ $fwCount -eq 1 && -n $ips && $ips == *"7.7.7.7/32"* ]]; then
+                      echo "firewall attached and rule has specified ip"
+                      break
+                  fi
+                  sleep 10
+              done
+            check:
+                ($error == null): true
+                (contains($stdout, 'firewall attached and rule has specified ip')): true
+    - name: Delete ACL and check that firewall no longer exists
+      try:
+        - script:
+            content: |
+              set -e
+
+              for i in {1..10}; do
+                  nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+
+                  fw=$(curl -s --request GET \
+                    -H "Authorization: Bearer $LINODE_TOKEN" \
+                    -H "Content-Type: application/json" \
+                    -H "accept: application/json" \
+                    "https://api.linode.com/v4/nodebalancers/${nbid}/firewalls" || true)
+                  
+                  fwid=$(echo $fw | jq -r '.data[].id')
+
+                  # Patch service to remove ACL annotation
+                  kubectl patch service svc-test -n $NAMESPACE --type=json -p='[{"op": "remove", "path": "/metadata/annotations/service.beta.kubernetes.io~1linode-loadbalancer-firewall-acl"}]'
+                  sleep 5
+
+                  # Check that firewall is no longer attached to nb
+                  fw=$(curl -s --request GET \
+                    -H "Authorization: Bearer $LINODE_TOKEN" \
+                    -H "Content-Type: application/json" \
+                    -H "accept: application/json" \
+                    "https://api.linode.com/v4/nodebalancers/${nbid}/firewalls" || true)
+                  
+                  fwCount=$(echo $fw | jq -r '.data | length')
+
+                  # Check if firewall is deleted
+                  fwRespCode=$(curl -s -o /dev/null -w "%{http_code}" \
+                    --request GET \
+                    -H "Authorization: Bearer $LINODE_TOKEN" \
+                    -H "accept: application/json" \
+                    "https://api.linode.com/v4/networking/firewalls/${fwid}" || true)
+
+                  if [[ $fwCount -eq 0 && $fwRespCode -eq "404" ]]; then
+                      echo "firewall detatched and deleted"
+                      break
+                  fi
+                  sleep 10
+              done
+            check:
+                ($error == null): true
+                (contains($stdout, 'firewall detatched and deleted')): true
+    - name: Refresh service by adding the ACL again
+      try:
+        - apply:
+            file: create-pods-services.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Delete service and make sure nb and fw are deleted automatically
+      try:
+        - script:
+            content: |
+              set -e
+
+              nbid=0
+              fwid=0
+
+              for i in {1..10}; do
+                  nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+
+                  fw=$(curl -s --request GET \
+                    -H "Authorization: Bearer $LINODE_TOKEN" \
+                    -H "Content-Type: application/json" \
+                    -H "accept: application/json" \
+                    "https://api.linode.com/v4/nodebalancers/${nbid}/firewalls" || true)
+                  
+                  fwid=$(echo $fw | jq -r '.data[].id')
+
+                  if [[ $nbid -ne 0 && $fwid -ne 0 ]]; then
+                      break
+                  fi
+                  sleep 2
+              done
+
+              if [[ $nbid -eq 0 || $fwid -eq 0 ]]; then
+                  echo "nb or fw not found"
+                  exit 1
+              fi
+
+              for i in {1..10}; do
+                  # Remove service
+                  kubectl delete service svc-test -n $NAMESPACE --ignore-not-found
+                  sleep 5
+
+                  # Check if nodebalancer is deleted
+                  nbRespCode=$(curl -s -o /dev/null -w "%{http_code}" \
+                    --request GET \
+                    -H "Authorization: Bearer $LINODE_TOKEN" \
+                    -H "accept: application/json" \
+                    "https://api.linode.com/v4/nodebalancers/${nbid}" || true)
+
+                  # Check if firewall is deleted
+                  fwRespCode=$(curl -s -o /dev/null -w "%{http_code}" \
+                    --request GET \
+                    -H "Authorization: Bearer $LINODE_TOKEN" \
+                    -H "accept: application/json" \
+                    "https://api.linode.com/v4/networking/firewalls/${fwid}" || true)
+
+                  if [[ $nbRespCode == "404" && $fwRespCode == "404" ]]; then
+                      echo "nb and fw deleted"
+                      break
+                  fi
+                  sleep 10
+              done
+            check:
+                ($error == null): true
+                (contains($stdout, 'nb and fw deleted')): true

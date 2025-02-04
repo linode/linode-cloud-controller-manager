@@ -1,0 +1,3 @@
+ignore:
+  - "cloud/linode/client/mocks"
+  - "cloud/linode/client/client_with_metrics.go"

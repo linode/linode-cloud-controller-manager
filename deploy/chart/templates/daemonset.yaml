@@ -29,13 +29,57 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           name: ccm-linode
           args:
-            - --leader-elect-resource-lock=endpoints
+            - --leader-elect-resource-lock=leases
             - --v=3
-            - --port=0
             - --secure-port=10253
+            - --webhook-secure-port=0
+            {{- if .Values.linodegoDebug }}
+            - --linodego-debug={{ .Values.linodegoDebug }}
+            {{- end }}
+            {{- if .Values.routeController }}
+            - --enable-route-controller=true
+            {{- if and .Values.routeController.vpcName .Values.routeController.vpcNames }}
+            {{- fail "Both vpcName and vpcNames are set. Please use only vpcNames." }}
+            {{- end }}
+            {{- if not (or .Values.routeController.vpcName .Values.routeController.vpcNames) }}
+            {{- fail "Neither vpcName nor vpcNames is set. Please set one of them." }}
+            {{- end }}
+            {{- if .Values.routeController.vpcName }}
+            - --vpc-name={{ .Values.routeController.vpcName }}
+            {{- end }}
+            {{- if .Values.routeController.vpcNames }}
+            - --vpc-names={{ .Values.routeController.vpcNames }}
+            {{- end }}
+            - --configure-cloud-routes={{ default true .Values.routeController.configureCloudRoutes }}
+            - --cluster-cidr={{ required "A valid .Values.routeController.clusterCIDR is required" .Values.routeController.clusterCIDR }}
+            {{- if .Values.routeController.routeReconciliationPeriod }}
+            - --route-reconciliation-period={{ .Values.routeController.routeReconciliationPeriod }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.sharedIPLoadBalancing }}
+            {{- if .Values.sharedIPLoadBalancing.bgpNodeSelector }}
+            - --bgp-node-selector={{ .Values.sharedIPLoadBalancing.bgpNodeSelector }}
+            {{- end }}
+            {{- if .Values.sharedIPLoadBalancing.ipHolderSuffix }}
+            - --ip-holder-suffix={{ .Values.sharedIPLoadBalancing.ipHolderSuffix }}
+            {{- end}}
+            - --load-balancer-type={{ required "A valid .Values.sharedIPLoadBalancing.loadBalancerType is required for shared IP load-balancing" .Values.sharedIPLoadBalancing.loadBalancerType }}
+            {{- end }}
+            {{- if .Values.tokenHealthChecker }}
+            - --enable-token-health-checker={{ .Values.tokenHealthChecker }}
+            {{- end }}
+            {{- if .Values.nodeBalancerTags }}
+            - --nodebalancer-tags={{ join " " .Values.nodeBalancerTags }}
+            {{- end }}
+            {{- if .Values.allowUnauthorizedMetrics }}
+            - --authorization-always-allow-paths="/metrics"
+            {{- end }}
           volumeMounts:
             - mountPath: /etc/kubernetes
               name: k8s
+            {{- with .Values.volumeMounts}}
+            {{- toYaml . | nindent 12 }}
+            {{- end}}
           env:
             - name: LINODE_API_TOKEN
               valueFrom:
@@ -47,10 +91,13 @@ spec:
                 secretKeyRef:
                   name: {{ if .Values.secretRef }}{{ .Values.secretRef.name | default "ccm-linode" }}{{ else }}"ccm-linode"{{ end }}
                   key: {{ if .Values.secretRef }}{{ .Values.secretRef.regionRef | default "region" }}{{ else }}"region"{{ end }}
-            {{if .Values.env}}
-            {{- toYaml .Values.env | nindent 12 }}
-            {{end}}
+            {{- with .Values.env}}
+            {{- toYaml . | nindent 12 }}
+            {{- end}}
       volumes:
         - name: k8s
           hostPath:
             path: /etc/kubernetes
+        {{- with .Values.volumes}}
+        {{- toYaml . | nindent 8 }}
+        {{- end}}

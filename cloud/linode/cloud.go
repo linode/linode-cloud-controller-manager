@@ -1,39 +1,66 @@
 package linode
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"net"
 	"os"
+	"strconv"
+	"time"
 
-	"github.com/linode/linodego"
 	"github.com/spf13/pflag"
+	"golang.org/x/exp/slices"
 	"k8s.io/client-go/informers"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog/v2"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 )
 
 const (
 	// The name of this cloudprovider
-	ProviderName   = "linode"
-	accessTokenEnv = "LINODE_API_TOKEN"
-	regionEnv      = "LINODE_REGION"
-	urlEnv         = "LINODE_URL"
+	ProviderName           = "linode"
+	accessTokenEnv         = "LINODE_API_TOKEN"
+	regionEnv              = "LINODE_REGION"
+	ciliumLBType           = "cilium-bgp"
+	nodeBalancerLBType     = "nodebalancer"
+	tokenHealthCheckPeriod = 5 * time.Minute
 )
+
+var supportedLoadBalancerTypes = []string{ciliumLBType, nodeBalancerLBType}
 
 // Options is a configuration object for this cloudprovider implementation.
 // We expect it to be initialized with flags external to this package, likely in
 // main.go
 var Options struct {
-	KubeconfigFlag *pflag.Flag
-	LinodeGoDebug  bool
+	KubeconfigFlag           *pflag.Flag
+	LinodeGoDebug            bool
+	EnableRouteController    bool
+	EnableTokenHealthChecker bool
+	// Deprecated: use VPCNames instead
+	VPCName               string
+	VPCNames              string
+	LoadBalancerType      string
+	BGPNodeSelector       string
+	IpHolderSuffix        string
+	LinodeExternalNetwork *net.IPNet
+	NodeBalancerTags      []string
+	GlobalStopChannel     chan<- struct{}
 }
 
 type linodeCloud struct {
-	client        Client
-	instances     cloudprovider.InstancesV2
-	loadbalancers cloudprovider.LoadBalancer
+	client                   client.Client
+	instances                cloudprovider.InstancesV2
+	loadbalancers            cloudprovider.LoadBalancer
+	routes                   cloudprovider.Routes
+	linodeTokenHealthChecker *healthChecker
 }
 
+var instanceCache *instances
+
 func init() {
+	registerMetrics()
 	cloudprovider.RegisterCloudProvider(
 		ProviderName,
 		func(io.Reader) (cloudprovider.Interface, error) {
@@ -41,22 +68,10 @@ func init() {
 		})
 }
 
-func newCloud() (cloudprovider.Interface, error) {
-	// Read environment variables (from secrets)
-	apiToken := os.Getenv(accessTokenEnv)
-	if apiToken == "" {
-		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", accessTokenEnv)
-	}
-
-	region := os.Getenv(regionEnv)
-	if region == "" {
-		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", regionEnv)
-	}
-
-	url := os.Getenv(urlEnv)
-	ua := fmt.Sprintf("linode-cloud-controller-manager %s", linodego.DefaultUserAgent)
-
-	linodeClient, err := newLinodeClient(apiToken, ua, url)
+// newLinodeClientWithPrometheus creates a new client kept in its own local
+// scope and returns an instrumented one that should be used and passed around
+func newLinodeClientWithPrometheus(apiToken string, timeout time.Duration) (client.Client, error) {
+	linodeClient, err := client.New(apiToken, timeout)
 	if err != nil {
 		return nil, fmt.Errorf("client was not created succesfully: %w", err)
 	}
@@ -65,12 +80,91 @@ func newCloud() (cloudprovider.Interface, error) {
 		linodeClient.SetDebug(true)
 	}
 
-	// Return struct that satisfies cloudprovider.Interface
-	return &linodeCloud{
-		client:        linodeClient,
-		instances:     newInstances(linodeClient),
-		loadbalancers: newLoadbalancers(linodeClient, region),
-	}, nil
+	return client.NewClientWithPrometheus(linodeClient), nil
+}
+
+func newCloud() (cloudprovider.Interface, error) {
+	region := os.Getenv(regionEnv)
+	if region == "" {
+		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", regionEnv)
+	}
+
+	// Read environment variables (from secrets)
+	apiToken := os.Getenv(accessTokenEnv)
+	if apiToken == "" {
+		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", accessTokenEnv)
+	}
+
+	// set timeout used by linodeclient for API calls
+	timeout := client.DefaultClientTimeout
+	if raw, ok := os.LookupEnv("LINODE_REQUEST_TIMEOUT_SECONDS"); ok {
+		if t, err := strconv.Atoi(raw); err == nil && t > 0 {
+			timeout = time.Duration(t) * time.Second
+		}
+	}
+
+	linodeClient, err := newLinodeClientWithPrometheus(apiToken, timeout)
+	if err != nil {
+		return nil, err
+	}
+
+	var healthChecker *healthChecker
+
+	if Options.EnableTokenHealthChecker {
+		authenticated, err := client.CheckClientAuthenticated(context.TODO(), linodeClient)
+		if err != nil {
+			return nil, fmt.Errorf("linode client authenticated connection error: %w", err)
+		}
+
+		if !authenticated {
+			return nil, fmt.Errorf("linode api token %q is invalid", accessTokenEnv)
+		}
+
+		healthChecker = newHealthChecker(linodeClient, tokenHealthCheckPeriod, Options.GlobalStopChannel)
+	}
+
+	if Options.VPCName != "" && Options.VPCNames != "" {
+		return nil, fmt.Errorf("cannot have both vpc-name and vpc-names set")
+	}
+
+	if Options.VPCName != "" {
+		klog.Warningf("vpc-name flag is deprecated. Use vpc-names instead")
+		Options.VPCNames = Options.VPCName
+	}
+
+	instanceCache = newInstances(linodeClient)
+	routes, err := newRoutes(linodeClient, instanceCache)
+	if err != nil {
+		return nil, fmt.Errorf("routes client was not created successfully: %w", err)
+	}
+
+	if Options.LoadBalancerType != "" && !slices.Contains(supportedLoadBalancerTypes, Options.LoadBalancerType) {
+		return nil, fmt.Errorf(
+			"unsupported default load-balancer type %s. Options are %v",
+			Options.LoadBalancerType,
+			supportedLoadBalancerTypes,
+		)
+	}
+
+	if Options.IpHolderSuffix != "" {
+		klog.Infof("Using IP holder suffix '%s'\n", Options.IpHolderSuffix)
+	}
+
+	if len(Options.IpHolderSuffix) > 23 {
+		msg := fmt.Sprintf("ip-holder-suffix must be 23 characters or less: %s is %d characters\n", Options.IpHolderSuffix, len(Options.IpHolderSuffix))
+		klog.Error(msg)
+		return nil, fmt.Errorf("%s", msg)
+	}
+
+	// create struct that satisfies cloudprovider.Interface
+	lcloud := &linodeCloud{
+		client:                   linodeClient,
+		instances:                instanceCache,
+		loadbalancers:            newLoadbalancers(linodeClient, region),
+		routes:                   routes,
+		linodeTokenHealthChecker: healthChecker,
+	}
+	return lcloud, nil
 }
 
 func (c *linodeCloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stopCh <-chan struct{}) {
@@ -79,10 +173,14 @@ func (c *linodeCloud) Initialize(clientBuilder cloudprovider.ControllerClientBui
 	serviceInformer := sharedInformer.Core().V1().Services()
 	nodeInformer := sharedInformer.Core().V1().Nodes()
 
+	if c.linodeTokenHealthChecker != nil {
+		go c.linodeTokenHealthChecker.Run(stopCh)
+	}
+
 	serviceController := newServiceController(c.loadbalancers.(*loadbalancers), serviceInformer)
 	go serviceController.Run(stopCh)
 
-	nodeController := newNodeController(kubeclient, c.client, nodeInformer)
+	nodeController := newNodeController(kubeclient, c.client, nodeInformer, instanceCache)
 	go nodeController.Run(stopCh)
 }
 
@@ -107,6 +205,9 @@ func (c *linodeCloud) Clusters() (cloudprovider.Clusters, bool) {
 }
 
 func (c *linodeCloud) Routes() (cloudprovider.Routes, bool) {
+	if Options.EnableRouteController {
+		return c.routes, true
+	}
 	return nil, false
 }
 

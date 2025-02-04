@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 
 	"k8s.io/component-base/logs"
@@ -11,10 +12,10 @@ import (
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode"
 	"github.com/linode/linode-cloud-controller-manager/sentry"
 	"github.com/spf13/pflag"
-	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	"k8s.io/cloud-provider/app/config"
+	"k8s.io/cloud-provider/names"
 	"k8s.io/cloud-provider/options"
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
@@ -24,9 +25,10 @@ import (
 )
 
 const (
-	sentryDSNVariable         = "SENTRY_DSN"
-	sentryEnvironmentVariable = "SENTRY_ENVIRONMENT"
-	sentryReleaseVariable     = "SENTRY_RELEASE"
+	sentryDSNVariable            = "SENTRY_DSN"
+	sentryEnvironmentVariable    = "SENTRY_ENVIRONMENT"
+	sentryReleaseVariable        = "SENTRY_RELEASE"
+	linodeExternalSubnetVariable = "LINODE_EXTERNAL_SUBNET"
 )
 
 func initializeSentry() {
@@ -72,10 +74,20 @@ func main() {
 		klog.Fatalf("unable to initialize command options: %v", err)
 	}
 	fss := utilflag.NamedFlagSets{}
-	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, app.DefaultInitFuncConstructors, fss, wait.NeverStop)
+	controllerAliases := names.CCMControllerAliases()
+	stopCh := make(chan struct{})
+	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, app.DefaultInitFuncConstructors, controllerAliases, fss, stopCh)
 
 	// Add Linode-specific flags
 	command.Flags().BoolVar(&linode.Options.LinodeGoDebug, "linodego-debug", false, "enables debug output for the LinodeAPI wrapper")
+	command.Flags().BoolVar(&linode.Options.EnableRouteController, "enable-route-controller", false, "enables route_controller for ccm")
+	command.Flags().BoolVar(&linode.Options.EnableTokenHealthChecker, "enable-token-health-checker", false, "enables Linode API token health checker")
+	command.Flags().StringVar(&linode.Options.VPCName, "vpc-name", "", "[deprecated: use vpc-names instead] vpc name whose routes will be managed by route-controller")
+	command.Flags().StringVar(&linode.Options.VPCNames, "vpc-names", "", "comma separated vpc names whose routes will be managed by route-controller")
+	command.Flags().StringVar(&linode.Options.LoadBalancerType, "load-balancer-type", "nodebalancer", "configures which type of load-balancing to use for LoadBalancer Services (options: nodebalancer, cilium-bgp)")
+	command.Flags().StringVar(&linode.Options.BGPNodeSelector, "bgp-node-selector", "", "node selector to use to perform shared IP fail-over with BGP (e.g. cilium-bgp-peering=true")
+	command.Flags().StringVar(&linode.Options.IpHolderSuffix, "ip-holder-suffix", "", "suffix to append to the ip holder name when using shared IP fail-over with BGP (e.g. ip-holder-suffix=my-cluster-name")
+	command.Flags().StringSliceVar(&linode.Options.NodeBalancerTags, "nodebalancer-tags", []string{}, "Linode tags to apply to all NodeBalancers")
 
 	// Set static flags
 	command.Flags().VisitAll(func(fl *pflag.Flag) {
@@ -103,10 +115,24 @@ func main() {
 	linode.Options.KubeconfigFlag = command.Flags().Lookup("kubeconfig")
 	if linode.Options.KubeconfigFlag == nil {
 		msg := "kubeconfig missing from CCM flag set"
-		sentry.CaptureError(ctx, fmt.Errorf(msg))
+		sentry.CaptureError(ctx, fmt.Errorf("%s", msg))
 		fmt.Fprintf(os.Stderr, "kubeconfig missing from CCM flag set"+"\n")
 		os.Exit(1)
 	}
+
+	if externalSubnet, ok := os.LookupEnv(linodeExternalSubnetVariable); ok && externalSubnet != "" {
+		_, network, err := net.ParseCIDR(externalSubnet)
+		if err != nil {
+			msg := fmt.Sprintf("Unable to parse %s as network subnet: %v", externalSubnet, err)
+			sentry.CaptureError(ctx, fmt.Errorf("%s", msg))
+			fmt.Fprintf(os.Stderr, "%v\n", msg)
+			os.Exit(1)
+		}
+		linode.Options.LinodeExternalNetwork = network
+	}
+
+	// Provide stop channel for linode authenticated client healthchecker
+	linode.Options.GlobalStopChannel = stopCh
 
 	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)

@@ -3,6 +3,7 @@ package linode
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/appscode/go/wait"
@@ -14,25 +15,25 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const retryInterval = time.Minute * 1
+var retryInterval = time.Minute * 1
 
 type serviceController struct {
 	loadbalancers *loadbalancers
 	informer      v1informers.ServiceInformer
 
-	queue workqueue.DelayingInterface
+	queue workqueue.TypedDelayingInterface[any]
 }
 
 func newServiceController(loadbalancers *loadbalancers, informer v1informers.ServiceInformer) *serviceController {
 	return &serviceController{
 		loadbalancers: loadbalancers,
 		informer:      informer,
-		queue:         workqueue.NewDelayingQueue(),
+		queue:         workqueue.NewTypedDelayingQueue[any](),
 	}
 }
 
 func (s *serviceController) Run(stopCh <-chan struct{}) {
-	s.informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := s.informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: func(obj interface{}) {
 			service, ok := obj.(*v1.Service)
 			if !ok {
@@ -46,7 +47,24 @@ func (s *serviceController) Run(stopCh <-chan struct{}) {
 			klog.Infof("ServiceController will handle service (%s) deletion", getServiceNn(service))
 			s.queue.Add(service)
 		},
-	})
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			newSvc, ok := newObj.(*v1.Service)
+			if !ok {
+				return
+			}
+			oldSvc, ok := oldObj.(*v1.Service)
+			if !ok {
+				return
+			}
+
+			if newSvc.Spec.Type != "LoadBalancer" && oldSvc.Spec.Type == "LoadBalancer" {
+				klog.Infof("ServiceController will handle service (%s) LoadBalancer deletion", getServiceNn(oldSvc))
+				s.queue.Add(oldSvc)
+			}
+		},
+	}); err != nil {
+		klog.Errorf("ServiceController didn't successfully register it's Informer %s", err)
+	}
 
 	go wait.Until(s.worker, time.Second, stopCh)
 	s.informer.Informer().Run(stopCh)
@@ -91,5 +109,6 @@ func (s *serviceController) processNextDeletion() bool {
 
 func (s *serviceController) handleServiceDeleted(service *v1.Service) error {
 	klog.Infof("ServiceController handling service (%s) deletion", getServiceNn(service))
-	return s.loadbalancers.EnsureLoadBalancerDeleted(context.Background(), service.ClusterName, service)
+	clusterName := strings.TrimPrefix(service.Namespace, "kube-system-")
+	return s.loadbalancers.EnsureLoadBalancerDeleted(context.Background(), clusterName, service)
 }

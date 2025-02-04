@@ -1,0 +1,31 @@
+{
+  "packages": [
+    "ctlptl@latest",
+    "clusterctl@latest",
+    "docker@latest",
+    "envsubst@latest",
+    "go@1.23.3",
+    "golangci-lint@latest",
+    "jq@latest",
+    "kind@latest",
+    "kubectl@latest",
+    "kustomize@latest",
+    "kyverno-chainsaw@latest",
+    "mockgen@latest",
+    "yq-go@latest"
+  ],
+  "shell": {
+    "init_hook": [
+      "export \"GOROOT=$(go env GOROOT)\""
+    ],
+    "scripts": {
+      "mgmt-and-capl-cluster": "make mgmt-and-capl-cluster",
+      "e2e-test": "make e2e-test",
+      "e2e-test-bgp": "make e2e-test-bgp",
+      "cleanup-cluster": "make cleanup-cluster"
+    }
+  },
+  "env": {
+    "EXP_CLUSTER_RESOURCE_SET": "true"
+  }
+}

@@ -18,12 +18,20 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
+)
+
+const (
+	informerResyncPeriod = 1 * time.Minute
+	defaultMetadataTTL   = 300 * time.Second
 )
 
 type nodeController struct {
 	sync.RWMutex
 
-	client     Client
+	client     client.Client
 	instances  *instances
 	kubeclient kubernetes.Interface
 	informer   v1informers.NodeInformer
@@ -31,40 +39,54 @@ type nodeController struct {
 	metadataLastUpdate map[string]time.Time
 	ttl                time.Duration
 
-	queue workqueue.DelayingInterface
+	queue workqueue.TypedDelayingInterface[any]
 }
 
-func newNodeController(kubeclient kubernetes.Interface, client Client, informer v1informers.NodeInformer) *nodeController {
-	timeout := 300
+func newNodeController(kubeclient kubernetes.Interface, client client.Client, informer v1informers.NodeInformer, instanceCache *instances) *nodeController {
+	timeout := defaultMetadataTTL
 	if raw, ok := os.LookupEnv("LINODE_METADATA_TTL"); ok {
 		if t, _ := strconv.Atoi(raw); t > 0 {
-			timeout = t
+			timeout = time.Duration(t) * time.Second
 		}
 	}
 
 	return &nodeController{
 		client:             client,
-		instances:          newInstances(client),
+		instances:          instanceCache,
 		kubeclient:         kubeclient,
 		informer:           informer,
-		ttl:                time.Duration(timeout) * time.Second,
+		ttl:                timeout,
 		metadataLastUpdate: make(map[string]time.Time),
-		queue:              workqueue.NewDelayingQueue(),
+		queue:              workqueue.NewTypedDelayingQueueWithConfig[any](workqueue.TypedDelayingQueueConfig[any]{Name: "ccm_node"}),
 	}
 }
 
 func (s *nodeController) Run(stopCh <-chan struct{}) {
-	s.informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			node, ok := obj.(*v1.Node)
-			if !ok {
-				return
-			}
+	if _, err := s.informer.Informer().AddEventHandlerWithResyncPeriod(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				node, ok := obj.(*v1.Node)
+				if !ok {
+					return
+				}
 
-			klog.Infof("NodeController will handle newly created node (%s) metadata", node.Name)
-			s.queue.Add(node)
+				klog.Infof("NodeController will handle newly created node (%s) metadata", node.Name)
+				s.queue.Add(node)
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				node, ok := newObj.(*v1.Node)
+				if !ok {
+					return
+				}
+
+				klog.Infof("NodeController will handle newly updated node (%s) metadata", node.Name)
+				s.queue.Add(node)
+			},
 		},
-	})
+		informerResyncPeriod,
+	); err != nil {
+		klog.Errorf("NodeController can't handle newly created node's metadata. %s", err)
+	}
 
 	go wait.Until(s.worker, time.Second, stopCh)
 	s.informer.Informer().Run(stopCh)
@@ -120,44 +142,72 @@ func (s *nodeController) SetLastMetadataUpdate(nodeName string) {
 }
 
 func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
-	klog.Infof("NodeController handling node (%s) metadata", node.Name)
+	klog.V(3).InfoS("NodeController handling node metadata",
+		"node", klog.KObj(node))
 
 	lastUpdate := s.LastMetadataUpdate(node.Name)
 
-	uuid, ok := node.Labels[annLinodeHostUUID]
-	if ok && time.Since(lastUpdate) < s.ttl {
+	uuid, foundLabel := node.Labels[annotations.AnnLinodeHostUUID]
+	configuredPrivateIP, foundAnnotation := node.Annotations[annotations.AnnLinodeNodePrivateIP]
+
+	metaAge := time.Since(lastUpdate)
+	if foundLabel && foundAnnotation && metaAge < s.ttl {
+		klog.V(3).InfoS("Skipping refresh, ttl not reached",
+			"node", klog.KObj(node),
+			"ttl", s.ttl,
+			"metadata_age", metaAge,
+		)
 		return nil
 	}
 
 	linode, err := s.instances.lookupLinode(ctx, node)
 	if err != nil {
-		klog.Infof("instance lookup error: %s", err.Error())
+		klog.V(1).ErrorS(err, "Instance lookup error")
 		return err
 	}
 
-	if uuid == linode.HostUUID {
+	expectedPrivateIP := ""
+	// linode API response for linode will contain only one private ip
+	// if any private ip is configured. If it changes in future or linode
+	// supports other subnets with nodebalancer, this logic needs to be updated.
+	// https://www.linode.com/docs/api/linode-instances/#linode-view
+	for _, addr := range linode.IPv4 {
+		if isPrivate(addr) {
+			expectedPrivateIP = addr.String()
+			break
+		}
+	}
+
+	if uuid == linode.HostUUID && node.Spec.ProviderID != "" && configuredPrivateIP == expectedPrivateIP {
 		s.SetLastMetadataUpdate(node.Name)
 		return nil
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		// Get a fresh copy of the node so the resource version is up to date
+		// Get a fresh copy of the node so the resource version is up-to-date
 		n, err := s.kubeclient.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 
-		// It may be that the UUID has been set
-		if n.Labels[annLinodeHostUUID] == linode.HostUUID {
-			return nil
+		// Try to update the node UUID if it has not been set
+		if n.Labels[annotations.AnnLinodeHostUUID] != linode.HostUUID {
+			n.Labels[annotations.AnnLinodeHostUUID] = linode.HostUUID
 		}
 
-		// Try to update the node
-		n.Labels[annLinodeHostUUID] = linode.HostUUID
-		_, err = s.kubeclient.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
+		// Try to update the node ProviderID if it has not been set
+		if n.Spec.ProviderID == "" {
+			n.Spec.ProviderID = providerIDPrefix + strconv.Itoa(linode.ID)
+		}
+
+		// Try to update the expectedPrivateIP if its not set or doesn't match
+		if n.Annotations[annotations.AnnLinodeNodePrivateIP] != expectedPrivateIP && expectedPrivateIP != "" {
+			n.Annotations[annotations.AnnLinodeNodePrivateIP] = expectedPrivateIP
+		}
+		_, err = s.kubeclient.CoreV1().Nodes().Update(ctx, n, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
-		klog.Infof("node update error: %s", err.Error())
+		klog.V(1).ErrorS(err, "Node update error")
 		return err
 	}
 

@@ -4,35 +4,103 @@ on:
   push:
     branches:
       - main
-  pull_request: null
+  pull_request_target: null
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  ci:
+  changes:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: [ 'stable', 'oldstable', '1.20' ]
+    outputs:
+      paths: ${{ steps.filter.outputs.changes }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
         with:
-          fetch-depth: 0
-      - uses: actions/setup-go@v4
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
         with:
-          go-version: ${{ matrix.go-version }}
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          base: ${{ github.ref }}
+          filters: .github/filters.yml
+
+  build-test:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.pull_request.head.repo.fork == true && 'prod-external' || 'prod' }}
+    needs: changes
+    if: ${{ contains(fromJSON(needs.changes.outputs.paths), 'src') }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            golang.org:443
+            proxy.golang.org:443
+            sum.golang.org:443
+            objects.githubusercontent.com:443
+            storage.googleapis.com:443
+            cli.codecov.io:443
+            api.codecov.io:443
+            ingest.codecov.io:443
+            raw.githubusercontent.com:443
+            get.helm.sh:443
+
+      - uses: actions/checkout@v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
       - name: Vet
         run: make vet
-      - name: Lint
-        run: make lint
+
+      - name: lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.62.2
+
       - name: Helm Lint
         run: make helm-lint
+
       - name: Test
         run: make test
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.out
+          verbose: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: linode/linode-cloud-controller-manager
+
       - name: Build
         run: make build
+
   docker-build:
     runs-on: ubuntu-latest
+    environment: ${{ github.event.pull_request.head.repo.fork == true && 'prod-external' || 'prod' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 0
       - name: Docker Meta
@@ -45,7 +113,7 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
             type=semver,pattern={{raw}},value=${{ github.ref_name }}
       - name: Build Dockerfile
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: false
@@ -53,3 +121,49 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             REV=${{ github.ref_name }}
+
+  e2e-tests:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.pull_request.head.repo.fork == true && 'prod-external' || 'prod' }}
+    needs: changes
+    if: ${{ contains(fromJSON(needs.changes.outputs.paths), 'src') }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.github_token }}
+      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      IMG: linode/linode-cloud-controller-manager:${{ github.ref == 'refs/heads/main' && 'latest' || format('pr-{0}', github.event.number) || github.ref_name }}
+      LINODE_REGION: us-lax
+      LINODE_CONTROL_PLANE_MACHINE_TYPE: g6-standard-2
+      LINODE_MACHINE_TYPE: g6-standard-2
+      WORKER_NODES: '2'
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          check-latest: true
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Install devbox
+        uses: jetify-com/devbox-install-action@v0.12.0
+
+      - name: Setup CAPL Management Kind Cluster and CAPL Child Cluster For Testing
+        run: devbox run mgmt-and-capl-cluster
+
+      - name: Run E2E Tests
+        run: devbox run e2e-test
+
+      - name: Run Cilium BGP e2e test
+        run: devbox run e2e-test-bgp
+
+      - name: Cleanup Resources
+        if: always()
+        run: devbox run cleanup-cluster
