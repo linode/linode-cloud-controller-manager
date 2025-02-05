@@ -627,17 +627,29 @@ func (l *loadbalancers) GetLoadBalancerTags(_ context.Context, clusterName strin
 	return tags
 }
 
+// GetLinodeNBType returns the NodeBalancer type for the service.
+func (l *loadbalancers) GetLinodeNBType(service *v1.Service) linodego.NodeBalancerPlanType {
+	typeStr, ok := service.GetAnnotations()[annotations.AnnLinodeNodeBalancerType]
+	if ok && linodego.NodeBalancerPlanType(typeStr) == linodego.NBTypePremium {
+		return linodego.NBTypePremium
+	}
+
+	return linodego.NodeBalancerPlanType(Options.DefaultNBType)
+}
+
 func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName string, service *v1.Service, configs []*linodego.NodeBalancerConfigCreateOptions) (lb *linodego.NodeBalancer, err error) {
 	connThrottle := getConnectionThrottle(service)
 
 	label := l.GetLoadBalancerName(ctx, clusterName, service)
 	tags := l.GetLoadBalancerTags(ctx, clusterName, service)
+	nbType := l.GetLinodeNBType(service)
 	createOpts := linodego.NodeBalancerCreateOptions{
 		Label:              &label,
 		Region:             l.zone,
 		ClientConnThrottle: &connThrottle,
 		Configs:            configs,
 		Tags:               tags,
+		Type:               nbType,
 	}
 
 	fwid, ok := service.GetAnnotations()[annotations.AnnLinodeCloudFirewallID]

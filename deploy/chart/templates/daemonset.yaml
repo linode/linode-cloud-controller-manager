@@ -74,6 +74,9 @@ spec:
             {{- if .Values.allowUnauthorizedMetrics }}
             - --authorization-always-allow-paths="/metrics"
             {{- end }}
+            {{- if .Values.defaultNBType }}
+            - --default-nodebalancer-type={{ .Values.defaultNBType }}
+            {{- end }}
           volumeMounts:
             - mountPath: /etc/kubernetes
               name: k8s
