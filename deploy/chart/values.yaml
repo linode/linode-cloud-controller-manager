@@ -10,10 +10,27 @@ region: ""
 #   apiTokenRef: "apiToken"
 #   regionRef: "region"
 
-# node-role.kubernetes.io/master - if set true, it deploys the svc on the master node
-nodeSelector:
-  # The CCM will only run on a Node labelled as a master, you may want to change this
-  node-role.kubernetes.io/control-plane: ""
+# Ensures the CCM runs on control plane nodes
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+
+# DEPRECATED: use affinity instead
+nodeSelector: {}
+
+securityContext:
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
 
 # Image repository must be 'linode/linode-cloud-controller-manager'. The tag can be changed/set to various ccm versions.
 # The pullPolicy is set to Always but can be changed when it is not required to always pull the new image
