@@ -15,13 +15,21 @@ spec:
         app: ccm-linode
     spec:
       serviceAccountName: ccm-linode
-      {{- if .Values.nodeSelector }}
-      nodeSelector:
-{{ toYaml .Values.nodeSelector | indent 8 }}
+      {{- with .Values.securityContext }}
+      securityContext:
+      {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if .Values.tolerations }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
       tolerations:
-{{ toYaml .Values.tolerations | indent 8 }}
+      {{- toYaml . | nindent 8 }}
       {{- end }}
       hostNetwork: true
       containers:
@@ -33,8 +41,8 @@ spec:
             - --v=3
             - --secure-port=10253
             - --webhook-secure-port=0
-            {{- if .Values.linodegoDebug }}
-            - --linodego-debug={{ .Values.linodegoDebug }}
+            {{- with .Values.linodegoDebug }}
+            - --linodego-debug={{ . }}
             {{- end }}
             {{- if .Values.routeController }}
             - --enable-route-controller=true
@@ -44,36 +52,40 @@ spec:
             {{- if not (or .Values.routeController.vpcName .Values.routeController.vpcNames) }}
             {{- fail "Neither vpcName nor vpcNames is set. Please set one of them." }}
             {{- end }}
-            {{- if .Values.routeController.vpcName }}
-            - --vpc-name={{ .Values.routeController.vpcName }}
+            {{- with .Values.routeController.vpcName }}
+            - --vpc-name={{ . }}
             {{- end }}
-            {{- if .Values.routeController.vpcNames }}
-            - --vpc-names={{ .Values.routeController.vpcNames }}
+            {{- with .Values.routeController.vpcNames }}
+            - --vpc-names={{ . }}
             {{- end }}
             - --configure-cloud-routes={{ default true .Values.routeController.configureCloudRoutes }}
             - --cluster-cidr={{ required "A valid .Values.routeController.clusterCIDR is required" .Values.routeController.clusterCIDR }}
-            {{- if .Values.routeController.routeReconciliationPeriod }}
-            - --route-reconciliation-period={{ .Values.routeController.routeReconciliationPeriod }}
+            {{- with .Values.routeController.routeReconciliationPeriod }}
+            - --route-reconciliation-period={{ . }}
             {{- end }}
             {{- end }}
             {{- if .Values.sharedIPLoadBalancing }}
-            {{- if .Values.sharedIPLoadBalancing.bgpNodeSelector }}
-            - --bgp-node-selector={{ .Values.sharedIPLoadBalancing.bgpNodeSelector }}
+            {{- with .Values.sharedIPLoadBalancing.bgpNodeSelector }}
+            - --bgp-node-selector={{ . }}
             {{- end }}
-            {{- if .Values.sharedIPLoadBalancing.ipHolderSuffix }}
-            - --ip-holder-suffix={{ .Values.sharedIPLoadBalancing.ipHolderSuffix }}
+            {{- with .Values.sharedIPLoadBalancing.ipHolderSuffix }}
+            - --ip-holder-suffix={{ . }}
             {{- end}}
             - --load-balancer-type={{ required "A valid .Values.sharedIPLoadBalancing.loadBalancerType is required for shared IP load-balancing" .Values.sharedIPLoadBalancing.loadBalancerType }}
             {{- end }}
-            {{- if .Values.tokenHealthChecker }}
-            - --enable-token-health-checker={{ .Values.tokenHealthChecker }}
+            {{- with .Values.tokenHealthChecker }}
+            - --enable-token-health-checker={{ . }}
             {{- end }}
-            {{- if .Values.nodeBalancerTags }}
-            - --nodebalancer-tags={{ join " " .Values.nodeBalancerTags }}
+            {{- with .Values.nodeBalancerTags }}
+            - --nodebalancer-tags={{ join " " . }}
             {{- end }}
             {{- if .Values.allowUnauthorizedMetrics }}
             - --authorization-always-allow-paths="/metrics"
             {{- end }}
+          {{- with .Values.containerSecurityContext }}
+          securityContext:
+          {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
             - mountPath: /etc/kubernetes
               name: k8s
