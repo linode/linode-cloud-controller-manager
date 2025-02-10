@@ -258,6 +258,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 			name: "Update Load Balancer - No Nodes",
 			f:    testUpdateLoadBalancerNoNodes,
 		},
+		{
+			name: "Create Load Balancer - Very long Service name",
+			f:    testVeryLongServiceName,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -813,6 +817,89 @@ func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Clie
 
 	if !reflect.DeepEqual(expectedPortConfigs, observedPortConfigs) {
 		t.Errorf("NodeBalancer port mismatch: expected %v, got %v", expectedPortConfigs, observedPortConfigs)
+	}
+}
+
+func toJSON(v interface{}) string {
+	data, _ := json.Marshal(v)
+	return string(data)
+}
+
+func testVeryLongServiceName(t *testing.T, client *linodego.Client, _ *fakeAPI) {
+	ipv4DenyList := make([]string, 130)
+	ipv6DenyList := make([]string, 130)
+
+	for i := 0; i < len(ipv4DenyList); i++ {
+		ipv4DenyList[i] = fmt.Sprintf("192.168.1.%d/32", i)
+		ipv6DenyList[i] = fmt.Sprintf("2001:db8::%x/128", i)
+	}
+	denyListJSON := fmt.Sprintf(`{
+		"denyList": {
+			"ipv4": %s,
+			"ipv6": %s
+		}
+	}`, toJSON(ipv4DenyList), toJSON(ipv6DenyList))
+
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: strings.Repeat(randString(), 6),
+			UID:  "foobar123",
+			Annotations: map[string]string{
+				annotations.AnnLinodeCloudFirewallACL: denyListJSON,
+			},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     randString(),
+					Protocol: "TCP",
+					Port:     int32(80),
+					NodePort: int32(30000),
+				},
+			},
+		},
+	}
+
+	nodes := []*v1.Node{
+		{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+		},
+	}
+
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
+	fakeClientset := fake.NewSimpleClientset()
+	lb.kubeClient = fakeClientset
+
+	defer func() {
+		_ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+	}()
+
+	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
+	}
+	svc.Status.LoadBalancer = *lbStatus
+	stubService(fakeClientset, svc)
+
+	svc.ObjectMeta.SetAnnotations(map[string]string{
+		annotations.AnnLinodeCloudFirewallACL: `{
+			"denyList": {
+				"ipv4": ["192.168.1.0/32"],
+				"ipv6": ["2001:db8::/128"]
+			}
+		}`,
+	})
+
+	err = lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Fatalf("UpdateLoadBalancer returned an error with updated annotations: %s", err)
 	}
 }
 
