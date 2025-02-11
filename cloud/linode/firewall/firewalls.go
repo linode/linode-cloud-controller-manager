@@ -184,6 +184,16 @@ func chunkIPs(ips []string) [][]string {
 	return chunks
 }
 
+// truncateFWRuleDesc truncates the description to maxFirewallRuleDescLen if it exceeds the limit.
+func truncateFWRuleDesc(desc string) string {
+	if len(desc) > maxFirewallRuleDescLen {
+		newDesc := desc[0:maxFirewallRuleDescLen-3] + "..."
+		klog.Infof("Firewall rule description '%s' is too long. Stripping it to '%s'", desc, newDesc)
+		desc = newDesc
+	}
+	return desc
+}
+
 // processACL takes the IPs, aclType, label etc and formats them into the passed linodego.FirewallCreateOptions pointer.
 func processACL(fwcreateOpts *linodego.FirewallCreateOptions, aclType, label, svcName, ports string, ips linodego.NetworkAddresses) error {
 	ruleLabel := fmt.Sprintf("%s-%s", aclType, svcName)
@@ -207,15 +217,10 @@ func processACL(fwcreateOpts *linodego.FirewallCreateOptions, aclType, label, sv
 		for i, chunk := range ipv4chunks {
 			v4chunk := chunk
 			desc := fmt.Sprintf("Rule %d, Created by linode-ccm: %s, for %s", i, label, svcName)
-			if len(desc) > maxFirewallRuleDescLen {
-				newDesc := desc[0:maxFirewallRuleDescLen-3] + "..."
-				klog.Infof("Firewall rule description '%s' is too long. Stripping it to '%s'", desc, newDesc)
-				desc = newDesc
-			}
 			fwcreateOpts.Rules.Inbound = append(fwcreateOpts.Rules.Inbound, linodego.FirewallRule{
 				Action:      aclType,
 				Label:       ruleLabel,
-				Description: desc,
+				Description: truncateFWRuleDesc(desc),
 				Protocol:    linodego.TCP, // Nodebalancers support only TCP.
 				Ports:       ports,
 				Addresses:   linodego.NetworkAddresses{IPv4: &v4chunk},
@@ -226,15 +231,10 @@ func processACL(fwcreateOpts *linodego.FirewallCreateOptions, aclType, label, sv
 		for i, chunk := range ipv6chunks {
 			v6chunk := chunk
 			desc := fmt.Sprintf("Rule %d, Created by linode-ccm: %s, for %s", i, label, svcName)
-			if len(desc) > maxFirewallRuleDescLen {
-				newDesc := desc[0:maxFirewallRuleDescLen-3] + "..."
-				klog.Infof("Firewall rule description '%s' is too long. Stripping it to '%s'", desc, newDesc)
-				desc = newDesc
-			}
 			fwcreateOpts.Rules.Inbound = append(fwcreateOpts.Rules.Inbound, linodego.FirewallRule{
 				Action:      aclType,
 				Label:       ruleLabel,
-				Description: desc,
+				Description: truncateFWRuleDesc(desc),
 				Protocol:    linodego.TCP, // Nodebalancers support only TCP.
 				Ports:       ports,
 				Addresses:   linodego.NetworkAddresses{IPv6: &v6chunk},
@@ -242,15 +242,10 @@ func processACL(fwcreateOpts *linodego.FirewallCreateOptions, aclType, label, sv
 		}
 	} else {
 		desc := fmt.Sprintf("Created by linode-ccm: %s, for %s", label, svcName)
-		if len(desc) > maxFirewallRuleDescLen {
-			newDesc := desc[0:maxFirewallRuleDescLen-3] + "..."
-			klog.Infof("Firewall rule description '%s' is too long. Stripping it to '%s'", desc, newDesc)
-			desc = newDesc
-		}
 		fwcreateOpts.Rules.Inbound = append(fwcreateOpts.Rules.Inbound, linodego.FirewallRule{
 			Action:      aclType,
 			Label:       ruleLabel,
-			Description: desc,
+			Description: truncateFWRuleDesc(desc),
 			Protocol:    linodego.TCP, // Nodebalancers support only TCP.
 			Ports:       ports,
 			Addresses:   ips,
