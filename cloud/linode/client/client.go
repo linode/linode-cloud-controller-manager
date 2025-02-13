@@ -35,6 +35,7 @@ type Client interface {
 
 	ListVPCs(context.Context, *linodego.ListOptions) ([]linodego.VPC, error)
 	ListVPCIPAddresses(context.Context, int, *linodego.ListOptions) ([]linodego.VPCIP, error)
+	ListVPCSubnets(context.Context, int, *linodego.ListOptions) ([]linodego.VPCSubnet, error)
 
 	CreateNodeBalancer(context.Context, linodego.NodeBalancerCreateOptions) (*linodego.NodeBalancer, error)
 	GetNodeBalancer(context.Context, int) (*linodego.NodeBalancer, error)
