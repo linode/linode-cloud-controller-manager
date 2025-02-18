@@ -2,8 +2,10 @@ package linode
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -26,6 +28,10 @@ type vpcLookupError struct {
 
 type subnetLookupError struct {
 	value string
+}
+
+type subnetFilter struct {
+	SubnetID string `json:"subnet_id"`
 }
 
 func (e vpcLookupError) Error() string {
@@ -99,9 +105,35 @@ func GetVPCIPAddresses(ctx context.Context, client client.Client, vpcName string
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Add logic to get subnet ID(s) from name(s) if subnet-names is specified
-	// TODO: if subnet-names is specified, add the ID(s) to ListOptions
-	resp, err := client.ListVPCIPAddresses(ctx, vpcID, linodego.NewListOptions(0, ""))
+
+	resultFilter := ""
+
+	// Get subnet ID(s) from name(s) if subnet-names is specified
+	if Options.SubnetNames != "" {
+		// Get the IDs and store them
+		subnetNames := strings.Split(Options.SubnetNames, ",")
+		subnetIDList := []string{} // Making this a slice of strings for ease of use with resultFilter
+
+		for _, name := range subnetNames {
+			subnetID, err := GetSubnetID(ctx, client, vpcID, name) // For caching
+
+			if err != nil { // Don't filter subnets we can't find
+				klog.Errorf("subnet %s not found. Skipping.", name)
+				continue
+			}
+
+			subnetIDList = append(subnetIDList, strconv.Itoa(subnetID)) // For use with the JSON filter
+		}
+
+		// Assign the list of IDs to a stringified JSON filter
+		filter, err := json.Marshal(subnetFilter{SubnetID: strings.Join(subnetIDList, ",")})
+		if err != nil {
+			klog.Error("could not create JSON filter for subnet_id")
+		}
+		resultFilter = string(filter)
+	}
+
+	resp, err := client.ListVPCIPAddresses(ctx, vpcID, linodego.NewListOptions(0, resultFilter))
 	if err != nil {
 		if linodego.ErrHasStatus(err, http.StatusNotFound) {
 			Mu.Lock()
