@@ -163,8 +163,8 @@ github.com/grpc-ecosystem/grpc-gateway/v2 v2.24.0 h1:TmHmbvxPmaegwhDubVz0lICL0J5
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.24.0/go.mod h1:qztMSjm835F2bXf+5HKAPIS5qsmQDqZna/PgVt4rWtI=
 github.com/hashicorp/hcl v1.0.1-vault-7 h1:ag5OxFVy3QYTFTJODRzTKVZ6xvdfLLCA1cy/Y6xGI0I=
 github.com/hashicorp/hcl v1.0.1-vault-7/go.mod h1:XYhtn6ijBSAj6n4YqAaf7RBPS4I06AItNorpy+MoQNM=
-github.com/hexdigest/gowrap v1.4.1 h1:gZS/XE6ClEHskmhu1bNd0d4wWYcuDzUNsTr7eXC9TYQ=
-github.com/hexdigest/gowrap v1.4.1/go.mod h1:s+1hE6qakgdaaLqgdwPAj5qKYVBCSbPJhEbx+I1ef/Q=
+github.com/hexdigest/gowrap v1.4.2 h1:crtk5lGwHCROa77mKcP/iQ50eh7z6mBjXsg4U492gfc=
+github.com/hexdigest/gowrap v1.4.2/go.mod h1:s+1hE6qakgdaaLqgdwPAj5qKYVBCSbPJhEbx+I1ef/Q=
 github.com/howeyc/gopass v0.0.0-20170109162249-bf9dde6d0d2c/go.mod h1:lADxMC39cJJqL93Duh1xhAs4I2Zs8mKS89XWXFGp9cs=
 github.com/huandu/xstrings v1.3.1/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
 github.com/huandu/xstrings v1.3.2 h1:L18LIDzqlW6xN2rEkpdV8+oL/IXWJ1APd+vsdYy4Wdw=

@@ -10,7 +10,7 @@ require (
 	github.com/getsentry/sentry-go v0.31.1
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
-	github.com/hexdigest/gowrap v1.4.1
+	github.com/hexdigest/gowrap v1.4.2
 	github.com/linode/linodego v1.47.0
 	github.com/prometheus/client_golang v1.20.5
 	github.com/spf13/pflag v1.0.6
