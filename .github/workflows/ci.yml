@@ -62,6 +62,7 @@ jobs:
             ingest.codecov.io:443
             raw.githubusercontent.com:443
             get.helm.sh:443
+            golangci-lint.run:443
 
       - uses: actions/checkout@v4.2.2
         with:
