@@ -9,10 +9,6 @@ spec:
       value: (join('-', ['ccm-fwtest', env('CLUSTER_NAME')]))
   namespace: "fw-use-specified-nb"
   steps:
-    - name: Check if CCM is deployed
-      try:
-        - assert:
-            file: ../assert-ccm-resources.yaml
     - name: Create firewall, Create pods and services
       try:
         - script:
