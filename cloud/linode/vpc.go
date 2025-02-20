@@ -111,18 +111,21 @@ func GetVPCIPAddresses(ctx context.Context, client client.Client, vpcName string
 	// Get subnet ID(s) from name(s) if subnet-names is specified
 	if Options.SubnetNames != "" {
 		// Get the IDs and store them
+		// subnetIDList is a slice of strings for ease of use with resultFilter
 		subnetNames := strings.Split(Options.SubnetNames, ",")
-		subnetIDList := []string{} // Making this a slice of strings for ease of use with resultFilter
+		subnetIDList := []string{}
 
 		for _, name := range subnetNames {
-			subnetID, err := GetSubnetID(ctx, client, vpcID, name) // For caching
-
-			if err != nil { // Don't filter subnets we can't find
+			// For caching
+			subnetID, err := GetSubnetID(ctx, client, vpcID, name)
+			// Don't filter subnets we can't find
+			if err != nil {
 				klog.Errorf("subnet %s not found. Skipping.", name)
 				continue
 			}
 
-			subnetIDList = append(subnetIDList, strconv.Itoa(subnetID)) // For use with the JSON filter
+			// For use with the JSON filter
+			subnetIDList = append(subnetIDList, strconv.Itoa(subnetID))
 		}
 
 		// Assign the list of IDs to a stringified JSON filter
