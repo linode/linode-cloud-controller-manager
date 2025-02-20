@@ -12,7 +12,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -103,7 +103,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4.2.2
         with:
-          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
       - name: Docker Meta
         id: meta
         uses: docker/metadata-action@v5
@@ -111,8 +111,8 @@ jobs:
           images: |
             linode/linode-cloud-controller-manager
           tags: |
-            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
-            type=semver,pattern={{raw}},value=${{ github.ref_name }}
+            type=raw,value=pr-${{ github.event.pull_request.number }},enable=${{ github.event_name == 'pull_request_target' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
       - name: Build Dockerfile
         uses: docker/build-push-action@v6
         with:
@@ -131,7 +131,7 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.github_token }}
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
-      IMG: linode/linode-cloud-controller-manager:${{ github.ref == 'refs/heads/main' && 'latest' || format('pr-{0}', github.event.number) || github.ref_name }}
+      IMG: linode/linode-cloud-controller-manager:${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'latest' || format('pr-{0}', github.event.pull_request.number) || github.ref_name }}
       LINODE_REGION: us-lax
       LINODE_CONTROL_PLANE_MACHINE_TYPE: g6-standard-2
       LINODE_MACHINE_TYPE: g6-standard-2
