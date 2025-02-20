@@ -21,9 +21,9 @@ region: "us-east"
 
 # Optional: Configure route controller
 routeController:
-  vpcNames: ""  # Comma separated VPC names
   clusterCIDR: "10.0.0.0/8"
   configureCloudRoutes: true
+vpcNames: ""  # Comma separated VPC names
 
 # Optional: Configure shared IP load balancing instead of NodeBalancers (requires Cilium CNI and BGP Control Plane enabled)
 sharedIPLoadBalancing:
