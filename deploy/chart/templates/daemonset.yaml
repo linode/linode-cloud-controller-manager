@@ -58,7 +58,6 @@ spec:
             {{- with .Values.routeController.vpcNames }}
             - --vpc-names={{ . }}
             {{- end }}
-            {{- if .Values.routeController.subnetNames}}
             {{- with .Values.routeController.subnetNames}}
             - --subnet-names={{ . }}
             {{- end }}
