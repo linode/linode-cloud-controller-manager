@@ -41,6 +41,7 @@ var Options struct {
 	// Deprecated: use VPCNames instead
 	VPCName               string
 	VPCNames              string
+	SubnetNames           string
 	LoadBalancerType      string
 	BGPNodeSelector       string
 	IpHolderSuffix        string
@@ -130,6 +131,12 @@ func newCloud() (cloudprovider.Interface, error) {
 	if Options.VPCName != "" {
 		klog.Warningf("vpc-name flag is deprecated. Use vpc-names instead")
 		Options.VPCNames = Options.VPCName
+	}
+
+	// SubnetNames can't be used without VPCNames also being set
+	if Options.SubnetNames != "" && Options.VPCNames == "" {
+		klog.Warningf("failed to set flag subnet-names: vpc-names must be set to a non-empty value")
+		Options.SubnetNames = ""
 	}
 
 	instanceCache = newInstances(linodeClient)
