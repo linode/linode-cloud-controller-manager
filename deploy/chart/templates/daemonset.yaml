@@ -44,25 +44,33 @@ spec:
             {{- with .Values.linodegoDebug }}
             - --linodego-debug={{ . }}
             {{- end }}
-            {{- if .Values.routeController }}
-            - --enable-route-controller=true
-            {{- if and .Values.routeController.vpcName .Values.routeController.vpcNames }}
+            {{- $vpcNames := .Values.vpcNames }}
+            {{- if and .Values.routeController .Values.routeController.vpcNames }}
+            {{- $vpcNames = .Values.routeController.vpcNames }}
+            {{- end }}
+            {{- $vpcName := .Values.vpcName }}
+            {{- if and .Values.routeController .Values.routeController.vpcName }}
+            {{- $vpcName = .Values.routeController.vpcName }}
+            {{- end }}
+            {{- if and $vpcName $vpcNames }}
             {{- fail "Both vpcName and vpcNames are set. Please use only vpcNames." }}
             {{- end }}
-            {{- if not (or .Values.routeController.vpcName .Values.routeController.vpcNames) }}
+            {{- if .Values.routeController }}
+            - --enable-route-controller=true
+            {{- if not (or $vpcName $vpcNames) }}
             {{- fail "Neither vpcName nor vpcNames is set. Please set one of them." }}
-            {{- end }}
-            {{- with .Values.routeController.vpcName }}
-            - --vpc-name={{ . }}
-            {{- end }}
-            {{- with .Values.routeController.vpcNames }}
-            - --vpc-names={{ . }}
             {{- end }}
             - --configure-cloud-routes={{ default true .Values.routeController.configureCloudRoutes }}
             - --cluster-cidr={{ required "A valid .Values.routeController.clusterCIDR is required" .Values.routeController.clusterCIDR }}
             {{- with .Values.routeController.routeReconciliationPeriod }}
             - --route-reconciliation-period={{ . }}
             {{- end }}
+            {{- end }}
+            {{- with $vpcNames }}
+            - --vpc-names={{ . }}
+            {{- end }}
+            {{- with $vpcName }}
+            - --vpc-name={{ . }}
             {{- end }}
             {{- if .Values.sharedIPLoadBalancing }}
             {{- with .Values.sharedIPLoadBalancing.bgpNodeSelector }}
