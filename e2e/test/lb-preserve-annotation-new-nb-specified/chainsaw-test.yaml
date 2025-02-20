@@ -6,10 +6,6 @@ metadata:
 spec:
   namespace: "lb-preserve-annotation-new-nb-specified"
   steps:
-    - name: Check if CCM is deployed
-      try:
-        - assert:
-            file: ../assert-ccm-resources.yaml
     - name: Create resources
       try:
         - apply:

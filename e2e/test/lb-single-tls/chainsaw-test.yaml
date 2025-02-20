@@ -6,10 +6,6 @@ metadata:
 spec:
   namespace: "lb-single-tls"
   steps:
-    - name: Check if CCM is deployed
-      try:
-        - assert:
-            file: ../assert-ccm-resources.yaml
     - name: Create secret
       try:
         - script:

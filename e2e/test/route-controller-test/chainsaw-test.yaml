@@ -9,10 +9,6 @@ spec:
       value: (join('-', ['ccm-fwtest', env('CLUSTER_NAME')]))
   namespace: "route-controller-test"
   steps:
-    - name: Check if CCM is deployed
-      try:
-        - assert:
-            file: ../assert-ccm-resources.yaml
     - name: Check if the route controller updated the config for the linode
       try:
         - script:

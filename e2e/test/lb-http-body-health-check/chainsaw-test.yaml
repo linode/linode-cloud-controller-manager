@@ -6,10 +6,6 @@ metadata:
 spec:
   namespace: "lb-http-body-health-check"
   steps:
-    - name: Check if CCM is deployed
-      try:
-        - assert:
-            file: ../assert-ccm-resources.yaml
     - name: Create pods and services
       try:
         - apply:
