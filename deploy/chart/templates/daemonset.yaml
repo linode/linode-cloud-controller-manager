@@ -55,13 +55,14 @@ spec:
             {{- if and $vpcName $vpcNames }}
             {{- fail "Both vpcName and vpcNames are set. Please use only vpcNames." }}
             {{- end }}
+            {{- $subnetNames := .Values.subnetNames }}
+            {{- if and .Values.routeController .Values.routeController.subnetNames }}
+            {{- $subnetNames = .Values.routeController.subnetNames }}
+            {{- end }}
             {{- if .Values.routeController }}
             - --enable-route-controller=true
             {{- if not (or $vpcName $vpcNames) }}
             {{- fail "Neither vpcName nor vpcNames is set. Please set one of them." }}
-            {{- end }}
-            {{- with .Values.routeController.subnetNames}}
-            - --subnet-names={{ . }}
             {{- end }}
             - --configure-cloud-routes={{ default true .Values.routeController.configureCloudRoutes }}
             - --cluster-cidr={{ required "A valid .Values.routeController.clusterCIDR is required" .Values.routeController.clusterCIDR }}
@@ -75,6 +76,9 @@ spec:
             {{- with $vpcName }}
             - --vpc-name={{ . }}
             {{- end }}
+            {{- with $subnetNames }}
+            - --subnet-names={{ . }}
+            {{ end }}
             {{- if .Values.sharedIPLoadBalancing }}
             {{- with .Values.sharedIPLoadBalancing.bgpNodeSelector }}
             - --bgp-node-selector={{ . }}

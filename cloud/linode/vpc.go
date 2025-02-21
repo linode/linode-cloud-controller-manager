@@ -120,7 +120,7 @@ func GetVPCIPAddresses(ctx context.Context, client client.Client, vpcName string
 			subnetID, err := GetSubnetID(ctx, client, vpcID, name)
 			// Don't filter subnets we can't find
 			if err != nil {
-				klog.Errorf("subnet %s not found. Skipping.", name)
+				klog.Errorf("subnet %s not found due to error: %v. Skipping.", name, err)
 				continue
 			}
 

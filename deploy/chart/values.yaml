@@ -71,12 +71,14 @@ tolerations:
 # routeController:
 #   vpcName: <name of VPC> [Deprecated: use vpcNames instead]
 #   vpcNames: <comma separated list of vpc names>
+#   subnetNames: <comma separated list of subnet names>
 #   clusterCIDR: 10.0.0.0/8
 #   configureCloudRoutes: true
 
-# vpcs that node internal IPs will be assigned from (not required if already specified in routeController)
+# vpcs and subnets that node internal IPs will be assigned from (not required if already specified in routeController)
 # vpcName: <name of VPC> [Deprecated: use vpcNames instead]
 # vpcNames: <comma separated list of vpc names>
+# subnetNames: <comma separated list of subnet names>
 
 # Enable Linode token health checker
 # tokenHealthChecker: true
