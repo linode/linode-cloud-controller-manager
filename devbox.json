@@ -4,7 +4,7 @@
     "clusterctl@latest",
     "docker@latest",
     "envsubst@latest",
-    "go@1.23.3",
+    "go@1.24.0",
     "golangci-lint@latest",
     "jq@latest",
     "kind@latest",
