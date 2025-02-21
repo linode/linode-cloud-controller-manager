@@ -1,0 +1,113 @@
+name: Build Test
+on:
+  push:
+    branches:
+      - main
+  pull_request: null
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+concurrency:
+  group: build-test-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      paths: ${{ steps.filter.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          base: ${{ github.ref }}
+          filters: .github/filters.yml
+
+  build-test:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ contains(fromJSON(needs.changes.outputs.paths), 'src') }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            golang.org:443
+            proxy.golang.org:443
+            sum.golang.org:443
+            objects.githubusercontent.com:443
+            storage.googleapis.com:443
+            cli.codecov.io:443
+            api.codecov.io:443
+            ingest.codecov.io:443
+            raw.githubusercontent.com:443
+            get.helm.sh:443
+            golangci-lint.run:443
+
+      - uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Vet
+        run: make vet
+
+      - name: lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64.5
+
+      - name: Helm Lint
+        run: make helm-lint
+
+      - name: Test
+        run: make test
+
+      - name: Build
+        run: make build
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+      - name: Docker Meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            linode/linode-cloud-controller-manager
+          tags: |
+            type=raw,value=pr-${{ github.event.pull_request.number }},enable=${{ github.event_name == 'pull_request' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      - name: Build Dockerfile
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            REV=${{ github.ref_name }}
