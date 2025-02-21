@@ -55,6 +55,10 @@ spec:
             {{- if and $vpcName $vpcNames }}
             {{- fail "Both vpcName and vpcNames are set. Please use only vpcNames." }}
             {{- end }}
+            {{- $subnetNames := .Values.subnetNames }}
+            {{- if and .Values.routeController .Values.routeController.subnetNames }}
+            {{- $subnetNames = .Values.routeController.subnetNames }}
+            {{- end }}
             {{- if .Values.routeController }}
             - --enable-route-controller=true
             {{- if not (or $vpcName $vpcNames) }}
@@ -72,6 +76,9 @@ spec:
             {{- with $vpcName }}
             - --vpc-name={{ . }}
             {{- end }}
+            {{- with $subnetNames }}
+            - --subnet-names={{ . }}
+            {{ end }}
             {{- if .Values.sharedIPLoadBalancing }}
             {{- with .Values.sharedIPLoadBalancing.bgpNodeSelector }}
             - --bgp-node-selector={{ . }}
