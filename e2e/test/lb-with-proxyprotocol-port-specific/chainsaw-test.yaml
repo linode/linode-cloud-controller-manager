@@ -3,6 +3,9 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: lb-with-proxyprotocol-port-specific
+  labels:
+    all:
+    lke:
 spec:
   namespace: "lb-with-proxyprotocol-port-specific"
   steps:

@@ -3,6 +3,8 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: check-ccm-resources
+  labels:
+    all:
 spec:
   steps:
     - name: Check if CCM is deployed

@@ -3,6 +3,9 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: lb-with-proxyprotocol-default-annotation
+  labels:
+    all:
+    lke:
 spec:
   namespace: "lb-with-proxyprotocol-default-annotation"
   steps:

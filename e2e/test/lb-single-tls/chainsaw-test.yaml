@@ -3,6 +3,9 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: lb-single-tls
+  labels:
+    all:
+    lke:
 spec:
   namespace: "lb-single-tls"
   steps:

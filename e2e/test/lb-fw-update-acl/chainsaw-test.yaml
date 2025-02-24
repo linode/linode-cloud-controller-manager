@@ -3,6 +3,9 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: lb-fw-update-acl
+  labels:
+    all:
+    lke:
 spec:
   namespace: "lb-fw-update-acl"
   steps:

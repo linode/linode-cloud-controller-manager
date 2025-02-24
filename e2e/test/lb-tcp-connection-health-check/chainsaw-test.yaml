@@ -3,6 +3,9 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: lb-tcp-connection-health-check
+  labels:
+    all:
+    lke:
 spec:
   namespace: "lb-tcp-connection-health-check"
   steps:
