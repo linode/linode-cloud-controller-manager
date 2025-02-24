@@ -3,6 +3,8 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: lb-with-node-addition
+  labels:
+    all:
 spec:
   namespace: "lb-with-node-addition"
   steps:

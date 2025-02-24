@@ -3,6 +3,9 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: lb-hostname-only-ingress
+  labels:
+    all:
+    lke:
 spec:
   namespace: "lb-hostname-only-ingress"
   steps:

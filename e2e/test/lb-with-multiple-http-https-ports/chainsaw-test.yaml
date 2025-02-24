@@ -3,6 +3,9 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: lb-with-multiple-http-https-ports
+  labels:
+    all:
+    lke:
 spec:
   namespace: "lb-with-multiple-http-https-ports"
   steps:

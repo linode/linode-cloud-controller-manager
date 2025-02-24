@@ -3,6 +3,8 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: route-controller-test
+  labels:
+    all:
 spec:
   bindings:
     - name: fwname
