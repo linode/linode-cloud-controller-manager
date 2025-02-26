@@ -383,8 +383,12 @@ func (l *loadbalancers) updateNodeBalancer(
 		}
 		// Add all of the Nodes to the config
 		newNBNodes := make([]linodego.NodeBalancerConfigRebuildNodeOptions, 0, len(nodes))
+		subnetID := 0
+		if nb.GetCreateOptions().VPCs != nil {
+			subnetID = nb.GetCreateOptions().VPCs[0].SubnetID
+		}
 		for _, node := range nodes {
-			newNodeOpts := l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort)
+			newNodeOpts := l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort, subnetID)
 			oldNodeID, ok := oldNBNodeIDs[newNodeOpts.Address]
 			if ok {
 				newNodeOpts.ID = oldNodeID
@@ -652,6 +656,20 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 		Type:               nbType,
 	}
 
+	backendIPv4Range, ok := service.GetAnnotations()[annotations.NodeBalancerBackendIPv4Range]
+	if ok {
+		subnetID, err := l.getSubnetIDForSVC(ctx, service)
+		if err != nil {
+			return nil, err
+		}
+		createOpts.VPCs = []linodego.NodeBalancerVPCOptions{
+			{
+				SubnetID:  subnetID,
+				IPv4Range: backendIPv4Range,
+			},
+		}
+	}
+
 	fwid, ok := service.GetAnnotations()[annotations.AnnLinodeCloudFirewallID]
 	if ok {
 		firewallID, err := strconv.Atoi(fwid)
@@ -768,6 +786,27 @@ func (l *loadbalancers) addTLSCert(ctx context.Context, service *v1.Service, nbC
 	return nil
 }
 
+func (l *loadbalancers) getSubnetIDForSVC(ctx context.Context, service *v1.Service) (int, error) {
+	if Options.VPCNames == "" {
+		return 0, fmt.Errorf("CCM not configured with VPC, cannot create NodeBalancer with specified annotation")
+	}
+	vpcName := strings.Split(Options.VPCNames, ",")[0]
+	specifiedVPCName, ok := service.GetAnnotations()[annotations.NodeBalancerBackendVPCName]
+	if ok {
+		vpcName = specifiedVPCName
+	}
+	vpcID, err := GetVPCID(ctx, l.client, vpcName)
+	if err != nil {
+		return 0, err
+	}
+	subnetName := strings.Split(Options.SubnetNames, ",")[0]
+	specifiedSubnetName, ok := service.GetAnnotations()[annotations.NodeBalancerBackendSubnetName]
+	if ok {
+		subnetName = specifiedSubnetName
+	}
+	return GetSubnetID(ctx, l.client, vpcID, subnetName)
+}
+
 // buildLoadBalancerRequest returns a linodego.NodeBalancer
 // requests for service across nodes.
 func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*linodego.NodeBalancer, error) {
@@ -776,6 +815,16 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 	}
 	ports := service.Spec.Ports
 	configs := make([]*linodego.NodeBalancerConfigCreateOptions, 0, len(ports))
+
+	subnetID := 0
+	_, ok := service.GetAnnotations()[annotations.NodeBalancerBackendIPv4Range]
+	if ok {
+		id, err := l.getSubnetIDForSVC(ctx, service)
+		if err != nil {
+			return nil, err
+		}
+		subnetID = id
+	}
 
 	for _, port := range ports {
 		if port.Protocol == v1.ProtocolUDP {
@@ -789,7 +838,7 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 		createOpt := config.GetCreateOptions()
 
 		for _, n := range nodes {
-			createOpt.Nodes = append(createOpt.Nodes, l.buildNodeBalancerNodeConfigRebuildOptions(n, port.NodePort).NodeBalancerNodeCreateOptions)
+			createOpt.Nodes = append(createOpt.Nodes, l.buildNodeBalancerNodeConfigRebuildOptions(n, port.NodePort, subnetID).NodeBalancerNodeCreateOptions)
 		}
 
 		configs = append(configs, &createOpt)
@@ -809,10 +858,10 @@ func coerceString(s string, minLen, maxLen int, padding string) string {
 	return s
 }
 
-func (l *loadbalancers) buildNodeBalancerNodeConfigRebuildOptions(node *v1.Node, nodePort int32) linodego.NodeBalancerConfigRebuildNodeOptions {
-	return linodego.NodeBalancerConfigRebuildNodeOptions{
+func (l *loadbalancers) buildNodeBalancerNodeConfigRebuildOptions(node *v1.Node, nodePort int32, subnetID int) linodego.NodeBalancerConfigRebuildNodeOptions {
+	nodeOptions := linodego.NodeBalancerConfigRebuildNodeOptions{
 		NodeBalancerNodeCreateOptions: linodego.NodeBalancerNodeCreateOptions{
-			Address: fmt.Sprintf("%v:%v", getNodePrivateIP(node), nodePort),
+			Address: fmt.Sprintf("%v:%v", getNodePrivateIP(node, subnetID), nodePort),
 			// NodeBalancer backends must be 3-32 chars in length
 			// If < 3 chars, pad node name with "node-" prefix
 			Label:  coerceString(node.Name, 3, 32, "node-"),
@@ -820,6 +869,10 @@ func (l *loadbalancers) buildNodeBalancerNodeConfigRebuildOptions(node *v1.Node,
 			Weight: 100,
 		},
 	}
+	if subnetID != 0 {
+		nodeOptions.NodeBalancerNodeCreateOptions.SubnetID = subnetID
+	}
+	return nodeOptions
 }
 
 func (l *loadbalancers) retrieveKubeClient() error {
@@ -926,13 +979,17 @@ func getPortConfigAnnotation(service *v1.Service, port int) (portConfigAnnotatio
 	return annotation, nil
 }
 
-// getNodePrivateIP should provide the Linode Private IP the NodeBalance
-// will communicate with. When using a VLAN or VPC for the Kubernetes cluster
-// network, this will not be the NodeInternalIP, so this prefers an annotation
-// cluster operators may specify in such a situation.
-func getNodePrivateIP(node *v1.Node) string {
-	if address, exists := node.Annotations[annotations.AnnLinodeNodePrivateIP]; exists {
-		return address
+// getNodePrivateIP provides the Linode Backend IP the NodeBalancer will communicate with.
+// If a service specifies NodeBalancerBackendIPv4Range annotation, it will
+// use NodeInternalIP of node.
+// For services which don't have NodeBalancerBackendIPv4Range annotation,
+// Backend IP can be overwritten to the one specified using AnnLinodeNodePrivateIP
+// annotation over the NodeInternalIP.
+func getNodePrivateIP(node *v1.Node, subnetID int) string {
+	if subnetID == 0 {
+		if address, exists := node.Annotations[annotations.AnnLinodeNodePrivateIP]; exists {
+			return address
+		}
 	}
 
 	klog.Infof("Node %s, assigned IP addresses: %v", node.Name, node.Status.Addresses)
