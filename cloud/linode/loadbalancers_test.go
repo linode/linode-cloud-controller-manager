@@ -2635,9 +2635,10 @@ func Test_getHealthCheckType(t *testing.T) {
 
 func Test_getNodePrivateIP(t *testing.T) {
 	testcases := []struct {
-		name    string
-		node    *v1.Node
-		address string
+		name     string
+		node     *v1.Node
+		address  string
+		subnetID int
 	}{
 		{
 			"node internal ip specified",
@@ -2652,6 +2653,7 @@ func Test_getNodePrivateIP(t *testing.T) {
 				},
 			},
 			"127.0.0.1",
+			0,
 		},
 		{
 			"node internal ip not specified",
@@ -2666,6 +2668,7 @@ func Test_getNodePrivateIP(t *testing.T) {
 				},
 			},
 			"",
+			0,
 		},
 		{
 			"node internal ip annotation present",
@@ -2685,12 +2688,33 @@ func Test_getNodePrivateIP(t *testing.T) {
 				},
 			},
 			"192.168.42.42",
+			0,
+		},
+		{
+			"node internal ip annotation present and subnet id is not zero",
+			&v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotations.AnnLinodeNodePrivateIP: "192.168.42.42",
+					},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.1.1",
+						},
+					},
+				},
+			},
+			"10.0.1.1",
+			100,
 		},
 	}
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
-			ip := getNodePrivateIP(test.node)
+			ip := getNodePrivateIP(test.node, test.subnetID)
 			if ip != test.address {
 				t.Error("unexpected certificate")
 				t.Logf("expected: %q", test.address)
