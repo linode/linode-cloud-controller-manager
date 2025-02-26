@@ -384,8 +384,14 @@ func (l *loadbalancers) updateNodeBalancer(
 		// Add all of the Nodes to the config
 		newNBNodes := make([]linodego.NodeBalancerConfigRebuildNodeOptions, 0, len(nodes))
 		subnetID := 0
-		if nb.GetCreateOptions().VPCs != nil {
-			subnetID = nb.GetCreateOptions().VPCs[0].SubnetID
+		_, ok := service.GetAnnotations()[annotations.NodeBalancerBackendIPv4Range]
+		if ok {
+			id, err := l.getSubnetIDForSVC(ctx, service)
+			if err != nil {
+				sentry.CaptureError(ctx, err)
+				return fmt.Errorf("Error getting subnet ID for service %s: %v", service.Name, err)
+			}
+			subnetID = id
 		}
 		for _, node := range nodes {
 			newNodeOpts := l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort, subnetID)
@@ -786,6 +792,9 @@ func (l *loadbalancers) addTLSCert(ctx context.Context, service *v1.Service, nbC
 	return nil
 }
 
+// getSubnetIDForSVC returns the subnet ID for the service's VPC and subnet.
+// By default, first VPCName and SubnetName are used to calculate subnet id for the service.
+// If the service has annotations specifying VPCName and SubnetName, they are used instead.
 func (l *loadbalancers) getSubnetIDForSVC(ctx context.Context, service *v1.Service) (int, error) {
 	if Options.VPCNames == "" {
 		return 0, fmt.Errorf("CCM not configured with VPC, cannot create NodeBalancer with specified annotation")

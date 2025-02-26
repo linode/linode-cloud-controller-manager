@@ -36,7 +36,6 @@ const (
 	AnnLinodeNodeIPSharingUpdated = "node.k8s.linode.com/ip-sharing-updated"
 
 	NodeBalancerBackendIPv4Range = "service.beta.kubernetes.io/linode-loadbalancer-backend-ipv4-range"
-	NodeBalancerBackendIPv6Range = "service.beta.kubernetes.io/linode-loadbalancer-backend-ipv6-range"
 
 	NodeBalancerBackendVPCName    = "service.beta.kubernetes.io/linode-loadbalancer-backend-vpc-name"
 	NodeBalancerBackendSubnetName = "service.beta.kubernetes.io/linode-loadbalancer-backend-subnet-name"
