@@ -800,8 +800,7 @@ func (l *loadbalancers) getSubnetIDForSVC(ctx context.Context, service *v1.Servi
 		return 0, fmt.Errorf("CCM not configured with VPC, cannot create NodeBalancer with specified annotation")
 	}
 	vpcName := strings.Split(Options.VPCNames, ",")[0]
-	specifiedVPCName, ok := service.GetAnnotations()[annotations.NodeBalancerBackendVPCName]
-	if ok {
+	if specifiedVPCName, ok := service.GetAnnotations()[annotations.NodeBalancerBackendVPCName]; ok {
 		vpcName = specifiedVPCName
 	}
 	vpcID, err := GetVPCID(ctx, l.client, vpcName)
@@ -809,8 +808,7 @@ func (l *loadbalancers) getSubnetIDForSVC(ctx context.Context, service *v1.Servi
 		return 0, err
 	}
 	subnetName := strings.Split(Options.SubnetNames, ",")[0]
-	specifiedSubnetName, ok := service.GetAnnotations()[annotations.NodeBalancerBackendSubnetName]
-	if ok {
+	if specifiedSubnetName, ok := service.GetAnnotations()[annotations.NodeBalancerBackendSubnetName]; ok {
 		subnetName = specifiedSubnetName
 	}
 	return GetSubnetID(ctx, l.client, vpcID, subnetName)
