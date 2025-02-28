@@ -83,6 +83,9 @@ tolerations:
 # Enable Linode token health checker
 # tokenHealthChecker: true
 
+# Default NodeBalancer type to create (default is "common")
+# defaultNBType: "common"
+
 # This section adds the ability to pass environment variables to adjust CCM defaults
 # https://github.com/linode/linode-cloud-controller-manager/blob/master/cloud/linode/loadbalancers.go
 # LINODE_HOSTNAME_ONLY_INGRESS type bool is supported

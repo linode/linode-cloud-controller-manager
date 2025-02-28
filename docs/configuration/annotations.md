@@ -32,6 +32,7 @@ For implementation details, see:
 | `tags` | string | | A comma separated list of tags to be applied to the NodeBalancer instance |
 | `firewall-id` | string | | An existing Cloud Firewall ID to be attached to the NodeBalancer instance. See [Firewall Setup](firewall.md) |
 | `firewall-acl` | string | | The Firewall rules to be applied to the NodeBalancer. See [Firewall Configuration](#firewall-configuration) |
+| `nodebalancer-type` | string | | The type of NodeBalancer to create (options: common, premium) |
 
 ### Port Specific Configuration
 

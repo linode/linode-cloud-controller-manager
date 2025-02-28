@@ -11,6 +11,7 @@ import (
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode"
 	"github.com/linode/linode-cloud-controller-manager/sentry"
+	"github.com/linode/linodego"
 	"github.com/spf13/pflag"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
@@ -88,6 +89,7 @@ func main() {
 	command.Flags().StringVar(&linode.Options.LoadBalancerType, "load-balancer-type", "nodebalancer", "configures which type of load-balancing to use for LoadBalancer Services (options: nodebalancer, cilium-bgp)")
 	command.Flags().StringVar(&linode.Options.BGPNodeSelector, "bgp-node-selector", "", "node selector to use to perform shared IP fail-over with BGP (e.g. cilium-bgp-peering=true")
 	command.Flags().StringVar(&linode.Options.IpHolderSuffix, "ip-holder-suffix", "", "suffix to append to the ip holder name when using shared IP fail-over with BGP (e.g. ip-holder-suffix=my-cluster-name")
+	command.Flags().StringVar(&linode.Options.DefaultNBType, "default-nodebalancer-type", string(linodego.NBTypeCommon), "default type of NodeBalancer to create (options: common, premium)")
 	command.Flags().StringSliceVar(&linode.Options.NodeBalancerTags, "nodebalancer-tags", []string{}, "Linode tags to apply to all NodeBalancers")
 
 	// Set static flags
