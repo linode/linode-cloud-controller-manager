@@ -3,6 +3,9 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: fw-use-specified-nb
+  labels:
+    all:
+    lke:
 spec:
   bindings:
     - name: fwname
