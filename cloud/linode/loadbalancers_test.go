@@ -18,9 +18,6 @@ import (
 	"testing"
 
 	ciliumclient "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/typed/cilium.io/v2alpha1"
-	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/firewall"
 	"github.com/linode/linodego"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -29,6 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/firewall"
 )
 
 const testCert string = `-----BEGIN CERTIFICATE-----

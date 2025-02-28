@@ -83,7 +83,7 @@ tolerations:
 # Enable Linode token health checker
 # tokenHealthChecker: true
 
-# Default NodeBalancer type to create (default is "common")
+# Default NodeBalancer type to create("common" or "premium"). Default is "common"
 # defaultNBType: "common"
 
 # This section adds the ability to pass environment variables to adjust CCM defaults
