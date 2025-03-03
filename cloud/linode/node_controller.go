@@ -28,6 +28,11 @@ const (
 	defaultMetadataTTL   = 300 * time.Second
 )
 
+type nodeRequest struct {
+	node      *v1.Node
+	timestamp time.Time
+}
+
 type nodeController struct {
 	sync.RWMutex
 
@@ -40,6 +45,9 @@ type nodeController struct {
 	ttl                time.Duration
 
 	queue workqueue.TypedDelayingInterface[any]
+
+	nodeLastAdded map[string]time.Time
+	lock          sync.Mutex
 }
 
 func newNodeController(kubeclient kubernetes.Interface, client client.Client, informer v1informers.NodeInformer, instanceCache *instances) *nodeController {
@@ -58,6 +66,7 @@ func newNodeController(kubeclient kubernetes.Interface, client client.Client, in
 		ttl:                timeout,
 		metadataLastUpdate: make(map[string]time.Time),
 		queue:              workqueue.NewTypedDelayingQueueWithConfig[any](workqueue.TypedDelayingQueueConfig[any]{Name: "ccm_node"}),
+		nodeLastAdded:      make(map[string]time.Time),
 	}
 }
 
@@ -71,7 +80,10 @@ func (s *nodeController) Run(stopCh <-chan struct{}) {
 				}
 
 				klog.Infof("NodeController will handle newly created node (%s) metadata", node.Name)
-				s.queue.Add(node)
+				s.lock.Lock()
+				defer s.lock.Unlock()
+				s.nodeLastAdded[node.Name] = time.Now()
+				s.queue.Add(nodeRequest{node: node, timestamp: time.Now()})
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				node, ok := newObj.(*v1.Node)
@@ -80,7 +92,10 @@ func (s *nodeController) Run(stopCh <-chan struct{}) {
 				}
 
 				klog.Infof("NodeController will handle newly updated node (%s) metadata", node.Name)
-				s.queue.Add(node)
+				s.lock.Lock()
+				defer s.lock.Unlock()
+				s.nodeLastAdded[node.Name] = time.Now()
+				s.queue.Add(nodeRequest{node: node, timestamp: time.Now()})
 			},
 		},
 		informerResyncPeriod,
@@ -106,25 +121,32 @@ func (s *nodeController) processNext() bool {
 	}
 	defer s.queue.Done(key)
 
-	node, ok := key.(*v1.Node)
+	request, ok := key.(nodeRequest)
 	if !ok {
-		klog.Errorf("expected dequeued key to be of type *v1.Node but got %T", node)
+		klog.Errorf("expected dequeued key to be of type nodeRequest but got %T", request)
 		return true
 	}
 
-	err := s.handleNode(context.TODO(), node)
+	s.lock.Lock()
+	latestTimestamp, exists := s.nodeLastAdded[request.node.Name]
+	s.lock.Unlock()
+	if !exists || request.timestamp.Before(latestTimestamp) {
+		klog.V(3).InfoS("Skipping node metadata update as its not the most recent object", "node", klog.KObj(request.node))
+		return true
+	}
+	err := s.handleNode(context.TODO(), request.node)
 	switch deleteErr := err.(type) {
 	case nil:
 		break
 
 	case *linodego.Error:
 		if deleteErr.Code >= http.StatusInternalServerError || deleteErr.Code == http.StatusTooManyRequests {
-			klog.Errorf("failed to add metadata for node (%s); retrying in 1 minute: %s", node.Name, err)
-			s.queue.AddAfter(node, retryInterval)
+			klog.Errorf("failed to add metadata for node (%s); retrying in 1 minute: %s", request.node.Name, err)
+			s.queue.AddAfter(request, retryInterval)
 		}
 
 	default:
-		klog.Errorf("failed to add metadata for node (%s); will not retry: %s", node.Name, err)
+		klog.Errorf("failed to add metadata for node (%s); will not retry: %s", request.node.Name, err)
 	}
 	return true
 }
