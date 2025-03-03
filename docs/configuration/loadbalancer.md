@@ -120,10 +120,10 @@ metadata:
 
 ## BGP-based IP Sharing Implementation
 
-BGP-based IP sharing provides a more cost-effective solution for multiple LoadBalancer services. For detailed setup instructions, see [Cilium BGP Documentation](https://docs.cilium.io/en/stable/network/bgp-control-plane/).
+BGP-based IP sharing provides a more cost-effective solution for multiple LoadBalancer services. For detailed setup instructions, see [Cilium BGP Documentation](https://docs.cilium.io/en/stable/network/bgp-control-plane/bgp-control-plane/).
 
 ### Prerequisites
-- [Cilium CNI](https://docs.cilium.io/en/stable/network/bgp-control-plane/) with BGP control plane enabled
+- [Cilium CNI](https://docs.cilium.io/en/stable/network/bgp-control-plane/bgp-control-plane/) with BGP control plane enabled
 - Additional IP provisioning enabled on your account (contact [Linode Support](https://www.linode.com/support/))
 - Nodes labeled for BGP peering
 
@@ -149,6 +149,27 @@ kubectl label node my-node cilium-bgp-peering=true
 - `BGP_PEER_PREFIX`: Use your own BGP peer prefix instead of default one
 
 For more details, see [Environment Variables](environment.md#network-configuration).
+
+## Configuring NodeBalancers directly with VPC
+NodeBalancers can be configured to have VPC specific ips configured as backend nodes. It requires:
+1. VPC with a subnet and Linodes in VPC
+2. Each NodeBalancer created within that VPC needs a free /30 or bigger subnet from the subnet to which Linodes are connected
+
+Specify NodeBalancer backend ipv4 range when creating service:
+```yaml
+metadata:
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-backend-ipv4-range: "10.100.0.0/30"
+```
+
+By default, CCM uses first VPC and Subnet name configured with it to attach NodeBalancers to that VPC subnet. To overwrite those, use:
+```yaml
+metadata:
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-backend-ipv4-range: "10.100.0.4/30"
+    service.beta.kubernetes.io/linode-loadbalancer-vpc-name: "vpc1"
+    service.beta.kubernetes.io/linode-loadbalancer-subnet-name: "subnet1"
+```
 
 ## Advanced Configuration
 
@@ -201,6 +222,6 @@ metadata:
 - [Environment Variables](environment.md)
 - [Route Configuration](routes.md)
 - [Linode NodeBalancer Documentation](https://www.linode.com/docs/products/networking/nodebalancers/)
-- [Cilium BGP Documentation](https://docs.cilium.io/en/stable/network/bgp-control-plane/)
+- [Cilium BGP Documentation](https://docs.cilium.io/en/stable/network/bgp-control-plane/bgp-control-plane/)
 - [Basic Service Examples](../examples/basic.md)
 - [Advanced Configuration Examples](../examples/advanced.md)

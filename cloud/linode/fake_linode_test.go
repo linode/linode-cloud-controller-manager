@@ -19,12 +19,15 @@ import (
 const apiVersion = "v4"
 
 type fakeAPI struct {
-	t   *testing.T
-	nb  map[string]*linodego.NodeBalancer
-	nbc map[string]*linodego.NodeBalancerConfig
-	nbn map[string]*linodego.NodeBalancerNode
-	fw  map[int]*linodego.Firewall               // map of firewallID -> firewall
-	fwd map[int]map[int]*linodego.FirewallDevice // map of firewallID -> firewallDeviceID:FirewallDevice
+	t      *testing.T
+	nb     map[string]*linodego.NodeBalancer
+	nbc    map[string]*linodego.NodeBalancerConfig
+	nbn    map[string]*linodego.NodeBalancerNode
+	fw     map[int]*linodego.Firewall               // map of firewallID -> firewall
+	fwd    map[int]map[int]*linodego.FirewallDevice // map of firewallID -> firewallDeviceID:FirewallDevice
+	nbvpcc map[string]*linodego.NodeBalancerVPCConfig
+	vpc    map[int]*linodego.VPC
+	subnet map[int]*linodego.VPCSubnet
 
 	requests map[fakeRequest]struct{}
 	mux      *http.ServeMux
@@ -44,6 +47,9 @@ func newFake(t *testing.T) *fakeAPI {
 		nbn:      make(map[string]*linodego.NodeBalancerNode),
 		fw:       make(map[int]*linodego.Firewall),
 		fwd:      make(map[int]map[int]*linodego.FirewallDevice),
+		nbvpcc:   make(map[string]*linodego.NodeBalancerVPCConfig),
+		vpc:      make(map[int]*linodego.VPC),
+		subnet:   make(map[int]*linodego.VPCSubnet),
 		requests: make(map[fakeRequest]struct{}),
 		mux:      http.NewServeMux(),
 	}
@@ -112,6 +118,54 @@ func (f *fakeAPI) setupRoutes() {
 			Pages:   1,
 			Results: res,
 			Data:    data,
+		}
+		rr, _ := json.Marshal(resp)
+		_, _ = w.Write(rr)
+	})
+
+	f.mux.HandleFunc("GET /v4/vpcs", func(w http.ResponseWriter, r *http.Request) {
+		res := 0
+		data := []linodego.VPC{}
+		filter := r.Header.Get("X-Filter")
+		if filter == "" {
+			for _, v := range f.vpc {
+				data = append(data, *v)
+			}
+		} else {
+			var fs map[string]string
+			err := json.Unmarshal([]byte(filter), &fs)
+			if err != nil {
+				f.t.Fatal(err)
+			}
+			for _, v := range f.vpc {
+				if v.Label != "" && fs["label"] != "" && v.Label == fs["label"] {
+					data = append(data, *v)
+				}
+			}
+		}
+
+		resp := paginatedResponse[linodego.VPC]{
+			Page:    1,
+			Pages:   1,
+			Results: res,
+			Data:    data,
+		}
+		rr, _ := json.Marshal(resp)
+		_, _ = w.Write(rr)
+	})
+
+	f.mux.HandleFunc("GET /v4/vpcs/{vpcId}/subnets", func(w http.ResponseWriter, r *http.Request) {
+		res := 0
+		vpcID, err := strconv.Atoi(r.PathValue("vpcId"))
+		if err != nil {
+			f.t.Fatal(err)
+		}
+
+		resp := paginatedResponse[linodego.VPCSubnet]{
+			Page:    1,
+			Pages:   1,
+			Results: res,
+			Data:    f.vpc[vpcID].Subnets,
 		}
 		rr, _ := json.Marshal(resp)
 		_, _ = w.Write(rr)
@@ -460,6 +514,54 @@ func (f *fakeAPI) setupRoutes() {
 			f.t.Fatal(err)
 		}
 		_, _ = w.Write(resp)
+	})
+
+	f.mux.HandleFunc("POST /v4/vpcs", func(w http.ResponseWriter, r *http.Request) {
+		vco := linodego.VPCCreateOptions{}
+		if err := json.NewDecoder(r.Body).Decode(&vco); err != nil {
+			f.t.Fatal(err)
+		}
+
+		subnets := []linodego.VPCSubnet{}
+		for _, s := range vco.Subnets {
+			subnet := linodego.VPCSubnet{
+				ID:    rand.Intn(9999),
+				IPv4:  s.IPv4,
+				Label: s.Label,
+			}
+			subnets = append(subnets, subnet)
+			f.subnet[subnet.ID] = &subnet
+		}
+		vpc := linodego.VPC{
+			ID:          rand.Intn(9999),
+			Label:       vco.Label,
+			Description: vco.Description,
+			Region:      vco.Region,
+			Subnets:     subnets,
+		}
+
+		f.vpc[vpc.ID] = &vpc
+		resp, err := json.Marshal(vpc)
+		if err != nil {
+			f.t.Fatal(err)
+		}
+		_, _ = w.Write(resp)
+	})
+
+	f.mux.HandleFunc("DELETE /v4/vpcs/{vpcId}", func(w http.ResponseWriter, r *http.Request) {
+		vpcid, err := strconv.Atoi(r.PathValue("vpcId"))
+		if err != nil {
+			f.t.Fatal(err)
+		}
+
+		for k, v := range f.vpc {
+			if v.ID == vpcid {
+				for _, s := range v.Subnets {
+					delete(f.subnet, s.ID)
+				}
+				delete(f.vpc, k)
+			}
+		}
 	})
 
 	f.mux.HandleFunc("POST /v4/networking/firewalls/{firewallId}/devices", func(w http.ResponseWriter, r *http.Request) {
