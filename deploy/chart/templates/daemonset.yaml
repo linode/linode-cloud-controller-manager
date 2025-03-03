@@ -100,6 +100,9 @@ spec:
             {{- if .Values.defaultNBType }}
             - --default-nodebalancer-type={{ .Values.defaultNBType }}
             {{- end }}
+            {{- if .Values.useIPv6ForLoadBalancers }}
+            - --use-ipv6-for-loadbalancers=true
+            {{- end }}
           {{- with .Values.containerSecurityContext }}
           securityContext:
           {{- toYaml . | nindent 12 }}
