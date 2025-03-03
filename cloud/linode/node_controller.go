@@ -28,6 +28,11 @@ const (
 	defaultMetadataTTL   = 300 * time.Second
 )
 
+type queueNode struct {
+	node      *v1.Node
+	timestamp time.Time
+}
+
 type nodeController struct {
 	sync.RWMutex
 
@@ -40,6 +45,9 @@ type nodeController struct {
 	ttl                time.Duration
 
 	queue workqueue.TypedDelayingInterface[any]
+
+	nodeLastAdded map[string]time.Time
+	lock          sync.Mutex
 }
 
 func newNodeController(kubeclient kubernetes.Interface, client client.Client, informer v1informers.NodeInformer, instanceCache *instances) *nodeController {
@@ -58,6 +66,7 @@ func newNodeController(kubeclient kubernetes.Interface, client client.Client, in
 		ttl:                timeout,
 		metadataLastUpdate: make(map[string]time.Time),
 		queue:              workqueue.NewTypedDelayingQueueWithConfig[any](workqueue.TypedDelayingQueueConfig[any]{Name: "ccm_node"}),
+		nodeLastAdded:      make(map[string]time.Time),
 	}
 }
 
@@ -71,7 +80,10 @@ func (s *nodeController) Run(stopCh <-chan struct{}) {
 				}
 
 				klog.Infof("NodeController will handle newly created node (%s) metadata", node.Name)
-				s.queue.Add(node)
+				s.lock.Lock()
+				defer s.lock.Unlock()
+				s.nodeLastAdded[node.Name] = time.Now()
+				s.queue.Add(queueNode{node: node, timestamp: time.Now()})
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				node, ok := newObj.(*v1.Node)
@@ -80,7 +92,10 @@ func (s *nodeController) Run(stopCh <-chan struct{}) {
 				}
 
 				klog.Infof("NodeController will handle newly updated node (%s) metadata", node.Name)
-				s.queue.Add(node)
+				s.lock.Lock()
+				defer s.lock.Unlock()
+				s.nodeLastAdded[node.Name] = time.Now()
+				s.queue.Add(queueNode{node: node, timestamp: time.Now()})
 			},
 		},
 		informerResyncPeriod,
@@ -106,9 +121,19 @@ func (s *nodeController) processNext() bool {
 	}
 	defer s.queue.Done(key)
 
-	node, ok := key.(*v1.Node)
+	item, ok := key.(queueNode)
 	if !ok {
-		klog.Errorf("expected dequeued key to be of type *v1.Node but got %T", node)
+		klog.Errorf("expected dequeued key to be of type queueNode but got %T", item)
+		return true
+	}
+
+	node := item.node
+	timestamp := item.timestamp
+	s.lock.Lock()
+	latestTimestamp, exists := s.nodeLastAdded[node.Name]
+	s.lock.Unlock()
+	if !exists || latestTimestamp.After(timestamp) {
+		klog.V(3).InfoS("Skipping node metadata update as its not the most recent object", "node", klog.KObj(node))
 		return true
 	}
 
@@ -120,7 +145,7 @@ func (s *nodeController) processNext() bool {
 	case *linodego.Error:
 		if deleteErr.Code >= http.StatusInternalServerError || deleteErr.Code == http.StatusTooManyRequests {
 			klog.Errorf("failed to add metadata for node (%s); retrying in 1 minute: %s", node.Name, err)
-			s.queue.AddAfter(node, retryInterval)
+			s.queue.AddAfter(queueNode{node: node, timestamp: timestamp}, retryInterval)
 		}
 
 	default:
