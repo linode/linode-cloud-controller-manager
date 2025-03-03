@@ -1,5 +1,71 @@
 run:
   timeout: 5m
+  issues-exit-code: 1
+
+output:
+  formats:
+    - format: colored-line-number
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+  gci:
+    sections:
+      - standard
+      - default
+      - blank
+      - dot
+      - prefix(github.com/linode/linode-cloud-controller-manager)
+
+  govet:
+    enable:
+      - shadow
+
+  gosec:
+    confidence: "medium"
+    excludes:
+      - G115
+
+  gofmt:
+    simplify: true
+
+  goimports:
+    local-prefixes: github.com/linode/linode-cloud-controller-manager
+
+  dupl:
+    threshold: 100
+
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+
+  prealloc:
+    simple: true
+    range-loops: true
+    for-loops: true
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+
+    settings:
+      captLocal:
+        paramsOnly: true
+      rangeValCopy:
+        sizeThreshold: 32
+
+  nolintlint:
+    require-explanation: true
+    require-specific: true
+
+  varnamelen:
+    min-name-length: 2
 
 linters:
   disable-all: true
@@ -14,23 +80,106 @@ linters:
     - unused
     # cherry picked from https://golangci-lint.run/usage/linters/
     # - ginkgolinter # to be enabled once #158 is merged
+    - asasalint
+    - asciicheck
+    - bidichk
     - bodyclose
+    - containedctx
+    - contextcheck
     - copyloopvar
+    - cyclop
+    - decorder
+    - depguard
+    - dogsled
+    - dupl
+    - dupword
+    - durationcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - errcheck
+    - exhaustive
+    - forbidigo
+    - forcetypeassert
+    - gci
     - gocheckcompilerdirectives
     - gofmt
     - goimports
-    - importas
-    - loggercheck
-    - makezero
-    - nilerr
-    - prealloc
-    - reassign
-    - tenv
-    - unconvert
-    - wastedassign
-    - unparam
+    - gocognit
+    - goconst
+    - gocritic
     - gofumpt
-    - nosprintfhostport
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    - importas
+    - ineffassign
+    - loggercheck
+    - maintidx
+    - makezero
+    - misspell
+    - mnd
     - musttag
-    - exhaustive
+    - nestif
+    - nilerr
     - nilnil
+    - noctx
+    - nolintlint
+    - nosprintfhostport
+    - paralleltest
+    - prealloc
+    - predeclared
+    - reassign
+    - staticcheck
+    - tenv
+    - thelper
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - usestdlibvars
+    - varnamelen
+    - wastedassign
+    - whitespace
+  
+  presets:
+    - bugs
+    - unused
+  fast: false
+
+issues:
+  exclude-rules:
+    # Exclude some linters from running on tests files.
+    - path: _test(ing)?\.go
+      linters:
+        - gocyclo
+        - maintidx
+        - errcheck
+        - dupl
+        - gosec
+        - copyloopvar
+        - unparam
+        - varnamelen
+
+    # Ease some gocritic warnings on test files.
+    - path: _test\.go
+      text: "(unnamedResult|exitAfterDefer)"
+      linters:
+        - gocritic
+
+    - text: "G101:"
+      linters:
+        - gosec
+        - gas
+
+    - text: "G104:"
+      linters:
+        - gosec
+        - gas
+
+  exclude-use-default: false
+  new: false
+  max-same-issues: 0
+  exclude-files:
+    - "zz_generated\\..+\\.go$"
