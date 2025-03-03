@@ -20,7 +20,9 @@ For more details, see [Linode NodeBalancer Documentation](https://www.linode.com
 
 ### IPv6 Support
 
-NodeBalancers support both IPv4 and IPv6 ingress addresses. By default, the CCM uses sets IPv4 address for LoadBalancer services. You can configure the CCM to set both IPv4 and IPv6 addresses by setting the `use-ipv6-for-loadbalancers` flag:
+NodeBalancers support both IPv4 and IPv6 ingress addresses. By default, the CCM uses only IPv4 address for LoadBalancer services. 
+
+You can enable IPv6 addresses globally for all services by setting the `enable-ipv6-for-loadbalancers` flag:
 
 ```yaml
 spec:
@@ -29,7 +31,7 @@ spec:
       containers:
         - name: ccm-linode
           args:
-            - --use-ipv6-for-loadbalancers
+            - --enable-ipv6-for-loadbalancers=true
 ```
 
 Alternatively, you can enable IPv6 addresses for individual services using the annotation:

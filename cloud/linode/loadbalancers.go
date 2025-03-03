@@ -1004,7 +1004,7 @@ func makeLoadBalancerStatus(service *v1.Service, nb *linodego.NodeBalancer) *v1.
 	}
 
 	// Check for per-service IPv6 annotation first, then fall back to global setting
-	useIPv6 := getServiceBoolAnnotation(service, annotations.AnnLinodeEnableIPv6Ingress) || Options.UseIPv6ForLoadBalancers
+	useIPv6 := getServiceBoolAnnotation(service, annotations.AnnLinodeEnableIPv6Ingress) || Options.EnableIPv6ForLoadBalancers
 
 	// When IPv6 is enabled (either per-service or globally), include both IPv4 and IPv6
 	if useIPv6 && nb.IPv6 != nil && *nb.IPv6 != "" {

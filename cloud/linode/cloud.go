@@ -39,17 +39,17 @@ var Options struct {
 	EnableRouteController    bool
 	EnableTokenHealthChecker bool
 	// Deprecated: use VPCNames instead
-	VPCName                 string
-	VPCNames                string
-	SubnetNames             string
-	LoadBalancerType        string
-	BGPNodeSelector         string
-	IpHolderSuffix          string
-	LinodeExternalNetwork   *net.IPNet
-	NodeBalancerTags        []string
-	DefaultNBType           string
-	GlobalStopChannel       chan<- struct{}
-	UseIPv6ForLoadBalancers bool
+	VPCName                    string
+	VPCNames                   string
+	SubnetNames                string
+	LoadBalancerType           string
+	BGPNodeSelector            string
+	IpHolderSuffix             string
+	LinodeExternalNetwork      *net.IPNet
+	NodeBalancerTags           []string
+	DefaultNBType              string
+	GlobalStopChannel          chan<- struct{}
+	EnableIPv6ForLoadBalancers bool
 }
 
 type linodeCloud struct {

@@ -3100,8 +3100,8 @@ func testMakeLoadBalancerStatusWithIPv6(t *testing.T, client *linodego.Client, _
 		},
 	}
 
-	// Test with UseIPv6ForLoadBalancers = false (default)
-	Options.UseIPv6ForLoadBalancers = false
+	// Test with EnableIPv6ForLoadBalancers = false (default)
+	Options.EnableIPv6ForLoadBalancers = false
 	expectedStatus := &v1.LoadBalancerStatus{
 		Ingress: []v1.LoadBalancerIngress{{
 			Hostname: hostname,
@@ -3110,11 +3110,11 @@ func testMakeLoadBalancerStatusWithIPv6(t *testing.T, client *linodego.Client, _
 	}
 	status := makeLoadBalancerStatus(svc, nb)
 	if !reflect.DeepEqual(status, expectedStatus) {
-		t.Errorf("expected status with UseIPv6ForLoadBalancers=false to be %#v; got %#v", expectedStatus, status)
+		t.Errorf("expected status with EnableIPv6ForLoadBalancers=false to be %#v; got %#v", expectedStatus, status)
 	}
 
-	// Test with UseIPv6ForLoadBalancers = true
-	Options.UseIPv6ForLoadBalancers = true
+	// Test with EnableIPv6ForLoadBalancers = true
+	Options.EnableIPv6ForLoadBalancers = true
 	expectedStatus = &v1.LoadBalancerStatus{
 		Ingress: []v1.LoadBalancerIngress{
 			{
@@ -3129,12 +3129,12 @@ func testMakeLoadBalancerStatusWithIPv6(t *testing.T, client *linodego.Client, _
 	}
 	status = makeLoadBalancerStatus(svc, nb)
 	if !reflect.DeepEqual(status, expectedStatus) {
-		t.Errorf("expected status with UseIPv6ForLoadBalancers=true to be %#v; got %#v", expectedStatus, status)
+		t.Errorf("expected status with EnableIPv6ForLoadBalancers=true to be %#v; got %#v", expectedStatus, status)
 	}
 
 	// Test with per-service annotation
 	// Reset the global flag to false and set the annotation
-	Options.UseIPv6ForLoadBalancers = false
+	Options.EnableIPv6ForLoadBalancers = false
 	svc.Annotations[annotations.AnnLinodeEnableIPv6Ingress] = "true"
 
 	// Expect the same result as when the global flag is enabled
@@ -3145,7 +3145,7 @@ func testMakeLoadBalancerStatusWithIPv6(t *testing.T, client *linodego.Client, _
 	}
 
 	// Reset the flag to its default value
-	Options.UseIPv6ForLoadBalancers = false
+	Options.EnableIPv6ForLoadBalancers = false
 }
 
 func testMakeLoadBalancerStatusEnvVar(t *testing.T, client *linodego.Client, _ *fakeAPI) {
