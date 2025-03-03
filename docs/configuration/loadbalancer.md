@@ -18,6 +18,22 @@ When using NodeBalancers, the CCM automatically:
 
 For more details, see [Linode NodeBalancer Documentation](https://www.linode.com/docs/products/networking/nodebalancers/).
 
+### IPv6 Support
+
+NodeBalancers support both IPv4 and IPv6 addresses. By default, the CCM uses IPv4 addresses for LoadBalancer services. You can configure the CCM to use IPv6 addresses instead by setting the `use-ipv6-for-loadbalancers` flag:
+
+```yaml
+spec:
+  template:
+    spec:
+      containers:
+        - name: ccm-linode
+          args:
+            - --use-ipv6-for-loadbalancers
+```
+
+When this flag is set, all LoadBalancer services will use the IPv6 address of the NodeBalancer in their status, which will be used by clients to connect to the service.
+
 ### Basic Configuration
 
 Create a LoadBalancer service:
@@ -198,7 +214,7 @@ metadata:
 - [Service Annotations](annotations.md)
 - [Firewall Configuration](firewall.md)
 - [Session Affinity](session-affinity.md)
-- [Environment Variables](environment.md)
+- [Environment Variables and Flags](environment.md)
 - [Route Configuration](routes.md)
 - [Linode NodeBalancer Documentation](https://www.linode.com/docs/products/networking/nodebalancers/)
 - [Cilium BGP Documentation](https://docs.cilium.io/en/stable/network/bgp-control-plane/)

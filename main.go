@@ -91,6 +91,7 @@ func main() {
 	command.Flags().StringVar(&linode.Options.IpHolderSuffix, "ip-holder-suffix", "", "suffix to append to the ip holder name when using shared IP fail-over with BGP (e.g. ip-holder-suffix=my-cluster-name")
 	command.Flags().StringVar(&linode.Options.DefaultNBType, "default-nodebalancer-type", string(linodego.NBTypeCommon), "default type of NodeBalancer to create (options: common, premium)")
 	command.Flags().StringSliceVar(&linode.Options.NodeBalancerTags, "nodebalancer-tags", []string{}, "Linode tags to apply to all NodeBalancers")
+	command.Flags().BoolVar(&linode.Options.UseIPv6ForLoadBalancers, "use-ipv6-for-loadbalancers", false, "use IPv6 addresses instead of IPv4 for all LoadBalancer services")
 
 	// Set static flags
 	command.Flags().VisitAll(func(fl *pflag.Flag) {

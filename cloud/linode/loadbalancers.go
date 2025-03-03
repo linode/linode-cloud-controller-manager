@@ -991,6 +991,10 @@ func makeLoadBalancerStatus(service *v1.Service, nb *linodego.NodeBalancer) *v1.
 	if !getServiceBoolAnnotation(service, annotations.AnnLinodeHostnameOnlyIngress) {
 		if val := envBoolOptions("LINODE_HOSTNAME_ONLY_INGRESS"); val {
 			klog.Infof("LINODE_HOSTNAME_ONLY_INGRESS:  (%v)", val)
+		} else if Options.UseIPv6ForLoadBalancers && nb.IPv6 != nil && *nb.IPv6 != "" {
+			// Use IPv6 address if the flag is set and IPv6 is available
+			ingress.IP = *nb.IPv6
+			klog.V(2).Infof("Using IPv6 address for NodeBalancer (%d): %s", nb.ID, *nb.IPv6)
 		} else {
 			ingress.IP = *nb.IPv4
 		}
