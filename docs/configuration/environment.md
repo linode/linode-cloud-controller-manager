@@ -44,7 +44,7 @@ The CCM supports the following flags:
 | `--ip-holder-suffix` | `""` | Suffix to append to the IP holder name when using shared IP fail-over with BGP |
 | `--default-nodebalancer-type` | `common` | Default type of NodeBalancer to create (options: common, premium) |
 | `--nodebalancer-tags` | `[]` | Linode tags to apply to all NodeBalancers |
-| `--use-ipv6-for-loadbalancers` | `false` | Use IPv6 addresses instead of IPv4 for all LoadBalancer services |
+| `--use-ipv6-for-loadbalancers` | `false` | Set both IPv4 and IPv6 addresses for all LoadBalancer services (when disabled, only IPv4 is used) |
 
 ## Configuration Methods
 

@@ -3116,10 +3116,16 @@ func testMakeLoadBalancerStatusWithIPv6(t *testing.T, client *linodego.Client, _
 	// Test with UseIPv6ForLoadBalancers = true
 	Options.UseIPv6ForLoadBalancers = true
 	expectedStatus = &v1.LoadBalancerStatus{
-		Ingress: []v1.LoadBalancerIngress{{
-			Hostname: hostname,
-			IP:       ipv6,
-		}},
+		Ingress: []v1.LoadBalancerIngress{
+			{
+				Hostname: hostname,
+				IP:       ipv4,
+			},
+			{
+				Hostname: hostname,
+				IP:       ipv6,
+			},
+		},
 	}
 	status = makeLoadBalancerStatus(svc, nb)
 	if !reflect.DeepEqual(status, expectedStatus) {
