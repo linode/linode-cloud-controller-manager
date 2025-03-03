@@ -11,9 +11,10 @@ import (
 	"os"
 	"time"
 
-	_ "github.com/hexdigest/gowrap"
 	"github.com/linode/linodego"
 	"k8s.io/klog/v2"
+
+	_ "github.com/hexdigest/gowrap"
 )
 
 const (

@@ -10,12 +10,13 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 	"github.com/linode/linodego"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cloudprovider "k8s.io/cloud-provider"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 )
 
 func nodeWithProviderID(providerID string) *v1.Node {
@@ -94,7 +95,7 @@ func TestMetadataRetrieval(t *testing.T) {
 		node := nodeWithName(name)
 
 		meta, err := instances.InstanceMetadata(ctx, node)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, providerIDPrefix+strconv.Itoa(expectedInstance.ID), meta.ProviderID)
 	})
 
@@ -352,7 +353,7 @@ func TestMetadataRetrieval(t *testing.T) {
 
 			meta, err := instances.InstanceMetadata(ctx, node)
 
-			assert.Equal(t, err, test.expectedErr)
+			assert.Equal(t, test.expectedErr, err)
 			if test.expectedErr == nil {
 				assert.Equal(t, region, meta.Region)
 				assert.Equal(t, linodeType, meta.InstanceType)
@@ -420,9 +421,9 @@ func TestMetadataRetrieval(t *testing.T) {
 				meta, err := instances.InstanceMetadata(ctx, &node)
 				if test.expectedErr != nil {
 					assert.Nil(t, meta)
-					assert.Equal(t, err, test.expectedErr)
+					assert.Equal(t, test.expectedErr, err)
 				} else {
-					assert.Nil(t, err)
+					assert.NoError(t, err)
 					assert.Equal(t, providerIDPrefix+strconv.Itoa(expectedInstance.ID), meta.ProviderID)
 				}
 			})

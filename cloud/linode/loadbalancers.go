@@ -402,7 +402,7 @@ func (l *loadbalancers) updateNodeBalancer(
 			currentNBCfg, err = l.client.CreateNodeBalancerConfig(ctx, nb.ID, createOpts)
 			if err != nil {
 				sentry.CaptureError(ctx, err)
-				return fmt.Errorf("[port %d] error creating NodeBalancer config: %v", int(port.Port), err)
+				return fmt.Errorf("[port %d] error creating NodeBalancer config: %w", int(port.Port), err)
 			}
 			rebuildOpts = currentNBCfg.GetRebuildOptions()
 
@@ -418,7 +418,7 @@ func (l *loadbalancers) updateNodeBalancer(
 
 		if _, err = l.client.RebuildNodeBalancerConfig(ctx, nb.ID, currentNBCfg.ID, rebuildOpts); err != nil {
 			sentry.CaptureError(ctx, err)
-			return fmt.Errorf("[port %d] error rebuilding NodeBalancer config: %v", int(port.Port), err)
+			return fmt.Errorf("[port %d] error rebuilding NodeBalancer config: %w", int(port.Port), err)
 		}
 	}
 
@@ -455,7 +455,7 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 	serviceWithStatus := service.DeepCopy()
 	serviceWithStatus.Status.LoadBalancer, err = l.getLatestServiceLoadBalancerStatus(ctx, service)
 	if err != nil {
-		return fmt.Errorf("failed to get latest LoadBalancer status for service (%s): %s", getServiceNn(service), err)
+		return fmt.Errorf("failed to get latest LoadBalancer status for service (%s): %w", getServiceNn(service), err)
 	}
 
 	nb, err := l.getNodeBalancerForService(ctx, serviceWithStatus)

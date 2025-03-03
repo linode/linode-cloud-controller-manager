@@ -5,8 +5,9 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 	"github.com/linode/linodego"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 )
 
 func TestHealthCheck(t *testing.T) {

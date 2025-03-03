@@ -9,9 +9,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 	"github.com/linode/linodego"
 	"k8s.io/klog/v2"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 )
 
 var (
