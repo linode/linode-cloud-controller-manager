@@ -97,6 +97,9 @@ spec:
             {{- if .Values.allowUnauthorizedMetrics }}
             - --authorization-always-allow-paths="/metrics"
             {{- end }}
+            {{- if .Values.defaultNBType }}
+            - --default-nodebalancer-type={{ .Values.defaultNBType }}
+            {{- end }}
           {{- with .Values.containerSecurityContext }}
           securityContext:
           {{- toYaml . | nindent 12 }}

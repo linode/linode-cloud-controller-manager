@@ -47,6 +47,7 @@ var Options struct {
 	IpHolderSuffix        string
 	LinodeExternalNetwork *net.IPNet
 	NodeBalancerTags      []string
+	DefaultNBType         string
 	GlobalStopChannel     chan<- struct{}
 }
 

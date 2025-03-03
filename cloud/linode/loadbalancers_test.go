@@ -17,6 +17,7 @@ import (
 	"strings"
 	"testing"
 
+	ciliumclient "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/typed/cilium.io/v2alpha1"
 	"github.com/linode/linodego"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/firewall"
 )
 
@@ -3673,5 +3675,103 @@ func Test_LoadbalNodeNameCoercion(t *testing.T) {
 		if out := coerceString(tc.nodeName, 3, 32, tc.padding); out != tc.expectedOutput {
 			t.Fatalf("Expected loadbal backend name to be %s (got: %s)", tc.expectedOutput, out)
 		}
+	}
+}
+
+func Test_loadbalancers_GetLinodeNBType(t *testing.T) {
+	type fields struct {
+		client           client.Client
+		zone             string
+		kubeClient       kubernetes.Interface
+		ciliumClient     ciliumclient.CiliumV2alpha1Interface
+		loadBalancerType string
+	}
+	type args struct {
+		service *v1.Service
+	}
+	tests := []struct {
+		name      string
+		fields    fields
+		args      args
+		defaultNB linodego.NodeBalancerPlanType
+		want      linodego.NodeBalancerPlanType
+	}{
+		{
+			name: "No annotation in service and common as default",
+			fields: fields{
+				client:           nil,
+				zone:             "",
+				kubeClient:       nil,
+				ciliumClient:     nil,
+				loadBalancerType: "nodebalancer",
+			},
+			args: args{
+				service: &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "test",
+						Annotations: map[string]string{},
+					},
+				},
+			},
+			defaultNB: linodego.NBTypeCommon,
+			want:      linodego.NBTypeCommon,
+		},
+		{
+			name: "No annotation in service and premium as default",
+			fields: fields{
+				client:           nil,
+				zone:             "",
+				kubeClient:       nil,
+				ciliumClient:     nil,
+				loadBalancerType: "nodebalancer",
+			},
+			args: args{
+				service: &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "test",
+						Annotations: map[string]string{},
+					},
+				},
+			},
+			defaultNB: linodego.NBTypePremium,
+			want:      linodego.NBTypePremium,
+		},
+		{
+			name: "Nodebalancer type annotation in service",
+			fields: fields{
+				client:           nil,
+				zone:             "",
+				kubeClient:       nil,
+				ciliumClient:     nil,
+				loadBalancerType: "nodebalancer",
+			},
+			args: args{
+				service: &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test",
+						Annotations: map[string]string{
+							annotations.AnnLinodeNodeBalancerType: string(linodego.NBTypePremium),
+						},
+					},
+				},
+			},
+			defaultNB: linodego.NBTypeCommon,
+			want:      linodego.NBTypePremium,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			l := &loadbalancers{
+				client:           tt.fields.client,
+				zone:             tt.fields.zone,
+				kubeClient:       tt.fields.kubeClient,
+				ciliumClient:     tt.fields.ciliumClient,
+				loadBalancerType: tt.fields.loadBalancerType,
+			}
+			Options.DefaultNBType = string(tt.defaultNB)
+			if got := l.GetLinodeNBType(tt.args.service); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("loadbalancers.GetLinodeNBType() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

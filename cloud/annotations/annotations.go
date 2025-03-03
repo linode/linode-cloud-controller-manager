@@ -23,6 +23,7 @@ const (
 
 	AnnLinodeLoadBalancerPreserve = "service.beta.kubernetes.io/linode-loadbalancer-preserve"
 	AnnLinodeNodeBalancerID       = "service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"
+	AnnLinodeNodeBalancerType     = "service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-type"
 
 	AnnLinodeHostnameOnlyIngress = "service.beta.kubernetes.io/linode-loadbalancer-hostname-only-ingress"
 	AnnLinodeLoadBalancerTags    = "service.beta.kubernetes.io/linode-loadbalancer-tags"
