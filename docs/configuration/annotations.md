@@ -33,6 +33,7 @@ For implementation details, see:
 | `firewall-id` | string | | An existing Cloud Firewall ID to be attached to the NodeBalancer instance. See [Firewall Setup](firewall.md) |
 | `firewall-acl` | string | | The Firewall rules to be applied to the NodeBalancer. See [Firewall Configuration](#firewall-configuration) |
 | `nodebalancer-type` | string | | The type of NodeBalancer to create (options: common, premium). See [NodeBalancer Types](#nodebalancer-type) |
+| `enable-ipv6-ingress` | bool | `false` | When `true`, both IPv4 and IPv6 addresses will be included in the LoadBalancerStatus ingress |
 
 ### Port Specific Configuration
 
@@ -111,6 +112,13 @@ Linode supports nodebalancers of different types: common and premium. By default
 metadata:
   annotations:
     service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-type: premium
+```
+
+### Service with IPv6 Address
+```yaml
+metadata:
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-ingress: "true"
 ```
 
 For more examples and detailed configuration options, see:

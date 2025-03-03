@@ -32,7 +32,15 @@ spec:
             - --use-ipv6-for-loadbalancers
 ```
 
-When this flag is set, all LoadBalancer services have both the IPv4 and IPv6 addresses of the NodeBalancer in their status, allowing clients to connect using either addresses. When the flag is not set, only IPv4 address will be set.
+Alternatively, you can enable IPv6 addresses for individual services using the annotation:
+
+```yaml
+metadata:
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-ingress: "true"
+```
+
+When IPv6 is enabled (either globally or per-service), both IPv4 and IPv6 addresses will be included in the service's LoadBalancer status.
 
 ### Basic Configuration
 

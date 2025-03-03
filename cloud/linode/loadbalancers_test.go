@@ -3132,6 +3132,18 @@ func testMakeLoadBalancerStatusWithIPv6(t *testing.T, client *linodego.Client, _
 		t.Errorf("expected status with UseIPv6ForLoadBalancers=true to be %#v; got %#v", expectedStatus, status)
 	}
 
+	// Test with per-service annotation
+	// Reset the global flag to false and set the annotation
+	Options.UseIPv6ForLoadBalancers = false
+	svc.Annotations[annotations.AnnLinodeEnableIPv6Ingress] = "true"
+
+	// Expect the same result as when the global flag is enabled
+	status = makeLoadBalancerStatus(svc, nb)
+	if !reflect.DeepEqual(status, expectedStatus) {
+		t.Errorf("expected status with %s=true annotation to be %#v; got %#v",
+			annotations.AnnLinodeEnableIPv6Ingress, expectedStatus, status)
+	}
+
 	// Reset the flag to its default value
 	Options.UseIPv6ForLoadBalancers = false
 }
