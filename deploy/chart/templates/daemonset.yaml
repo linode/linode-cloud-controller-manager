@@ -103,6 +103,9 @@ spec:
             {{- if .Values.enableIPv6ForLoadBalancers }}
             - --enable-ipv6-for-loadbalancers={{ .Values.enableIPv6ForLoadBalancers }}
             {{- end }}
+            {{- if .Values.nodeBalancerBackendIPv4Subnet }}
+            - --nodebalancer-backend-ipv4-subnet={{ .Values.nodeBalancerBackendIPv4Subnet }}
+            {{- end }}
           {{- with .Values.containerSecurityContext }}
           securityContext:
           {{- toYaml . | nindent 12 }}
