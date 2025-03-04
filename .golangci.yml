@@ -102,8 +102,7 @@ linters:
     - staticcheck
     - typecheck
     - unused
-    # cherry picked from https://golangci-lint.run/usage/linters/
-    - ginkgolinter # to be enabled once #158 is merged
+    - ginkgolinter 
     - asasalint
     - asciicheck
     - bidichk
