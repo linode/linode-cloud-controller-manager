@@ -1,0 +1,75 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: lb-with-vpc-backends
+  labels:
+    all:
+spec:
+  namespace: "lb-with-vpc-backends"
+  steps:
+    - name: Create pods and services
+      try:
+        - apply:
+            file: create-pods-services.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check endpoints exist
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Endpoints
+            metadata:
+              name: svc-test
+            (subsets[0].addresses != null): true
+            (subsets[0].ports != null): true
+    - name: Check that loadbalancer ip is assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test
+            status:
+              (loadBalancer.ingress[0].ip != null): true
+    - name: Check NodeBalancerConfig for backend ips
+      try:
+        - script:
+            content: |
+              set -e
+
+              nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+
+              nbconfig=$(curl -s \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                "https://api.linode.com/v4/nodebalancers/$nbid/configs")
+
+              config_id=$(echo $nbconfig | jq -r '.data[] | select(.port == 80) | .id')
+
+              # Get nodes from the config
+              nodes=$(curl -s \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                "https://api.linode.com/v4/nodebalancers/$nbid/configs/$config_id/nodes")
+
+              # Extract all addresses and remove ports
+              addresses=$(echo "$json_data" | jq -r '.data[].address' | sed 's/:[0-9]*$//')
+
+              for ip in $addresses; do
+                  if [[ $ip =~ ^10\.0\.0\.[0-9]+$ ]]; then
+                      echo "$ip is in the 10.0.0.0/8 subnet"
+                  else
+                      echo "$ip is NOT in the 10.0.0.0/8 subnet"
+                  fi
+              done
+            check:
+              ($error): ~
+              (contains($stdout, 'is NOT in the 10.0.0.0/8 subnet')): false

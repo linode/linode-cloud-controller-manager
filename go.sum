@@ -201,8 +201,8 @@ github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0
 github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de h1:9TO3cAIGXtEhnIaL+V+BEER86oLrvS+kWobKpbJuye0=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de/go.mod h1:zAbeS9B/r2mtpb6U+EI2rYA5OAXxsYw6wTamcNW+zcE=
-github.com/linode/linodego v1.47.1-0.20250228182220-41a199a7ed93 h1:ZhHBbs+z/HISVA3vuP6tpUiqh87ycU5ztSUqB+nJHl0=
-github.com/linode/linodego v1.47.1-0.20250228182220-41a199a7ed93/go.mod h1:k/lRz48xUtGaeVYyvF2X2iNxMpt8JJ+DR4I77R8I1Vg=
+github.com/linode/linodego v1.48.0 h1:Xn00rWYSpK5arNEFwymW58jpsdnK8axxhwS/9+cFkQ0=
+github.com/linode/linodego v1.48.0/go.mod h1:k/lRz48xUtGaeVYyvF2X2iNxMpt8JJ+DR4I77R8I1Vg=
 github.com/mackerelio/go-osstat v0.2.5 h1:+MqTbZUhoIt4m8qzkVoXUJg1EuifwlAJSk4Yl2GXh+o=
 github.com/mackerelio/go-osstat v0.2.5/go.mod h1:atxwWF+POUZcdtR1wnsUcQxTytoHG4uhl2AKKzrOajY=
 github.com/magiconair/properties v1.8.9 h1:nWcCbLq1N2v/cpNsy5WvQ37Fb+YElfq20WJ/a8RkpQM=

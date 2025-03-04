@@ -153,6 +153,14 @@ func TestCCMLoadBalancers(t *testing.T) {
 			f:    testCreateNodeBalanceWithNoAllowOrDenyList,
 		},
 		{
+			name: "Create Load Balancer With VPC Backend",
+			f:    testCreateNodeBalancerWithVPCBackend,
+		},
+		{
+			name: "Create Load Balancer With VPC Backend - Overwrite VPC Name and Subnet with Annotation",
+			f:    testCreateNodeBalancerWithVPCAnnotationOverwrite,
+		},
+		{
 			name: "Create Load Balancer With Global Tags set",
 			f:    testCreateNodeBalancerWithGlobalTags,
 		},
@@ -480,6 +488,86 @@ func testCreateNodeBalancerWithGlobalTags(t *testing.T, client *linodego.Client,
 	Options.NodeBalancerTags = []string{"foobar"}
 	expectedTags := []string{"linodelb", "foobar", "fake", "test", "yolo"}
 	err := testCreateNodeBalancer(t, client, f, nil, expectedTags)
+	if err != nil {
+		t.Fatalf("expected a nil error, got %v", err)
+	}
+}
+
+func testCreateNodeBalancerWithVPCBackend(t *testing.T, client *linodego.Client, f *fakeAPI) {
+	// test when no VPCs are present
+	ann := map[string]string{
+		annotations.NodeBalancerBackendIPv4Range: "10.100.0.0/30",
+	}
+	if err := testCreateNodeBalancer(t, client, f, ann, nil); err == nil {
+		t.Fatalf("expected nodebalancer creation to fail")
+	}
+
+	f.ResetRequests()
+
+	// provision vpc and test again
+	vpcNames := Options.VPCNames
+	subnetNames := Options.SubnetNames
+	defer func() {
+		Options.VPCNames = vpcNames
+		Options.SubnetNames = subnetNames
+	}()
+	Options.VPCNames = "test1"
+	Options.SubnetNames = "default"
+	_, _ = client.CreateVPC(context.TODO(), linodego.VPCCreateOptions{
+		Label:       "test1",
+		Description: "",
+		Region:      "us-west",
+		Subnets: []linodego.VPCSubnetCreateOptions{
+			{
+				Label: "default",
+				IPv4:  "10.0.0.0/8",
+			},
+		},
+	})
+
+	err := testCreateNodeBalancer(t, client, f, ann, nil)
+	if err != nil {
+		t.Fatalf("expected a nil error, got %v", err)
+	}
+}
+
+func testCreateNodeBalancerWithVPCAnnotationOverwrite(t *testing.T, client *linodego.Client, f *fakeAPI) {
+	// provision multiple vpcs
+	vpcNames := Options.VPCNames
+	defer func() {
+		Options.VPCNames = vpcNames
+	}()
+	Options.VPCNames = "test1"
+
+	_, _ = client.CreateVPC(context.TODO(), linodego.VPCCreateOptions{
+		Label:       "test1",
+		Description: "",
+		Region:      "us-west",
+		Subnets: []linodego.VPCSubnetCreateOptions{
+			{
+				Label: "default",
+				IPv4:  "10.0.0.0/8",
+			},
+		},
+	})
+
+	_, _ = client.CreateVPC(context.TODO(), linodego.VPCCreateOptions{
+		Label:       "test2",
+		Description: "",
+		Region:      "us-west",
+		Subnets: []linodego.VPCSubnetCreateOptions{
+			{
+				Label: "subnet1",
+				IPv4:  "10.0.0.0/8",
+			},
+		},
+	})
+	ann := map[string]string{
+		annotations.NodeBalancerBackendIPv4Range:  "10.100.0.0/30",
+		annotations.NodeBalancerBackendVPCName:    "test2",
+		annotations.NodeBalancerBackendSubnetName: "subnet1",
+	}
+	err := testCreateNodeBalancer(t, client, f, ann, nil)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
@@ -2641,9 +2729,10 @@ func Test_getHealthCheckType(t *testing.T) {
 
 func Test_getNodePrivateIP(t *testing.T) {
 	testcases := []struct {
-		name    string
-		node    *v1.Node
-		address string
+		name     string
+		node     *v1.Node
+		address  string
+		subnetID int
 	}{
 		{
 			"node internal ip specified",
@@ -2658,6 +2747,7 @@ func Test_getNodePrivateIP(t *testing.T) {
 				},
 			},
 			"127.0.0.1",
+			0,
 		},
 		{
 			"node internal ip not specified",
@@ -2672,6 +2762,7 @@ func Test_getNodePrivateIP(t *testing.T) {
 				},
 			},
 			"",
+			0,
 		},
 		{
 			"node internal ip annotation present",
@@ -2691,12 +2782,33 @@ func Test_getNodePrivateIP(t *testing.T) {
 				},
 			},
 			"192.168.42.42",
+			0,
+		},
+		{
+			"node internal ip annotation present and subnet id is not zero",
+			&v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotations.AnnLinodeNodePrivateIP: "192.168.42.42",
+					},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.1.1",
+						},
+					},
+				},
+			},
+			"10.0.1.1",
+			100,
 		},
 	}
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
-			ip := getNodePrivateIP(test.node)
+			ip := getNodePrivateIP(test.node, test.subnetID)
 			if ip != test.address {
 				t.Error("unexpected certificate")
 				t.Logf("expected: %q", test.address)
