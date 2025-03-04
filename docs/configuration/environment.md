@@ -44,6 +44,7 @@ The CCM supports the following flags:
 | `--ip-holder-suffix` | `""` | Suffix to append to the IP holder name when using shared IP fail-over with BGP |
 | `--default-nodebalancer-type` | `common` | Default type of NodeBalancer to create (options: common, premium) |
 | `--nodebalancer-tags` | `[]` | Linode tags to apply to all NodeBalancers |
+| `--nodebalancer-backend-ipv4-subnet` | `""` | ipv4 subnet to use for NodeBalancer backends |
 | `--enable-ipv6-for-loadbalancers` | `false` | Set both IPv4 and IPv6 addresses for all LoadBalancer services (when disabled, only IPv4 is used). This can also be configured per-service using the `service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-ingress` annotation. |
 
 ## Configuration Methods
