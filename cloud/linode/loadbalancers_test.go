@@ -153,6 +153,18 @@ func TestCCMLoadBalancers(t *testing.T) {
 			f:    testCreateNodeBalanceWithNoAllowOrDenyList,
 		},
 		{
+			name: "Create Load Balancer With VPC Backend",
+			f:    testCreateNodeBalancerWithVPCBackend,
+		},
+		{
+			name: "Update Load Balancer With VPC Backend",
+			f:    testUpdateNodeBalancerWithVPCBackend,
+		},
+		{
+			name: "Create Load Balancer With VPC Backend - Overwrite VPC Name and Subnet with Annotation",
+			f:    testCreateNodeBalancerWithVPCAnnotationOverwrite,
+		},
+		{
 			name: "Create Load Balancer With Global Tags set",
 			f:    testCreateNodeBalancerWithGlobalTags,
 		},
@@ -247,6 +259,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 		{
 			name: "makeLoadBalancerStatus",
 			f:    testMakeLoadBalancerStatus,
+		},
+		{
+			name: "makeLoadBalancerStatusWithIPv6",
+			f:    testMakeLoadBalancerStatusWithIPv6,
 		},
 		{
 			name: "makeLoadBalancerStatusEnvVar",
@@ -476,6 +492,181 @@ func testCreateNodeBalancerWithGlobalTags(t *testing.T, client *linodego.Client,
 	Options.NodeBalancerTags = []string{"foobar"}
 	expectedTags := []string{"linodelb", "foobar", "fake", "test", "yolo"}
 	err := testCreateNodeBalancer(t, client, f, nil, expectedTags)
+	if err != nil {
+		t.Fatalf("expected a nil error, got %v", err)
+	}
+}
+
+func testCreateNodeBalancerWithVPCBackend(t *testing.T, client *linodego.Client, f *fakeAPI) {
+	// test when no VPCs are present
+	ann := map[string]string{
+		annotations.NodeBalancerBackendIPv4Range: "10.100.0.0/30",
+	}
+	if err := testCreateNodeBalancer(t, client, f, ann, nil); err == nil {
+		t.Fatalf("expected nodebalancer creation to fail")
+	}
+
+	f.ResetRequests()
+
+	// provision vpc and test again
+	vpcNames := Options.VPCNames
+	subnetNames := Options.SubnetNames
+	defer func() {
+		Options.VPCNames = vpcNames
+		Options.SubnetNames = subnetNames
+	}()
+	Options.VPCNames = "test1"
+	Options.SubnetNames = "default"
+	_, _ = client.CreateVPC(context.TODO(), linodego.VPCCreateOptions{
+		Label:       "test1",
+		Description: "",
+		Region:      "us-west",
+		Subnets: []linodego.VPCSubnetCreateOptions{
+			{
+				Label: "default",
+				IPv4:  "10.0.0.0/8",
+			},
+		},
+	})
+
+	err := testCreateNodeBalancer(t, client, f, ann, nil)
+	if err != nil {
+		t.Fatalf("expected a nil error, got %v", err)
+	}
+
+	f.ResetRequests()
+
+	// test with IPv4Range outside of defined NodeBalancer subnet
+	nodebalancerBackendIPv4Subnet := Options.NodeBalancerBackendIPv4Subnet
+	defer func() {
+		Options.NodeBalancerBackendIPv4Subnet = nodebalancerBackendIPv4Subnet
+	}()
+	Options.NodeBalancerBackendIPv4Subnet = "10.99.0.0/24"
+	if err := testCreateNodeBalancer(t, client, f, ann, nil); err == nil {
+		t.Fatalf("expected nodebalancer creation to fail")
+	}
+}
+
+func testUpdateNodeBalancerWithVPCBackend(t *testing.T, client *linodego.Client, f *fakeAPI) {
+	// provision vpc and test
+	vpcNames := Options.VPCNames
+	subnetNames := Options.SubnetNames
+	defer func() {
+		Options.VPCNames = vpcNames
+		Options.SubnetNames = subnetNames
+	}()
+	Options.VPCNames = "test1"
+	Options.SubnetNames = "default"
+	_, _ = client.CreateVPC(context.TODO(), linodego.VPCCreateOptions{
+		Label:       "test1",
+		Description: "",
+		Region:      "us-west",
+		Subnets: []linodego.VPCSubnetCreateOptions{
+			{
+				Label: "default",
+				IPv4:  "10.0.0.0/8",
+			},
+		},
+	})
+
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: randString(),
+			UID:  "foobar123",
+			Annotations: map[string]string{
+				annotations.NodeBalancerBackendIPv4Range: "10.100.0.0/30",
+			},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     randString(),
+					Protocol: "TCP",
+					Port:     int32(80),
+					NodePort: int32(30000),
+				},
+			},
+		},
+	}
+
+	nodes := []*v1.Node{
+		{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+		},
+	}
+
+	lb := newLoadbalancers(client, "us-west").(*loadbalancers)
+	fakeClientset := fake.NewSimpleClientset()
+	lb.kubeClient = fakeClientset
+
+	defer func() {
+		_ = lb.EnsureLoadBalancerDeleted(context.TODO(), "linodelb", svc)
+	}()
+
+	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
+	}
+	svc.Status.LoadBalancer = *lbStatus
+
+	stubService(fakeClientset, svc)
+	svc.ObjectMeta.SetAnnotations(map[string]string{
+		annotations.NodeBalancerBackendIPv4Range: "10.100.1.0/30",
+	})
+
+	err = lb.UpdateLoadBalancer(context.TODO(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
+	}
+}
+
+func testCreateNodeBalancerWithVPCAnnotationOverwrite(t *testing.T, client *linodego.Client, f *fakeAPI) {
+	// provision multiple vpcs
+	vpcNames := Options.VPCNames
+	nodebalancerBackendIPv4Subnet := Options.NodeBalancerBackendIPv4Subnet
+	defer func() {
+		Options.VPCNames = vpcNames
+		Options.NodeBalancerBackendIPv4Subnet = nodebalancerBackendIPv4Subnet
+	}()
+	Options.VPCNames = "test1"
+	Options.NodeBalancerBackendIPv4Subnet = "10.100.0.0/24"
+
+	_, _ = client.CreateVPC(context.TODO(), linodego.VPCCreateOptions{
+		Label:       "test1",
+		Description: "",
+		Region:      "us-west",
+		Subnets: []linodego.VPCSubnetCreateOptions{
+			{
+				Label: "default",
+				IPv4:  "10.0.0.0/8",
+			},
+		},
+	})
+
+	_, _ = client.CreateVPC(context.TODO(), linodego.VPCCreateOptions{
+		Label:       "test2",
+		Description: "",
+		Region:      "us-west",
+		Subnets: []linodego.VPCSubnetCreateOptions{
+			{
+				Label: "subnet1",
+				IPv4:  "10.0.0.0/8",
+			},
+		},
+	})
+	ann := map[string]string{
+		annotations.NodeBalancerBackendIPv4Range:  "10.100.0.0/30",
+		annotations.NodeBalancerBackendVPCName:    "test2",
+		annotations.NodeBalancerBackendSubnetName: "subnet1",
+	}
+	err := testCreateNodeBalancer(t, client, f, ann, nil)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
@@ -2637,9 +2828,10 @@ func Test_getHealthCheckType(t *testing.T) {
 
 func Test_getNodePrivateIP(t *testing.T) {
 	testcases := []struct {
-		name    string
-		node    *v1.Node
-		address string
+		name     string
+		node     *v1.Node
+		address  string
+		subnetID int
 	}{
 		{
 			"node internal ip specified",
@@ -2654,6 +2846,7 @@ func Test_getNodePrivateIP(t *testing.T) {
 				},
 			},
 			"127.0.0.1",
+			0,
 		},
 		{
 			"node internal ip not specified",
@@ -2668,6 +2861,7 @@ func Test_getNodePrivateIP(t *testing.T) {
 				},
 			},
 			"",
+			0,
 		},
 		{
 			"node internal ip annotation present",
@@ -2687,12 +2881,33 @@ func Test_getNodePrivateIP(t *testing.T) {
 				},
 			},
 			"192.168.42.42",
+			0,
+		},
+		{
+			"node internal ip annotation present and subnet id is not zero",
+			&v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotations.AnnLinodeNodePrivateIP: "192.168.42.42",
+					},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.1.1",
+						},
+					},
+				},
+			},
+			"10.0.1.1",
+			100,
 		},
 	}
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
-			ip := getNodePrivateIP(test.node)
+			ip := getNodePrivateIP(test.node, test.subnetID)
 			if ip != test.address {
 				t.Error("unexpected certificate")
 				t.Logf("expected: %q", test.address)
@@ -3077,6 +3292,71 @@ func testMakeLoadBalancerStatus(t *testing.T, client *linodego.Client, _ *fakeAP
 	if !reflect.DeepEqual(status, expectedStatus) {
 		t.Errorf("expected status for %q annotated service to be %#v; got %#v", annotations.AnnLinodeHostnameOnlyIngress, expectedStatus, status)
 	}
+}
+
+func testMakeLoadBalancerStatusWithIPv6(t *testing.T, client *linodego.Client, _ *fakeAPI) {
+	ipv4 := "192.168.0.1"
+	ipv6 := "2600:3c00::f03c:91ff:fe24:3a2f"
+	hostname := "nb-192-168-0-1.newark.nodebalancer.linode.com"
+	nb := &linodego.NodeBalancer{
+		IPv4:     &ipv4,
+		IPv6:     &ipv6,
+		Hostname: &hostname,
+	}
+
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test",
+			Annotations: make(map[string]string, 1),
+		},
+	}
+
+	// Test with EnableIPv6ForLoadBalancers = false (default)
+	Options.EnableIPv6ForLoadBalancers = false
+	expectedStatus := &v1.LoadBalancerStatus{
+		Ingress: []v1.LoadBalancerIngress{{
+			Hostname: hostname,
+			IP:       ipv4,
+		}},
+	}
+	status := makeLoadBalancerStatus(svc, nb)
+	if !reflect.DeepEqual(status, expectedStatus) {
+		t.Errorf("expected status with EnableIPv6ForLoadBalancers=false to be %#v; got %#v", expectedStatus, status)
+	}
+
+	// Test with EnableIPv6ForLoadBalancers = true
+	Options.EnableIPv6ForLoadBalancers = true
+	expectedStatus = &v1.LoadBalancerStatus{
+		Ingress: []v1.LoadBalancerIngress{
+			{
+				Hostname: hostname,
+				IP:       ipv4,
+			},
+			{
+				Hostname: hostname,
+				IP:       ipv6,
+			},
+		},
+	}
+	status = makeLoadBalancerStatus(svc, nb)
+	if !reflect.DeepEqual(status, expectedStatus) {
+		t.Errorf("expected status with EnableIPv6ForLoadBalancers=true to be %#v; got %#v", expectedStatus, status)
+	}
+
+	// Test with per-service annotation
+	// Reset the global flag to false and set the annotation
+	Options.EnableIPv6ForLoadBalancers = false
+	svc.Annotations[annotations.AnnLinodeEnableIPv6Ingress] = "true"
+
+	// Expect the same result as when the global flag is enabled
+	status = makeLoadBalancerStatus(svc, nb)
+	if !reflect.DeepEqual(status, expectedStatus) {
+		t.Errorf("expected status with %s=true annotation to be %#v; got %#v",
+			annotations.AnnLinodeEnableIPv6Ingress, expectedStatus, status)
+	}
+
+	// Reset the flag to its default value
+	Options.EnableIPv6ForLoadBalancers = false
 }
 
 func testMakeLoadBalancerStatusEnvVar(t *testing.T, client *linodego.Client, _ *fakeAPI) {
@@ -3771,6 +4051,42 @@ func Test_loadbalancers_GetLinodeNBType(t *testing.T) {
 			Options.DefaultNBType = string(tt.defaultNB)
 			if got := l.GetLinodeNBType(tt.args.service); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("loadbalancers.GetLinodeNBType() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_validateNodeBalancerBackendIPv4Range(t *testing.T) {
+	type args struct {
+		backendIPv4Range string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name:    "Valid IPv4 range",
+			args:    args{backendIPv4Range: "10.100.0.0/30"},
+			wantErr: false,
+		},
+		{
+			name:    "Invalid IPv4 range",
+			args:    args{backendIPv4Range: "10.100.0.0"},
+			wantErr: true,
+		},
+	}
+
+	nbBackendSubnet := Options.NodeBalancerBackendIPv4Subnet
+	defer func() {
+		Options.NodeBalancerBackendIPv4Subnet = nbBackendSubnet
+	}()
+	Options.NodeBalancerBackendIPv4Subnet = "10.100.0.0/24"
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := validateNodeBalancerBackendIPv4Range(tt.args.backendIPv4Range); (err != nil) != tt.wantErr {
+				t.Errorf("validateNodeBalancerBackendIPv4Range() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

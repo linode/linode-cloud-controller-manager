@@ -30,8 +30,17 @@ const (
 	AnnLinodeCloudFirewallID     = "service.beta.kubernetes.io/linode-loadbalancer-firewall-id"
 	AnnLinodeCloudFirewallACL    = "service.beta.kubernetes.io/linode-loadbalancer-firewall-acl"
 
+	// AnnLinodeEnableIPv6Ingress is the annotation used to specify that a service should include both IPv4 and IPv6
+	// addresses for its LoadBalancer ingress. When set to "true", both addresses will be included in the status.
+	AnnLinodeEnableIPv6Ingress = "service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-ingress"
+
 	AnnLinodeNodePrivateIP = "node.k8s.linode.com/private-ip"
 	AnnLinodeHostUUID      = "node.k8s.linode.com/host-uuid"
 
 	AnnLinodeNodeIPSharingUpdated = "node.k8s.linode.com/ip-sharing-updated"
+
+	NodeBalancerBackendIPv4Range = "service.beta.kubernetes.io/linode-loadbalancer-backend-ipv4-range"
+
+	NodeBalancerBackendVPCName    = "service.beta.kubernetes.io/linode-loadbalancer-backend-vpc-name"
+	NodeBalancerBackendSubnetName = "service.beta.kubernetes.io/linode-loadbalancer-backend-subnet-name"
 )

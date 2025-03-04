@@ -1,10 +1,10 @@
-# Environment Variables
+# Environment Variables and Flags
 
 ## Overview
 
-Environment variables provide global configuration options for the CCM. These settings affect caching, API behavior, and networking configurations.
+The CCM can be configured using environment variables and flags. Environment variables provide global configuration options, while flags control specific features.
 
-## Available Variables
+## Environment Variables
 
 ### Cache Configuration
 
@@ -28,6 +28,25 @@ Environment variables provide global configuration options for the CCM. These se
 | `BGP_CUSTOM_ID_MAP` | "" | Use your own map instead of default region map for BGP |
 | `BGP_PEER_PREFIX` | `2600:3c0f` | Use your own BGP peer prefix instead of default one |
 
+## Flags
+
+The CCM supports the following flags:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--linodego-debug` | `false` | Enables debug output for the LinodeAPI wrapper |
+| `--enable-route-controller` | `false` | Enables route_controller for CCM |
+| `--enable-token-health-checker` | `false` | Enables Linode API token health checker |
+| `--vpc-names` | `""` | Comma separated VPC names whose routes will be managed by route-controller |
+| `--subnet-names` | `""` | Comma separated subnet names whose routes will be managed by route-controller (requires vpc-names flag) |
+| `--load-balancer-type` | `nodebalancer` | Configures which type of load-balancing to use (options: nodebalancer, cilium-bgp) |
+| `--bgp-node-selector` | `""` | Node selector to use to perform shared IP fail-over with BGP |
+| `--ip-holder-suffix` | `""` | Suffix to append to the IP holder name when using shared IP fail-over with BGP |
+| `--default-nodebalancer-type` | `common` | Default type of NodeBalancer to create (options: common, premium) |
+| `--nodebalancer-tags` | `[]` | Linode tags to apply to all NodeBalancers |
+| `--nodebalancer-backend-ipv4-subnet` | `""` | ipv4 subnet to use for NodeBalancer backends |
+| `--enable-ipv6-for-loadbalancers` | `false` | Set both IPv4 and IPv6 addresses for all LoadBalancer services (when disabled, only IPv4 is used). This can also be configured per-service using the `service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-ingress` annotation. |
+
 ## Configuration Methods
 
 ### Helm Chart
@@ -36,6 +55,9 @@ Configure via `values.yaml`:
 env:
   - name: LINODE_INSTANCE_CACHE_TTL
     value: "30"
+args:
+  - --enable-ipv6-for-loadbalancers
+  - --enable-route-controller
 ```
 
 ### Manual Deployment
@@ -49,6 +71,9 @@ spec:
           env:
             - name: LINODE_INSTANCE_CACHE_TTL
               value: "30"
+          args:
+            - --enable-ipv6-for-loadbalancers
+            - --enable-route-controller
 ```
 
 ## Usage Guidelines
