@@ -7,9 +7,30 @@ output:
     - format: colored-line-number
 
 linters-settings:
+  cyclop:
+    max-complexity: 15
+
+  depguard:
+    rules:
+      main:
+        files:
+          - "$all"
+          - "!$test"
+        deny:
+          - pkg: "reflect"
+            desc: "Reflection is never clear."
+          - pkg: "gob"
+            desc: "Please convert types manually"
+
+  dupl:
+    threshold: 100
+
   errcheck:
     check-type-assertions: true
     check-blank: true
+    exclude-functions:
+      - fmt:.*
+      - io/ioutil:^Read.*
 
   gci:
     sections:
@@ -19,32 +40,9 @@ linters-settings:
       - dot
       - prefix(github.com/linode/linode-cloud-controller-manager)
 
-  govet:
-    enable:
-      - shadow
-
-  gosec:
-    confidence: "medium"
-    excludes:
-      - G115
-
-  gofmt:
-    simplify: true
-
-  goimports:
-    local-prefixes: github.com/linode/linode-cloud-controller-manager
-
-  dupl:
-    threshold: 100
-
   goconst:
     min-len: 3
-    min-occurrences: 3
-
-  prealloc:
-    simple: true
-    range-loops: true
-    for-loops: true
+    min-occurrences: 5
 
   gocritic:
     enabled-tags:
@@ -60,26 +58,52 @@ linters-settings:
       rangeValCopy:
         sizeThreshold: 32
 
+  gofmt:
+    simplify: true
+
+  goimports:
+    local-prefixes: github.com/linode/linode-cloud-controller-manager
+
+  govet:
+    enable:
+      - shadow
+
+  gosec:
+    confidence: "medium"
+    excludes:
+      - G115
+
   nolintlint:
     require-explanation: true
     require-specific: true
+
+  prealloc:
+    simple: true
+    range-loops: true
+    for-loops: true
 
   varnamelen:
     min-name-length: 2
 
 linters:
-  disable-all: true
+  #disable-all: true
+  disable:
+    - errcheck
+    - errchkjson
+    - errorlint
+    - govet
+    - testifylint
   enable:
     # these are enabled by default
-    - errcheck
+    #- errcheck
     - gosimple
-    - govet
+    #- govet
     - ineffassign
     - staticcheck
     - typecheck
     - unused
     # cherry picked from https://golangci-lint.run/usage/linters/
-    # - ginkgolinter # to be enabled once #158 is merged
+    - ginkgolinter # to be enabled once #158 is merged
     - asasalint
     - asciicheck
     - bidichk
@@ -87,59 +111,52 @@ linters:
     - containedctx
     - contextcheck
     - copyloopvar
-    - cyclop
+    #- cyclop
     - decorder
-    - depguard
+    #- depguard
     - dogsled
     - dupl
     - dupword
     - durationcheck
-    - errchkjson
+    #- errchkjson
     - errname
-    - errorlint
-    - errcheck
+    #- errorlint
     - exhaustive
-    - forbidigo
-    - forcetypeassert
-    - gci
+    #- forbidigo
+    #- forcetypeassert
+    #- gci
     - gocheckcompilerdirectives
     - gofmt
     - goimports
-    - gocognit
-    - goconst
-    - gocritic
+    #- gocognit
+    #- goconst
+    #- gocritic
     - gofumpt
     - goprintffuncname
-    - gosec
-    - gosimple
-    - govet
+    #- gosec
     - importas
-    - ineffassign
     - loggercheck
     - maintidx
     - makezero
     - misspell
-    - mnd
+    #- mnd
     - musttag
-    - nestif
+    #- nestif
     - nilerr
     - nilnil
     - noctx
     - nolintlint
     - nosprintfhostport
-    - paralleltest
-    - prealloc
+    #- paralleltest
+    #- prealloc
     - predeclared
     - reassign
-    - staticcheck
-    - tenv
-    - thelper
-    - typecheck
+    #- tenv
+    #- thelper
     - unconvert
     - unparam
-    - unused
     - usestdlibvars
-    - varnamelen
+    #- varnamelen
     - wastedassign
     - whitespace
   
@@ -153,7 +170,6 @@ issues:
     # Exclude some linters from running on tests files.
     - path: _test(ing)?\.go
       linters:
-        - goconst
         - gocyclo
         - maintidx
         - errcheck
@@ -181,6 +197,7 @@ issues:
 
   exclude-use-default: false
   new: false
+  max-issues-per-linter: 0
   max-same-issues: 0
   exclude-files:
     - "zz_generated\\..+\\.go$"

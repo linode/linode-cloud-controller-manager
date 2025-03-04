@@ -288,7 +288,6 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	return lbStatus, nil
 }
 
-//nolint:funlen
 func (l *loadbalancers) updateNodeBalancer(
 	ctx context.Context,
 	clusterName string,
@@ -680,7 +679,6 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 	return l.client.CreateNodeBalancer(ctx, createOpts)
 }
 
-//nolint:funlen
 func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1.Service, port int) (linodego.NodeBalancerConfig, error) {
 	portConfig, err := getPortConfig(service, port)
 	if err != nil {
