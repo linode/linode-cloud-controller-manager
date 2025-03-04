@@ -1052,13 +1052,44 @@ func makeLoadBalancerStatus(service *v1.Service, nb *linodego.NodeBalancer) *v1.
 	ingress := v1.LoadBalancerIngress{
 		Hostname: *nb.Hostname,
 	}
-	if !getServiceBoolAnnotation(service, annotations.AnnLinodeHostnameOnlyIngress) {
-		if val := envBoolOptions("LINODE_HOSTNAME_ONLY_INGRESS"); val {
-			klog.Infof("LINODE_HOSTNAME_ONLY_INGRESS:  (%v)", val)
-		} else {
-			ingress.IP = *nb.IPv4
+
+	// Return hostname-only if annotation is set or environment variable is set
+	if getServiceBoolAnnotation(service, annotations.AnnLinodeHostnameOnlyIngress) {
+		return &v1.LoadBalancerStatus{
+			Ingress: []v1.LoadBalancerIngress{ingress},
 		}
 	}
+
+	if val := envBoolOptions("LINODE_HOSTNAME_ONLY_INGRESS"); val {
+		klog.Infof("LINODE_HOSTNAME_ONLY_INGRESS:  (%v)", val)
+		return &v1.LoadBalancerStatus{
+			Ingress: []v1.LoadBalancerIngress{ingress},
+		}
+	}
+
+	// Check for per-service IPv6 annotation first, then fall back to global setting
+	useIPv6 := getServiceBoolAnnotation(service, annotations.AnnLinodeEnableIPv6Ingress) || Options.EnableIPv6ForLoadBalancers
+
+	// When IPv6 is enabled (either per-service or globally), include both IPv4 and IPv6
+	if useIPv6 && nb.IPv6 != nil && *nb.IPv6 != "" {
+		ingresses := []v1.LoadBalancerIngress{
+			{
+				Hostname: *nb.Hostname,
+				IP:       *nb.IPv4,
+			},
+			{
+				Hostname: *nb.Hostname,
+				IP:       *nb.IPv6,
+			},
+		}
+		klog.V(4).Infof("Using both IPv4 and IPv6 addresses for NodeBalancer (%d): %s, %s", nb.ID, *nb.IPv4, *nb.IPv6)
+		return &v1.LoadBalancerStatus{
+			Ingress: ingresses,
+		}
+	}
+
+	// Default case - just use IPv4
+	ingress.IP = *nb.IPv4
 	return &v1.LoadBalancerStatus{
 		Ingress: []v1.LoadBalancerIngress{ingress},
 	}

@@ -86,6 +86,11 @@ tolerations:
 # Default NodeBalancer type to create("common" or "premium"). Default is "common"
 # defaultNBType: "common"
 
+# Enable IPv6 ingress addresses for LoadBalancer services
+# When enabled, both IPv4 and IPv6 addresses will be included in the LoadBalancer status for all services
+# This can also be controlled per-service using the "service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-ingress" annotation
+# enableIPv6ForLoadBalancers: true
+
 # This section adds the ability to pass environment variables to adjust CCM defaults
 # https://github.com/linode/linode-cloud-controller-manager/blob/master/cloud/linode/loadbalancers.go
 # LINODE_HOSTNAME_ONLY_INGRESS type bool is supported

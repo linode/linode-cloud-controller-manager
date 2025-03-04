@@ -18,6 +18,32 @@ When using NodeBalancers, the CCM automatically:
 
 For more details, see [Linode NodeBalancer Documentation](https://www.linode.com/docs/products/networking/nodebalancers/).
 
+### IPv6 Support
+
+NodeBalancers support both IPv4 and IPv6 ingress addresses. By default, the CCM uses only IPv4 address for LoadBalancer services. 
+
+You can enable IPv6 addresses globally for all services by setting the `enable-ipv6-for-loadbalancers` flag:
+
+```yaml
+spec:
+  template:
+    spec:
+      containers:
+        - name: ccm-linode
+          args:
+            - --enable-ipv6-for-loadbalancers=true
+```
+
+Alternatively, you can enable IPv6 addresses for individual services using the annotation:
+
+```yaml
+metadata:
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-ingress: "true"
+```
+
+When IPv6 is enabled (either globally or per-service), both IPv4 and IPv6 addresses will be included in the service's LoadBalancer status.
+
 ### Basic Configuration
 
 Create a LoadBalancer service:
@@ -219,7 +245,7 @@ metadata:
 - [Service Annotations](annotations.md)
 - [Firewall Configuration](firewall.md)
 - [Session Affinity](session-affinity.md)
-- [Environment Variables](environment.md)
+- [Environment Variables and Flags](environment.md)
 - [Route Configuration](routes.md)
 - [Linode NodeBalancer Documentation](https://www.linode.com/docs/products/networking/nodebalancers/)
 - [Cilium BGP Documentation](https://docs.cilium.io/en/stable/network/bgp-control-plane/bgp-control-plane/)
