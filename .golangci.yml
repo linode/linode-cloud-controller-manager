@@ -153,6 +153,7 @@ issues:
     # Exclude some linters from running on tests files.
     - path: _test(ing)?\.go
       linters:
+        - goconst
         - gocyclo
         - maintidx
         - errcheck

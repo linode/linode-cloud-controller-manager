@@ -17,6 +17,8 @@ import (
 
 var retryInterval = time.Minute * 1
 
+const specType = "LoadBalancer"
+
 type serviceController struct {
 	loadbalancers *loadbalancers
 	informer      v1informers.ServiceInformer
@@ -40,7 +42,7 @@ func (s *serviceController) Run(stopCh <-chan struct{}) {
 				return
 			}
 
-			if service.Spec.Type != "LoadBalancer" {
+			if service.Spec.Type != specType {
 				return
 			}
 
@@ -57,7 +59,7 @@ func (s *serviceController) Run(stopCh <-chan struct{}) {
 				return
 			}
 
-			if newSvc.Spec.Type != "LoadBalancer" && oldSvc.Spec.Type == "LoadBalancer" {
+			if newSvc.Spec.Type != specType && oldSvc.Spec.Type == specType {
 				klog.Infof("ServiceController will handle service (%s) LoadBalancer deletion", getServiceNn(oldSvc))
 				s.queue.Add(oldSvc)
 			}
