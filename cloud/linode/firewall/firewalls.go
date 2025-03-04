@@ -8,9 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"golang.org/x/exp/slices"
-
 	"github.com/linode/linodego"
+	"golang.org/x/exp/slices"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
@@ -23,6 +22,8 @@ const (
 	maxFirewallRuleDescLen  = 100
 	maxIPsPerFirewall       = 255
 	maxRulesPerFirewall     = 25
+	accept                  = "ACCEPT"
+	drop                    = "DROP"
 )
 
 var (
@@ -135,7 +136,7 @@ func ruleChanged(old linodego.FirewallRuleSet, newACL aclConfig) bool {
 	var ips *linodego.NetworkAddresses
 	if newACL.AllowList != nil {
 		// this is a allowList, this means that the rules should have `DROP` as inboundpolicy
-		if old.InboundPolicy != "DROP" {
+		if old.InboundPolicy != drop {
 			return true
 		}
 		if (newACL.AllowList.IPv4 != nil || newACL.AllowList.IPv6 != nil) && len(old.Inbound) == 0 {
@@ -145,7 +146,7 @@ func ruleChanged(old linodego.FirewallRuleSet, newACL aclConfig) bool {
 	}
 
 	if newACL.DenyList != nil {
-		if old.InboundPolicy != "ACCEPT" {
+		if old.InboundPolicy != accept {
 			return true
 		}
 
@@ -252,13 +253,13 @@ func processACL(fwcreateOpts *linodego.FirewallCreateOptions, aclType, label, sv
 		})
 	}
 
-	fwcreateOpts.Rules.OutboundPolicy = "ACCEPT"
-	if aclType == "ACCEPT" {
+	fwcreateOpts.Rules.OutboundPolicy = accept
+	if aclType == accept {
 		// if an allowlist is present, we drop everything else.
-		fwcreateOpts.Rules.InboundPolicy = "DROP"
+		fwcreateOpts.Rules.InboundPolicy = drop
 	} else {
 		// if a denylist is present, we accept everything else.
-		fwcreateOpts.Rules.InboundPolicy = "ACCEPT"
+		fwcreateOpts.Rules.InboundPolicy = accept
 	}
 
 	if len(fwcreateOpts.Rules.Inbound) > maxRulesPerFirewall {
@@ -494,7 +495,7 @@ func CreateFirewallOptsForSvc(label string, tags []string, svc *v1.Service) (*li
 		servicePorts = append(servicePorts, strconv.Itoa(int(port.Port)))
 	}
 
-	portsString := strings.Join(servicePorts[:], ",")
+	portsString := strings.Join(servicePorts, ",")
 	var acl aclConfig
 	if err := json.Unmarshal([]byte(aclString), &acl); err != nil {
 		return nil, err
@@ -504,10 +505,10 @@ func CreateFirewallOptsForSvc(label string, tags []string, svc *v1.Service) (*li
 		return nil, ErrInvalidFWConfig
 	}
 
-	aclType := "ACCEPT"
+	aclType := accept
 	allowedIPs := acl.AllowList
 	if acl.DenyList != nil {
-		aclType = "DROP"
+		aclType = drop
 		allowedIPs = acl.DenyList
 	}
 

@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 	"github.com/linode/linodego"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
@@ -18,6 +16,9 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/util/workqueue"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 )
 
 func TestNodeController_Run(t *testing.T) {

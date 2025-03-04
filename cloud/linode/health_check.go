@@ -4,9 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 )
 
 type healthChecker struct {

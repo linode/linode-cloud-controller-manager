@@ -10,11 +10,12 @@ import (
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
 	fakev2alpha1 "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/typed/cilium.io/v2alpha1/fake"
 	"github.com/golang/mock/gomock"
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 	"github.com/linode/linodego"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 )
 
 var (

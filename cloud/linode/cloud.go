@@ -77,7 +77,7 @@ func init() {
 func newLinodeClientWithPrometheus(apiToken string, timeout time.Duration) (client.Client, error) {
 	linodeClient, err := client.New(apiToken, timeout)
 	if err != nil {
-		return nil, fmt.Errorf("client was not created succesfully: %w", err)
+		return nil, fmt.Errorf("client was not created successfully: %w", err)
 	}
 
 	if Options.LinodeGoDebug {

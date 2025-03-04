@@ -174,7 +174,7 @@ func (f *fakeAPI) setupRoutes() {
 	f.mux.HandleFunc("GET /v4/nodebalancers/{nodeBalancerId}", func(w http.ResponseWriter, r *http.Request) {
 		nb, found := f.nb[r.PathValue("nodeBalancerId")]
 		if !found {
-			w.WriteHeader(404)
+			w.WriteHeader(http.StatusNotFound)
 			resp := linodego.APIError{
 				Errors: []linodego.APIErrorReason{
 					{Reason: "Not Found"},
@@ -284,7 +284,7 @@ func (f *fakeAPI) setupRoutes() {
 
 		firewallDevices, found := f.fwd[fwdId]
 		if !found {
-			w.WriteHeader(404)
+			w.WriteHeader(http.StatusNotFound)
 			resp := linodego.APIError{
 				Errors: []linodego.APIErrorReason{
 					{Reason: "Not Found"},
@@ -728,7 +728,7 @@ func (f *fakeAPI) setupRoutes() {
 			return
 		}
 
-		w.WriteHeader(404)
+		w.WriteHeader(http.StatusNotFound)
 		resp := linodego.APIError{
 			Errors: []linodego.APIErrorReason{
 				{Reason: "Not Found"},
@@ -767,7 +767,7 @@ func (f *fakeAPI) setupRoutes() {
 			return
 		}
 
-		w.WriteHeader(404)
+		w.WriteHeader(http.StatusNotFound)
 		resp := linodego.APIError{
 			Errors: []linodego.APIErrorReason{
 				{Reason: "Not Found"},
