@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"reflect"
@@ -384,8 +385,11 @@ func (l *loadbalancers) updateNodeBalancer(
 		// Add all of the Nodes to the config
 		newNBNodes := make([]linodego.NodeBalancerConfigRebuildNodeOptions, 0, len(nodes))
 		subnetID := 0
-		_, ok := service.GetAnnotations()[annotations.NodeBalancerBackendIPv4Range]
+		backendIPv4Range, ok := service.GetAnnotations()[annotations.NodeBalancerBackendIPv4Range]
 		if ok {
+			if err := validateNodeBalancerBackendIPv4Range(backendIPv4Range); err != nil {
+				return err
+			}
 			id, err := l.getSubnetIDForSVC(ctx, service)
 			if err != nil {
 				sentry.CaptureError(ctx, err)
@@ -664,6 +668,9 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 
 	backendIPv4Range, ok := service.GetAnnotations()[annotations.NodeBalancerBackendIPv4Range]
 	if ok {
+		if err := validateNodeBalancerBackendIPv4Range(backendIPv4Range); err != nil {
+			return nil, err
+		}
 		subnetID, err := l.getSubnetIDForSVC(ctx, service)
 		if err != nil {
 			return nil, err
@@ -824,8 +831,11 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 	configs := make([]*linodego.NodeBalancerConfigCreateOptions, 0, len(ports))
 
 	subnetID := 0
-	_, ok := service.GetAnnotations()[annotations.NodeBalancerBackendIPv4Range]
+	backendIPv4Range, ok := service.GetAnnotations()[annotations.NodeBalancerBackendIPv4Range]
 	if ok {
+		if err := validateNodeBalancerBackendIPv4Range(backendIPv4Range); err != nil {
+			return nil, err
+		}
 		id, err := l.getSubnetIDForSVC(ctx, service)
 		if err != nil {
 			return nil, err
@@ -1116,4 +1126,33 @@ func getServiceBoolAnnotation(service *v1.Service, name string) bool {
 	}
 	boolValue, err := strconv.ParseBool(value)
 	return err == nil && boolValue
+}
+
+// validateNodeBalancerBackendIPv4Range validates the NodeBalancerBackendIPv4Range
+// annotation to be within the NodeBalancerBackendIPv4Subnet if it is set.
+func validateNodeBalancerBackendIPv4Range(backendIPv4Range string) error {
+	if Options.NodeBalancerBackendIPv4Subnet == "" {
+		return nil
+	}
+	withinCIDR, err := isCIDRWithinCIDR(Options.NodeBalancerBackendIPv4Subnet, backendIPv4Range)
+	if err != nil {
+		return fmt.Errorf("invalid IPv4 range: %v", err)
+	}
+	if !withinCIDR {
+		return fmt.Errorf("IPv4 range %s is not within the subnet %s", backendIPv4Range, Options.NodeBalancerBackendIPv4Subnet)
+	}
+	return nil
+}
+
+// isCIDRWithinCIDR returns true if the inner CIDR is within the outer CIDR.
+func isCIDRWithinCIDR(outer, inner string) (bool, error) {
+	_, ipNet1, err := net.ParseCIDR(outer)
+	if err != nil {
+		return false, fmt.Errorf("invalid CIDR: %v", err)
+	}
+	_, ipNet2, err := net.ParseCIDR(inner)
+	if err != nil {
+		return false, fmt.Errorf("invalid CIDR: %v", err)
+	}
+	return ipNet1.Contains(ipNet2.IP), nil
 }

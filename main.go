@@ -90,6 +90,7 @@ func main() {
 	command.Flags().StringVar(&linode.Options.BGPNodeSelector, "bgp-node-selector", "", "node selector to use to perform shared IP fail-over with BGP (e.g. cilium-bgp-peering=true")
 	command.Flags().StringVar(&linode.Options.IpHolderSuffix, "ip-holder-suffix", "", "suffix to append to the ip holder name when using shared IP fail-over with BGP (e.g. ip-holder-suffix=my-cluster-name")
 	command.Flags().StringVar(&linode.Options.DefaultNBType, "default-nodebalancer-type", string(linodego.NBTypeCommon), "default type of NodeBalancer to create (options: common, premium)")
+	command.Flags().StringVar(&linode.Options.NodeBalancerBackendIPv4Subnet, "nodebalancer-backend-ipv4-subnet", "", "ipv4 subnet to use for NodeBalancer backends")
 	command.Flags().StringSliceVar(&linode.Options.NodeBalancerTags, "nodebalancer-tags", []string{}, "Linode tags to apply to all NodeBalancers")
 	command.Flags().BoolVar(&linode.Options.EnableIPv6ForLoadBalancers, "enable-ipv6-for-loadbalancers", false, "set both IPv4 and IPv6 addresses for all LoadBalancer services (when disabled, only IPv4 is used)")
 

@@ -197,6 +197,8 @@ metadata:
     service.beta.kubernetes.io/linode-loadbalancer-subnet-name: "subnet1"
 ```
 
+If CCM is started with `--nodebalancer-backend-ipv4-subnet` flag, then it will not allow provisioning of nodebalancer unless subnet specified in service annotation lie within the subnet specified using the flag. This is to prevent accidental overlap between nodebalancer backend ips and pod CIDRs.
+
 ## Advanced Configuration
 
 ### Using Existing NodeBalancers
