@@ -861,16 +861,16 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 	return l.createNodeBalancer(ctx, clusterName, service, configs)
 }
 
-func coerceString(s string, minLen, maxLen int, padding string) string {
+func coerceString(str string, minLen, maxLen int, padding string) string {
 	if len(padding) == 0 {
 		padding = "x"
 	}
-	if len(s) > maxLen {
-		return s[:maxLen]
-	} else if len(s) < minLen {
-		return coerceString(fmt.Sprintf("%s%s", padding, s), minLen, maxLen, padding)
+	if len(str) > maxLen {
+		return str[:maxLen]
+	} else if len(str) < minLen {
+		return coerceString(fmt.Sprintf("%s%s", padding, str), minLen, maxLen, padding)
 	}
-	return s
+	return str
 }
 
 func (l *loadbalancers) buildNodeBalancerNodeConfigRebuildOptions(node *v1.Node, nodePort int32, subnetID int) linodego.NodeBalancerConfigRebuildNodeOptions {
