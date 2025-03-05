@@ -83,6 +83,9 @@ linters-settings:
     range-loops: true
     for-loops: true
 
+  thelper:
+    begin: false
+  
   varnamelen:
     min-name-length: 2
 
@@ -151,11 +154,11 @@ linters:
     - prealloc
     - predeclared
     - reassign
-    #- tenv
-    #- thelper
+    - thelper
     - unconvert
     - unparam
     - usestdlibvars
+    - usetesting
     - varnamelen
     - wastedassign
     - whitespace
