@@ -132,7 +132,7 @@ linters:
     #- gocritic
     - gofumpt
     - goprintffuncname
-    #- gosec
+    - gosec
     - importas
     - loggercheck
     - maintidx
@@ -147,7 +147,7 @@ linters:
     - nolintlint
     - nosprintfhostport
     #- paralleltest
-    #- prealloc
+    - prealloc
     - predeclared
     - reassign
     #- tenv

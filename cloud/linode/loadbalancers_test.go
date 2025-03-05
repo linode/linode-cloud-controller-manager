@@ -1531,8 +1531,8 @@ func testUpdateLoadBalancerAddNewFirewallACL(t *testing.T, client *linodego.Clie
 		t.Fatalf("Firewalls attached when none specified")
 	}
 
-	var ipv4s []string
-	var ipv6s []string
+	ipv4s := make([]string, 0, 400)
+	ipv6s := make([]string, 0, 300)
 	i := 0
 	for i < 400 {
 		ipv4s = append(ipv4s, fmt.Sprintf("%d.%d.%d.%d", 192, rand.Int31n(255), rand.Int31n(255), rand.Int31n(255)))
