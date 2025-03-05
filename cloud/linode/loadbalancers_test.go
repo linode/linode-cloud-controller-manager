@@ -115,6 +115,8 @@ o/aoxqmE0mN1lyCPOa9UP//LlsREkWVKI3+Wld/xERtzf66hjcH+ilsXDxxpMEXo
 bSiPJQsGIKtQvyCaZY2szyOoeUGgOId+He7ITlezxKrjdj+1pLMESvAxKeo=
 -----END RSA PRIVATE KEY-----`
 
+const drop string = "DROP"
+
 func TestCCMLoadBalancers(t *testing.T) {
 	testCases := []struct {
 		name string
@@ -1529,8 +1531,8 @@ func testUpdateLoadBalancerAddNewFirewallACL(t *testing.T, client *linodego.Clie
 		t.Fatalf("Firewalls attached when none specified")
 	}
 
-	var ipv4s []string
-	var ipv6s []string
+	ipv4s := make([]string, 0, 400)
+	ipv6s := make([]string, 0, 300)
 	i := 0
 	for i < 400 {
 		ipv4s = append(ipv4s, fmt.Sprintf("%d.%d.%d.%d", 192, rand.Int31n(255), rand.Int31n(255), rand.Int31n(255)))
@@ -1587,7 +1589,7 @@ func testUpdateLoadBalancerAddNewFirewallACL(t *testing.T, client *linodego.Clie
 		t.Fatalf("No firewalls found")
 	}
 
-	if firewallsNew[0].Rules.InboundPolicy != "DROP" {
+	if firewallsNew[0].Rules.InboundPolicy != drop {
 		t.Errorf("expected DROP inbound policy, got %s", firewallsNew[0].Rules.InboundPolicy)
 	}
 
@@ -1663,7 +1665,7 @@ func testUpdateLoadBalancerDeleteFirewallRemoveACL(t *testing.T, client *linodeg
 		t.Fatalf("No firewalls attached")
 	}
 
-	if firewalls[0].Rules.InboundPolicy != "DROP" {
+	if firewalls[0].Rules.InboundPolicy != drop {
 		t.Errorf("expected DROP inbound policy, got %s", firewalls[0].Rules.InboundPolicy)
 	}
 
@@ -1756,7 +1758,7 @@ func testUpdateLoadBalancerUpdateFirewallRemoveACLaddID(t *testing.T, client *li
 		t.Fatalf("No firewalls attached")
 	}
 
-	if firewalls[0].Rules.InboundPolicy != "DROP" {
+	if firewalls[0].Rules.InboundPolicy != drop {
 		t.Errorf("expected DROP inbound policy, got %s", firewalls[0].Rules.InboundPolicy)
 	}
 
@@ -1942,7 +1944,7 @@ func testUpdateLoadBalancerUpdateFirewallRemoveIDaddACL(t *testing.T, client *li
 		t.Fatalf("No attached firewalls found")
 	}
 
-	if firewallsNew[0].Rules.InboundPolicy != "DROP" {
+	if firewallsNew[0].Rules.InboundPolicy != drop {
 		t.Errorf("expected DROP inbound policy, got %s", firewallsNew[0].Rules.InboundPolicy)
 	}
 
@@ -2022,7 +2024,7 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 		t.Fatalf("No firewalls attached")
 	}
 
-	if firewalls[0].Rules.InboundPolicy != "DROP" {
+	if firewalls[0].Rules.InboundPolicy != drop {
 		t.Errorf("expected DROP inbound policy, got %s", firewalls[0].Rules.InboundPolicy)
 	}
 

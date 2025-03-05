@@ -185,26 +185,26 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Get a fresh copy of the node so the resource version is up-to-date
-		n, err := s.kubeclient.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
+		nodeResult, err := s.kubeclient.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 
 		// Try to update the node UUID if it has not been set
-		if n.Labels[annotations.AnnLinodeHostUUID] != linode.HostUUID {
-			n.Labels[annotations.AnnLinodeHostUUID] = linode.HostUUID
+		if nodeResult.Labels[annotations.AnnLinodeHostUUID] != linode.HostUUID {
+			nodeResult.Labels[annotations.AnnLinodeHostUUID] = linode.HostUUID
 		}
 
 		// Try to update the node ProviderID if it has not been set
-		if n.Spec.ProviderID == "" {
-			n.Spec.ProviderID = providerIDPrefix + strconv.Itoa(linode.ID)
+		if nodeResult.Spec.ProviderID == "" {
+			nodeResult.Spec.ProviderID = providerIDPrefix + strconv.Itoa(linode.ID)
 		}
 
 		// Try to update the expectedPrivateIP if its not set or doesn't match
-		if n.Annotations[annotations.AnnLinodeNodePrivateIP] != expectedPrivateIP && expectedPrivateIP != "" {
-			n.Annotations[annotations.AnnLinodeNodePrivateIP] = expectedPrivateIP
+		if nodeResult.Annotations[annotations.AnnLinodeNodePrivateIP] != expectedPrivateIP && expectedPrivateIP != "" {
+			nodeResult.Annotations[annotations.AnnLinodeNodePrivateIP] = expectedPrivateIP
 		}
-		_, err = s.kubeclient.CoreV1().Nodes().Update(ctx, n, metav1.UpdateOptions{})
+		_, err = s.kubeclient.CoreV1().Nodes().Update(ctx, nodeResult, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		klog.V(1).ErrorS(err, "Node update error")
