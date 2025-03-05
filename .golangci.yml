@@ -123,12 +123,12 @@ linters:
     - exhaustive
     #- forbidigo
     #- forcetypeassert
-    #- gci
+    - gci
     - gocheckcompilerdirectives
     - gofmt
     - goimports
     #- gocognit
-    #- goconst
+    - goconst
     #- gocritic
     - gofumpt
     - goprintffuncname
@@ -155,7 +155,7 @@ linters:
     - unconvert
     - unparam
     - usestdlibvars
-    #- varnamelen
+    - varnamelen
     - wastedassign
     - whitespace
   
