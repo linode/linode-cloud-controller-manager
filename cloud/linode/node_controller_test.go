@@ -22,6 +22,8 @@ import (
 )
 
 func TestNodeController_Run(t *testing.T) {
+	t.Parallel()
+
 	// Mock dependencies
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -63,6 +65,8 @@ func TestNodeController_Run(t *testing.T) {
 }
 
 func TestNodeController_processNext(t *testing.T) {
+	t.Parallel()
+
 	// Mock dependencies
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -90,6 +94,8 @@ func TestNodeController_processNext(t *testing.T) {
 	}
 
 	t.Run("should return no error on unknown errors", func(t *testing.T) {
+		t.Parallel()
+
 		queue.Add(node)
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, errors.New("lookup failed"))
 		result := controller.processNext()
@@ -100,6 +106,8 @@ func TestNodeController_processNext(t *testing.T) {
 	})
 
 	t.Run("should return no error if node exists", func(t *testing.T) {
+		t.Parallel()
+
 		queue.Add(node)
 		publicIP := net.ParseIP("172.234.31.123")
 		privateIP := net.ParseIP("192.168.159.135")
@@ -114,6 +122,8 @@ func TestNodeController_processNext(t *testing.T) {
 	})
 
 	t.Run("should return no error if queued object is not of type Node", func(t *testing.T) {
+		t.Parallel()
+
 		queue.Add("abc")
 		result := controller.processNext()
 		assert.True(t, result, "processNext should return true")
@@ -123,6 +133,8 @@ func TestNodeController_processNext(t *testing.T) {
 	})
 
 	t.Run("should return no error if node in k8s doesn't exist", func(t *testing.T) {
+		t.Parallel()
+
 		queue.Add(node)
 		controller.kubeclient = fake.NewSimpleClientset()
 		defer func() { controller.kubeclient = kubeClient }()
@@ -134,6 +146,8 @@ func TestNodeController_processNext(t *testing.T) {
 	})
 
 	t.Run("should return error and requeue when it gets 429 from linode API", func(t *testing.T) {
+		t.Parallel()
+
 		queue = workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[any]{Name: "testQueue1"})
 		queue.Add(node)
 		controller.queue = queue
@@ -150,6 +164,8 @@ func TestNodeController_processNext(t *testing.T) {
 	})
 
 	t.Run("should return error and requeue when it gets error >= 500 from linode API", func(t *testing.T) {
+		t.Parallel()
+
 		queue = workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[any]{Name: "testQueue2"})
 		queue.Add(node)
 		controller.queue = queue

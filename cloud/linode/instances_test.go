@@ -36,6 +36,8 @@ func nodeWithName(name string) *v1.Node {
 }
 
 func TestInstanceExists(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.TODO()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -43,6 +45,8 @@ func TestInstanceExists(t *testing.T) {
 	client := mocks.NewMockClient(ctrl)
 
 	t.Run("should return false if linode does not exist (by providerID)", func(t *testing.T) {
+		t.Parallel()
+
 		instances := newInstances(client)
 		node := nodeWithProviderID(providerIDPrefix + "123")
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
@@ -53,6 +57,8 @@ func TestInstanceExists(t *testing.T) {
 	})
 
 	t.Run("should return true if linode exists (by provider)", func(t *testing.T) {
+		t.Parallel()
+
 		instances := newInstances(client)
 		node := nodeWithProviderID(providerIDPrefix + "123")
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
@@ -70,6 +76,8 @@ func TestInstanceExists(t *testing.T) {
 	})
 
 	t.Run("should return true if linode exists (by name)", func(t *testing.T) {
+		t.Parallel()
+
 		instances := newInstances(client)
 		name := "some-name"
 		node := nodeWithName(name)
@@ -85,6 +93,8 @@ func TestInstanceExists(t *testing.T) {
 }
 
 func TestMetadataRetrieval(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.TODO()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -92,6 +102,8 @@ func TestMetadataRetrieval(t *testing.T) {
 	client := mocks.NewMockClient(ctrl)
 
 	t.Run("uses name over IP for finding linode", func(t *testing.T) {
+		t.Parallel()
+
 		instances := newInstances(client)
 		publicIP := net.ParseIP("172.234.31.123")
 		privateIP := net.ParseIP("192.168.159.135")
@@ -106,6 +118,8 @@ func TestMetadataRetrieval(t *testing.T) {
 	})
 
 	t.Run("fails when linode does not exist (by provider)", func(t *testing.T) {
+		t.Parallel()
+
 		instances := newInstances(client)
 		id := 456302
 		providerID := providerIDPrefix + strconv.Itoa(id)
@@ -118,6 +132,8 @@ func TestMetadataRetrieval(t *testing.T) {
 	})
 
 	t.Run("should return data when linode is found (by name)", func(t *testing.T) {
+		t.Parallel()
+
 		instances := newInstances(client)
 		id := 123
 		node := nodeWithName(instanceName)
@@ -151,6 +167,8 @@ func TestMetadataRetrieval(t *testing.T) {
 	})
 
 	t.Run("should return data when linode is found (by name) and addresses must be in order", func(t *testing.T) {
+		t.Parallel()
+
 		instances := newInstances(client)
 		id := 123
 		node := nodeWithName(instanceName)
@@ -326,6 +344,8 @@ func TestMetadataRetrieval(t *testing.T) {
 
 	for _, test := range ipTests {
 		t.Run(fmt.Sprintf("addresses are retrieved - %s", test.name), func(t *testing.T) {
+			t.Parallel()
+
 			instances := newInstances(client)
 			id := 192910
 			name := "my-instance"
@@ -418,6 +438,8 @@ func TestMetadataRetrieval(t *testing.T) {
 
 		for _, test := range getByIPTests {
 			t.Run(fmt.Sprintf("gets linode by IP - %s", test.name), func(t *testing.T) {
+				t.Parallel()
+
 				instances := newInstances(client)
 				client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{{ID: 3456, IPv4: []*net.IP{&wrongIP}}, expectedInstance}, nil)
 				node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node-1"}, Status: v1.NodeStatus{Addresses: test.nodeAddresses}}
@@ -435,6 +457,8 @@ func TestMetadataRetrieval(t *testing.T) {
 }
 
 func TestMalformedProviders(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.TODO()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -442,6 +466,8 @@ func TestMalformedProviders(t *testing.T) {
 	client := mocks.NewMockClient(ctrl)
 
 	t.Run("fails on non-numeric providerID", func(t *testing.T) {
+		t.Parallel()
+
 		instances := newInstances(client)
 		providerID := providerIDPrefix + "abc"
 		node := nodeWithProviderID(providerID)
@@ -454,6 +480,8 @@ func TestMalformedProviders(t *testing.T) {
 }
 
 func TestInstanceShutdown(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.TODO()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -461,6 +489,8 @@ func TestInstanceShutdown(t *testing.T) {
 	client := mocks.NewMockClient(ctrl)
 
 	t.Run("fails when instance not found (by provider)", func(t *testing.T) {
+		t.Parallel()
+
 		instances := newInstances(client)
 		id := 12345
 		node := nodeWithProviderID(providerIDPrefix + strconv.Itoa(id))
@@ -472,6 +502,8 @@ func TestInstanceShutdown(t *testing.T) {
 	})
 
 	t.Run("fails when instance not found (by name)", func(t *testing.T) {
+		t.Parallel()
+
 		instances := newInstances(client)
 		name := "some-name"
 		node := nodeWithName(name)
@@ -483,6 +515,8 @@ func TestInstanceShutdown(t *testing.T) {
 	})
 
 	t.Run("returns true when instance is shut down", func(t *testing.T) {
+		t.Parallel()
+
 		instances := newInstances(client)
 		id := 12345
 		node := nodeWithProviderID(providerIDPrefix + strconv.Itoa(id))
@@ -496,6 +530,8 @@ func TestInstanceShutdown(t *testing.T) {
 	})
 
 	t.Run("returns true when instance is shutting down", func(t *testing.T) {
+		t.Parallel()
+
 		instances := newInstances(client)
 		id := 12345
 		node := nodeWithProviderID(providerIDPrefix + strconv.Itoa(id))
@@ -509,6 +545,8 @@ func TestInstanceShutdown(t *testing.T) {
 	})
 
 	t.Run("returns false when instance is running", func(t *testing.T) {
+		t.Parallel()
+
 		instances := newInstances(client)
 		id := 12345
 		node := nodeWithProviderID(providerIDPrefix + strconv.Itoa(id))

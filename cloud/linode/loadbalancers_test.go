@@ -118,6 +118,8 @@ bSiPJQsGIKtQvyCaZY2szyOoeUGgOId+He7ITlezxKrjdj+1pLMESvAxKeo=
 const drop string = "DROP"
 
 func TestCCMLoadBalancers(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name string
 		f    func(*testing.T, *linodego.Client, *fakeAPI)
@@ -292,6 +294,8 @@ func TestCCMLoadBalancers(t *testing.T) {
 		linodeClient.SetBaseURL(ts.URL)
 
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			defer ts.Close()
 			tc.f(t, &linodeClient, fake)
 		})
@@ -1351,6 +1355,8 @@ func testUpdateLoadBalancerAddProxyProtocol(t *testing.T, client *linodego.Clien
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			svc := &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        randString(),
@@ -2556,6 +2562,8 @@ func testUpdateLoadBalancerAddNodeBalancerID(t *testing.T, client *linodego.Clie
 }
 
 func Test_getConnectionThrottle(t *testing.T) {
+	t.Parallel()
+
 	testcases := []struct {
 		name     string
 		service  *v1.Service
@@ -2628,6 +2636,8 @@ func Test_getConnectionThrottle(t *testing.T) {
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			connThrottle := getConnectionThrottle(test.service)
 
 			if test.expected != connThrottle {
@@ -2638,6 +2648,8 @@ func Test_getConnectionThrottle(t *testing.T) {
 }
 
 func Test_getPortConfig(t *testing.T) {
+	t.Parallel()
+
 	testcases := []struct {
 		name               string
 		service            *v1.Service
@@ -2799,6 +2811,8 @@ func Test_getPortConfig(t *testing.T) {
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			testPort := 443
 			portConfig, err := getPortConfig(test.service, testPort)
 
@@ -2818,6 +2832,8 @@ func Test_getPortConfig(t *testing.T) {
 }
 
 func Test_getHealthCheckType(t *testing.T) {
+	t.Parallel()
+
 	testcases := []struct {
 		name       string
 		service    *v1.Service
@@ -2868,6 +2884,8 @@ func Test_getHealthCheckType(t *testing.T) {
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			hType, err := getHealthCheckType(test.service)
 			if !reflect.DeepEqual(hType, test.healthType) {
 				t.Error("unexpected health check type")
@@ -2885,6 +2903,8 @@ func Test_getHealthCheckType(t *testing.T) {
 }
 
 func Test_getNodePrivateIP(t *testing.T) {
+	t.Parallel()
+
 	testcases := []struct {
 		name     string
 		node     *v1.Node
@@ -2965,6 +2985,8 @@ func Test_getNodePrivateIP(t *testing.T) {
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			ip := getNodePrivateIP(test.node, test.subnetID)
 			if ip != test.address {
 				t.Error("unexpected certificate")
@@ -3087,6 +3109,8 @@ func testEnsureLoadBalancerPreserveAnnotation(t *testing.T, client *linodego.Cli
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			svc := &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "test",
@@ -3188,6 +3212,8 @@ func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client, fake *
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			err := lb.EnsureLoadBalancerDeleted(context.TODO(), test.clusterName, test.service)
 			if !reflect.DeepEqual(err, test.err) {
 				t.Error("unexpected error")
@@ -3308,6 +3334,8 @@ func testEnsureExistingLoadBalancer(t *testing.T, client *linodego.Client, _ *fa
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), test.clusterName, test.service, test.nodes)
 			if err != nil {
 				t.Fatal(err)
@@ -3813,6 +3841,8 @@ func testGetLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			_, found, err := lb.GetLoadBalancer(context.TODO(), test.clusterName, test.service)
 			if found != test.found {
 				t.Error("unexpected error")
@@ -3829,6 +3859,8 @@ func testGetLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 }
 
 func Test_getPortConfigAnnotation(t *testing.T) {
+	t.Parallel()
+
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test",
@@ -3891,6 +3923,8 @@ func Test_getPortConfigAnnotation(t *testing.T) {
 	}
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			svc.Annotations = test.ann
 			ann, err := getPortConfigAnnotation(svc, 443)
 			if !reflect.DeepEqual(ann, test.expected) {
@@ -3908,6 +3942,8 @@ func Test_getPortConfigAnnotation(t *testing.T) {
 }
 
 func Test_getTLSCertInfo(t *testing.T) {
+	t.Parallel()
+
 	kubeClient := fake.NewSimpleClientset()
 	addTLSSecret(t, kubeClient)
 
@@ -3964,6 +4000,8 @@ func Test_getTLSCertInfo(t *testing.T) {
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			cert, key, err := getTLSCertInfo(context.TODO(), kubeClient, "", test.portConfig)
 			if cert != test.cert {
 				t.Error("unexpected error")
@@ -4004,6 +4042,8 @@ func addTLSSecret(t *testing.T, kubeClient kubernetes.Interface) {
 }
 
 func Test_LoadbalNodeNameCoercion(t *testing.T) {
+	t.Parallel()
+
 	type testCase struct {
 		nodeName       string
 		padding        string
@@ -4045,6 +4085,8 @@ func Test_LoadbalNodeNameCoercion(t *testing.T) {
 }
 
 func Test_loadbalancers_GetLinodeNBType(t *testing.T) {
+	t.Parallel()
+
 	type fields struct {
 		client           client.Client
 		zone             string
@@ -4127,6 +4169,8 @@ func Test_loadbalancers_GetLinodeNBType(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			l := &loadbalancers{
 				client:           tt.fields.client,
 				zone:             tt.fields.zone,
@@ -4143,6 +4187,8 @@ func Test_loadbalancers_GetLinodeNBType(t *testing.T) {
 }
 
 func Test_validateNodeBalancerBackendIPv4Range(t *testing.T) {
+	t.Parallel()
+
 	type args struct {
 		backendIPv4Range string
 	}
@@ -4171,6 +4217,8 @@ func Test_validateNodeBalancerBackendIPv4Range(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			if err := validateNodeBalancerBackendIPv4Range(tt.args.backendIPv4Range); (err != nil) != tt.wantErr {
 				t.Errorf("validateNodeBalancerBackendIPv4Range() error = %v, wantErr %v", err, tt.wantErr)
 			}

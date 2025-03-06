@@ -21,6 +21,8 @@ func TestNewCloudRouteControllerDisabled(t *testing.T) {
 	t.Setenv("LINODE_REQUEST_TIMEOUT_SECONDS", "10")
 
 	t.Run("should not fail if vpc is empty and routecontroller is disabled", func(t *testing.T) {
+		t.Parallel()
+
 		Options.VPCName = ""
 		Options.EnableRouteController = false
 		_, err := newCloud()
@@ -28,6 +30,8 @@ func TestNewCloudRouteControllerDisabled(t *testing.T) {
 	})
 
 	t.Run("fail if vpcname is empty and routecontroller is enabled", func(t *testing.T) {
+		t.Parallel()
+
 		Options.VPCName = ""
 		Options.EnableRouteController = true
 		_, err := newCloud()
@@ -46,18 +50,24 @@ func TestNewCloud(t *testing.T) {
 	Options.LinodeGoDebug = true
 
 	t.Run("should fail if api token is empty", func(t *testing.T) {
+		t.Parallel()
+
 		t.Setenv("LINODE_API_TOKEN", "")
 		_, err := newCloud()
 		assert.Error(t, err, "expected error when api token is empty")
 	})
 
 	t.Run("should fail if region is empty", func(t *testing.T) {
+		t.Parallel()
+
 		t.Setenv("LINODE_REGION", "")
 		_, err := newCloud()
 		assert.Error(t, err, "expected error when linode region is empty")
 	})
 
 	t.Run("should fail if both vpcname and vpcnames are set", func(t *testing.T) {
+		t.Parallel()
+
 		Options.VPCName = "tt"
 		Options.VPCNames = "tt"
 		defer func() {
@@ -69,6 +79,8 @@ func TestNewCloud(t *testing.T) {
 	})
 
 	t.Run("should not fail if deprecated vpcname is set", func(t *testing.T) {
+		t.Parallel()
+
 		Options.VPCName = "tt"
 		defer func() {
 			Options.VPCName = ""
@@ -80,6 +92,8 @@ func TestNewCloud(t *testing.T) {
 	})
 
 	t.Run("should fail if incorrect loadbalancertype is set", func(t *testing.T) {
+		t.Parallel()
+
 		rtEnabled := Options.EnableRouteController
 		Options.EnableRouteController = false
 		Options.LoadBalancerType = "test"
@@ -92,6 +106,8 @@ func TestNewCloud(t *testing.T) {
 	})
 
 	t.Run("should fail if ipholdersuffix is longer than 23 chars", func(t *testing.T) {
+		t.Parallel()
+
 		suffix := Options.IpHolderSuffix
 		Options.IpHolderSuffix = strings.Repeat("a", 24)
 		rtEnabled := Options.EnableRouteController
@@ -106,6 +122,8 @@ func TestNewCloud(t *testing.T) {
 }
 
 func Test_linodeCloud_LoadBalancer(t *testing.T) {
+	t.Parallel()
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	client := mocks.NewMockClient(ctrl)
@@ -135,6 +153,8 @@ func Test_linodeCloud_LoadBalancer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			c := &linodeCloud{
 				client:        tt.fields.client,
 				instances:     tt.fields.instances,
@@ -153,6 +173,8 @@ func Test_linodeCloud_LoadBalancer(t *testing.T) {
 }
 
 func Test_linodeCloud_InstancesV2(t *testing.T) {
+	t.Parallel()
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	client := mocks.NewMockClient(ctrl)
@@ -182,6 +204,8 @@ func Test_linodeCloud_InstancesV2(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			c := &linodeCloud{
 				client:        tt.fields.client,
 				instances:     tt.fields.instances,
@@ -200,6 +224,8 @@ func Test_linodeCloud_InstancesV2(t *testing.T) {
 }
 
 func Test_linodeCloud_Instances(t *testing.T) {
+	t.Parallel()
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	client := mocks.NewMockClient(ctrl)
@@ -229,6 +255,8 @@ func Test_linodeCloud_Instances(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			c := &linodeCloud{
 				client:        tt.fields.client,
 				instances:     tt.fields.instances,
@@ -247,6 +275,8 @@ func Test_linodeCloud_Instances(t *testing.T) {
 }
 
 func Test_linodeCloud_Zones(t *testing.T) {
+	t.Parallel()
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	client := mocks.NewMockClient(ctrl)
@@ -276,6 +306,8 @@ func Test_linodeCloud_Zones(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			c := &linodeCloud{
 				client:        tt.fields.client,
 				instances:     tt.fields.instances,
@@ -294,6 +326,8 @@ func Test_linodeCloud_Zones(t *testing.T) {
 }
 
 func Test_linodeCloud_Clusters(t *testing.T) {
+	t.Parallel()
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	client := mocks.NewMockClient(ctrl)
@@ -323,6 +357,8 @@ func Test_linodeCloud_Clusters(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			c := &linodeCloud{
 				client:        tt.fields.client,
 				instances:     tt.fields.instances,
@@ -341,6 +377,8 @@ func Test_linodeCloud_Clusters(t *testing.T) {
 }
 
 func Test_linodeCloud_Routes(t *testing.T) {
+	t.Parallel()
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	client := mocks.NewMockClient(ctrl)
@@ -385,6 +423,8 @@ func Test_linodeCloud_Routes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			c := &linodeCloud{
 				client:        tt.fields.client,
 				instances:     tt.fields.instances,
@@ -406,6 +446,8 @@ func Test_linodeCloud_Routes(t *testing.T) {
 }
 
 func Test_linodeCloud_ProviderName(t *testing.T) {
+	t.Parallel()
+
 	type fields struct {
 		client        *mocks.MockClient
 		instances     cloudprovider.InstancesV2
@@ -430,6 +472,8 @@ func Test_linodeCloud_ProviderName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			c := &linodeCloud{
 				client:        tt.fields.client,
 				instances:     tt.fields.instances,
@@ -444,6 +488,8 @@ func Test_linodeCloud_ProviderName(t *testing.T) {
 }
 
 func Test_linodeCloud_ScrubDNS(t *testing.T) {
+	t.Parallel()
+
 	type fields struct {
 		client        *mocks.MockClient
 		instances     cloudprovider.InstancesV2
@@ -475,6 +521,8 @@ func Test_linodeCloud_ScrubDNS(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			c := &linodeCloud{
 				client:        tt.fields.client,
 				instances:     tt.fields.instances,
@@ -493,6 +541,8 @@ func Test_linodeCloud_ScrubDNS(t *testing.T) {
 }
 
 func Test_linodeCloud_HasClusterID(t *testing.T) {
+	t.Parallel()
+
 	type fields struct {
 		client        *mocks.MockClient
 		instances     cloudprovider.InstancesV2
@@ -517,6 +567,8 @@ func Test_linodeCloud_HasClusterID(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			c := &linodeCloud{
 				client:        tt.fields.client,
 				instances:     tt.fields.instances,

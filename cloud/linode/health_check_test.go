@@ -11,6 +11,8 @@ import (
 )
 
 func TestHealthCheck(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name string
 		f    func(*testing.T, *mocks.MockClient)
@@ -31,6 +33,8 @@ func TestHealthCheck(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 

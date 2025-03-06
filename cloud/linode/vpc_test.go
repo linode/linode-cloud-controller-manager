@@ -16,6 +16,8 @@ import (
 )
 
 func TestGetAllVPCIDs(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name   string
 		vpcIDs map[string]int
@@ -34,6 +36,8 @@ func TestGetAllVPCIDs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			vpcIDs = tt.vpcIDs
 			got := GetAllVPCIDs()
 			sort.Ints(got)
@@ -45,7 +49,11 @@ func TestGetAllVPCIDs(t *testing.T) {
 }
 
 func TestGetVPCID(t *testing.T) {
+	t.Parallel()
+
 	t.Run("vpcID in cache", func(t *testing.T) {
+		t.Parallel()
+
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
@@ -61,6 +69,8 @@ func TestGetVPCID(t *testing.T) {
 	})
 
 	t.Run("vpcID not in cache and listVPCs return error", func(t *testing.T) {
+		t.Parallel()
+
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
@@ -74,6 +84,8 @@ func TestGetVPCID(t *testing.T) {
 	})
 
 	t.Run("vpcID not in cache and listVPCs return nothing", func(t *testing.T) {
+		t.Parallel()
+
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
@@ -87,6 +99,8 @@ func TestGetVPCID(t *testing.T) {
 	})
 
 	t.Run("vpcID not in cache and listVPCs return vpc info", func(t *testing.T) {
+		t.Parallel()
+
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
@@ -101,7 +115,11 @@ func TestGetVPCID(t *testing.T) {
 }
 
 func TestGetVPCIPAddresses(t *testing.T) {
+	t.Parallel()
+
 	t.Run("vpc id not found", func(t *testing.T) {
+		t.Parallel()
+
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
@@ -112,6 +130,8 @@ func TestGetVPCIPAddresses(t *testing.T) {
 	})
 
 	t.Run("vpc id found but listing ip addresses fails with 404 error", func(t *testing.T) {
+		t.Parallel()
+
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
@@ -124,6 +144,8 @@ func TestGetVPCIPAddresses(t *testing.T) {
 	})
 
 	t.Run("vpc id found but listing ip addresses fails with 500 error", func(t *testing.T) {
+		t.Parallel()
+
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
@@ -136,6 +158,8 @@ func TestGetVPCIPAddresses(t *testing.T) {
 	})
 
 	t.Run("vpc id found and listing vpc ipaddresses succeeds", func(t *testing.T) {
+		t.Parallel()
+
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
@@ -149,6 +173,8 @@ func TestGetVPCIPAddresses(t *testing.T) {
 	})
 
 	t.Run("vpc id found and ip addresses found with subnet filtering", func(t *testing.T) {
+		t.Parallel()
+
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
@@ -168,7 +194,11 @@ func TestGetVPCIPAddresses(t *testing.T) {
 }
 
 func TestGetSubnetID(t *testing.T) {
+	t.Parallel()
+
 	t.Run("subnet in cache", func(t *testing.T) {
+		t.Parallel()
+
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
@@ -184,6 +214,8 @@ func TestGetSubnetID(t *testing.T) {
 	})
 
 	t.Run("subnetID not in cache and listVPCSubnets return error", func(t *testing.T) {
+		t.Parallel()
+
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
@@ -199,6 +231,8 @@ func TestGetSubnetID(t *testing.T) {
 	})
 
 	t.Run("subnetID not in cache and listVPCSubnets return nothing", func(t *testing.T) {
+		t.Parallel()
+
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
@@ -212,6 +246,8 @@ func TestGetSubnetID(t *testing.T) {
 	})
 
 	t.Run("subnetID not in cache and listVPCSubnets return subnet info", func(t *testing.T) {
+		t.Parallel()
+
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)

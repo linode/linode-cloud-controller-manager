@@ -16,6 +16,8 @@ import (
 )
 
 func Test_serviceController_Run(t *testing.T) {
+	t.Parallel()
+
 	// Mock dependencies
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -49,6 +51,8 @@ func Test_serviceController_Run(t *testing.T) {
 }
 
 func Test_serviceController_processNextDeletion(t *testing.T) {
+	t.Parallel()
+
 	type fields struct {
 		loadbalancers *loadbalancers
 		queue         workqueue.TypedDelayingInterface[any]
@@ -91,6 +95,8 @@ func Test_serviceController_processNextDeletion(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			s := &serviceController{
 				loadbalancers: tt.fields.loadbalancers,
 				queue:         tt.fields.queue,

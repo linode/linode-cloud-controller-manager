@@ -150,7 +150,7 @@ linters:
     - noctx
     - nolintlint
     - nosprintfhostport
-    #- paralleltest
+    - paralleltest
     - prealloc
     - predeclared
     - reassign
