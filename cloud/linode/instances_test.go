@@ -17,6 +17,13 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
+
+)
+
+const (
+	instanceName string = "mock-instance"
+	usEast       string = "us-east"
+	typeG6       string = "g6-standard-1"
 )
 
 const (
