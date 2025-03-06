@@ -50,16 +50,12 @@ func TestNewCloud(t *testing.T) {
 	Options.LinodeGoDebug = true
 
 	t.Run("should fail if api token is empty", func(t *testing.T) {
-		t.Parallel()
-
 		t.Setenv("LINODE_API_TOKEN", "")
 		_, err := newCloud()
 		assert.Error(t, err, "expected error when api token is empty")
 	})
 
 	t.Run("should fail if region is empty", func(t *testing.T) {
-		t.Parallel()
-
 		t.Setenv("LINODE_REGION", "")
 		_, err := newCloud()
 		assert.Error(t, err, "expected error when linode region is empty")
