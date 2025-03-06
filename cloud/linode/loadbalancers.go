@@ -392,7 +392,7 @@ func (l *loadbalancers) updateNodeBalancer(
 			id, err := l.getSubnetIDForSVC(ctx, service)
 			if err != nil {
 				sentry.CaptureError(ctx, err)
-				return fmt.Errorf("Error getting subnet ID for service %s: %v", service.Name, err)
+				return fmt.Errorf("Error getting subnet ID for service %s: %w", service.Name, err)
 			}
 			subnetID = id
 		}
@@ -1134,7 +1134,7 @@ func validateNodeBalancerBackendIPv4Range(backendIPv4Range string) error {
 	}
 	withinCIDR, err := isCIDRWithinCIDR(Options.NodeBalancerBackendIPv4Subnet, backendIPv4Range)
 	if err != nil {
-		return fmt.Errorf("invalid IPv4 range: %v", err)
+		return fmt.Errorf("invalid IPv4 range: %w", err)
 	}
 	if !withinCIDR {
 		return fmt.Errorf("IPv4 range %s is not within the subnet %s", backendIPv4Range, Options.NodeBalancerBackendIPv4Subnet)
@@ -1146,11 +1146,11 @@ func validateNodeBalancerBackendIPv4Range(backendIPv4Range string) error {
 func isCIDRWithinCIDR(outer, inner string) (bool, error) {
 	_, ipNet1, err := net.ParseCIDR(outer)
 	if err != nil {
-		return false, fmt.Errorf("invalid CIDR: %v", err)
+		return false, fmt.Errorf("invalid CIDR: %w", err)
 	}
 	_, ipNet2, err := net.ParseCIDR(inner)
 	if err != nil {
-		return false, fmt.Errorf("invalid CIDR: %v", err)
+		return false, fmt.Errorf("invalid CIDR: %w", err)
 	}
 	return ipNet1.Contains(ipNet2.IP), nil
 }

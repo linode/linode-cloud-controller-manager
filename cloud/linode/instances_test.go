@@ -17,7 +17,6 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
-
 )
 
 const (
