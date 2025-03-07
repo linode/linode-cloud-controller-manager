@@ -8,8 +8,6 @@ import (
 )
 
 func TestParseProviderID(t *testing.T) {
-	t.Parallel()
-
 	for _, tc := range []struct {
 		name        string
 		providerID  string
@@ -38,8 +36,6 @@ func TestParseProviderID(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
 			id, err := parseProviderID(tc.providerID)
 			if err != nil {
 				if !tc.errExpected {

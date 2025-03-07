@@ -88,8 +88,6 @@ var (
 )
 
 func TestCiliumCCMLoadBalancers(t *testing.T) {
-	t.Parallel()
-
 	testCases := []struct {
 		name string
 		f    func(*testing.T, *mocks.MockClient)

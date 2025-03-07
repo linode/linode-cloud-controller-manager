@@ -9,8 +9,6 @@ import (
 )
 
 func TestInitialize(t *testing.T) {
-	t.Parallel()
-
 	// Reset the initialized flag before each test
 	initialized = false
 
@@ -46,8 +44,6 @@ func TestInitialize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			err := Initialize(tt.dsn, tt.environment, tt.release)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -60,8 +56,6 @@ func TestInitialize(t *testing.T) {
 }
 
 func TestSetHubOnContext(t *testing.T) {
-	t.Parallel()
-
 	// Reset the initialized flag
 	initialized = false
 	_ = Initialize("https://test@sentry.io/123", "test", "1.0.0")
@@ -74,8 +68,6 @@ func TestSetHubOnContext(t *testing.T) {
 }
 
 func TestGetHubFromContext(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name        string
 		setupFunc   func() context.Context
@@ -111,8 +103,6 @@ func TestGetHubFromContext(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			// Reset the initialized flag
 			initialized = false
 			if tt.initialized {
@@ -132,8 +122,6 @@ func TestGetHubFromContext(t *testing.T) {
 }
 
 func TestSetTag(t *testing.T) {
-	t.Parallel()
-
 	// Reset the initialized flag
 	initialized = false
 	_ = Initialize("https://test@sentry.io/123", "test", "1.0.0")
@@ -164,8 +152,6 @@ func TestSetTag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			ctx := tt.setupFunc()
 			// This should not panic
 			SetTag(ctx, tt.key, tt.value)
@@ -174,8 +160,6 @@ func TestSetTag(t *testing.T) {
 }
 
 func TestCaptureError(t *testing.T) {
-	t.Parallel()
-
 	// Reset the initialized flag
 	initialized = false
 	_ = Initialize("https://test@sentry.io/123", "test", "1.0.0")
@@ -203,8 +187,6 @@ func TestCaptureError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			ctx := tt.setupFunc()
 			// This should not panic
 			CaptureError(ctx, tt.err)
