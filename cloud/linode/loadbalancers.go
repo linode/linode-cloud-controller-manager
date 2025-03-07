@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2alpha1"
 	ciliumclient "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/typed/cilium.io/v2alpha1"
 	"github.com/linode/linodego"
 	v1 "k8s.io/api/core/v1"
@@ -208,7 +209,8 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 		}
 
 		// check for existing CiliumLoadBalancerIPPool for service
-		pool, err := l.getCiliumLBIPPool(ctx, service)
+		var pool *v2alpha1.CiliumLoadBalancerIPPool
+		pool, err = l.getCiliumLBIPPool(ctx, service)
 		if err != nil && !k8serrors.IsNotFound(err) {
 			klog.Infof("Failed to get CiliumLoadBalancerIPPool: %s", err.Error())
 			return nil, err
@@ -368,7 +370,8 @@ func (l *loadbalancers) updateNodeBalancer(
 		oldNBNodeIDs := make(map[string]int)
 		if currentNBCfg != nil {
 			// Obtain list of current NB nodes and convert it to map of node IDs
-			currentNBNodes, err := l.client.ListNodeBalancerNodes(ctx, nb.ID, currentNBCfg.ID, nil)
+			var currentNBNodes []linodego.NodeBalancerNode
+			currentNBNodes, err = l.client.ListNodeBalancerNodes(ctx, nb.ID, currentNBCfg.ID, nil)
 			if err != nil {
 				// This error can be ignored, because if we fail to get nodes we can anyway rebuild the config from scratch,
 				// it would just cause the NB to reload config even if the node list did not change, so we prefer to send IDs when it is posible.
@@ -386,10 +389,12 @@ func (l *loadbalancers) updateNodeBalancer(
 		subnetID := 0
 		backendIPv4Range, ok := service.GetAnnotations()[annotations.NodeBalancerBackendIPv4Range]
 		if ok {
-			if err := validateNodeBalancerBackendIPv4Range(backendIPv4Range); err != nil {
+			if err = validateNodeBalancerBackendIPv4Range(backendIPv4Range); err != nil {
 				return err
 			}
-			id, err := l.getSubnetIDForSVC(ctx, service)
+
+			var id int
+			id, err = l.getSubnetIDForSVC(ctx, service)
 			if err != nil {
 				sentry.CaptureError(ctx, err)
 				return fmt.Errorf("Error getting subnet ID for service %s: %w", service.Name, err)
@@ -456,7 +461,7 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 
 		// make sure that IPs are shared properly on the Node if using load-balancers not backed by NodeBalancers
 		for _, node := range nodes {
-			if err := l.handleIPSharing(ctx, node, ipHolderSuffix); err != nil {
+			if err = l.handleIPSharing(ctx, node, ipHolderSuffix); err != nil {
 				return err
 			}
 		}
@@ -711,7 +716,7 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 }
 
 func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1.Service, port int) (linodego.NodeBalancerConfig, error) {
-	portConfig, err := getPortConfig(service, port)
+	portConfigResult, err := getPortConfig(service, port)
 	if err != nil {
 		return linodego.NodeBalancerConfig{}, err
 	}
@@ -723,8 +728,8 @@ func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1
 
 	config := linodego.NodeBalancerConfig{
 		Port:          port,
-		Protocol:      portConfig.Protocol,
-		ProxyProtocol: portConfig.ProxyProtocol,
+		Protocol:      portConfigResult.Protocol,
+		ProxyProtocol: portConfigResult.ProxyProtocol,
 		Check:         health,
 	}
 
@@ -775,8 +780,8 @@ func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1
 	}
 	config.CheckPassive = checkPassive
 
-	if portConfig.Protocol == linodego.ProtocolHTTPS {
-		if err = l.addTLSCert(ctx, service, &config, portConfig); err != nil {
+	if portConfigResult.Protocol == linodego.ProtocolHTTPS {
+		if err = l.addTLSCert(ctx, service, &config, portConfigResult); err != nil {
 			return config, err
 		}
 	}
@@ -922,12 +927,12 @@ func (l *loadbalancers) retrieveKubeClient() error {
 }
 
 func getPortConfig(service *v1.Service, port int) (portConfig, error) {
-	portConfig := portConfig{}
-	portConfigAnnotation, err := getPortConfigAnnotation(service, port)
+	portConfigResult := portConfig{}
+	portConfigAnnotationResult, err := getPortConfigAnnotation(service, port)
 	if err != nil {
-		return portConfig, err
+		return portConfigResult, err
 	}
-	protocol := portConfigAnnotation.Protocol
+	protocol := portConfigAnnotationResult.Protocol
 	if protocol == "" {
 		protocol = "tcp"
 		if p, ok := service.GetAnnotations()[annotations.AnnLinodeDefaultProtocol]; ok {
@@ -936,7 +941,7 @@ func getPortConfig(service *v1.Service, port int) (portConfig, error) {
 	}
 	protocol = strings.ToLower(protocol)
 
-	proxyProtocol := portConfigAnnotation.ProxyProtocol
+	proxyProtocol := portConfigAnnotationResult.ProxyProtocol
 	if proxyProtocol == "" {
 		proxyProtocol = string(linodego.ProxyProtocolNone)
 		for _, ann := range []string{annotations.AnnLinodeDefaultProxyProtocol, annLinodeProxyProtocolDeprecated} {
@@ -948,22 +953,22 @@ func getPortConfig(service *v1.Service, port int) (portConfig, error) {
 	}
 
 	if protocol != "tcp" && protocol != "http" && protocol != "https" {
-		return portConfig, fmt.Errorf("invalid protocol: %q specified", protocol)
+		return portConfigResult, fmt.Errorf("invalid protocol: %q specified", protocol)
 	}
 
 	switch proxyProtocol {
 	case string(linodego.ProxyProtocolNone), string(linodego.ProxyProtocolV1), string(linodego.ProxyProtocolV2):
 		break
 	default:
-		return portConfig, fmt.Errorf("invalid NodeBalancer proxy protocol value '%s'", proxyProtocol)
+		return portConfigResult, fmt.Errorf("invalid NodeBalancer proxy protocol value '%s'", proxyProtocol)
 	}
 
-	portConfig.Port = port
-	portConfig.Protocol = linodego.ConfigProtocol(protocol)
-	portConfig.ProxyProtocol = linodego.ConfigProxyProtocol(proxyProtocol)
-	portConfig.TLSSecretName = portConfigAnnotation.TLSSecretName
+	portConfigResult.Port = port
+	portConfigResult.Protocol = linodego.ConfigProtocol(protocol)
+	portConfigResult.ProxyProtocol = linodego.ConfigProxyProtocol(proxyProtocol)
+	portConfigResult.TLSSecretName = portConfigAnnotationResult.TLSSecretName
 
-	return portConfig, nil
+	return portConfigResult, nil
 }
 
 func getHealthCheckType(service *v1.Service) (linodego.ConfigCheck, error) {

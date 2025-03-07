@@ -803,7 +803,7 @@ func testUpdateLoadBalancerAddNode(t *testing.T, client *linodego.Client, f *fak
 
 		var nbcro linodego.NodeBalancerConfigRebuildOptions
 
-		if err := json.Unmarshal([]byte(req.Body), &nbcro); err != nil {
+		if err = json.Unmarshal([]byte(req.Body), &nbcro); err != nil {
 			t.Fatalf("Unable to unmarshall request body %#v, error: %#v", req.Body, err)
 		}
 
@@ -1583,7 +1583,7 @@ func testUpdateLoadBalancerAddNewFirewallACL(t *testing.T, client *linodego.Clie
 	i = 0
 	for i < 300 {
 		ip := make([]byte, 16)
-		if _, err := cryptoRand.Read(ip); err != nil {
+		if _, err = cryptoRand.Read(ip); err != nil {
 			t.Fatalf("unable to read random bytes")
 		}
 		ipv6s = append(ipv6s, fmt.Sprintf("%s:%s:%s:%s:%s:%s:%s:%s",
@@ -2800,12 +2800,12 @@ func Test_getPortConfig(t *testing.T) {
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
 			testPort := 443
-			portConfig, err := getPortConfig(test.service, testPort)
+			portConfigResult, err := getPortConfig(test.service, testPort)
 
-			if !reflect.DeepEqual(portConfig, test.expectedPortConfig) {
+			if !reflect.DeepEqual(portConfigResult, test.expectedPortConfig) {
 				t.Error("unexpected port config")
 				t.Logf("expected: %q", test.expectedPortConfig)
-				t.Logf("actual: %q", portConfig)
+				t.Logf("actual: %q", portConfigResult)
 			}
 
 			if !reflect.DeepEqual(err, test.err) {

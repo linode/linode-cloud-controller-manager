@@ -115,7 +115,8 @@ func newCloud() (cloudprovider.Interface, error) {
 	var healthChecker *healthChecker
 
 	if Options.EnableTokenHealthChecker {
-		authenticated, err := client.CheckClientAuthenticated(context.TODO(), linodeClient)
+		var authenticated bool
+		authenticated, err = client.CheckClientAuthenticated(context.TODO(), linodeClient)
 		if err != nil {
 			return nil, fmt.Errorf("linode client authenticated connection error: %w", err)
 		}
