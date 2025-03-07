@@ -74,10 +74,8 @@ jobs:
         run: make vet
 
       - name: lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: v1.64.5
-
+        run: make lint
+        
       - name: Helm Lint
         run: make helm-lint
 
