@@ -41,6 +41,8 @@ func TestHealthCheck(t *testing.T) {
 }
 
 func testSucceedingCallsToLinodeAPIHappenStopSignalNotFired(t *testing.T, client *mocks.MockClient) {
+	t.Helper()
+
 	writableStopCh := make(chan struct{})
 	readableStopCh := make(chan struct{})
 
@@ -62,6 +64,8 @@ func testSucceedingCallsToLinodeAPIHappenStopSignalNotFired(t *testing.T, client
 }
 
 func testFailingCallsToLinodeAPIHappenStopSignalFired(t *testing.T, client *mocks.MockClient) {
+	t.Helper()
+
 	writableStopCh := make(chan struct{})
 	readableStopCh := make(chan struct{})
 
@@ -95,6 +99,8 @@ func testFailingCallsToLinodeAPIHappenStopSignalFired(t *testing.T, client *mock
 }
 
 func testErrorCallsToLinodeAPIHappenStopSignalNotFired(t *testing.T, client *mocks.MockClient) {
+	t.Helper()
+
 	writableStopCh := make(chan struct{})
 	readableStopCh := make(chan struct{})
 

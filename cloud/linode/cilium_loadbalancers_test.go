@@ -141,6 +141,7 @@ func TestCiliumCCMLoadBalancers(t *testing.T) {
 			f:    testCiliumUpdateLoadBalancerAddNodeWithNewIpHolderNamingConvention,
 		},
 	}
+	//nolint: paralleltest // two tests use t.Setenv, which fails after t.Parallel() call
 	for _, tc := range testCases {
 		ctrl := gomock.NewController(t)
 		mc := mocks.NewMockClient(ctrl)
@@ -180,6 +181,8 @@ func createTestService() *v1.Service {
 }
 
 func addService(t *testing.T, kubeClient kubernetes.Interface, svc *v1.Service) {
+	t.Helper()
+
 	_, err := kubeClient.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to add Service: %v", err)
@@ -187,6 +190,8 @@ func addService(t *testing.T, kubeClient kubernetes.Interface, svc *v1.Service) 
 }
 
 func addNodes(t *testing.T, kubeClient kubernetes.Interface, nodes []*v1.Node) {
+	t.Helper()
+
 	for _, node := range nodes {
 		_, err := kubeClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 		if err != nil {
@@ -206,6 +211,8 @@ func createNewIpHolderInstance() linodego.Instance {
 }
 
 func testNoBGPNodeLabel(t *testing.T, mc *mocks.MockClient) {
+	t.Helper()
+
 	Options.BGPNodeSelector = ""
 	Options.IpHolderSuffix = clusterName
 	t.Setenv("BGP_PEER_PREFIX", "2600:3cef")
@@ -255,6 +262,8 @@ func testNoBGPNodeLabel(t *testing.T, mc *mocks.MockClient) {
 }
 
 func testUnsupportedRegion(t *testing.T, mc *mocks.MockClient) {
+	t.Helper()
+
 	Options.BGPNodeSelector = nodeSelector
 	svc := createTestService()
 
@@ -284,6 +293,8 @@ func testUnsupportedRegion(t *testing.T, mc *mocks.MockClient) {
 }
 
 func testCreateWithExistingIPHolderWithOldIpHolderNamingConvention(t *testing.T, mc *mocks.MockClient) {
+	t.Helper()
+
 	Options.BGPNodeSelector = nodeSelector
 	svc := createTestService()
 	newIpHolderInstance = createNewIpHolderInstance()
@@ -323,6 +334,8 @@ func testCreateWithExistingIPHolderWithOldIpHolderNamingConvention(t *testing.T,
 }
 
 func testCreateWithExistingIPHolderWithNewIpHolderNamingConvention(t *testing.T, mc *mocks.MockClient) {
+	t.Helper()
+
 	Options.BGPNodeSelector = nodeSelector
 	Options.IpHolderSuffix = clusterName
 	svc := createTestService()
@@ -363,6 +376,8 @@ func testCreateWithExistingIPHolderWithNewIpHolderNamingConvention(t *testing.T,
 }
 
 func testCreateWithExistingIPHolderWithNewIpHolderNamingConventionUsingLongSuffix(t *testing.T, mc *mocks.MockClient) {
+	t.Helper()
+
 	Options.BGPNodeSelector = nodeSelector
 	Options.IpHolderSuffix = "OaTJrRuufacHVougjwkpBpmstiqvswvBNEMWXsRYfMBTCkKIUTXpbGIcIbDWSQp"
 	svc := createTestService()
@@ -403,6 +418,8 @@ func testCreateWithExistingIPHolderWithNewIpHolderNamingConventionUsingLongSuffi
 }
 
 func testCreateWithNoExistingIPHolderUsingNoSuffix(t *testing.T, mc *mocks.MockClient) {
+	t.Helper()
+
 	Options.BGPNodeSelector = nodeSelector
 	Options.IpHolderSuffix = ""
 	svc := createTestService()
@@ -447,6 +464,8 @@ func testCreateWithNoExistingIPHolderUsingNoSuffix(t *testing.T, mc *mocks.MockC
 }
 
 func testCreateWithNoExistingIPHolderUsingShortSuffix(t *testing.T, mc *mocks.MockClient) {
+	t.Helper()
+
 	Options.BGPNodeSelector = nodeSelector
 	Options.IpHolderSuffix = clusterName
 	svc := createTestService()
@@ -491,6 +510,8 @@ func testCreateWithNoExistingIPHolderUsingShortSuffix(t *testing.T, mc *mocks.Mo
 }
 
 func testCreateWithNoExistingIPHolderUsingLongSuffix(t *testing.T, mc *mocks.MockClient) {
+	t.Helper()
+
 	Options.BGPNodeSelector = nodeSelector
 	Options.IpHolderSuffix = "OaTJrRuufacHVougjwkpBpmstiqvswvBNEMWXsRYfMBTCkKIUTXpbGIcIbDWSQp"
 	svc := createTestService()
@@ -535,6 +556,8 @@ func testCreateWithNoExistingIPHolderUsingLongSuffix(t *testing.T, mc *mocks.Moc
 }
 
 func testEnsureCiliumLoadBalancerDeletedWithOldIpHolderNamingConvention(t *testing.T, mc *mocks.MockClient) {
+	t.Helper()
+
 	Options.BGPNodeSelector = nodeSelector
 	svc := createTestService()
 
@@ -561,6 +584,8 @@ func testEnsureCiliumLoadBalancerDeletedWithOldIpHolderNamingConvention(t *testi
 }
 
 func testEnsureCiliumLoadBalancerDeletedWithNewIpHolderNamingConvention(t *testing.T, mc *mocks.MockClient) {
+	t.Helper()
+
 	Options.BGPNodeSelector = nodeSelector
 	Options.IpHolderSuffix = clusterName
 	svc := createTestService()
@@ -592,6 +617,8 @@ func testEnsureCiliumLoadBalancerDeletedWithNewIpHolderNamingConvention(t *testi
 }
 
 func testCiliumUpdateLoadBalancerAddNodeWithOldIpHolderNamingConvention(t *testing.T, mc *mocks.MockClient) {
+	t.Helper()
+
 	Options.BGPNodeSelector = nodeSelector
 	svc := createTestService()
 
@@ -648,6 +675,8 @@ func testCiliumUpdateLoadBalancerAddNodeWithOldIpHolderNamingConvention(t *testi
 }
 
 func testCiliumUpdateLoadBalancerAddNodeWithNewIpHolderNamingConvention(t *testing.T, mc *mocks.MockClient) {
+	t.Helper()
+
 	Options.BGPNodeSelector = nodeSelector
 	Options.IpHolderSuffix = clusterName
 	svc := createTestService()

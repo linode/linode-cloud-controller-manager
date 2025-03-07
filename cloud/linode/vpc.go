@@ -118,7 +118,8 @@ func GetVPCIPAddresses(ctx context.Context, client client.Client, vpcName string
 
 		for _, name := range subnetNames {
 			// For caching
-			subnetID, err := GetSubnetID(ctx, client, vpcID, name)
+			var subnetID int
+			subnetID, err = GetSubnetID(ctx, client, vpcID, name)
 			// Don't filter subnets we can't find
 			if err != nil {
 				klog.Errorf("subnet %s not found due to error: %v. Skipping.", name, err)
@@ -130,7 +131,8 @@ func GetVPCIPAddresses(ctx context.Context, client client.Client, vpcName string
 		}
 
 		// Assign the list of IDs to a stringified JSON filter
-		filter, err := json.Marshal(subnetFilter{SubnetID: strings.Join(subnetIDList, ",")})
+		var filter []byte
+		filter, err = json.Marshal(subnetFilter{SubnetID: strings.Join(subnetIDList, ",")})
 		if err != nil {
 			klog.Error("could not create JSON filter for subnet_id")
 		}

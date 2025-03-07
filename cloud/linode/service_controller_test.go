@@ -24,7 +24,10 @@ func Test_serviceController_Run(t *testing.T) {
 	informer := informers.NewSharedInformerFactory(kubeClient, 0).Core().V1().Services()
 	mockQueue := workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[any]{Name: "test"})
 
-	loadbalancers := newLoadbalancers(client, "us-east").(*loadbalancers)
+	loadbalancers, assertion := newLoadbalancers(client, "us-east").(*loadbalancers)
+	if !assertion {
+		t.Error("type assertion failed")
+	}
 	svcCtrl := newServiceController(loadbalancers, informer)
 	svcCtrl.queue = mockQueue
 

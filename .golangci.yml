@@ -92,13 +92,13 @@ linters:
     - errcheck
     - errchkjson
     - errorlint
-    - govet
+    #- govet
     - testifylint
   enable:
     # these are enabled by default
     #- errcheck
     - gosimple
-    #- govet
+    - govet
     - ineffassign
     - staticcheck
     - typecheck
@@ -123,7 +123,7 @@ linters:
     #- errorlint
     - exhaustive
     #- forbidigo
-    #- forcetypeassert
+    - forcetypeassert
     - gci
     - gocheckcompilerdirectives
     - gofmt
@@ -147,15 +147,15 @@ linters:
     - noctx
     - nolintlint
     - nosprintfhostport
-    #- paralleltest
+    #- paralleltest # adding t.Parallel() to tests broke so many and made others flaky
     - prealloc
     - predeclared
     - reassign
-    #- tenv
-    #- thelper
+    - thelper
     - unconvert
     - unparam
     - usestdlibvars
+    - usetesting
     - varnamelen
     - wastedassign
     - whitespace

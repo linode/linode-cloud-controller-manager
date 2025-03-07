@@ -294,10 +294,12 @@ func (l *loadbalancers) deleteSharedIP(ctx context.Context, service *v1.Service)
 	}
 	svcIngress := service.Status.LoadBalancer.Ingress
 	if len(svcIngress) > 0 && ipHolder != nil {
+		var nodeLinodeID int
+
 		for _, ingress := range svcIngress {
 			// delete the shared IP on the Linodes it's shared on
 			for _, node := range bgpNodes {
-				nodeLinodeID, err := parseProviderID(node.Spec.ProviderID)
+				nodeLinodeID, err = parseProviderID(node.Spec.ProviderID)
 				if err != nil {
 					return err
 				}
