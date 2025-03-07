@@ -123,7 +123,7 @@ linters:
     #- errorlint
     - exhaustive
     #- forbidigo
-    #- forcetypeassert
+    - forcetypeassert
     - gci
     - gocheckcompilerdirectives
     - gofmt

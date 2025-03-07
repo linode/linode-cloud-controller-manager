@@ -188,7 +188,12 @@ func (c *linodeCloud) Initialize(clientBuilder cloudprovider.ControllerClientBui
 		go c.linodeTokenHealthChecker.Run(stopCh)
 	}
 
-	serviceController := newServiceController(c.loadbalancers.(*loadbalancers), serviceInformer)
+	lb, assertion := c.loadbalancers.(*loadbalancers)
+	if !assertion {
+		klog.Error("type assertion during Initialize() failed")
+		return
+	}
+	serviceController := newServiceController(lb, serviceInformer)
 	go serviceController.Run(stopCh)
 
 	nodeController := newNodeController(kubeclient, c.client, nodeInformer, instanceCache)
