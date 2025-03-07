@@ -31,6 +31,7 @@ jobs:
           allowed-endpoints: >
             api.github.com:443
             github.com:443
+            registry.docker.io:443
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -74,9 +75,7 @@ jobs:
         run: make vet
 
       - name: lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: v1.64.5
+        run: make lint
 
       - name: Helm Lint
         run: make helm-lint
