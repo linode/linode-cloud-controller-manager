@@ -100,6 +100,16 @@ func TestNodeController_processNext(t *testing.T) {
 		}
 	})
 
+	t.Run("should return no error if timestamp for node being processed is older than the most recent request", func(t *testing.T) {
+		controller.addNodeToQueue(node)
+		controller.nodeLastAdded["test"] = time.Now().Add(controller.ttl)
+		result := controller.processNext()
+		assert.True(t, result, "processNext should return true")
+		if queue.Len() != 0 {
+			t.Errorf("expected queue to be empty, got %d items", queue.Len())
+		}
+	})
+
 	t.Run("should return no error if node exists", func(t *testing.T) {
 		controller.addNodeToQueue(node)
 		publicIP := net.ParseIP("172.234.31.123")

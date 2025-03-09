@@ -103,8 +103,9 @@ func (s *nodeController) Run(stopCh <-chan struct{}) {
 func (s *nodeController) addNodeToQueue(node *v1.Node) {
 	s.Lock()
 	defer s.Unlock()
-	s.nodeLastAdded[node.Name] = time.Now()
-	s.queue.Add(nodeRequest{node: node, timestamp: time.Now()})
+	currTime := time.Now()
+	s.nodeLastAdded[node.Name] = currTime
+	s.queue.Add(nodeRequest{node: node, timestamp: currTime})
 }
 
 // worker runs a worker thread that dequeues new or modified nodes and processes
