@@ -44,10 +44,8 @@ type nodeController struct {
 	metadataLastUpdate map[string]time.Time
 	ttl                time.Duration
 
-	queue workqueue.TypedDelayingInterface[any]
-
+	queue         workqueue.TypedDelayingInterface[nodeRequest]
 	nodeLastAdded map[string]time.Time
-	lock          sync.Mutex
 }
 
 func newNodeController(kubeclient kubernetes.Interface, client client.Client, informer v1informers.NodeInformer, instanceCache *instances) *nodeController {
@@ -65,7 +63,7 @@ func newNodeController(kubeclient kubernetes.Interface, client client.Client, in
 		informer:           informer,
 		ttl:                timeout,
 		metadataLastUpdate: make(map[string]time.Time),
-		queue:              workqueue.NewTypedDelayingQueueWithConfig[any](workqueue.TypedDelayingQueueConfig[any]{Name: "ccm_node"}),
+		queue:              workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[nodeRequest]{Name: "ccm_node"}),
 		nodeLastAdded:      make(map[string]time.Time),
 	}
 }
@@ -80,10 +78,7 @@ func (s *nodeController) Run(stopCh <-chan struct{}) {
 				}
 
 				klog.Infof("NodeController will handle newly created node (%s) metadata", node.Name)
-				s.lock.Lock()
-				defer s.lock.Unlock()
-				s.nodeLastAdded[node.Name] = time.Now()
-				s.queue.Add(nodeRequest{node: node, timestamp: time.Now()})
+				s.addNodeToQueue(node)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				node, ok := newObj.(*v1.Node)
@@ -92,10 +87,7 @@ func (s *nodeController) Run(stopCh <-chan struct{}) {
 				}
 
 				klog.Infof("NodeController will handle newly updated node (%s) metadata", node.Name)
-				s.lock.Lock()
-				defer s.lock.Unlock()
-				s.nodeLastAdded[node.Name] = time.Now()
-				s.queue.Add(nodeRequest{node: node, timestamp: time.Now()})
+				s.addNodeToQueue(node)
 			},
 		},
 		informerResyncPeriod,
@@ -107,6 +99,14 @@ func (s *nodeController) Run(stopCh <-chan struct{}) {
 	s.informer.Informer().Run(stopCh)
 }
 
+// addNodeToQueue adds a node to the queue for processing.
+func (s *nodeController) addNodeToQueue(node *v1.Node) {
+	s.Lock()
+	defer s.Unlock()
+	s.nodeLastAdded[node.Name] = time.Now()
+	s.queue.Add(nodeRequest{node: node, timestamp: time.Now()})
+}
+
 // worker runs a worker thread that dequeues new or modified nodes and processes
 // metadata (host UUID) on each of them.
 func (s *nodeController) worker() {
@@ -115,21 +115,15 @@ func (s *nodeController) worker() {
 }
 
 func (s *nodeController) processNext() bool {
-	key, quit := s.queue.Get()
+	request, quit := s.queue.Get()
 	if quit {
 		return false
 	}
-	defer s.queue.Done(key)
+	defer s.queue.Done(request)
 
-	request, ok := key.(nodeRequest)
-	if !ok {
-		klog.Errorf("expected dequeued key to be of type nodeRequest but got %T", request)
-		return true
-	}
-
-	s.lock.Lock()
+	s.RLock()
 	latestTimestamp, exists := s.nodeLastAdded[request.node.Name]
-	s.lock.Unlock()
+	s.RUnlock()
 	if !exists || request.timestamp.Before(latestTimestamp) {
 		klog.V(3).InfoS("Skipping node metadata update as its not the most recent object", "node", klog.KObj(request.node))
 		return true
