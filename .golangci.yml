@@ -89,14 +89,10 @@ linters-settings:
 linters:
   #disable-all: true
   disable:
-    - errcheck
-    - errchkjson
-    - errorlint
-    #- govet
     - testifylint
   enable:
     # these are enabled by default
-    #- errcheck
+    - errcheck
     - gosimple
     - govet
     - ineffassign
@@ -118,9 +114,9 @@ linters:
     - dupl
     - dupword
     - durationcheck
-    #- errchkjson
+    - errchkjson
     - errname
-    #- errorlint
+    - errorlint
     - exhaustive
     #- forbidigo
     - forcetypeassert
@@ -151,6 +147,7 @@ linters:
     - prealloc
     - predeclared
     - reassign
+    #- testifylint
     - thelper
     - unconvert
     - unparam

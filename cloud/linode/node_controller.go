@@ -45,7 +45,7 @@ type nodeController struct {
 func newNodeController(kubeclient kubernetes.Interface, client client.Client, informer v1informers.NodeInformer, instanceCache *instances) *nodeController {
 	timeout := defaultMetadataTTL
 	if raw, ok := os.LookupEnv("LINODE_METADATA_TTL"); ok {
-		if t, _ := strconv.Atoi(raw); t > 0 {
+		if t, err := strconv.Atoi(raw); t > 0 && err == nil {
 			timeout = time.Duration(t) * time.Second
 		}
 	}
