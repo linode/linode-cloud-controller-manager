@@ -60,9 +60,7 @@ jobs:
             ingest.codecov.io:443
             raw.githubusercontent.com:443
             get.helm.sh:443
-            registry-1.docker.io:443
-            auth.docker.io:443
-            production.cloudflare.docker.com:443
+            golangci-lint.run:443
 
       - uses: actions/checkout@v4.2.2
         with:
@@ -76,7 +74,9 @@ jobs:
         run: make vet
 
       - name: lint
-        run: make lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64.5
 
       - name: Helm Lint
         run: make helm-lint

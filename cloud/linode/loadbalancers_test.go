@@ -810,6 +810,10 @@ func testUpdateLoadBalancerAddNode(t *testing.T, client *linodego.Client, f *fak
 			t.Fatalf("Nodebalancer config rebuild request was not called.")
 		}
 
+		if req.Body == "" {
+			t.Fatalf("Request body is empty")
+		}
+
 		var nbcro linodego.NodeBalancerConfigRebuildOptions
 
 		if err = json.Unmarshal([]byte(req.Body), &nbcro); err != nil {
