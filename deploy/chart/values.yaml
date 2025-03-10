@@ -136,7 +136,7 @@ resources:
 #     maxUnavailable: 25%
 
 # log verbosity of the CCM
-logVerbosity: 3
+# logVerbosity: 3
 
 # set the liveness and readiness probes
 # livenessProbe:
