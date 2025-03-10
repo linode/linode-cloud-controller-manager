@@ -150,8 +150,8 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end}}
       volumes:
-        {{- if .Values.k8sVolume }}
-        {{- toYaml .Values.k8sVolume | nindent 8 }}
+        {{- with .Values.k8sVolume }}
+        {{- toYaml . | nindent 8 }}
         {{- else }}
         - name: k8s
           hostPath:
