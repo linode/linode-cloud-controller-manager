@@ -115,7 +115,8 @@ func newCloud() (cloudprovider.Interface, error) {
 	var healthChecker *healthChecker
 
 	if Options.EnableTokenHealthChecker {
-		authenticated, err := client.CheckClientAuthenticated(context.TODO(), linodeClient)
+		var authenticated bool
+		authenticated, err = client.CheckClientAuthenticated(context.TODO(), linodeClient)
 		if err != nil {
 			return nil, fmt.Errorf("linode client authenticated connection error: %w", err)
 		}
@@ -187,7 +188,12 @@ func (c *linodeCloud) Initialize(clientBuilder cloudprovider.ControllerClientBui
 		go c.linodeTokenHealthChecker.Run(stopCh)
 	}
 
-	serviceController := newServiceController(c.loadbalancers.(*loadbalancers), serviceInformer)
+	lb, assertion := c.loadbalancers.(*loadbalancers)
+	if !assertion {
+		klog.Error("type assertion during Initialize() failed")
+		return
+	}
+	serviceController := newServiceController(lb, serviceInformer)
 	go serviceController.Run(stopCh)
 
 	nodeController := newNodeController(kubeclient, c.client, nodeInformer, instanceCache)
