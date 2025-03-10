@@ -1,5 +1,4 @@
-{{- $rbac := .Values.rbac | default dict }}
-{{- if or (eq $rbac.enabled true ) (eq $rbac.enabled nil ) }}
+{{- if ne .Values.rbacEnabled false }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -40,4 +39,4 @@ rules:
     resources: ["ciliumbgppeeringpolicies"]
     verbs: ["get", "watch", "list", "create"]
 {{- end }}
-{{- end }}
+{{ end }}

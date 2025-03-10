@@ -1,5 +1,4 @@
-{{- $rbac := .Values.rbac | default dict }}
-{{- if or (eq $rbac.enabled true ) (eq $rbac.enabled nil ) }}
+{{- if ne .Values.rbacEnabled false }}
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -12,4 +11,4 @@ subjects:
   - kind: ServiceAccount
     name: ccm-linode
     namespace: {{ required ".Values.namespace required" .Values.namespace }}
-{{- end }}
+{{ end }}

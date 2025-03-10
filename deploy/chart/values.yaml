@@ -1,8 +1,8 @@
 # apiToken [Required if secretRef is not set] - Must be a Linode APIv4 Personal Access Token with all permissions. (https://cloud.linode.com/profile/tokens)
-apiToken: "qwe"
+apiToken: ""
 
 # region [Required if secretRef is not set] - Must be a Linode region. (https://api.linode.com/v4/regions)
-region: "qwe"
+region: ""
 
 # Set these values if your APIToken and region are already present in a k8s secret.
 # secretRef:
@@ -158,8 +158,7 @@ resources:
 # - --kubeconfig=/etc/kubernetes/value
 
 # add toggle to rbac, useful when running CCM outside a cluster
-# rbac:
-#   enabled: true
+# rbacEnabled: true
 
 # template kubeconfig volume
 # k8sVolume: 
