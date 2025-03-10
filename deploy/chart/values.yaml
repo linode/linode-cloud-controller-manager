@@ -127,7 +127,7 @@ resources:
 # allowUnauthorizedMetrics: false
 
 # enables host network
-# enableHostNetwork: false 
+# enableHostNetwork: false
 
 # specify the update strategy
 # updateStrategy:
@@ -161,7 +161,7 @@ resources:
 # rbacEnabled: true
 
 # template kubeconfig volume
-# k8sVolume: 
+# k8sVolume:
 # - name: k8s
 #   hostPath:
 #     path: /etc/kubeconfig
