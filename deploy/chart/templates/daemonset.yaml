@@ -42,7 +42,7 @@ spec:
           name: ccm-linode
           args:
             - --leader-elect-resource-lock=leases
-            - --v={{ default 2 .Values.logVerbosity }}
+            - --v={{ default 3 .Values.logVerbosity }}
             - --secure-port=10253
             - --webhook-secure-port=0
             {{- with .Values.linodegoDebug }}
