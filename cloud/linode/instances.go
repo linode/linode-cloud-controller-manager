@@ -2,6 +2,7 @@ package linode
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -235,7 +236,7 @@ func (i *instances) lookupLinode(ctx context.Context, node *v1.Node) (*linodego.
 func (i *instances) InstanceExists(ctx context.Context, node *v1.Node) (bool, error) {
 	ctx = sentry.SetHubOnContext(ctx)
 	if _, err := i.lookupLinode(ctx, node); err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if errors.Is(err, cloudprovider.InstanceNotFound) {
 			return false, nil
 		}
 		sentry.CaptureError(ctx, err)

@@ -141,7 +141,6 @@ func TestCiliumCCMLoadBalancers(t *testing.T) {
 			f:    testCiliumUpdateLoadBalancerAddNodeWithNewIpHolderNamingConvention,
 		},
 	}
-	//nolint: paralleltest // two tests use t.Setenv, which fails after t.Parallel() call
 	for _, tc := range testCases {
 		ctrl := gomock.NewController(t)
 		mc := mocks.NewMockClient(ctrl)
