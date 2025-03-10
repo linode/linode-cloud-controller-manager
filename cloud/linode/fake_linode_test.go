@@ -40,6 +40,8 @@ type fakeRequest struct {
 }
 
 func newFake(t *testing.T) *fakeAPI {
+	t.Helper()
+
 	fake := &fakeAPI{
 		t:        t,
 		nb:       make(map[string]*linodego.NodeBalancer),
