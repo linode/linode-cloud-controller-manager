@@ -8,5 +8,5 @@ stringData:
   apiToken: {{ required ".Values.apiToken required" .Values.apiToken }}
   region: {{ required ".Values.region required" .Values.region }}
 type: Opaque
-{{- end }}
+{{ end }}
 
