@@ -11,4 +11,4 @@ subjects:
   - kind: ServiceAccount
     name: ccm-linode
     namespace: {{ required ".Values.namespace required" .Values.namespace }}
-{{ end }}
+{{- end }}

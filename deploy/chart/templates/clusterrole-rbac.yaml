@@ -39,4 +39,4 @@ rules:
     resources: ["ciliumbgppeeringpolicies"]
     verbs: ["get", "watch", "list", "create"]
 {{- end }}
-{{ end }}
+{{- end }}
