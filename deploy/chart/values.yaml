@@ -1,8 +1,8 @@
 # apiToken [Required if secretRef is not set] - Must be a Linode APIv4 Personal Access Token with all permissions. (https://cloud.linode.com/profile/tokens)
-apiToken: ""
+apiToken: "qwe"
 
 # region [Required if secretRef is not set] - Must be a Linode region. (https://api.linode.com/v4/regions)
-region: ""
+region: "qwe"
 
 # Set these values if your APIToken and region are already present in a k8s secret.
 # secretRef:
@@ -124,4 +124,45 @@ resources:
   #   cpu: "1000m"
 
 # This flag allows to scrape /metrics endpoint without authorization
-allowUnauthorizedMetrics: false
+# allowUnauthorizedMetrics: false
+
+# enables host network
+# enableHostNetwork: false 
+
+# specify the update strategy
+# updateStrategy:
+#   type: RollingUpdate
+#   rollingUpdate:
+#     maxUnavailable: 25%
+
+# log verbosity of the CCM
+logVerbosity: 3
+
+# set the liveness and readiness probes
+# livenessProbe:
+#   tcpSocket:
+#     port: 10253
+#   initialDelaySeconds: 15
+#   timeoutSeconds: 15
+#   failureThreshold: 8
+
+# readinessProbe:
+#   tcpSocket:
+#     port: 10253
+#   initialDelaySeconds: 15
+#   timeoutSeconds: 15
+#   failureThreshold: 8
+
+# set extra arguments to the CCM container.
+# extraArgs:
+# - --kubeconfig=/etc/kubernetes/value
+
+# add toggle to rbac, useful when running CCM outside a cluster
+# rbac:
+#   enabled: true
+
+# template kubeconfig volume
+# k8sVolume: 
+# - name: k8s
+#   hostPath:
+#     path: /etc/kubeconfig
