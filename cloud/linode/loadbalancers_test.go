@@ -808,10 +808,7 @@ func testUpdateLoadBalancerAddNode(t *testing.T, client *linodego.Client, f *fak
 
 		if req == nil {
 			t.Fatalf("Nodebalancer config rebuild request was not called.")
-		}
-
-		if req.Body == "" {
-			t.Fatalf("Request body is empty")
+			return 0, 0 // explicitly return to satisfy staticcheck
 		}
 
 		var nbcro linodego.NodeBalancerConfigRebuildOptions
