@@ -7,6 +7,7 @@ const (
 	AnnLinodePortConfigPrefix     = "service.beta.kubernetes.io/linode-loadbalancer-port-"
 	AnnLinodeDefaultProxyProtocol = "service.beta.kubernetes.io/linode-loadbalancer-default-proxy-protocol"
 
+	
 	AnnLinodeCheckPath       = "service.beta.kubernetes.io/linode-loadbalancer-check-path"
 	AnnLinodeCheckBody       = "service.beta.kubernetes.io/linode-loadbalancer-check-body"
 	AnnLinodeHealthCheckType = "service.beta.kubernetes.io/linode-loadbalancer-check-type"
