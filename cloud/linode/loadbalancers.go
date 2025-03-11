@@ -245,29 +245,31 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	var nb *linodego.NodeBalancer
 
 	nb, err = l.getNodeBalancerForService(ctx, service)
-	if err != nil {
-		if errors.Is(err, lbNotFoundError{serviceNn: getServiceNn(service)}) {
-			if service.GetAnnotations()[annotations.AnnLinodeNodeBalancerID] != "" {
-				// a load balancer annotation has been created so a NodeBalancer is coming, error out and retry later
-				klog.Infof("NodeBalancer created but not available yet, waiting...")
-				sentry.CaptureError(ctx, err)
-				return nil, err
-			}
-
-			if nb, err = l.buildLoadBalancerRequest(ctx, clusterName, service, nodes); err != nil {
-				sentry.CaptureError(ctx, err)
-				return nil, err
-			}
-			klog.Infof("created new NodeBalancer (%d) for service (%s)", nb.ID, serviceNn)
-		} else {
+	//nolint: errlint //conversion to errors.Is() may break chainsaw tests
+	switch err.(type) {
+	case lbNotFoundError:
+		if service.GetAnnotations()[annotations.AnnLinodeNodeBalancerID] != "" {
+			// a load balancer annotation has been created so a NodeBalancer is coming, error out and retry later
+			klog.Infof("NodeBalancer created but not available yet, waiting...")
 			sentry.CaptureError(ctx, err)
 			return nil, err
 		}
-	} else {
+
+		if nb, err = l.buildLoadBalancerRequest(ctx, clusterName, service, nodes); err != nil {
+			sentry.CaptureError(ctx, err)
+			return nil, err
+		}
+		klog.Infof("created new NodeBalancer (%d) for service (%s)", nb.ID, serviceNn)
+
+	case nil:
 		if err = l.updateNodeBalancer(ctx, clusterName, service, nodes, nb); err != nil {
 			sentry.CaptureError(ctx, err)
 			return nil, err
 		}
+
+	default:
+		sentry.CaptureError(ctx, err)
+		return nil, err
 	}
 
 	klog.Infof("NodeBalancer (%d) has been ensured for service (%s)", nb.ID, serviceNn)
@@ -544,14 +546,18 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 	}
 
 	nb, err := l.getNodeBalancerForService(ctx, service)
-	if err != nil {
-		if errors.Is(err, lbNotFoundError{serviceNn: getServiceNn(service)}) {
-			klog.Infof("short-circuiting deletion for NodeBalancer for service (%s) as one does not exist: %s", serviceNn, err)
-			return nil
-		}
+	//nolint: errlint //conversion to errors.Is() may break chainsaw tests
+	switch getErr := err.(type) {
+	case nil:
+		break
 
+	case lbNotFoundError:
+		klog.Infof("short-circuiting deletion for NodeBalancer for service (%s) as one does not exist: %s", serviceNn, err)
+		return nil
+
+	default:
 		klog.Errorf("failed to get NodeBalancer for service (%s): %s", serviceNn, err)
-		sentry.CaptureError(ctx, err)
+		sentry.CaptureError(ctx, getErr)
 		return err
 	}
 
