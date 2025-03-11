@@ -9,6 +9,10 @@ spec:
   selector:
     matchLabels:
       app: ccm-linode
+  {{- with .Values.updateStrategy }}
+  updateStrategy: 
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
   template:
     metadata:
       labels:
@@ -31,14 +35,14 @@ spec:
       tolerations:
       {{- toYaml . | nindent 8 }}
       {{- end }}
-      hostNetwork: true
+      hostNetwork: {{ default true .Values.enableHostNetwork }}
       containers:
         - image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           name: ccm-linode
           args:
             - --leader-elect-resource-lock=leases
-            - --v=3
+            - --v={{ default 3 .Values.logVerbosity }}
             - --secure-port=10253
             - --webhook-secure-port=0
             {{- with .Values.linodegoDebug }}
@@ -106,8 +110,19 @@ spec:
             {{- if .Values.nodeBalancerBackendIPv4Subnet }}
             - --nodebalancer-backend-ipv4-subnet={{ .Values.nodeBalancerBackendIPv4Subnet }}
             {{- end }}
+            {{- if .Values.extraArgs }}
+            {{- toYaml .Values.extraArgs | nindent 12 }}
+            {{- end }}
           {{- with .Values.containerSecurityContext }}
           securityContext:
+          {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe: 
+          {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe: 
           {{- toYaml . | nindent 12 }}
           {{- end }}
           {{- with .Values.resources }}
@@ -135,9 +150,13 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end}}
       volumes:
+        {{- with .Values.k8sVolume }}
+        {{- toYaml . | nindent 8 }}
+        {{- else }}
         - name: k8s
           hostPath:
             path: /etc/kubernetes
+        {{- end }}
         {{- with .Values.volumes}}
         {{- toYaml . | nindent 8 }}
         {{- end}}
