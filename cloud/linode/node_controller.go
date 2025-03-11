@@ -130,19 +130,21 @@ func (s *nodeController) processNext() bool {
 		return true
 	}
 	err := s.handleNode(context.TODO(), request.node)
-	if err != nil {
-		//nolint: errorlint //switching to errors.Is()/errors.As() causes errors with Code field
-		switch deleteErr := err.(type) {
-		case *linodego.Error:
-			if deleteErr.Code >= http.StatusInternalServerError || deleteErr.Code == http.StatusTooManyRequests {
-				klog.Errorf("failed to add metadata for node (%s); retrying in 1 minute: %s", request.node.Name, err)
-				s.queue.AddAfter(request, retryInterval)
-			}
+	//nolint: errorlint //switching to errors.Is()/errors.As() causes errors with Code field
+	switch deleteErr := err.(type) {
+	case nil:
+		break
 
-		default:
-			klog.Errorf("failed to add metadata for node (%s); will not retry: %s", request.node.Name, err)
+	case *linodego.Error:
+		if deleteErr.Code >= http.StatusInternalServerError || deleteErr.Code == http.StatusTooManyRequests {
+			klog.Errorf("failed to add metadata for node (%s); retrying in 1 minute: %s", request.node.Name, err)
+			s.queue.AddAfter(request, retryInterval)
 		}
+
+	default:
+		klog.Errorf("failed to add metadata for node (%s); will not retry: %s", request.node.Name, err)
 	}
+
 	return true
 }
 
