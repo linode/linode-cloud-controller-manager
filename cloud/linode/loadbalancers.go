@@ -123,10 +123,14 @@ func (l *loadbalancers) cleanupOldNodeBalancer(ctx context.Context, service *v1.
 	}
 
 	previousNB, err := l.getNodeBalancerByStatus(ctx, service)
-	if err != nil {
-		if errors.Is(err, lbNotFoundError{serviceNn: getServiceNn(service)}) {
-			return nil
-		}
+	//nolint: errorlint //conversion to errors.Is() may break chainsaw tests
+	switch err.(type) {
+	case nil:
+		// continue execution
+		break
+	case lbNotFoundError:
+		return nil
+	default:
 		return err
 	}
 
@@ -171,10 +175,15 @@ func (l *loadbalancers) GetLoadBalancer(ctx context.Context, clusterName string,
 	}
 
 	nb, err := l.getNodeBalancerForService(ctx, service)
-	if err != nil {
-		if errors.Is(err, lbNotFoundError{serviceNn: getServiceNn(service)}) {
-			return nil, false, nil
-		}
+	//nolint: errorlint //conversion to errors.Is() may break chainsaw tests
+	switch err.(type) {
+	case nil:
+		break
+
+	case lbNotFoundError:
+		return nil, false, nil
+
+	default:
 		sentry.CaptureError(ctx, err)
 		return nil, false, err
 	}
@@ -245,7 +254,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	var nb *linodego.NodeBalancer
 
 	nb, err = l.getNodeBalancerForService(ctx, service)
-	//nolint: errlint //conversion to errors.Is() may break chainsaw tests
+	//nolint: errorlint //conversion to errors.Is() may break chainsaw tests
 	switch err.(type) {
 	case lbNotFoundError:
 		if service.GetAnnotations()[annotations.AnnLinodeNodeBalancerID] != "" {
@@ -546,7 +555,7 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 	}
 
 	nb, err := l.getNodeBalancerForService(ctx, service)
-	//nolint: errlint //conversion to errors.Is() may break chainsaw tests
+	//nolint: errorlint //conversion to errors.Is() may break chainsaw tests
 	switch getErr := err.(type) {
 	case nil:
 		break
