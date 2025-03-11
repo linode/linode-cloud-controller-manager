@@ -91,18 +91,18 @@ func (s *serviceController) processNextDeletion() bool {
 	}
 
 	err := s.handleServiceDeleted(service)
-	switch deleteErr := err.(type) {
-	case nil:
-		break
+	if err != nil {
+		//nolint: errorlint //switching to errors.Is()/errors.As() causes errors with Code field
+		switch deleteErr := err.(type) {
+		case *linodego.Error:
+			if deleteErr.Code >= http.StatusInternalServerError || deleteErr.Code == http.StatusTooManyRequests {
+				klog.Errorf("failed to delete NodeBalancer for service (%s); retrying in 1 minute: %s", getServiceNn(service), err)
+				s.queue.AddAfter(service, retryInterval)
+			}
 
-	case *linodego.Error:
-		if deleteErr.Code >= http.StatusInternalServerError || deleteErr.Code == http.StatusTooManyRequests {
-			klog.Errorf("failed to delete NodeBalancer for service (%s); retrying in 1 minute: %s", getServiceNn(service), err)
-			s.queue.AddAfter(service, retryInterval)
+		default:
+			klog.Errorf("failed to delete NodeBalancer for service (%s); will not retry: %s", getServiceNn(service), err)
 		}
-
-	default:
-		klog.Errorf("failed to delete NodeBalancer for service (%s); will not retry: %s", getServiceNn(service), err)
 	}
 	return true
 }
