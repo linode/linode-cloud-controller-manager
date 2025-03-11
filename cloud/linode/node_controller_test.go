@@ -28,7 +28,7 @@ func TestNodeController_Run(t *testing.T) {
 	client := mocks.NewMockClient(ctrl)
 	kubeClient := fake.NewSimpleClientset()
 	informer := informers.NewSharedInformerFactory(kubeClient, 0).Core().V1().Nodes()
-	mockQueue := workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[nodeRequest]{Name: "test"})
+	mockQueue := workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[any]{Name: "test"})
 
 	nodeCtrl := newNodeController(kubeClient, client, informer, newInstances(client))
 	nodeCtrl.queue = mockQueue
@@ -68,7 +68,7 @@ func TestNodeController_processNext(t *testing.T) {
 	defer ctrl.Finish()
 	client := mocks.NewMockClient(ctrl)
 	kubeClient := fake.NewSimpleClientset()
-	queue := workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[nodeRequest]{Name: "testQueue"})
+	queue := workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[any]{Name: "testQueue"})
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "test",
@@ -87,11 +87,10 @@ func TestNodeController_processNext(t *testing.T) {
 		queue:              queue,
 		metadataLastUpdate: make(map[string]time.Time),
 		ttl:                defaultMetadataTTL,
-		nodeLastAdded:      make(map[string]time.Time),
 	}
 
 	t.Run("should return no error on unknown errors", func(t *testing.T) {
-		controller.addNodeToQueue(node)
+		queue.Add(node)
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, errors.New("lookup failed"))
 		result := controller.processNext()
 		assert.True(t, result, "processNext should return true")
@@ -100,18 +99,8 @@ func TestNodeController_processNext(t *testing.T) {
 		}
 	})
 
-	t.Run("should return no error if timestamp for node being processed is older than the most recent request", func(t *testing.T) {
-		controller.addNodeToQueue(node)
-		controller.nodeLastAdded["test"] = time.Now().Add(controller.ttl)
-		result := controller.processNext()
-		assert.True(t, result, "processNext should return true")
-		if queue.Len() != 0 {
-			t.Errorf("expected queue to be empty, got %d items", queue.Len())
-		}
-	})
-
 	t.Run("should return no error if node exists", func(t *testing.T) {
-		controller.addNodeToQueue(node)
+		queue.Add(node)
 		publicIP := net.ParseIP("172.234.31.123")
 		privateIP := net.ParseIP("192.168.159.135")
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
@@ -124,8 +113,17 @@ func TestNodeController_processNext(t *testing.T) {
 		}
 	})
 
+	t.Run("should return no error if queued object is not of type Node", func(t *testing.T) {
+		queue.Add("abc")
+		result := controller.processNext()
+		assert.True(t, result, "processNext should return true")
+		if queue.Len() != 0 {
+			t.Errorf("expected queue to be empty, got %d items", queue.Len())
+		}
+	})
+
 	t.Run("should return no error if node in k8s doesn't exist", func(t *testing.T) {
-		controller.addNodeToQueue(node)
+		queue.Add(node)
 		controller.kubeclient = fake.NewSimpleClientset()
 		defer func() { controller.kubeclient = kubeClient }()
 		result := controller.processNext()
@@ -136,9 +134,9 @@ func TestNodeController_processNext(t *testing.T) {
 	})
 
 	t.Run("should return error and requeue when it gets 429 from linode API", func(t *testing.T) {
-		queue = workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[nodeRequest]{Name: "testQueue1"})
+		queue = workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[any]{Name: "testQueue1"})
+		queue.Add(node)
 		controller.queue = queue
-		controller.addNodeToQueue(node)
 		client := mocks.NewMockClient(ctrl)
 		controller.instances = newInstances(client)
 		retryInterval = 1 * time.Nanosecond
@@ -152,9 +150,9 @@ func TestNodeController_processNext(t *testing.T) {
 	})
 
 	t.Run("should return error and requeue when it gets error >= 500 from linode API", func(t *testing.T) {
-		queue = workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[nodeRequest]{Name: "testQueue2"})
+		queue = workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[any]{Name: "testQueue2"})
+		queue.Add(node)
 		controller.queue = queue
-		controller.addNodeToQueue(node)
 		client := mocks.NewMockClient(ctrl)
 		controller.instances = newInstances(client)
 		retryInterval = 1 * time.Nanosecond
