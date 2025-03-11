@@ -18,7 +18,9 @@ spec:
       labels:
         app: ccm-linode
     spec:
+      {{- if ne .Values.rbacEnabled false }}
       serviceAccountName: ccm-linode
+      {{- end }}
       {{- with .Values.securityContext }}
       securityContext:
       {{- toYaml . | nindent 8 }}
