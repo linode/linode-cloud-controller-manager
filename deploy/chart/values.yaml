@@ -127,7 +127,7 @@ resources:
 # allowUnauthorizedMetrics: false
 
 # enables host network
-enableHostNetwork: true
+# enableHostNetwork: true
 
 # specify the update strategy
 # updateStrategy:

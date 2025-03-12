@@ -37,7 +37,7 @@ spec:
       tolerations:
       {{- toYaml . | nindent 8 }}
       {{- end }}
-      hostNetwork: {{ .Values.enableHostNetwork }}
+      hostNetwork: {{ if hasKey .Values "enableHostNetwork" }}{{ .Values.enableHostNetwork }}{{ else }}true{{ end }}
       containers:
         - image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
