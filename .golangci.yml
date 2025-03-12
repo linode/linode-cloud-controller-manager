@@ -74,6 +74,14 @@ linters-settings:
     excludes:
       - G115
 
+  mnd:
+    checks:
+      - case
+      - condition
+      - operation
+      - return
+      # Ignoring argument and assign due to the number of cases we're ignoring
+
   nolintlint:
     require-explanation: true
     require-specific: true
@@ -87,9 +95,7 @@ linters-settings:
     min-name-length: 2
 
 linters:
-  #disable-all: true
-  disable:
-    - testifylint
+  disable-all: true
   enable:
     # these are enabled by default
     - errcheck
@@ -118,7 +124,7 @@ linters:
     - errname
     - errorlint
     - exhaustive
-    #- forbidigo
+    - forbidigo
     - forcetypeassert
     - gci
     - gocheckcompilerdirectives
@@ -135,7 +141,7 @@ linters:
     - maintidx
     - makezero
     - misspell
-    #- mnd
+    - mnd
     - musttag
     #- nestif
     - nilerr
@@ -147,7 +153,7 @@ linters:
     - prealloc
     - predeclared
     - reassign
-    #- testifylint
+    - testifylint
     - thelper
     - unconvert
     - unparam

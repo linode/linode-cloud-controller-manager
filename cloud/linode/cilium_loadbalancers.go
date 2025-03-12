@@ -523,7 +523,8 @@ func (l *loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error 
 		}
 	} else {
 		kv := strings.Split(Options.BGPNodeSelector, "=")
-		if len(kv) != 2 {
+		maxNumNodes := 2
+		if len(kv) != maxNumNodes {
 			return fmt.Errorf("invalid node selector %s", Options.BGPNodeSelector)
 		}
 
