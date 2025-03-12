@@ -51,6 +51,7 @@ type nodeController struct {
 	nodeLastAdded map[string]time.Time
 }
 
+// k8sNodeCache stores node related info as registered in k8s
 type k8sNodeCache struct {
 	sync.RWMutex
 	nodes       map[string]*v1.Node
@@ -89,6 +90,7 @@ func (c *k8sNodeCache) updateCache(kubeclient kubernetes.Interface) {
 	c.lastUpdate = time.Now()
 }
 
+// addNodeToCache stores the specified node in k8s node cache
 func (c *k8sNodeCache) addNodeToCache(node *v1.Node) {
 	c.Lock()
 	defer c.Unlock()
@@ -131,6 +133,7 @@ func (c *k8sNodeCache) getProviderID(nodeName string) (string, bool) {
 	return "", false
 }
 
+// newK8sNodeCache returns new k8s node cache instance
 func newK8sNodeCache() *k8sNodeCache {
 	timeout := defaultK8sNodeCacheTTL
 	if raw, ok := os.LookupEnv("K8S_NODECACHE_TTL"); ok {
@@ -286,9 +289,7 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 
 	expectedPrivateIP := ""
 	// linode API response for linode will contain only one private ip
-	// if any private ip is configured. If it changes in future or linode
-	// supports other subnets with nodebalancer, this logic needs to be updated.
-	// https://www.linode.com/docs/api/linode-instances/#linode-view
+	// if any private ip is configured.
 	for _, addr := range linode.IPv4 {
 		if isPrivate(addr) {
 			expectedPrivateIP = addr.String()
@@ -330,7 +331,9 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 		return err
 	}
 
-	registeredK8sNodeCache.addNodeToCache(updatedNode)
+	if updatedNode != nil {
+		registeredK8sNodeCache.addNodeToCache(updatedNode)
+	}
 	s.SetLastMetadataUpdate(node.Name)
 
 	return nil
