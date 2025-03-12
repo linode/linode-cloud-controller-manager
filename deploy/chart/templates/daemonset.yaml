@@ -18,7 +18,9 @@ spec:
       labels:
         app: ccm-linode
     spec:
+      {{- if ne .Values.rbacEnabled false }}
       serviceAccountName: ccm-linode
+      {{- end }}
       {{- with .Values.securityContext }}
       securityContext:
       {{- toYaml . | nindent 8 }}
@@ -35,7 +37,7 @@ spec:
       tolerations:
       {{- toYaml . | nindent 8 }}
       {{- end }}
-      hostNetwork: {{ default true .Values.enableHostNetwork }}
+      hostNetwork: {{ if hasKey .Values "enableHostNetwork" }}{{ .Values.enableHostNetwork }}{{ else }}true{{ end }}
       containers:
         - image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
