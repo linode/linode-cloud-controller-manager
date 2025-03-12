@@ -125,6 +125,34 @@ func TestNodeController_processNext(t *testing.T) {
 		}
 	})
 
+	t.Run("should return no error if node has providerID set", func(t *testing.T) {
+		node2 := &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "test-node2",
+				Labels:      map[string]string{},
+				Annotations: map[string]string{},
+			},
+			Spec: v1.NodeSpec{ProviderID: "linode://112"},
+		}
+		currInstances := controller.instances
+		defer func() {
+			controller.instances = currInstances
+		}()
+		controller.instances = newInstances(client)
+		registeredK8sNodeCache.lastUpdate = time.Now().Add(-15 * time.Minute)
+		controller.addNodeToQueue(node2)
+		publicIP := net.ParseIP("172.234.31.123")
+		privateIP := net.ParseIP("192.168.159.135")
+		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
+			{ID: 112, Label: "test-node2", IPv4: []*net.IP{&publicIP, &privateIP}, HostUUID: "112"},
+		}, nil)
+		result := controller.processNext()
+		assert.True(t, result, "processNext should return true")
+		if queue.Len() != 0 {
+			t.Errorf("expected queue to be empty, got %d items", queue.Len())
+		}
+	})
+
 	t.Run("should return no error if node in k8s doesn't exist", func(t *testing.T) {
 		controller.addNodeToQueue(node)
 		controller.kubeclient = fake.NewSimpleClientset()
@@ -192,6 +220,10 @@ func TestNodeController_handleNode(t *testing.T) {
 	nodeCtrl := newNodeController(kubeClient, client, nil, instCache)
 	assert.Equal(t, 30*time.Second, nodeCtrl.ttl, "expected ttl to be 30 seconds")
 
+	t.Setenv("K8S_NODECACHE_TTL", "60")
+	currK8sNodeCache := newK8sNodeCache()
+	assert.Equal(t, 60*time.Second, currK8sNodeCache.ttl, "expected ttl to be 60 seconds")
+
 	// Test: Successful metadata update
 	publicIP := net.ParseIP("172.234.31.123")
 	privateIP := net.ParseIP("192.168.159.135")
@@ -230,4 +262,40 @@ func TestNodeController_handleNode(t *testing.T) {
 	}, nil)
 	err = nodeCtrl.handleNode(context.TODO(), node)
 	assert.NoError(t, err, "expected no error during handleNode")
+}
+
+func Test_k8sNodeCache_addNodeToCache(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Add node with providerID set
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test-node",
+			Labels:      map[string]string{},
+			Annotations: map[string]string{},
+		},
+		Spec: v1.NodeSpec{ProviderID: "linode://123"},
+	}
+
+	currK8sNodeCache := newK8sNodeCache()
+	currK8sNodeCache.addNodeToCache(node)
+
+	if _, exists := currK8sNodeCache.nodes[node.Name]; !exists {
+		t.Errorf("expected node to be added to cache")
+	}
+
+	// Add node without providerID set
+	node2 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test-node2",
+			Labels:      map[string]string{},
+			Annotations: map[string]string{},
+		},
+	}
+
+	currK8sNodeCache.addNodeToCache(node2)
+	if _, exists := currK8sNodeCache.nodes[node2.Name]; exists {
+		t.Errorf("expected node to not be added to cache")
+	}
 }
