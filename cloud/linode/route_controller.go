@@ -112,6 +112,11 @@ func (r *routes) getInstanceFromName(ctx context.Context, name string) (*linodeg
 		},
 	}
 
+	// fetch providerID from k8s node cache if it exists
+	if id, ok := registeredK8sNodeCache.getProviderID(name); ok {
+		node.Spec.ProviderID = id
+	}
+
 	// fetch instance with specified node name
 	instance, err := r.instances.lookupLinode(ctx, node)
 	if err != nil {
@@ -235,6 +240,15 @@ func (r *routes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpr
 
 	var configuredRoutes []*cloudprovider.Route
 	for _, instance := range instances {
+		providerID := providerIDPrefix + strconv.Itoa(instance.ID)
+		label, found := registeredK8sNodeCache.getNodeLabel(providerID, instance.Label)
+		if !found {
+			klog.V(4).Infof("Node %s not found in k8s node cache, skipping listing its routes", instance.Label)
+			continue
+		}
+		// Update label to match with k8s registered label
+		instance.Label = label
+
 		instanceRoutes, err := r.getInstanceRoutes(ctx, instance.ID)
 		if err != nil {
 			klog.Errorf("Failed finding routes for instance id %d. Error: %v", instance.ID, err)

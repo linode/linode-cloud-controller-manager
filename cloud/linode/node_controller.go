@@ -24,9 +24,12 @@ import (
 )
 
 const (
-	informerResyncPeriod = 1 * time.Minute
-	defaultMetadataTTL   = 300 * time.Second
+	informerResyncPeriod   = 1 * time.Minute
+	defaultMetadataTTL     = 300 * time.Second
+	defaultK8sNodeCacheTTL = 300 * time.Second
 )
+
+var registeredK8sNodeCache *k8sNodeCache = newK8sNodeCache()
 
 type nodeRequest struct {
 	node      *v1.Node
@@ -46,6 +49,101 @@ type nodeController struct {
 
 	queue         workqueue.TypedDelayingInterface[nodeRequest]
 	nodeLastAdded map[string]time.Time
+}
+
+type k8sNodeCache struct {
+	sync.RWMutex
+	nodes       map[string]*v1.Node
+	providerIDs map[string]string
+	lastUpdate  time.Time
+	ttl         time.Duration
+}
+
+// updateCache updates the k8s node cache with the latest nodes from the k8s API server.
+func (c *k8sNodeCache) updateCache(kubeclient kubernetes.Interface) {
+	c.Lock()
+	defer c.Unlock()
+	if time.Since(c.lastUpdate) < c.ttl {
+		return
+	}
+
+	nodeList, err := kubeclient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		klog.Errorf("failed to list nodes, cannot create/update k8s node cache: %s", err)
+		return
+	}
+
+	nodes := make(map[string]*v1.Node, nodeList.Size())
+	providerIDs := make(map[string]string, nodeList.Size())
+	for _, node := range nodeList.Items {
+		if node.Spec.ProviderID == "" {
+			klog.Errorf("Empty providerID [%s] for node %s, skipping it", node.Spec.ProviderID, node.Name)
+			continue
+		}
+		nodes[node.Name] = &node
+		providerIDs[node.Spec.ProviderID] = node.Name
+	}
+
+	c.nodes = nodes
+	c.providerIDs = providerIDs
+	c.lastUpdate = time.Now()
+}
+
+func (c *k8sNodeCache) addNodeToCache(node *v1.Node) {
+	c.Lock()
+	defer c.Unlock()
+	if node.Spec.ProviderID == "" {
+		klog.Errorf("Empty providerID [%s] for node %s, skipping it", node.Spec.ProviderID, node.Name)
+		return
+	}
+	c.nodes[node.Name] = node
+	c.providerIDs[node.Spec.ProviderID] = node.Name
+}
+
+// getNodeLabel returns the k8s node label for the given provider ID or instance label.
+// If the provider ID or label is not found in the cache, it returns an empty string and false.
+func (c *k8sNodeCache) getNodeLabel(providerID string, instanceLabel string) (string, bool) {
+	c.RLock()
+	defer c.RUnlock()
+
+	// check if instance label matches with the registered k8s node
+	if _, exists := c.nodes[instanceLabel]; exists {
+		return instanceLabel, true
+	}
+
+	// check if provider id matches with the registered k8s node
+	if label, exists := c.providerIDs[providerID]; exists {
+		return label, true
+	}
+
+	return "", false
+}
+
+// getProviderID returns linode specific providerID for given k8s node name
+func (c *k8sNodeCache) getProviderID(nodeName string) (string, bool) {
+	c.RLock()
+	defer c.RUnlock()
+
+	if node, exists := c.nodes[nodeName]; exists {
+		return node.Spec.ProviderID, true
+	}
+
+	return "", false
+}
+
+func newK8sNodeCache() *k8sNodeCache {
+	timeout := defaultK8sNodeCacheTTL
+	if raw, ok := os.LookupEnv("K8S_NODECACHE_TTL"); ok {
+		if t, _ := strconv.Atoi(raw); t > 0 {
+			timeout = time.Duration(t) * time.Second
+		}
+	}
+
+	return &k8sNodeCache{
+		nodes:       make(map[string]*v1.Node, 0),
+		providerIDs: make(map[string]string, 0),
+		ttl:         timeout,
+	}
 }
 
 func newNodeController(kubeclient kubernetes.Interface, client client.Client, informer v1informers.NodeInformer, instanceCache *instances) *nodeController {
@@ -145,6 +243,7 @@ func (s *nodeController) processNext() bool {
 		klog.Errorf("failed to add metadata for node (%s); will not retry: %s", request.node.Name, err)
 	}
 
+	registeredK8sNodeCache.updateCache(s.kubeclient)
 	return true
 }
 
@@ -202,6 +301,7 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 		return nil
 	}
 
+	var updatedNode *v1.Node
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Get a fresh copy of the node so the resource version is up-to-date
 		nodeResult, err := s.kubeclient.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
@@ -223,13 +323,14 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 		if nodeResult.Annotations[annotations.AnnLinodeNodePrivateIP] != expectedPrivateIP && expectedPrivateIP != "" {
 			nodeResult.Annotations[annotations.AnnLinodeNodePrivateIP] = expectedPrivateIP
 		}
-		_, err = s.kubeclient.CoreV1().Nodes().Update(ctx, nodeResult, metav1.UpdateOptions{})
+		updatedNode, err = s.kubeclient.CoreV1().Nodes().Update(ctx, nodeResult, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		klog.V(1).ErrorS(err, "Node update error")
 		return err
 	}
 
+	registeredK8sNodeCache.addNodeToCache(updatedNode)
 	s.SetLastMetadataUpdate(node.Name)
 
 	return nil
