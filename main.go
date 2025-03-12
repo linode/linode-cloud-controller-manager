@@ -41,30 +41,30 @@ func initializeSentry() {
 	)
 
 	if dsn, ok = os.LookupEnv(sentryDSNVariable); !ok {
-		fmt.Printf("%s not set, not initializing Sentry\n", sentryDSNVariable)
+		klog.Errorf("%s not set, not initializing Sentry\n", sentryDSNVariable)
 		return
 	}
 
 	if environment, ok = os.LookupEnv(sentryEnvironmentVariable); !ok {
-		fmt.Printf("%s not set, not initializing Sentry\n", sentryEnvironmentVariable)
+		klog.Errorf("%s not set, not initializing Sentry\n", sentryEnvironmentVariable)
 		return
 	}
 
 	if release, ok = os.LookupEnv(sentryReleaseVariable); !ok {
-		fmt.Printf("%s not set, defaulting to unknown", sentryReleaseVariable)
+		klog.Infof("%s not set, defaulting to unknown", sentryReleaseVariable)
 		release = "unknown"
 	}
 
 	if err := sentry.Initialize(dsn, environment, release); err != nil {
-		fmt.Printf("error initializing sentry: %s\n", err.Error())
+		klog.Errorf("error initializing sentry: %s\n", err.Error())
 		return
 	}
 
-	fmt.Print("Sentry successfully initialized\n")
+	klog.Infoln("Sentry successfully initialized")
 }
 
 func main() {
-	fmt.Printf("Linode Cloud Controller Manager starting up\n")
+	klog.Infoln("Linode Cloud Controller Manager starting up")
 
 	initializeSentry()
 

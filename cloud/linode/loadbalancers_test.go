@@ -2135,8 +2135,6 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 		t.Errorf("expected ips, got %v", fwIPs)
 	}
 
-	fmt.Printf("got %v", fwIPs)
-
 	// Add ipv6 ips in allowList
 	svc.ObjectMeta.SetAnnotations(map[string]string{
 		annotations.AnnLinodeCloudFirewallACL: `{
