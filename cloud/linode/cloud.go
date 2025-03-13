@@ -63,7 +63,7 @@ type linodeCloud struct {
 
 var (
 	instanceCache *instances
-	charLimit     int = 23
+	ipHolderCharLimit     int = 23
 )
 
 func init() {
