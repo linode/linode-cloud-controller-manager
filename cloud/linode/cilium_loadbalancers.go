@@ -69,6 +69,7 @@ var (
 		"ca-central":   15, // Toronto (Canada)
 		"us-iad":       17, // Washington, DC (USA)
 	}
+	maxNumNodes int = 2
 )
 
 // getExistingSharedIPsInCluster determines the list of addresses to share on nodes by checking the
@@ -523,7 +524,6 @@ func (l *loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error 
 		}
 	} else {
 		kv := strings.Split(Options.BGPNodeSelector, "=")
-		maxNumNodes := 2
 		if len(kv) != maxNumNodes {
 			return fmt.Errorf("invalid node selector %s", Options.BGPNodeSelector)
 		}

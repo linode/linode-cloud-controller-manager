@@ -31,7 +31,10 @@ import (
 	"github.com/linode/linode-cloud-controller-manager/sentry"
 )
 
-var errNoNodesAvailable = errors.New("no nodes available for nodebalancer")
+var (
+	errNoNodesAvailable     = errors.New("no nodes available for nodebalancer")
+	maxParsed           int = 20
+)
 
 type lbNotFoundError struct {
 	serviceNn      string
@@ -1056,7 +1059,6 @@ func getConnectionThrottle(service *v1.Service) int {
 				parsed = 0
 			}
 
-			maxParsed := 20
 			if parsed > maxParsed {
 				parsed = 20
 			}

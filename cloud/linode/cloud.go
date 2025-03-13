@@ -61,7 +61,10 @@ type linodeCloud struct {
 	linodeTokenHealthChecker *healthChecker
 }
 
-var instanceCache *instances
+var (
+	instanceCache *instances
+	charLimit     int = 23
+)
 
 func init() {
 	registerMetrics()
@@ -161,7 +164,6 @@ func newCloud() (cloudprovider.Interface, error) {
 		klog.Infof("Using IP holder suffix '%s'\n", Options.IpHolderSuffix)
 	}
 
-	charLimit := 23
 	if len(Options.IpHolderSuffix) > charLimit {
 		msg := fmt.Sprintf("ip-holder-suffix must be %d characters or less: %s is %d characters\n", charLimit, Options.IpHolderSuffix, len(Options.IpHolderSuffix))
 		klog.Error(msg)
