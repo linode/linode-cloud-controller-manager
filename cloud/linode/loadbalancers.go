@@ -33,7 +33,7 @@ import (
 
 var (
 	errNoNodesAvailable     = errors.New("no nodes available for nodebalancer")
-	maxParsed           int = 20
+	maxConnThrottleStringLen           int = 20
 )
 
 type lbNotFoundError struct {
