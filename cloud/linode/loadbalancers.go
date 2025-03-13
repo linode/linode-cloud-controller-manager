@@ -1059,8 +1059,8 @@ func getConnectionThrottle(service *v1.Service) int {
 				parsed = 0
 			}
 
-			if parsed > maxParsed {
-				parsed = 20
+			if parsed > maxConnThrottleStringLen {
+				parsed = maxConnThrottleStringLen
 			}
 			connThrottle = parsed
 		}
