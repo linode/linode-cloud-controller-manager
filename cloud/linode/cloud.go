@@ -62,8 +62,8 @@ type linodeCloud struct {
 }
 
 var (
-	instanceCache *instances
-	ipHolderCharLimit     int = 23
+	instanceCache     *instances
+	ipHolderCharLimit int = 23
 )
 
 func init() {
@@ -164,8 +164,8 @@ func newCloud() (cloudprovider.Interface, error) {
 		klog.Infof("Using IP holder suffix '%s'\n", Options.IpHolderSuffix)
 	}
 
-	if len(Options.IpHolderSuffix) > charLimit {
-		msg := fmt.Sprintf("ip-holder-suffix must be %d characters or less: %s is %d characters\n", charLimit, Options.IpHolderSuffix, len(Options.IpHolderSuffix))
+	if len(Options.IpHolderSuffix) > ipHolderCharLimit {
+		msg := fmt.Sprintf("ip-holder-suffix must be %d characters or less: %s is %d characters\n", ipHolderCharLimit, Options.IpHolderSuffix, len(Options.IpHolderSuffix))
 		klog.Error(msg)
 		return nil, fmt.Errorf("%s", msg)
 	}
