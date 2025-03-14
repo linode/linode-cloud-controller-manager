@@ -137,7 +137,7 @@ func (c *k8sNodeCache) getProviderID(nodeName string) (string, bool) {
 func newK8sNodeCache() *k8sNodeCache {
 	timeout := defaultK8sNodeCacheTTL
 	if raw, ok := os.LookupEnv("K8S_NODECACHE_TTL"); ok {
-		if t, _ := strconv.Atoi(raw); t > 0 {
+		if t, err := strconv.Atoi(raw); t > 0 && err == nil {
 			timeout = time.Duration(t) * time.Second
 		}
 	}
