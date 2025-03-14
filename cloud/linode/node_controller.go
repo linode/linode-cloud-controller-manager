@@ -74,8 +74,8 @@ func (c *k8sNodeCache) updateCache(kubeclient kubernetes.Interface) {
 		return
 	}
 
-	nodes := make(map[string]*v1.Node, nodeList.Size())
-	providerIDs := make(map[string]string, nodeList.Size())
+	nodes := make(map[string]*v1.Node, len(nodeList.Items))
+	providerIDs := make(map[string]string, len(nodeList.Items))
 	for _, node := range nodeList.Items {
 		if node.Spec.ProviderID == "" {
 			klog.Errorf("Empty providerID [%s] for node %s, skipping it", node.Spec.ProviderID, node.Name)
