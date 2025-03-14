@@ -6,12 +6,13 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/util/workqueue"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 )
 
 func Test_serviceController_Run(t *testing.T) {
@@ -23,7 +24,10 @@ func Test_serviceController_Run(t *testing.T) {
 	informer := informers.NewSharedInformerFactory(kubeClient, 0).Core().V1().Services()
 	mockQueue := workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[any]{Name: "test"})
 
-	loadbalancers := newLoadbalancers(client, "us-east").(*loadbalancers)
+	loadbalancers, assertion := newLoadbalancers(client, "us-east").(*loadbalancers)
+	if !assertion {
+		t.Error("type assertion failed")
+	}
 	svcCtrl := newServiceController(loadbalancers, informer)
 	svcCtrl.queue = mockQueue
 

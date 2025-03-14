@@ -7,10 +7,7 @@ import (
 	"net"
 	"os"
 
-	"k8s.io/component-base/logs"
-
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode"
-	"github.com/linode/linode-cloud-controller-manager/sentry"
+	"github.com/linode/linodego"
 	"github.com/spf13/pflag"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
@@ -18,7 +15,11 @@ import (
 	"k8s.io/cloud-provider/names"
 	"k8s.io/cloud-provider/options"
 	utilflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode"
+	"github.com/linode/linode-cloud-controller-manager/sentry"
 
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // for client metric registration
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
@@ -84,11 +85,14 @@ func main() {
 	command.Flags().BoolVar(&linode.Options.EnableTokenHealthChecker, "enable-token-health-checker", false, "enables Linode API token health checker")
 	command.Flags().StringVar(&linode.Options.VPCName, "vpc-name", "", "[deprecated: use vpc-names instead] vpc name whose routes will be managed by route-controller")
 	command.Flags().StringVar(&linode.Options.VPCNames, "vpc-names", "", "comma separated vpc names whose routes will be managed by route-controller")
-	command.Flags().StringVar(&linode.Options.SubnetNames, "subnet-names", "", "comma separated subnet names whose routes will be managed by route-controller (requires vpc-names flag to also be set)")
+	command.Flags().StringVar(&linode.Options.SubnetNames, "subnet-names", "default", "comma separated subnet names whose routes will be managed by route-controller (requires vpc-names flag to also be set)")
 	command.Flags().StringVar(&linode.Options.LoadBalancerType, "load-balancer-type", "nodebalancer", "configures which type of load-balancing to use for LoadBalancer Services (options: nodebalancer, cilium-bgp)")
 	command.Flags().StringVar(&linode.Options.BGPNodeSelector, "bgp-node-selector", "", "node selector to use to perform shared IP fail-over with BGP (e.g. cilium-bgp-peering=true")
 	command.Flags().StringVar(&linode.Options.IpHolderSuffix, "ip-holder-suffix", "", "suffix to append to the ip holder name when using shared IP fail-over with BGP (e.g. ip-holder-suffix=my-cluster-name")
+	command.Flags().StringVar(&linode.Options.DefaultNBType, "default-nodebalancer-type", string(linodego.NBTypeCommon), "default type of NodeBalancer to create (options: common, premium)")
+	command.Flags().StringVar(&linode.Options.NodeBalancerBackendIPv4Subnet, "nodebalancer-backend-ipv4-subnet", "", "ipv4 subnet to use for NodeBalancer backends")
 	command.Flags().StringSliceVar(&linode.Options.NodeBalancerTags, "nodebalancer-tags", []string{}, "Linode tags to apply to all NodeBalancers")
+	command.Flags().BoolVar(&linode.Options.EnableIPv6ForLoadBalancers, "enable-ipv6-for-loadbalancers", false, "set both IPv4 and IPv6 addresses for all LoadBalancer services (when disabled, only IPv4 is used)")
 
 	// Set static flags
 	command.Flags().VisitAll(func(fl *pflag.Flag) {

@@ -28,6 +28,11 @@ const (
 	defaultMetadataTTL   = 300 * time.Second
 )
 
+type nodeRequest struct {
+	node      *v1.Node
+	timestamp time.Time
+}
+
 type nodeController struct {
 	sync.RWMutex
 
@@ -39,7 +44,8 @@ type nodeController struct {
 	metadataLastUpdate map[string]time.Time
 	ttl                time.Duration
 
-	queue workqueue.TypedDelayingInterface[any]
+	queue         workqueue.TypedDelayingInterface[nodeRequest]
+	nodeLastAdded map[string]time.Time
 }
 
 func newNodeController(kubeclient kubernetes.Interface, client client.Client, informer v1informers.NodeInformer, instanceCache *instances) *nodeController {
@@ -57,7 +63,8 @@ func newNodeController(kubeclient kubernetes.Interface, client client.Client, in
 		informer:           informer,
 		ttl:                timeout,
 		metadataLastUpdate: make(map[string]time.Time),
-		queue:              workqueue.NewTypedDelayingQueueWithConfig[any](workqueue.TypedDelayingQueueConfig[any]{Name: "ccm_node"}),
+		queue:              workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[nodeRequest]{Name: "ccm_node"}),
+		nodeLastAdded:      make(map[string]time.Time),
 	}
 }
 
@@ -71,7 +78,7 @@ func (s *nodeController) Run(stopCh <-chan struct{}) {
 				}
 
 				klog.Infof("NodeController will handle newly created node (%s) metadata", node.Name)
-				s.queue.Add(node)
+				s.addNodeToQueue(node)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				node, ok := newObj.(*v1.Node)
@@ -80,7 +87,7 @@ func (s *nodeController) Run(stopCh <-chan struct{}) {
 				}
 
 				klog.Infof("NodeController will handle newly updated node (%s) metadata", node.Name)
-				s.queue.Add(node)
+				s.addNodeToQueue(node)
 			},
 		},
 		informerResyncPeriod,
@@ -92,6 +99,15 @@ func (s *nodeController) Run(stopCh <-chan struct{}) {
 	s.informer.Informer().Run(stopCh)
 }
 
+// addNodeToQueue adds a node to the queue for processing.
+func (s *nodeController) addNodeToQueue(node *v1.Node) {
+	s.Lock()
+	defer s.Unlock()
+	currTime := time.Now()
+	s.nodeLastAdded[node.Name] = currTime
+	s.queue.Add(nodeRequest{node: node, timestamp: currTime})
+}
+
 // worker runs a worker thread that dequeues new or modified nodes and processes
 // metadata (host UUID) on each of them.
 func (s *nodeController) worker() {
@@ -100,31 +116,32 @@ func (s *nodeController) worker() {
 }
 
 func (s *nodeController) processNext() bool {
-	key, quit := s.queue.Get()
+	request, quit := s.queue.Get()
 	if quit {
 		return false
 	}
-	defer s.queue.Done(key)
+	defer s.queue.Done(request)
 
-	node, ok := key.(*v1.Node)
-	if !ok {
-		klog.Errorf("expected dequeued key to be of type *v1.Node but got %T", node)
+	s.RLock()
+	latestTimestamp, exists := s.nodeLastAdded[request.node.Name]
+	s.RUnlock()
+	if !exists || request.timestamp.Before(latestTimestamp) {
+		klog.V(3).InfoS("Skipping node metadata update as its not the most recent object", "node", klog.KObj(request.node))
 		return true
 	}
-
-	err := s.handleNode(context.TODO(), node)
+	err := s.handleNode(context.TODO(), request.node)
 	switch deleteErr := err.(type) {
 	case nil:
 		break
 
 	case *linodego.Error:
 		if deleteErr.Code >= http.StatusInternalServerError || deleteErr.Code == http.StatusTooManyRequests {
-			klog.Errorf("failed to add metadata for node (%s); retrying in 1 minute: %s", node.Name, err)
-			s.queue.AddAfter(node, retryInterval)
+			klog.Errorf("failed to add metadata for node (%s); retrying in 1 minute: %s", request.node.Name, err)
+			s.queue.AddAfter(request, retryInterval)
 		}
 
 	default:
-		klog.Errorf("failed to add metadata for node (%s); will not retry: %s", node.Name, err)
+		klog.Errorf("failed to add metadata for node (%s); will not retry: %s", request.node.Name, err)
 	}
 	return true
 }
@@ -185,26 +202,26 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Get a fresh copy of the node so the resource version is up-to-date
-		n, err := s.kubeclient.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
+		nodeResult, err := s.kubeclient.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 
 		// Try to update the node UUID if it has not been set
-		if n.Labels[annotations.AnnLinodeHostUUID] != linode.HostUUID {
-			n.Labels[annotations.AnnLinodeHostUUID] = linode.HostUUID
+		if nodeResult.Labels[annotations.AnnLinodeHostUUID] != linode.HostUUID {
+			nodeResult.Labels[annotations.AnnLinodeHostUUID] = linode.HostUUID
 		}
 
 		// Try to update the node ProviderID if it has not been set
-		if n.Spec.ProviderID == "" {
-			n.Spec.ProviderID = providerIDPrefix + strconv.Itoa(linode.ID)
+		if nodeResult.Spec.ProviderID == "" {
+			nodeResult.Spec.ProviderID = providerIDPrefix + strconv.Itoa(linode.ID)
 		}
 
 		// Try to update the expectedPrivateIP if its not set or doesn't match
-		if n.Annotations[annotations.AnnLinodeNodePrivateIP] != expectedPrivateIP && expectedPrivateIP != "" {
-			n.Annotations[annotations.AnnLinodeNodePrivateIP] = expectedPrivateIP
+		if nodeResult.Annotations[annotations.AnnLinodeNodePrivateIP] != expectedPrivateIP && expectedPrivateIP != "" {
+			nodeResult.Annotations[annotations.AnnLinodeNodePrivateIP] = expectedPrivateIP
 		}
-		_, err = s.kubeclient.CoreV1().Nodes().Update(ctx, n, metav1.UpdateOptions{})
+		_, err = s.kubeclient.CoreV1().Nodes().Update(ctx, nodeResult, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		klog.V(1).ErrorS(err, "Node update error")

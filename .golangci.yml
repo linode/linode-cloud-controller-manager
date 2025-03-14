@@ -1,36 +1,203 @@
 run:
   timeout: 5m
+  issues-exit-code: 1
+
+output:
+  formats:
+    - format: colored-line-number
+
+linters-settings:
+  cyclop:
+    max-complexity: 15
+
+  depguard:
+    rules:
+      main:
+        files:
+          - "$all"
+          - "!$test"
+        deny:
+          # TODO: Remove reflect from loadbalancers.go and reinstate this requirement
+          #- pkg: "reflect"
+          #  desc: "Reflection is never clear."
+          - pkg: "gob"
+            desc: "Please convert types manually"
+
+  dupl:
+    threshold: 100
+
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+    exclude-functions:
+      - fmt:.*
+      - io/ioutil:^Read.*
+
+  gci:
+    sections:
+      - standard
+      - default
+      - blank
+      - dot
+      - prefix(github.com/linode/linode-cloud-controller-manager)
+
+  goconst:
+    min-len: 3
+    min-occurrences: 5
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+
+    settings:
+      captLocal:
+        paramsOnly: true
+      rangeValCopy:
+        sizeThreshold: 32
+
+  gofmt:
+    simplify: true
+
+  goimports:
+    local-prefixes: github.com/linode/linode-cloud-controller-manager
+
+  govet:
+    enable:
+      - shadow
+
+  gosec:
+    confidence: "medium"
+    excludes:
+      - G115
+
+  nolintlint:
+    require-explanation: true
+    require-specific: true
+
+  prealloc:
+    simple: true
+    range-loops: true
+    for-loops: true
+
+  varnamelen:
+    min-name-length: 2
 
 linters:
-  disable-all: true
+  #disable-all: true
+  disable:
+    - errcheck
+    - errchkjson
+    - errorlint
+    #- govet
+    - testifylint
   enable:
     # these are enabled by default
-    - errcheck
+    #- errcheck
     - gosimple
     - govet
     - ineffassign
     - staticcheck
     - typecheck
     - unused
-    # cherry picked from https://golangci-lint.run/usage/linters/
-    # - ginkgolinter # to be enabled once #158 is merged
+    - ginkgolinter 
+    - asasalint
+    - asciicheck
+    - bidichk
     - bodyclose
+    - containedctx
+    - contextcheck
     - copyloopvar
+    #- cyclop
+    - decorder
+    - depguard
+    - dogsled
+    - dupl
+    - dupword
+    - durationcheck
+    #- errchkjson
+    - errname
+    #- errorlint
+    - exhaustive
+    #- forbidigo
+    - forcetypeassert
+    - gci
     - gocheckcompilerdirectives
     - gofmt
     - goimports
+    #- gocognit
+    - goconst
+    #- gocritic
+    - gofumpt
+    - goprintffuncname
+    - gosec
     - importas
     - loggercheck
+    - maintidx
     - makezero
-    - nilerr
-    - prealloc
-    - reassign
-    - tenv
-    - unconvert
-    - wastedassign
-    - unparam
-    - gofumpt
-    - nosprintfhostport
+    - misspell
+    #- mnd
     - musttag
-    - exhaustive
+    #- nestif
+    - nilerr
     - nilnil
+    - noctx
+    - nolintlint
+    - nosprintfhostport
+    #- paralleltest # adding t.Parallel() to tests broke so many and made others flaky
+    - prealloc
+    - predeclared
+    - reassign
+    - thelper
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - usetesting
+    - varnamelen
+    - wastedassign
+    - whitespace
+  
+  presets:
+    - bugs
+    - unused
+  fast: false
+
+issues:
+  exclude-rules:
+    # Exclude some linters from running on tests files.
+    - path: _test(ing)?\.go
+      linters:
+        - gocyclo
+        - maintidx
+        - errcheck
+        - dupl
+        - gosec
+        - copyloopvar
+        - unparam
+        - varnamelen
+
+    # Ease some gocritic warnings on test files.
+    - path: _test\.go
+      text: "(unnamedResult|exitAfterDefer)"
+      linters:
+        - gocritic
+
+    - text: "G101:"
+      linters:
+        - gosec
+        - gas
+
+    - text: "G104:"
+      linters:
+        - gosec
+        - gas
+
+  exclude-use-default: false
+  new: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-files:
+    - "zz_generated\\..+\\.go$"

@@ -83,6 +83,17 @@ tolerations:
 # Enable Linode token health checker
 # tokenHealthChecker: true
 
+# Default NodeBalancer type to create("common" or "premium"). Default is "common"
+# defaultNBType: "common"
+
+# Enable IPv6 ingress addresses for LoadBalancer services
+# When enabled, both IPv4 and IPv6 addresses will be included in the LoadBalancer status for all services
+# This can also be controlled per-service using the "service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-ingress" annotation
+# enableIPv6ForLoadBalancers: true
+
+# nodeBalancerBackendIPv4Subnet is the subnet to use for the backend ips of the NodeBalancer
+# nodeBalancerBackendIPv4Subnet: ""
+
 # This section adds the ability to pass environment variables to adjust CCM defaults
 # https://github.com/linode/linode-cloud-controller-manager/blob/master/cloud/linode/loadbalancers.go
 # LINODE_HOSTNAME_ONLY_INGRESS type bool is supported
@@ -113,4 +124,44 @@ resources:
   #   cpu: "1000m"
 
 # This flag allows to scrape /metrics endpoint without authorization
-allowUnauthorizedMetrics: false
+# allowUnauthorizedMetrics: false
+
+# enables host network
+# enableHostNetwork: true
+
+# specify the update strategy
+# updateStrategy:
+#   type: RollingUpdate
+#   rollingUpdate:
+#     maxUnavailable: 25%
+
+# log verbosity of the CCM
+# logVerbosity: 3
+
+# set the liveness and readiness probes
+# livenessProbe:
+#   tcpSocket:
+#     port: 10253
+#   initialDelaySeconds: 15
+#   timeoutSeconds: 15
+#   failureThreshold: 8
+
+# readinessProbe:
+#   tcpSocket:
+#     port: 10253
+#   initialDelaySeconds: 15
+#   timeoutSeconds: 15
+#   failureThreshold: 8
+
+# set extra arguments to the CCM container.
+# extraArgs:
+# - --kubeconfig=/etc/kubernetes/value
+
+# add toggle to rbac, useful when running CCM outside a cluster
+# rbacEnabled: true
+
+# template kubeconfig volume
+# k8sVolume:
+# - name: k8s
+#   hostPath:
+#     path: /etc/kubeconfig

@@ -9,9 +9,10 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 	"github.com/linode/linodego"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 )
 
 func TestGetAllVPCIDs(t *testing.T) {

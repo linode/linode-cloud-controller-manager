@@ -10,12 +10,19 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 	"github.com/linode/linodego"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cloudprovider "k8s.io/cloud-provider"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
+)
+
+const (
+	instanceName string = "mock-instance"
+	usEast       string = "us-east"
+	typeG6       string = "g6-standard-1"
 )
 
 func nodeWithProviderID(providerID string) *v1.Node {
@@ -52,7 +59,7 @@ func TestInstanceExists(t *testing.T) {
 			{
 				ID:     123,
 				Label:  "mock",
-				Region: "us-east",
+				Region: usEast,
 				Type:   "g6-standard-2",
 			},
 		}, nil)
@@ -94,7 +101,7 @@ func TestMetadataRetrieval(t *testing.T) {
 		node := nodeWithName(name)
 
 		meta, err := instances.InstanceMetadata(ctx, node)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, providerIDPrefix+strconv.Itoa(expectedInstance.ID), meta.ProviderID)
 	})
 
@@ -113,14 +120,13 @@ func TestMetadataRetrieval(t *testing.T) {
 	t.Run("should return data when linode is found (by name)", func(t *testing.T) {
 		instances := newInstances(client)
 		id := 123
-		name := "mock-instance"
-		node := nodeWithName(name)
+		node := nodeWithName(instanceName)
 		publicIPv4 := net.ParseIP("45.76.101.25")
 		privateIPv4 := net.ParseIP("192.168.133.65")
-		linodeType := "g6-standard-1"
-		region := "us-east"
+		linodeType := typeG6
+		region := usEast
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
-			{ID: id, Label: name, Type: linodeType, Region: region, IPv4: []*net.IP{&publicIPv4, &privateIPv4}},
+			{ID: id, Label: instanceName, Type: linodeType, Region: region, IPv4: []*net.IP{&publicIPv4, &privateIPv4}},
 		}, nil)
 
 		meta, err := instances.InstanceMetadata(ctx, node)
@@ -131,7 +137,7 @@ func TestMetadataRetrieval(t *testing.T) {
 		assert.Equal(t, []v1.NodeAddress{
 			{
 				Type:    v1.NodeHostName,
-				Address: name,
+				Address: instanceName,
 			},
 			{
 				Type:    v1.NodeExternalIP,
@@ -147,13 +153,11 @@ func TestMetadataRetrieval(t *testing.T) {
 	t.Run("should return data when linode is found (by name) and addresses must be in order", func(t *testing.T) {
 		instances := newInstances(client)
 		id := 123
-		name := "mock-instance"
-		node := nodeWithName(name)
+		node := nodeWithName(instanceName)
 		publicIPv4 := net.ParseIP("45.76.101.25")
 		privateIPv4 := net.ParseIP("192.168.133.65")
 		ipv6Addr := "2001::8a2e:370:7348"
-		linodeType := "g6-standard-1"
-		region := "us-east"
+		linodeType := typeG6
 
 		Options.VPCNames = "test"
 		vpcIDs["test"] = 1
@@ -161,9 +165,9 @@ func TestMetadataRetrieval(t *testing.T) {
 
 		instance := linodego.Instance{
 			ID:     id,
-			Label:  name,
+			Label:  instanceName,
 			Type:   linodeType,
-			Region: region,
+			Region: usEast,
 			IPv4:   []*net.IP{&publicIPv4, &privateIPv4},
 			IPv6:   ipv6Addr,
 		}
@@ -200,12 +204,12 @@ func TestMetadataRetrieval(t *testing.T) {
 		meta, err := instances.InstanceMetadata(ctx, node)
 		assert.NoError(t, err)
 		assert.Equal(t, providerIDPrefix+strconv.Itoa(id), meta.ProviderID)
-		assert.Equal(t, region, meta.Region)
+		assert.Equal(t, usEast, meta.Region)
 		assert.Equal(t, linodeType, meta.InstanceType)
 		assert.Equal(t, []v1.NodeAddress{
 			{
 				Type:    v1.NodeHostName,
-				Address: name,
+				Address: instanceName,
 			},
 			{
 				Type:    v1.NodeInternalIP,
@@ -344,15 +348,15 @@ func TestMetadataRetrieval(t *testing.T) {
 				ips = append(ips, &parsed)
 			}
 
-			linodeType := "g6-standard-1"
-			region := "us-east"
+			linodeType := typeG6
+			region := usEast
 			client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
 				{ID: id, Label: name, Type: linodeType, Region: region, IPv4: ips, IPv6: test.inputIPv6},
 			}, nil)
 
 			meta, err := instances.InstanceMetadata(ctx, node)
 
-			assert.Equal(t, err, test.expectedErr)
+			assert.Equal(t, test.expectedErr, err)
 			if test.expectedErr == nil {
 				assert.Equal(t, region, meta.Region)
 				assert.Equal(t, linodeType, meta.InstanceType)
@@ -420,9 +424,9 @@ func TestMetadataRetrieval(t *testing.T) {
 				meta, err := instances.InstanceMetadata(ctx, &node)
 				if test.expectedErr != nil {
 					assert.Nil(t, meta)
-					assert.Equal(t, err, test.expectedErr)
+					assert.Equal(t, test.expectedErr, err)
 				} else {
-					assert.Nil(t, err)
+					assert.NoError(t, err)
 					assert.Equal(t, providerIDPrefix+strconv.Itoa(expectedInstance.ID), meta.ProviderID)
 				}
 			})

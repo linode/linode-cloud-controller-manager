@@ -28,12 +28,13 @@ The Linode Cloud Controller Manager (CCM) offers extensive configuration options
    - Node controller behavior
    - [See node management](nodes.md#node-controller-behavior)
 
-4. **[Environment Variables](environment.md)**
+4. **[Environment Variables and Flags](environment.md)**
    - Cache settings
    - API configuration
    - Network settings
    - BGP configuration
-   - [See environment reference](environment.md#available-variables)
+   - IPv6 configuration
+   - [See configuration reference](environment.md#flags)
 
 5. **[Firewall Setup](firewall.md)**
    - CCM-managed firewalls

@@ -39,15 +39,18 @@ var Options struct {
 	EnableRouteController    bool
 	EnableTokenHealthChecker bool
 	// Deprecated: use VPCNames instead
-	VPCName               string
-	VPCNames              string
-	SubnetNames           string
-	LoadBalancerType      string
-	BGPNodeSelector       string
-	IpHolderSuffix        string
-	LinodeExternalNetwork *net.IPNet
-	NodeBalancerTags      []string
-	GlobalStopChannel     chan<- struct{}
+	VPCName                       string
+	VPCNames                      string
+	SubnetNames                   string
+	LoadBalancerType              string
+	BGPNodeSelector               string
+	IpHolderSuffix                string
+	LinodeExternalNetwork         *net.IPNet
+	NodeBalancerTags              []string
+	DefaultNBType                 string
+	NodeBalancerBackendIPv4Subnet string
+	GlobalStopChannel             chan<- struct{}
+	EnableIPv6ForLoadBalancers    bool
 }
 
 type linodeCloud struct {
@@ -74,7 +77,7 @@ func init() {
 func newLinodeClientWithPrometheus(apiToken string, timeout time.Duration) (client.Client, error) {
 	linodeClient, err := client.New(apiToken, timeout)
 	if err != nil {
-		return nil, fmt.Errorf("client was not created succesfully: %w", err)
+		return nil, fmt.Errorf("client was not created successfully: %w", err)
 	}
 
 	if Options.LinodeGoDebug {
@@ -112,7 +115,8 @@ func newCloud() (cloudprovider.Interface, error) {
 	var healthChecker *healthChecker
 
 	if Options.EnableTokenHealthChecker {
-		authenticated, err := client.CheckClientAuthenticated(context.TODO(), linodeClient)
+		var authenticated bool
+		authenticated, err = client.CheckClientAuthenticated(context.TODO(), linodeClient)
 		if err != nil {
 			return nil, fmt.Errorf("linode client authenticated connection error: %w", err)
 		}
@@ -184,7 +188,12 @@ func (c *linodeCloud) Initialize(clientBuilder cloudprovider.ControllerClientBui
 		go c.linodeTokenHealthChecker.Run(stopCh)
 	}
 
-	serviceController := newServiceController(c.loadbalancers.(*loadbalancers), serviceInformer)
+	lb, assertion := c.loadbalancers.(*loadbalancers)
+	if !assertion {
+		klog.Error("type assertion during Initialize() failed")
+		return
+	}
+	serviceController := newServiceController(lb, serviceInformer)
 	go serviceController.Run(stopCh)
 
 	nodeController := newNodeController(kubeclient, c.client, nodeInformer, instanceCache)

@@ -1,0 +1,93 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: lb-premium-nb
+  labels:
+    all:
+spec:
+  namespace: "lb-premium-nb"
+  steps:
+    - name: Create pods and services
+      try:
+        - apply:
+            file: create-pods-services.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that loadbalancer ip is assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test
+            status:
+              (loadBalancer.ingress[0].ip != null): true
+    - name: Fetch loadbalancer ip and check both pods reachable
+      try:
+        - script:
+            content: |
+              set -e
+              IP=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].ip)
+
+              podnames=()
+
+              for i in {1..10}; do
+                  if [[ ${#podnames[@]} -lt 2 ]]; then
+                      output=$(curl -s $IP:80 | jq -e .podName || true)
+
+                      if [[ "$output" == *"test-"* ]]; then
+                          unique=true
+                          for i in "${array[@]}"; do
+                              if [[ "$i" == "$output" ]]; then
+                                  unique=false
+                                  break
+                              fi
+                          done
+                          if [[ "$unique" == true ]]; then
+                              podnames+=($output)
+                          fi
+                      fi
+                  else
+                      break
+                  fi
+                  sleep 10
+              done
+
+              if [[ ${#podnames[@]} -lt 2 ]]; then
+                  echo "all pods failed to respond"
+              else
+                  echo "all pods responded"
+              fi
+            check:
+              ($error == null): true
+              (contains($stdout, 'all pods responded')): true
+    - name: Check nodebalancer type
+      try:
+      - script:
+          content: |
+            set -e
+
+            nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+            for i in {1..10}; do
+                type=$(curl -s --request GET \
+                  -H "Authorization: Bearer $LINODE_TOKEN" \
+                  -H "Content-Type: application/json" \
+                  -H "accept: application/json" \
+                  "https://api.linode.com/v4/nodebalancers/${nbid}" | jq -r '.type')
+
+                if [[ $type == "premium" ]]; then
+                    echo "nodebalancer type is premium"
+                    break
+                fi
+                sleep 5
+            done
+          check:
+            ($error == null): true
+            (contains($stdout, 'nodebalancer type is premium')): true

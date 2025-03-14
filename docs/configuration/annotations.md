@@ -32,6 +32,11 @@ For implementation details, see:
 | `tags` | string | | A comma separated list of tags to be applied to the NodeBalancer instance |
 | `firewall-id` | string | | An existing Cloud Firewall ID to be attached to the NodeBalancer instance. See [Firewall Setup](firewall.md) |
 | `firewall-acl` | string | | The Firewall rules to be applied to the NodeBalancer. See [Firewall Configuration](#firewall-configuration) |
+| `nodebalancer-type` | string | | The type of NodeBalancer to create (options: common, premium). See [NodeBalancer Types](#nodebalancer-type) |
+| `enable-ipv6-ingress` | bool | `false` | When `true`, both IPv4 and IPv6 addresses will be included in the LoadBalancerStatus ingress |
+| `backend-ipv4-range` | string | | The IPv4 range from VPC subnet to be applied to the NodeBalancer backend. See [Nodebalancer VPC Configuration](#nodebalancer-vpc-configuration) |
+| `backend-vpc-name` | string | | VPC which is connected to the NodeBalancer backend. See [Nodebalancer VPC Configuration](#nodebalancer-vpc-configuration) |
+| `backend-subnet-name` | string | | Subnet within VPC which is connected to the NodeBalancer backend. See [Nodebalancer VPC Configuration](#nodebalancer-vpc-configuration) |
 
 ### Port Specific Configuration
 
@@ -102,6 +107,29 @@ metadata:
           "ipv6": ["2001:db8::/32"]
         }
       }
+```
+
+### NodeBalancer Type
+Linode supports nodebalancers of different types: common and premium. By default, nodebalancers of type common are provisioned. If an account is allowed to provision premium nodebalancers and one wants to use them, it can be achieved by specifying the annotation:
+```yaml
+metadata:
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-type: premium
+
+### Nodebalancer VPC Configuration
+```yaml
+metadata:
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-backend-ipv4-range: "10.100.0.0/30"
+    service.beta.kubernetes.io/linode-loadbalancer-vpc-name: "vpc1"
+    service.beta.kubernetes.io/linode-loadbalancer-subnet-name: "subnet1"
+```
+
+### Service with IPv6 Address
+```yaml
+metadata:
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-ingress: "true"
 ```
 
 For more examples and detailed configuration options, see:

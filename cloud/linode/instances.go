@@ -99,14 +99,13 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 	}
 
 	newNodes := make(map[int]linodeInstance, len(instances))
-	for i, instance := range instances {
-
+	for index, instance := range instances {
 		// if running within VPC, only store instances in cache which are part of VPC
 		if Options.VPCNames != "" && len(vpcNodes[instance.ID]) == 0 {
 			continue
 		}
 		node := linodeInstance{
-			instance: &instances[i],
+			instance: &instances[index],
 			ips:      nc.getInstanceAddresses(instance, vpcNodes[instance.ID]),
 		}
 		newNodes[instance.ID] = node
