@@ -226,10 +226,18 @@ func testNoBGPNodeLabel(t *testing.T, mc *mocks.MockClient) {
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
-	rawFilter, _ := json.Marshal(filter)
+	rawFilter, err := json.Marshal(filter)
+	if err != nil {
+		t.Errorf("json marshal error: %v", err)
+	}
+
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
 	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix)}
-	rawFilter, _ = json.Marshal(filter)
+	rawFilter, err = json.Marshal(filter)
+	if err != nil {
+		t.Errorf("json marshal error: %v", err)
+	}
+
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
 	dummySharedIP := dummyIP
 	mc.EXPECT().CreateInstance(gomock.Any(), gomock.Any()).Times(1).Return(&newIpHolderInstance, nil)
@@ -306,7 +314,10 @@ func testCreateWithExistingIPHolderWithOldIpHolderNamingConvention(t *testing.T,
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
-	rawFilter, _ := json.Marshal(filter)
+	rawFilter, err := json.Marshal(filter)
+	if err != nil {
+		t.Errorf("json marshal error: %v", err)
+	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{oldIpHolderInstance}, nil)
 	dummySharedIP := dummyIP
 	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), oldIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
@@ -348,7 +359,10 @@ func testCreateWithExistingIPHolderWithNewIpHolderNamingConvention(t *testing.T,
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
-	rawFilter, _ := json.Marshal(filter)
+	rawFilter, err := json.Marshal(filter)
+	if err != nil {
+		t.Errorf("json marshal error: %v", err)
+	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{oldIpHolderInstance}, nil)
 	dummySharedIP := dummyIP
 	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), oldIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
@@ -390,7 +404,10 @@ func testCreateWithExistingIPHolderWithNewIpHolderNamingConventionUsingLongSuffi
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
-	rawFilter, _ := json.Marshal(filter)
+	rawFilter, err := json.Marshal(filter)
+	if err != nil {
+		t.Errorf("json marshal error: %v", err)
+	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{oldIpHolderInstance}, nil)
 	dummySharedIP := dummyIP
 	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), oldIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
@@ -432,10 +449,16 @@ func testCreateWithNoExistingIPHolderUsingNoSuffix(t *testing.T, mc *mocks.MockC
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
-	rawFilter, _ := json.Marshal(filter)
+	rawFilter, err := json.Marshal(filter)
+	if err != nil {
+		t.Errorf("json marshal error: %v", err)
+	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
 	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix)}
-	rawFilter, _ = json.Marshal(filter)
+	rawFilter, err = json.Marshal(filter)
+	if err != nil {
+		t.Errorf("json marshal error: %v", err)
+	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
 	dummySharedIP := dummyIP
 	mc.EXPECT().CreateInstance(gomock.Any(), gomock.Any()).Times(1).Return(&newIpHolderInstance, nil)
@@ -478,10 +501,16 @@ func testCreateWithNoExistingIPHolderUsingShortSuffix(t *testing.T, mc *mocks.Mo
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
-	rawFilter, _ := json.Marshal(filter)
+	rawFilter, err := json.Marshal(filter)
+	if err != nil {
+		t.Errorf("json marshal error: %v", err)
+	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
 	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix)}
-	rawFilter, _ = json.Marshal(filter)
+	rawFilter, err = json.Marshal(filter)
+	if err != nil {
+		t.Errorf("json marshal error: %v", err)
+	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
 	dummySharedIP := dummyIP
 	mc.EXPECT().CreateInstance(gomock.Any(), gomock.Any()).Times(1).Return(&newIpHolderInstance, nil)
@@ -524,10 +553,16 @@ func testCreateWithNoExistingIPHolderUsingLongSuffix(t *testing.T, mc *mocks.Moc
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
-	rawFilter, _ := json.Marshal(filter)
+	rawFilter, err := json.Marshal(filter)
+	if err != nil {
+		t.Errorf("json marshal error: %v", err)
+	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
 	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix)}
-	rawFilter, _ = json.Marshal(filter)
+	rawFilter, err = json.Marshal(filter)
+	if err != nil {
+		t.Errorf("json marshal error: %v", err)
+	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
 	dummySharedIP := dummyIP
 	mc.EXPECT().CreateInstance(gomock.Any(), gomock.Any()).Times(1).Return(&newIpHolderInstance, nil)
@@ -571,13 +606,16 @@ func testEnsureCiliumLoadBalancerDeletedWithOldIpHolderNamingConvention(t *testi
 	svc.Status.LoadBalancer = v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{{IP: dummySharedIP}}}
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
-	rawFilter, _ := json.Marshal(filter)
+	rawFilter, err := json.Marshal(filter)
+	if err != nil {
+		t.Errorf("json marshal error: %v", err)
+	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{oldIpHolderInstance}, nil)
 	mc.EXPECT().DeleteInstanceIPAddress(gomock.Any(), 11111, dummySharedIP).Times(1).Return(nil)
 	mc.EXPECT().DeleteInstanceIPAddress(gomock.Any(), 22222, dummySharedIP).Times(1).Return(nil)
 	mc.EXPECT().DeleteInstanceIPAddress(gomock.Any(), oldIpHolderInstance.ID, dummySharedIP).Times(1).Return(nil)
 
-	err := lb.EnsureLoadBalancerDeleted(context.TODO(), clusterName, svc)
+	err = lb.EnsureLoadBalancerDeleted(context.TODO(), clusterName, svc)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
@@ -601,16 +639,22 @@ func testEnsureCiliumLoadBalancerDeletedWithNewIpHolderNamingConvention(t *testi
 	svc.Status.LoadBalancer = v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{{IP: dummySharedIP}}}
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
-	rawFilter, _ := json.Marshal(filter)
+	rawFilter, err := json.Marshal(filter)
+	if err != nil {
+		t.Errorf("json marshal error: %v", err)
+	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
 	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix)}
-	rawFilter, _ = json.Marshal(filter)
+	rawFilter, err = json.Marshal(filter)
+	if err != nil {
+		t.Errorf("json marshal error: %v", err)
+	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{newIpHolderInstance}, nil)
 	mc.EXPECT().DeleteInstanceIPAddress(gomock.Any(), 11111, dummySharedIP).Times(1).Return(nil)
 	mc.EXPECT().DeleteInstanceIPAddress(gomock.Any(), 22222, dummySharedIP).Times(1).Return(nil)
 	mc.EXPECT().DeleteInstanceIPAddress(gomock.Any(), newIpHolderInstance.ID, dummySharedIP).Times(1).Return(nil)
 
-	err := lb.EnsureLoadBalancerDeleted(context.TODO(), clusterName, svc)
+	err = lb.EnsureLoadBalancerDeleted(context.TODO(), clusterName, svc)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
@@ -629,7 +673,10 @@ func testCiliumUpdateLoadBalancerAddNodeWithOldIpHolderNamingConvention(t *testi
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
-	rawFilter, _ := json.Marshal(filter)
+	rawFilter, err := json.Marshal(filter)
+	if err != nil {
+		t.Errorf("json marshal error: %v", err)
+	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{oldIpHolderInstance}, nil)
 	dummySharedIP := dummyIP
 	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), oldIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
@@ -689,10 +736,16 @@ func testCiliumUpdateLoadBalancerAddNodeWithNewIpHolderNamingConvention(t *testi
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
-	rawFilter, _ := json.Marshal(filter)
+	rawFilter, err := json.Marshal(filter)
+	if err != nil {
+		t.Errorf("json marshal error: %v", err)
+	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
 	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix)}
-	rawFilter, _ = json.Marshal(filter)
+	rawFilter, err = json.Marshal(filter)
+	if err != nil {
+		t.Errorf("json marshal error: %v", err)
+	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{newIpHolderInstance}, nil)
 	dummySharedIP := dummyIP
 	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), newIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
@@ -720,10 +773,16 @@ func testCiliumUpdateLoadBalancerAddNodeWithNewIpHolderNamingConvention(t *testi
 
 	// Now add another node to the cluster and assert that it gets the shared IP
 	filter = map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
-	rawFilter, _ = json.Marshal(filter)
+	rawFilter, err = json.Marshal(filter)
+	if err != nil {
+		t.Errorf("json marshal error: %v", err)
+	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
 	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix)}
-	rawFilter, _ = json.Marshal(filter)
+	rawFilter, err = json.Marshal(filter)
+	if err != nil {
+		t.Errorf("json marshal error: %v", err)
+	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{newIpHolderInstance}, nil)
 
 	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), newIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{

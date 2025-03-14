@@ -11,6 +11,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/linode/linodego"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
@@ -44,7 +45,7 @@ func TestNodeController_Run(t *testing.T) {
 		Spec: v1.NodeSpec{},
 	}
 	_, err := kubeClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
-	assert.NoError(t, err, "expected no error during node creation")
+	require.NoError(t, err, "expected no error during node creation")
 
 	// Start the controller
 	stopCh := make(chan struct{})
@@ -53,7 +54,7 @@ func TestNodeController_Run(t *testing.T) {
 	client.EXPECT().ListInstances(gomock.Any(), nil).AnyTimes().Return([]linodego.Instance{}, &linodego.Error{Code: http.StatusTooManyRequests, Message: "Too many requests"})
 	// Add the node to the informer
 	err = nodeCtrl.informer.Informer().GetStore().Add(node)
-	assert.NoError(t, err, "expected no error when adding node to informer")
+	require.NoError(t, err, "expected no error when adding node to informer")
 
 	// Allow some time for the queue to process
 	time.Sleep(1 * time.Second)
@@ -79,7 +80,7 @@ func TestNodeController_processNext(t *testing.T) {
 	}
 
 	_, err := kubeClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
-	assert.NoError(t, err, "expected no error during node creation")
+	require.NoError(t, err, "expected no error during node creation")
 
 	controller := &nodeController{
 		kubeclient:         kubeClient,
@@ -183,7 +184,7 @@ func TestNodeController_handleNode(t *testing.T) {
 		Spec: v1.NodeSpec{ProviderID: "linode://123"},
 	}
 	_, err := kubeClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
-	assert.NoError(t, err, "expected no error during node creation")
+	require.NoError(t, err, "expected no error during node creation")
 
 	instCache := newInstances(client)
 
@@ -198,7 +199,7 @@ func TestNodeController_handleNode(t *testing.T) {
 		{ID: 123, Label: "test-node", IPv4: []*net.IP{&publicIP, &privateIP}, HostUUID: "123"},
 	}, nil)
 	err = nodeCtrl.handleNode(context.TODO(), node)
-	assert.NoError(t, err, "expected no error during handleNode")
+	require.NoError(t, err, "expected no error during handleNode")
 
 	// Check metadataLastUpdate
 	lastUpdate := nodeCtrl.LastMetadataUpdate("test-node")
@@ -210,7 +211,7 @@ func TestNodeController_handleNode(t *testing.T) {
 	node.Labels[annotations.AnnLinodeHostUUID] = "123"
 	node.Annotations[annotations.AnnLinodeNodePrivateIP] = privateIP.String()
 	err = nodeCtrl.handleNode(context.TODO(), node)
-	assert.NoError(t, err, "expected no error during handleNode")
+	require.NoError(t, err, "expected no error during handleNode")
 
 	// Lookup failure for linode instance
 	client = mocks.NewMockClient(ctrl)
@@ -218,7 +219,7 @@ func TestNodeController_handleNode(t *testing.T) {
 	nodeCtrl.metadataLastUpdate["test-node"] = time.Now().Add(-2 * nodeCtrl.ttl)
 	client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, errors.New("lookup failed"))
 	err = nodeCtrl.handleNode(context.TODO(), node)
-	assert.Error(t, err, "expected error during handleNode, got nil")
+	require.Error(t, err, "expected error during handleNode, got nil")
 
 	// All fields already set
 	client = mocks.NewMockClient(ctrl)

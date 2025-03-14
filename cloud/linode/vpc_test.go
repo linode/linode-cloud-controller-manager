@@ -11,6 +11,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/linode/linodego"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 )
@@ -67,7 +68,7 @@ func TestGetVPCID(t *testing.T) {
 		vpcIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
 		client.EXPECT().ListVPCs(gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPC{}, errors.New("error"))
 		got, err := GetVPCID(context.TODO(), client, "test4")
-		assert.Error(t, err)
+		require.Error(t, err)
 		if got != 0 {
 			t.Errorf("GetVPCID() = %v, want %v", got, 0)
 		}
@@ -80,7 +81,7 @@ func TestGetVPCID(t *testing.T) {
 		vpcIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
 		client.EXPECT().ListVPCs(gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPC{}, nil)
 		got, err := GetVPCID(context.TODO(), client, "test4")
-		assert.ErrorIs(t, err, vpcLookupError{"test4"})
+		require.ErrorIs(t, err, vpcLookupError{"test4"})
 		if got != 0 {
 			t.Errorf("GetVPCID() = %v, want %v", got, 0)
 		}
@@ -93,7 +94,7 @@ func TestGetVPCID(t *testing.T) {
 		vpcIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
 		client.EXPECT().ListVPCs(gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPC{{ID: 4, Label: "test4"}}, nil)
 		got, err := GetVPCID(context.TODO(), client, "test4")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		if got != 4 {
 			t.Errorf("GetVPCID() = %v, want %v", got, 4)
 		}
@@ -108,7 +109,7 @@ func TestGetVPCIPAddresses(t *testing.T) {
 		vpcIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
 		client.EXPECT().ListVPCs(gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPC{}, nil)
 		_, err := GetVPCIPAddresses(context.TODO(), client, "test4")
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("vpc id found but listing ip addresses fails with 404 error", func(t *testing.T) {
@@ -118,7 +119,7 @@ func TestGetVPCIPAddresses(t *testing.T) {
 		vpcIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCIP{}, &linodego.Error{Code: http.StatusNotFound, Message: "[404] [label] VPC not found"})
 		_, err := GetVPCIPAddresses(context.TODO(), client, "test3")
-		assert.Error(t, err)
+		require.Error(t, err)
 		_, exists := vpcIDs["test3"]
 		assert.False(t, exists, "test3 key should get deleted from vpcIDs map")
 	})
@@ -130,7 +131,7 @@ func TestGetVPCIPAddresses(t *testing.T) {
 		vpcIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCIP{}, &linodego.Error{Code: http.StatusInternalServerError, Message: "[500] [label] Internal Server Error"})
 		_, err := GetVPCIPAddresses(context.TODO(), client, "test1")
-		assert.Error(t, err)
+		require.Error(t, err)
 		_, exists := vpcIDs["test1"]
 		assert.True(t, exists, "test1 key should not get deleted from vpcIDs map")
 	})
@@ -143,7 +144,7 @@ func TestGetVPCIPAddresses(t *testing.T) {
 		client.EXPECT().ListVPCs(gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPC{{ID: 10, Label: "test10"}}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCIP{}, nil)
 		_, err := GetVPCIPAddresses(context.TODO(), client, "test10")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		_, exists := vpcIDs["test10"]
 		assert.True(t, exists, "test10 key should be present in vpcIDs map")
 	})
@@ -161,7 +162,7 @@ func TestGetVPCIPAddresses(t *testing.T) {
 		client.EXPECT().ListVPCSubnets(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCSubnet{{ID: 4, Label: "subnet4"}}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCIP{}, nil)
 		_, err := GetVPCIPAddresses(context.TODO(), client, "test10")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		_, exists := subnetIDs["subnet4"]
 		assert.True(t, exists, "subnet4 should be present in subnetIDs map")
 	})
@@ -190,7 +191,7 @@ func TestGetSubnetID(t *testing.T) {
 		subnetIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
 		client.EXPECT().ListVPCSubnets(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCSubnet{}, errors.New("error"))
 		got, err := GetSubnetID(context.TODO(), client, 0, "test4")
-		assert.Error(t, err)
+		require.Error(t, err)
 		if got != 0 {
 			t.Errorf("GetSubnetID() = %v, want %v", got, 0)
 		}
@@ -205,7 +206,7 @@ func TestGetSubnetID(t *testing.T) {
 		subnetIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
 		client.EXPECT().ListVPCSubnets(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCSubnet{}, nil)
 		got, err := GetSubnetID(context.TODO(), client, 0, "test4")
-		assert.ErrorIs(t, err, subnetLookupError{"test4"})
+		require.ErrorIs(t, err, subnetLookupError{"test4"})
 		if got != 0 {
 			t.Errorf("GetSubnetID() = %v, want %v", got, 0)
 		}
@@ -218,7 +219,7 @@ func TestGetSubnetID(t *testing.T) {
 		subnetIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
 		client.EXPECT().ListVPCSubnets(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCSubnet{{ID: 4, Label: "test4"}}, nil)
 		got, err := GetSubnetID(context.TODO(), client, 0, "test4")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		if got != 4 {
 			t.Errorf("GetSubnetID() = %v, want %v", got, 4)
 		}

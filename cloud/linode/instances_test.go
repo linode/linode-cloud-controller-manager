@@ -12,6 +12,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/linode/linodego"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cloudprovider "k8s.io/cloud-provider"
@@ -48,7 +49,7 @@ func TestInstanceExists(t *testing.T) {
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
 
 		exists, err := instances.InstanceExists(ctx, node)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.False(t, exists)
 	})
 
@@ -65,7 +66,7 @@ func TestInstanceExists(t *testing.T) {
 		}, nil)
 
 		exists, err := instances.InstanceExists(ctx, node)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, exists)
 	})
 
@@ -79,7 +80,7 @@ func TestInstanceExists(t *testing.T) {
 		}, nil)
 
 		exists, err := instances.InstanceExists(ctx, node)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, exists)
 	})
 }
@@ -101,7 +102,7 @@ func TestMetadataRetrieval(t *testing.T) {
 		node := nodeWithName(name)
 
 		meta, err := instances.InstanceMetadata(ctx, node)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, providerIDPrefix+strconv.Itoa(expectedInstance.ID), meta.ProviderID)
 	})
 
@@ -113,7 +114,7 @@ func TestMetadataRetrieval(t *testing.T) {
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
 		meta, err := instances.InstanceMetadata(ctx, node)
 
-		assert.ErrorIs(t, err, cloudprovider.InstanceNotFound)
+		require.ErrorIs(t, err, cloudprovider.InstanceNotFound)
 		assert.Nil(t, meta)
 	})
 
@@ -130,7 +131,7 @@ func TestMetadataRetrieval(t *testing.T) {
 		}, nil)
 
 		meta, err := instances.InstanceMetadata(ctx, node)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, providerIDPrefix+strconv.Itoa(id), meta.ProviderID)
 		assert.Equal(t, region, meta.Region)
 		assert.Equal(t, linodeType, meta.InstanceType)
@@ -202,7 +203,7 @@ func TestMetadataRetrieval(t *testing.T) {
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), vpcIDs["test"], gomock.Any()).Return(routesInVPC, nil)
 
 		meta, err := instances.InstanceMetadata(ctx, node)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, providerIDPrefix+strconv.Itoa(id), meta.ProviderID)
 		assert.Equal(t, usEast, meta.Region)
 		assert.Equal(t, linodeType, meta.InstanceType)
@@ -426,7 +427,7 @@ func TestMetadataRetrieval(t *testing.T) {
 					assert.Nil(t, meta)
 					assert.Equal(t, test.expectedErr, err)
 				} else {
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, providerIDPrefix+strconv.Itoa(expectedInstance.ID), meta.ProviderID)
 				}
 			})
@@ -448,7 +449,7 @@ func TestMalformedProviders(t *testing.T) {
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
 		meta, err := instances.InstanceMetadata(ctx, node)
 
-		assert.ErrorIs(t, err, invalidProviderIDError{providerID})
+		require.ErrorIs(t, err, invalidProviderIDError{providerID})
 		assert.Nil(t, meta)
 	})
 }
@@ -467,7 +468,7 @@ func TestInstanceShutdown(t *testing.T) {
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
 		shutdown, err := instances.InstanceShutdown(ctx, node)
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.False(t, shutdown)
 	})
 
@@ -478,7 +479,7 @@ func TestInstanceShutdown(t *testing.T) {
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
 		shutdown, err := instances.InstanceShutdown(ctx, node)
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.False(t, shutdown)
 	})
 
@@ -491,7 +492,7 @@ func TestInstanceShutdown(t *testing.T) {
 		}, nil)
 		shutdown, err := instances.InstanceShutdown(ctx, node)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, shutdown)
 	})
 
@@ -504,7 +505,7 @@ func TestInstanceShutdown(t *testing.T) {
 		}, nil)
 		shutdown, err := instances.InstanceShutdown(ctx, node)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, shutdown)
 	})
 
@@ -517,7 +518,7 @@ func TestInstanceShutdown(t *testing.T) {
 		}, nil)
 		shutdown, err := instances.InstanceShutdown(ctx, node)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.False(t, shutdown)
 	})
 }

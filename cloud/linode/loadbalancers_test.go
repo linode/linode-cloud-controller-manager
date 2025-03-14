@@ -1061,11 +1061,6 @@ func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Clie
 	}
 }
 
-func toJSON(v interface{}) string {
-	data, _ := json.Marshal(v)
-	return string(data)
-}
-
 func testVeryLongServiceName(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	t.Helper()
 
@@ -1076,12 +1071,23 @@ func testVeryLongServiceName(t *testing.T, client *linodego.Client, _ *fakeAPI) 
 		ipv4DenyList[i] = fmt.Sprintf("192.168.1.%d/32", i)
 		ipv6DenyList[i] = fmt.Sprintf("2001:db8::%x/128", i)
 	}
+
+	var jsonV4DenyList, jsonV6DenyList []byte
+	jsonV4DenyList, err := json.Marshal(ipv4DenyList)
+	if err != nil {
+		t.Error("Could not marshal ipv4DenyList into json")
+	}
+	jsonV6DenyList, err = json.Marshal(ipv6DenyList)
+	if err != nil {
+		t.Error("Could not marshal ipv6DenyList into json")
+	}
+
 	denyListJSON := fmt.Sprintf(`{
 		"denyList": {
 			"ipv4": %s,
 			"ipv6": %s
 		}
-	}`, toJSON(ipv4DenyList), toJSON(ipv6DenyList))
+	}`, string(jsonV4DenyList), string(jsonV6DenyList))
 
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2128,8 +2134,6 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 	if fwIPs == nil {
 		t.Errorf("expected ips, got %v", fwIPs)
 	}
-
-	fmt.Printf("got %v", fwIPs)
 
 	// Add ipv6 ips in allowList
 	svc.ObjectMeta.SetAnnotations(map[string]string{

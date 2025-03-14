@@ -51,7 +51,7 @@ type nodeController struct {
 func newNodeController(kubeclient kubernetes.Interface, client client.Client, informer v1informers.NodeInformer, instanceCache *instances) *nodeController {
 	timeout := defaultMetadataTTL
 	if raw, ok := os.LookupEnv("LINODE_METADATA_TTL"); ok {
-		if t, _ := strconv.Atoi(raw); t > 0 {
+		if t, err := strconv.Atoi(raw); t > 0 && err == nil {
 			timeout = time.Duration(t) * time.Second
 		}
 	}
@@ -130,6 +130,7 @@ func (s *nodeController) processNext() bool {
 		return true
 	}
 	err := s.handleNode(context.TODO(), request.node)
+	//nolint: errorlint //switching to errors.Is()/errors.As() causes errors with Code field
 	switch deleteErr := err.(type) {
 	case nil:
 		break
@@ -143,6 +144,7 @@ func (s *nodeController) processNext() bool {
 	default:
 		klog.Errorf("failed to add metadata for node (%s); will not retry: %s", request.node.Name, err)
 	}
+
 	return true
 }
 

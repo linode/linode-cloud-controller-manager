@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	cloudprovider "k8s.io/cloud-provider"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
@@ -75,7 +76,7 @@ func TestNewCloud(t *testing.T) {
 			Options.VPCNames = ""
 		}()
 		_, err := newCloud()
-		assert.NoError(t, err, "expected no error if deprecated flag vpcname is set")
+		require.NoError(t, err, "expected no error if deprecated flag vpcname is set")
 		assert.Equal(t, "tt", Options.VPCNames, "expected vpcnames to be set to vpcname")
 	})
 

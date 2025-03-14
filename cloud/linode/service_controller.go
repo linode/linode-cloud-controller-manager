@@ -91,6 +91,7 @@ func (s *serviceController) processNextDeletion() bool {
 	}
 
 	err := s.handleServiceDeleted(service)
+	//nolint: errorlint //switching to errors.Is()/errors.As() causes errors with Code field
 	switch deleteErr := err.(type) {
 	case nil:
 		break
@@ -104,6 +105,7 @@ func (s *serviceController) processNextDeletion() bool {
 	default:
 		klog.Errorf("failed to delete NodeBalancer for service (%s); will not retry: %s", getServiceNn(service), err)
 	}
+
 	return true
 }
 

@@ -31,7 +31,10 @@ import (
 	"github.com/linode/linode-cloud-controller-manager/sentry"
 )
 
-var errNoNodesAvailable = errors.New("no nodes available for nodebalancer")
+var (
+	errNoNodesAvailable          = errors.New("no nodes available for nodebalancer")
+	maxConnThrottleStringLen int = 20
+)
 
 type lbNotFoundError struct {
 	serviceNn      string
@@ -123,6 +126,7 @@ func (l *loadbalancers) cleanupOldNodeBalancer(ctx context.Context, service *v1.
 	}
 
 	previousNB, err := l.getNodeBalancerByStatus(ctx, service)
+	//nolint: errorlint //conversion to errors.Is() may break chainsaw tests
 	switch err.(type) {
 	case nil:
 		// continue execution
@@ -174,6 +178,7 @@ func (l *loadbalancers) GetLoadBalancer(ctx context.Context, clusterName string,
 	}
 
 	nb, err := l.getNodeBalancerForService(ctx, service)
+	//nolint: errorlint //conversion to errors.Is() may break chainsaw tests
 	switch err.(type) {
 	case nil:
 		break
@@ -252,6 +257,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	var nb *linodego.NodeBalancer
 
 	nb, err = l.getNodeBalancerForService(ctx, service)
+	//nolint: errorlint //conversion to errors.Is() may break chainsaw tests
 	switch err.(type) {
 	case lbNotFoundError:
 		if service.GetAnnotations()[annotations.AnnLinodeNodeBalancerID] != "" {
@@ -552,6 +558,7 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 	}
 
 	nb, err := l.getNodeBalancerForService(ctx, service)
+	//nolint: errorlint //conversion to errors.Is() may break chainsaw tests
 	switch getErr := err.(type) {
 	case nil:
 		break
@@ -621,6 +628,7 @@ func (l *loadbalancers) getNodeBalancerByIPv4(ctx context.Context, service *v1.S
 func (l *loadbalancers) getNodeBalancerByID(ctx context.Context, service *v1.Service, id int) (*linodego.NodeBalancer, error) {
 	nb, err := l.client.GetNodeBalancer(ctx, id)
 	if err != nil {
+		//nolint: errorlint //need type assertion for code field to work
 		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == http.StatusNotFound {
 			return nil, lbNotFoundError{serviceNn: getServiceNn(service), nodeBalancerID: id}
 		}
@@ -1051,8 +1059,8 @@ func getConnectionThrottle(service *v1.Service) int {
 				parsed = 0
 			}
 
-			if parsed > 20 {
-				parsed = 20
+			if parsed > maxConnThrottleStringLen {
+				parsed = maxConnThrottleStringLen
 			}
 			connThrottle = parsed
 		}

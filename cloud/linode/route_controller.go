@@ -65,7 +65,7 @@ type routes struct {
 func newRoutes(client client.Client, instanceCache *instances) (cloudprovider.Routes, error) {
 	timeout := 60
 	if raw, ok := os.LookupEnv("LINODE_ROUTES_CACHE_TTL_SECONDS"); ok {
-		if t, _ := strconv.Atoi(raw); t > 0 {
+		if t, err := strconv.Atoi(raw); t > 0 && err == nil {
 			timeout = t
 		}
 	}
