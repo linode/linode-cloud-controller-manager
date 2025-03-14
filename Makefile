@@ -14,8 +14,10 @@ HELM_VERSION            ?= v3.16.3
 # Dev Setup
 #####################################################################
 CLUSTER_NAME            ?= ccm-$(shell git rev-parse --short HEAD)
+SUBNET_CLUSTER_NAME		?= subnet-testing
 VPC_NAME				?= $(CLUSTER_NAME)
 MANIFEST_NAME			?= capl-cluster-manifests
+SUBNET_MANIFEST_NAME	?= subnet-testing-manifests
 K8S_VERSION             ?= "v1.31.2"
 CAPI_VERSION            ?= "v1.8.5"
 CAAPH_VERSION           ?= "v0.2.1"
@@ -26,6 +28,7 @@ LINODE_FIREWALL_ENABLED ?= true
 LINODE_REGION           ?= us-lax
 LINODE_OS               ?= linode/ubuntu22.04
 KUBECONFIG_PATH         ?= $(CURDIR)/test-cluster-kubeconfig.yaml
+SUBNET_KUBECONFIG_PATH	?= $(CURDIR)/subnet-testing-kubeconfig.yaml
 MGMT_KUBECONFIG_PATH    ?= $(CURDIR)/mgmt-cluster-kubeconfig.yaml
 
 # if the $DEVBOX_PACKAGES_DIR env variable exists that means we are within a devbox shell and can safely
@@ -154,10 +157,10 @@ generate-capl-cluster-manifests:
 generate-second-cluster-manifests:
 	# Create CAPL cluster manifests for a cluster that shares the same VPC as the first
 	LINODE_FIREWALL_ENABLED=$(LINODE_FIREWALL_ENABLED) LINODE_OS=$(LINODE_OS) VPC_NAME=$(VPC_NAME) SUBNET_NAME=testing \
-		VPC_NETWORK_CIDR=172.16.0.0/16 K8S_CLUSTER_CIDR=172.16.64.0/18 clusterctl generate cluster subnet-testing \
+		VPC_NETWORK_CIDR=172.16.0.0/16 K8S_CLUSTER_CIDR=172.16.64.0/18 clusterctl generate cluster $(SUBNET_CLUSTER_NAME) \
 		--kubernetes-version $(K8S_VERSION) --infrastructure linode-linode:$(CAPL_VERSION) \
-		--control-plane-machine-count $(CONTROLPLANE_NODES) --worker-machine-count $(WORKER_NODES) > subnet-testing-manifests.yaml
-	yq -i e 'select(.kind == "LinodeVPC").spec.subnets = [{"ipv4": "10.0.0.0/8", "label": "default"}, {"ipv4": "172.16.0.0/16", "label": "testing"}]' subnet-testing-manifests.yaml
+		--control-plane-machine-count $(CONTROLPLANE_NODES) --worker-machine-count $(WORKER_NODES) > $(SUBNET_MANIFEST_NAME).yaml
+	yq -i e 'select(.kind == "LinodeVPC").spec.subnets = [{"ipv4": "10.0.0.0/8", "label": "default"}, {"ipv4": "172.16.0.0/16", "label": "testing"}]' $(SUBNET_MANIFEST_NAME).yaml
 
 .PHONY: create-capl-cluster
 create-capl-cluster:
@@ -223,13 +226,19 @@ e2e-test-subnet: generate-second-cluster-manifests
 	# Modify existing cluster
 	yq -i e 'select(.kind == "LinodeVPC").spec.subnets = [{"ipv4": "10.0.0.0/8", "label": "default"}, {"ipv4": "172.16.0.0/16", "label": "testing"}]' $(MANIFEST_NAME).yaml
 	kubectl apply -f $(MANIFEST_NAME).yaml
-	# Run create-capl-cluster with different KUBECONFIG_PATH and CLUSTER_NAME to apply 
-	KUBECONFIG_PATH=$(CURDIR)/subnet-testing-kubeconfig.yaml CLUSTER_NAME=subnet-testing make create-capl-cluster
+	# Run create-capl-cluster with different KUBECONFIG_PATH, CLUSTER_NAME, and MANIFEST_NAME to apply 
+	KUBECONFIG_PATH=$(SUBNET_KUBECONFIG_PATH) \
+		CLUSTER_NAME=$(SUBNET_CLUSTER_NAME) \
+		MANIFEST_NAME=$(SUBNET_MANIFEST_NAME) \
+		make create-capl-cluster
 	# Patch both cluster CCM daemonsets with --subnet-names
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl -n kube-system patch daemonset ccm-linode --type='json' -p="[{'op': 'add', 'path': '/spec/template/spec/containers/0/args/-', 'value': '--subnet-names=default'}]" 
-	KUBECONFIG=$(CURDIR)/subnet-testing-kubeconfig.yaml kubectl -n kube-system patch daemonset ccm-linode --type='json' -p="[{'op': 'add', 'path': '/spec/template/spec/containers/0/args/-', 'value': '--subnet-names=testing'}]" 
-
-	chainsaw test e2e/subnet-test $(E2E_FLAGS)
+	KUBECONFIG=$(SUBNET_KUBECONFIG_PATH) kubectl -n kube-system patch daemonset ccm-linode --type='json' -p="[{'op': 'add', 'path': '/spec/template/spec/containers/0/args/-', 'value': '--subnet-names=testing'}]" 
+	# Run chainsaw test
+	LINODE_TOKEN=$(LINODE_TOKEN) \
+		FIRST_CONFIG=$(KUBECONFIG_PATH) \
+		SECOND_CONFIG=$(SUBNET_KUBECONFIG_PATH) \
+		chainsaw test e2e/subnet-test $(E2E_FLAGS)
 
 #####################################################################
 # OS / ARCH

@@ -123,6 +123,9 @@ jobs:
       - name: Run Cilium BGP e2e test
         run: devbox run e2e-test-bgp
 
+      - name: Run subnet filtering test
+        run: devbox run e2e-test-subnet
+
       - name: Cleanup Resources
         if: always()
         run: devbox run cleanup-cluster
