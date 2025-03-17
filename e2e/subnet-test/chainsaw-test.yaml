@@ -24,7 +24,6 @@ spec:
 
               # Iterate through both clusters
               for config in "$FIRST_CONFIG" "$SECOND_CONFIG"; do
-                echo $config
                 # Get all node names
                 nodes=$(KUBECONFIG=$config kubectl get nodes -o jsonpath='{.items[*].metadata.name}')
                 if [ -z "$nodes" ]; then
@@ -37,8 +36,8 @@ spec:
                     echo "Checking node: $node"
                     
                     # Get pod CIDR and instance ID
-                    pod_cidr=$(kubectl get node "$node" -o jsonpath='{.spec.podCIDR}')
-                    instance_id=$(kubectl get node "$node" -o jsonpath='{.spec.providerID}' | sed 's/linode:\/\///')
+                    pod_cidr=$(KUBECONFIG=$config kubectl get node "$node" -o jsonpath='{.spec.podCIDR}')
+                    instance_id=$(KUBECONFIG=$config kubectl get node "$node" -o jsonpath='{.spec.providerID}' | sed 's/linode:\/\///')
                     
                     echo "  Pod CIDR: $pod_cidr"
                     echo "  Instance ID: $instance_id"
