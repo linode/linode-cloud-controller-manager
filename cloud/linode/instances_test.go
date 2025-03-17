@@ -1,7 +1,6 @@
 package linode
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"slices"
@@ -37,7 +36,7 @@ func nodeWithName(name string) *v1.Node {
 }
 
 func TestInstanceExists(t *testing.T) {
-	ctx := context.TODO()
+	ctx := t.Context()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -86,7 +85,7 @@ func TestInstanceExists(t *testing.T) {
 }
 
 func TestMetadataRetrieval(t *testing.T) {
-	ctx := context.TODO()
+	ctx := t.Context()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -436,7 +435,7 @@ func TestMetadataRetrieval(t *testing.T) {
 }
 
 func TestMalformedProviders(t *testing.T) {
-	ctx := context.TODO()
+	ctx := t.Context()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -455,7 +454,7 @@ func TestMalformedProviders(t *testing.T) {
 }
 
 func TestInstanceShutdown(t *testing.T) {
-	ctx := context.TODO()
+	ctx := t.Context()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 

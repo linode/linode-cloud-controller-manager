@@ -1,7 +1,6 @@
 package linode
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -34,7 +33,7 @@ func Test_serviceController_Run(t *testing.T) {
 
 	svc := createTestService()
 	svc.Spec.Type = "LoadBalancer"
-	_, err := kubeClient.CoreV1().Services("test-ns").Create(context.TODO(), svc, metav1.CreateOptions{})
+	_, err := kubeClient.CoreV1().Services("test-ns").Create(t.Context(), svc, metav1.CreateOptions{})
 	require.NoError(t, err, "expected no error during svc creation")
 
 	// Start the controller

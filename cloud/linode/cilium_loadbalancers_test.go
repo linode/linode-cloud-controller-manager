@@ -1,7 +1,6 @@
 package linode
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -183,7 +182,7 @@ func createTestService() *v1.Service {
 func addService(t *testing.T, kubeClient kubernetes.Interface, svc *v1.Service) {
 	t.Helper()
 
-	_, err := kubeClient.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
+	_, err := kubeClient.CoreV1().Services(svc.Namespace).Create(t.Context(), svc, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to add Service: %v", err)
 	}
@@ -193,7 +192,7 @@ func addNodes(t *testing.T, kubeClient kubernetes.Interface, nodes []*v1.Node) {
 	t.Helper()
 
 	for _, node := range nodes {
-		_, err := kubeClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+		_, err := kubeClient.CoreV1().Nodes().Create(t.Context(), node, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("failed to add Node: %v", err)
 		}
@@ -260,7 +259,7 @@ func testNoBGPNodeLabel(t *testing.T, mc *mocks.MockClient) {
 		LinodeID: 33333,
 	}).Times(1)
 
-	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), clusterName, svc, nodes)
+	lbStatus, err := lb.EnsureLoadBalancer(t.Context(), clusterName, svc, nodes)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
@@ -280,7 +279,7 @@ func testUnsupportedRegion(t *testing.T, mc *mocks.MockClient) {
 	addService(t, kubeClient, svc)
 	lb := &loadbalancers{mc, "us-foobar", kubeClient, ciliumClient, ciliumLBType}
 
-	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), clusterName, svc, nodes)
+	lbStatus, err := lb.EnsureLoadBalancer(t.Context(), clusterName, svc, nodes)
 	if err == nil {
 		t.Fatal("expected not nil error")
 	}
@@ -291,7 +290,7 @@ func testUnsupportedRegion(t *testing.T, mc *mocks.MockClient) {
 	// Use BGP custom id map
 	t.Setenv("BGP_CUSTOM_ID_MAP", "{'us-foobar': 2}")
 	lb = &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
-	lbStatus, err = lb.EnsureLoadBalancer(context.TODO(), clusterName, svc, nodes)
+	lbStatus, err = lb.EnsureLoadBalancer(t.Context(), clusterName, svc, nodes)
 	if err == nil {
 		t.Fatal("expected not nil error")
 	}
@@ -335,7 +334,7 @@ func testCreateWithExistingIPHolderWithOldIpHolderNamingConvention(t *testing.T,
 		LinodeID: 22222,
 	}).Times(1)
 
-	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), clusterName, svc, nodes)
+	lbStatus, err := lb.EnsureLoadBalancer(t.Context(), clusterName, svc, nodes)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
@@ -380,7 +379,7 @@ func testCreateWithExistingIPHolderWithNewIpHolderNamingConvention(t *testing.T,
 		LinodeID: 22222,
 	}).Times(1)
 
-	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), clusterName, svc, nodes)
+	lbStatus, err := lb.EnsureLoadBalancer(t.Context(), clusterName, svc, nodes)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
@@ -425,7 +424,7 @@ func testCreateWithExistingIPHolderWithNewIpHolderNamingConventionUsingLongSuffi
 		LinodeID: 22222,
 	}).Times(1)
 
-	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), clusterName, svc, nodes)
+	lbStatus, err := lb.EnsureLoadBalancer(t.Context(), clusterName, svc, nodes)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
@@ -477,7 +476,7 @@ func testCreateWithNoExistingIPHolderUsingNoSuffix(t *testing.T, mc *mocks.MockC
 		LinodeID: 22222,
 	}).Times(1)
 
-	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), clusterName, svc, nodes)
+	lbStatus, err := lb.EnsureLoadBalancer(t.Context(), clusterName, svc, nodes)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
@@ -529,7 +528,7 @@ func testCreateWithNoExistingIPHolderUsingShortSuffix(t *testing.T, mc *mocks.Mo
 		LinodeID: 22222,
 	}).Times(1)
 
-	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), clusterName, svc, nodes)
+	lbStatus, err := lb.EnsureLoadBalancer(t.Context(), clusterName, svc, nodes)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
@@ -581,7 +580,7 @@ func testCreateWithNoExistingIPHolderUsingLongSuffix(t *testing.T, mc *mocks.Moc
 		LinodeID: 22222,
 	}).Times(1)
 
-	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), clusterName, svc, nodes)
+	lbStatus, err := lb.EnsureLoadBalancer(t.Context(), clusterName, svc, nodes)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
@@ -615,7 +614,7 @@ func testEnsureCiliumLoadBalancerDeletedWithOldIpHolderNamingConvention(t *testi
 	mc.EXPECT().DeleteInstanceIPAddress(gomock.Any(), 22222, dummySharedIP).Times(1).Return(nil)
 	mc.EXPECT().DeleteInstanceIPAddress(gomock.Any(), oldIpHolderInstance.ID, dummySharedIP).Times(1).Return(nil)
 
-	err = lb.EnsureLoadBalancerDeleted(context.TODO(), clusterName, svc)
+	err = lb.EnsureLoadBalancerDeleted(t.Context(), clusterName, svc)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
@@ -654,7 +653,7 @@ func testEnsureCiliumLoadBalancerDeletedWithNewIpHolderNamingConvention(t *testi
 	mc.EXPECT().DeleteInstanceIPAddress(gomock.Any(), 22222, dummySharedIP).Times(1).Return(nil)
 	mc.EXPECT().DeleteInstanceIPAddress(gomock.Any(), newIpHolderInstance.ID, dummySharedIP).Times(1).Return(nil)
 
-	err = lb.EnsureLoadBalancerDeleted(context.TODO(), clusterName, svc)
+	err = lb.EnsureLoadBalancerDeleted(t.Context(), clusterName, svc)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
@@ -694,7 +693,7 @@ func testCiliumUpdateLoadBalancerAddNodeWithOldIpHolderNamingConvention(t *testi
 		LinodeID: 22222,
 	}).Times(1)
 
-	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), clusterName, svc, nodes)
+	lbStatus, err := lb.EnsureLoadBalancer(t.Context(), clusterName, svc, nodes)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
@@ -715,7 +714,7 @@ func testCiliumUpdateLoadBalancerAddNodeWithOldIpHolderNamingConvention(t *testi
 	}).Times(1)
 	addNodes(t, kubeClient, additionalNodes)
 
-	err = lb.UpdateLoadBalancer(context.TODO(), clusterName, svc, additionalNodes)
+	err = lb.UpdateLoadBalancer(t.Context(), clusterName, svc, additionalNodes)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
@@ -763,7 +762,7 @@ func testCiliumUpdateLoadBalancerAddNodeWithNewIpHolderNamingConvention(t *testi
 		LinodeID: 22222,
 	}).Times(1)
 
-	lbStatus, err := lb.EnsureLoadBalancer(context.TODO(), clusterName, svc, nodes)
+	lbStatus, err := lb.EnsureLoadBalancer(t.Context(), clusterName, svc, nodes)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
@@ -796,7 +795,7 @@ func testCiliumUpdateLoadBalancerAddNodeWithNewIpHolderNamingConvention(t *testi
 	}).Times(1)
 	addNodes(t, kubeClient, additionalNodes)
 
-	err = lb.UpdateLoadBalancer(context.TODO(), clusterName, svc, additionalNodes)
+	err = lb.UpdateLoadBalancer(t.Context(), clusterName, svc, additionalNodes)
 	if err != nil {
 		t.Fatalf("expected a nil error, got %v", err)
 	}
