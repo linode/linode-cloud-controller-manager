@@ -21,7 +21,7 @@ SUBNET_MANIFEST_NAME	?= subnet-testing-manifests
 K8S_VERSION             ?= "v1.31.2"
 CAPI_VERSION            ?= "v1.8.5"
 CAAPH_VERSION           ?= "v0.2.1"
-CAPL_VERSION            ?= "v0.8.6"
+CAPL_VERSION            ?= "v0.8.5"
 CONTROLPLANE_NODES      ?= 1
 WORKER_NODES            ?= 1
 LINODE_FIREWALL_ENABLED ?= true
@@ -154,15 +154,6 @@ generate-capl-cluster-manifests:
 		--control-plane-machine-count $(CONTROLPLANE_NODES) --worker-machine-count $(WORKER_NODES) > $(MANIFEST_NAME).yaml
 	yq -i e 'select(.kind == "LinodeVPC").spec.subnets = [{"ipv4": "10.0.0.0/8", "label": "default"}, {"ipv4": "172.16.0.0/16", "label": "testing"}]' $(MANIFEST_NAME).yaml
 
-.PHONY: generate-second-cluster-manifests
-generate-second-cluster-manifests:
-	# Create CAPL cluster manifests for a cluster that shares the same VPC as the first
-	LINODE_FIREWALL_ENABLED=$(LINODE_FIREWALL_ENABLED) LINODE_OS=$(LINODE_OS) VPC_NAME=$(VPC_NAME) SUBNET_NAME=testing \
-		VPC_NETWORK_CIDR=172.16.0.0/16 K8S_CLUSTER_CIDR=172.16.64.0/18 clusterctl generate cluster $(SUBNET_CLUSTER_NAME) \
-		--kubernetes-version $(K8S_VERSION) --infrastructure linode-linode:$(CAPL_VERSION) \
-		--control-plane-machine-count $(CONTROLPLANE_NODES) --worker-machine-count $(WORKER_NODES) > $(SUBNET_MANIFEST_NAME).yaml
-	yq -i e 'select(.kind == "LinodeVPC").spec.subnets = [{"ipv4": "10.0.0.0/8", "label": "default"}, {"ipv4": "172.16.0.0/16", "label": "testing"}]' $(SUBNET_MANIFEST_NAME).yaml
-
 .PHONY: create-capl-cluster
 create-capl-cluster:
 	# Create a CAPL cluster with updated CCM and wait for it to be ready
@@ -223,12 +214,17 @@ e2e-test-bgp:
 		chainsaw test e2e/bgp-test/lb-cilium-bgp $(E2E_FLAGS)
 
 .PHONY: e2e-test-subnet
-e2e-test-subnet: generate-second-cluster-manifests
-	# Run create-capl-cluster with different KUBECONFIG_PATH, CLUSTER_NAME, and MANIFEST_NAME to apply 
-	KUBECONFIG_PATH=$(SUBNET_KUBECONFIG_PATH) \
-		CLUSTER_NAME=$(SUBNET_CLUSTER_NAME) \
-		MANIFEST_NAME=$(SUBNET_MANIFEST_NAME) \
-		make create-capl-cluster
+e2e-test-subnet: 
+	# Generate cluster manifests for second cluster
+	SUBNET_NAME=testing CLUSTER_NAME=$(SUBNET_CLUSTER_NAME) MANIFEST_NAME=$(SUBNET_MANIFEST_NAME) VPC_NAME=$(CLUSTER_NAME) \
+		VPC_NETWORK_CIDR=172.16.0.0/16 K8S_CLUSTER_CIDR=172.16.64.0/18 make generate-capl-cluster-manifests
+	# Follow create-capl-cluster steps minus NodeHealthy=true step (times out otherwise)
+	kubectl apply -f $(SUBNET_MANIFEST_NAME).yaml
+	kubectl wait --for=condition=ControlPlaneReady cluster/$(SUBNET_CLUSTER_NAME) --timeout=600s || (kubectl get cluster -o yaml; kubectl get linodecluster -o yaml; kubectl get linodemachines -o yaml)
+	clusterctl get kubeconfig $(SUBNET_CLUSTER_NAME) > $(SUBNET_KUBECONFIG_PATH)
+	KUBECONFIG=$(SUBNET_KUBECONFIG_PATH) kubectl wait --for=condition=Ready nodes --all --timeout=600s
+	KUBECONFIG=$(SUBNET_KUBECONFIG_PATH) kubectl taint nodes -l node-role.kubernetes.io/control-plane node-role.kubernetes.io/control-plane-
+	KUBECONFIG_PATH=$(SUBNET_KUBECONFIG_PATH) make patch-linode-ccm
 	# Patch both cluster CCM daemonsets with --subnet-names
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl -n kube-system patch daemonset ccm-linode --type='json' -p="[{'op': 'add', 'path': '/spec/template/spec/containers/0/args/-', 'value': '--subnet-names=default'}]" 
 	KUBECONFIG=$(SUBNET_KUBECONFIG_PATH) kubectl -n kube-system patch daemonset ccm-linode --type='json' -p="[{'op': 'add', 'path': '/spec/template/spec/containers/0/args/-', 'value': '--subnet-names=testing'}]" 
