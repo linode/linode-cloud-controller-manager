@@ -24,10 +24,9 @@ spec:
 
               # Iterate through both clusters
               for config in "$FIRST_CONFIG" "$SECOND_CONFIG"; do
-                KUBECONFIG="$config"
-                
+                echo $config
                 # Get all node names
-                nodes=$(kubectl get nodes -o jsonpath='{.items[*].metadata.name}')
+                nodes=$(KUBECONFIG=$config kubectl get nodes -o jsonpath='{.items[*].metadata.name}')
                 if [ -z "$nodes" ]; then
                     echo "Error: No nodes found in cluster"
                     exit 1

@@ -152,6 +152,7 @@ generate-capl-cluster-manifests:
 	LINODE_FIREWALL_ENABLED=$(LINODE_FIREWALL_ENABLED) LINODE_OS=$(LINODE_OS) VPC_NAME=$(VPC_NAME) clusterctl generate cluster $(CLUSTER_NAME) \
 		--kubernetes-version $(K8S_VERSION) --infrastructure linode-linode:$(CAPL_VERSION) \
 		--control-plane-machine-count $(CONTROLPLANE_NODES) --worker-machine-count $(WORKER_NODES) > $(MANIFEST_NAME).yaml
+	yq -i e 'select(.kind == "LinodeVPC").spec.subnets = [{"ipv4": "10.0.0.0/8", "label": "default"}, {"ipv4": "172.16.0.0/16", "label": "testing"}]' $(MANIFEST_NAME).yaml
 
 .PHONY: generate-second-cluster-manifests
 generate-second-cluster-manifests:
@@ -223,9 +224,6 @@ e2e-test-bgp:
 
 .PHONY: e2e-test-subnet
 e2e-test-subnet: generate-second-cluster-manifests
-	# Modify existing cluster
-	yq -i e 'select(.kind == "LinodeVPC").spec.subnets = [{"ipv4": "10.0.0.0/8", "label": "default"}, {"ipv4": "172.16.0.0/16", "label": "testing"}]' $(MANIFEST_NAME).yaml
-	kubectl apply -f $(MANIFEST_NAME).yaml
 	# Run create-capl-cluster with different KUBECONFIG_PATH, CLUSTER_NAME, and MANIFEST_NAME to apply 
 	KUBECONFIG_PATH=$(SUBNET_KUBECONFIG_PATH) \
 		CLUSTER_NAME=$(SUBNET_CLUSTER_NAME) \
