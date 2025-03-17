@@ -1,7 +1,6 @@
 package linode
 
 import (
-	"context"
 	"errors"
 	"net"
 	"net/http"
@@ -44,7 +43,7 @@ func TestNodeController_Run(t *testing.T) {
 		},
 		Spec: v1.NodeSpec{},
 	}
-	_, err := kubeClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+	_, err := kubeClient.CoreV1().Nodes().Create(t.Context(), node, metav1.CreateOptions{})
 	require.NoError(t, err, "expected no error during node creation")
 
 	// Start the controller
@@ -79,7 +78,7 @@ func TestNodeController_processNext(t *testing.T) {
 		Spec: v1.NodeSpec{},
 	}
 
-	_, err := kubeClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+	_, err := kubeClient.CoreV1().Nodes().Create(t.Context(), node, metav1.CreateOptions{})
 	require.NoError(t, err, "expected no error during node creation")
 
 	controller := &nodeController{
@@ -211,7 +210,7 @@ func TestNodeController_handleNode(t *testing.T) {
 		},
 		Spec: v1.NodeSpec{ProviderID: "linode://123"},
 	}
-	_, err := kubeClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+	_, err := kubeClient.CoreV1().Nodes().Create(t.Context(), node, metav1.CreateOptions{})
 	require.NoError(t, err, "expected no error during node creation")
 
 	instCache := newInstances(client)
@@ -230,7 +229,7 @@ func TestNodeController_handleNode(t *testing.T) {
 	client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
 		{ID: 123, Label: "test-node", IPv4: []*net.IP{&publicIP, &privateIP}, HostUUID: "123"},
 	}, nil)
-	err = nodeCtrl.handleNode(context.TODO(), node)
+	err = nodeCtrl.handleNode(t.Context(), node)
 	require.NoError(t, err, "expected no error during handleNode")
 
 	// Check metadataLastUpdate
@@ -242,7 +241,7 @@ func TestNodeController_handleNode(t *testing.T) {
 	// Annotations set, no update needed as ttl not reached
 	node.Labels[annotations.AnnLinodeHostUUID] = "123"
 	node.Annotations[annotations.AnnLinodeNodePrivateIP] = privateIP.String()
-	err = nodeCtrl.handleNode(context.TODO(), node)
+	err = nodeCtrl.handleNode(t.Context(), node)
 	require.NoError(t, err, "expected no error during handleNode")
 
 	// Lookup failure for linode instance
@@ -250,7 +249,7 @@ func TestNodeController_handleNode(t *testing.T) {
 	nodeCtrl.instances = newInstances(client)
 	nodeCtrl.metadataLastUpdate["test-node"] = time.Now().Add(-2 * nodeCtrl.ttl)
 	client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, errors.New("lookup failed"))
-	err = nodeCtrl.handleNode(context.TODO(), node)
+	err = nodeCtrl.handleNode(t.Context(), node)
 	require.Error(t, err, "expected error during handleNode, got nil")
 
 	// All fields already set
@@ -260,7 +259,7 @@ func TestNodeController_handleNode(t *testing.T) {
 	client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
 		{ID: 123, Label: "test-node", IPv4: []*net.IP{&publicIP, &privateIP}, HostUUID: "123"},
 	}, nil)
-	err = nodeCtrl.handleNode(context.TODO(), node)
+	err = nodeCtrl.handleNode(t.Context(), node)
 	assert.NoError(t, err, "expected no error during handleNode")
 }
 

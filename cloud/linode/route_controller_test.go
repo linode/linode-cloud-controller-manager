@@ -1,7 +1,6 @@
 package linode
 
 import (
-	"context"
 	"net"
 	"strconv"
 	"testing"
@@ -41,7 +40,7 @@ func TestListRoutes(t *testing.T) {
 	region := "us-east"
 
 	t.Run("should return empty if no instance exists in cluster", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
@@ -65,7 +64,7 @@ func TestListRoutes(t *testing.T) {
 	}
 
 	t.Run("should return no routes if instance exists but is not connected to VPC", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
@@ -92,7 +91,7 @@ func TestListRoutes(t *testing.T) {
 	}
 
 	t.Run("should return no routes if instance exists, connected to VPC but no ip_ranges configured", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
@@ -134,7 +133,7 @@ func TestListRoutes(t *testing.T) {
 	}
 
 	t.Run("should return routes if instance exists, connected to VPC and ip_ranges configured", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
@@ -182,7 +181,7 @@ func TestListRoutes(t *testing.T) {
 	}
 
 	t.Run("should return no routes if instance exists, connected to VPC and ip_ranges configured but vpc id doesn't match", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
@@ -204,7 +203,7 @@ func TestListRoutes(t *testing.T) {
 	})
 
 	t.Run("should return routes if multiple instances exists, connected to VPCs and ip_ranges configured", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
@@ -312,7 +311,7 @@ func TestListRoutes(t *testing.T) {
 }
 
 func TestCreateRoute(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	Options.VPCNames = "dummy"
 	vpcIDs["dummy"] = 1
 	Options.EnableRouteController = true
@@ -434,7 +433,7 @@ func TestDeleteRoute(t *testing.T) {
 	vpcIDs["dummy"] = 1
 	Options.EnableRouteController = true
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	nodeID := 123
 	name := "mock-instance"
