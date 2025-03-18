@@ -79,7 +79,7 @@ fmt:
 .PHONY: test
 # we say code is not worth testing unless it's formatted
 test: fmt codegen
-	go test -v -cover -coverprofile ./coverage.out ./cloud/... ./sentry/... $(TEST_ARGS)
+	go test -v -coverpkg=./sentry,./cloud/linode/client,./cloud/linode/firewall,./cloud/linode -coverprofile ./coverage.out -cover ./sentry/... ./cloud/... $(TEST_ARGS)
 
 .PHONY: build-linux
 build-linux: codegen

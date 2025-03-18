@@ -1,12 +1,12 @@
 module github.com/linode/linode-cloud-controller-manager
 
-go 1.23.0
+go 1.24
 
-toolchain go1.23.3
+toolchain go1.24.1
 
 require (
 	github.com/appscode/go v0.0.0-20201105063637-5613f3b8169f
-	github.com/cilium/cilium v1.17.1
+	github.com/cilium/cilium v1.17.2
 	github.com/getsentry/sentry-go v0.31.1
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
@@ -16,11 +16,11 @@ require (
 	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/exp v0.0.0-20241215155358-4a5509556b9e
-	k8s.io/api v0.32.2
-	k8s.io/apimachinery v0.32.2
-	k8s.io/client-go v0.32.2
-	k8s.io/cloud-provider v0.32.2
-	k8s.io/component-base v0.32.2
+	k8s.io/api v0.32.3
+	k8s.io/apimachinery v0.32.3
+	k8s.io/client-go v0.32.3
+	k8s.io/cloud-provider v0.32.3
+	k8s.io/component-base v0.32.3
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20241210054802-24370beab758
 )
@@ -41,7 +41,7 @@ require (
 	github.com/cilium/ebpf v0.17.1 // indirect
 	github.com/cilium/hive v0.0.0-20250121145729-e67f66eb0375 // indirect
 	github.com/cilium/proxy v0.0.0-20241216122539-268a44ec93e9 // indirect
-	github.com/cilium/statedb v0.3.4 // indirect
+	github.com/cilium/statedb v0.3.6 // indirect
 	github.com/cilium/stream v0.0.0-20241203114243-53c3e5d79744 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
@@ -115,7 +115,7 @@ require (
 	github.com/spf13/viper v1.19.0 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
-	github.com/vishvananda/netlink v1.3.1-0.20241022031324-976bd8de7d81 // indirect
+	github.com/vishvananda/netlink v1.3.1-0.20250221194427-0af32151e72b // indirect
 	github.com/vishvananda/netns v0.0.5 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.etcd.io/etcd/api/v3 v3.5.17 // indirect
@@ -136,9 +136,9 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba // indirect
-	golang.org/x/crypto v0.33.0 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/mod v0.22.0 // indirect
-	golang.org/x/net v0.35.0 // indirect
+	golang.org/x/net v0.36.0 // indirect
 	golang.org/x/oauth2 v0.27.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
@@ -156,10 +156,10 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.32.0 // indirect
-	k8s.io/apiserver v0.32.2 // indirect
-	k8s.io/component-helpers v0.32.2 // indirect
-	k8s.io/controller-manager v0.32.2 // indirect
-	k8s.io/kms v0.32.2 // indirect
+	k8s.io/apiserver v0.32.3 // indirect
+	k8s.io/component-helpers v0.32.3 // indirect
+	k8s.io/controller-manager v0.32.3 // indirect
+	k8s.io/kms v0.32.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20241212222426-2c72e554b1e7 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.1 // indirect
 	sigs.k8s.io/gateway-api v1.2.1 // indirect

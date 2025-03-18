@@ -2,6 +2,7 @@ package linode
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -125,7 +126,7 @@ type instances struct {
 func newInstances(client client.Client) *instances {
 	timeout := 15
 	if raw, ok := os.LookupEnv("LINODE_INSTANCE_CACHE_TTL"); ok {
-		if t, _ := strconv.Atoi(raw); t > 0 {
+		if t, err := strconv.Atoi(raw); t > 0 && err == nil {
 			timeout = t
 		}
 	}
@@ -235,7 +236,7 @@ func (i *instances) lookupLinode(ctx context.Context, node *v1.Node) (*linodego.
 func (i *instances) InstanceExists(ctx context.Context, node *v1.Node) (bool, error) {
 	ctx = sentry.SetHubOnContext(ctx)
 	if _, err := i.lookupLinode(ctx, node); err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if errors.Is(err, cloudprovider.InstanceNotFound) {
 			return false, nil
 		}
 		sentry.CaptureError(ctx, err)

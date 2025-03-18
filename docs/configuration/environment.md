@@ -12,6 +12,8 @@ The CCM can be configured using environment variables and flags. Environment var
 |----------|---------|-------------|
 | `LINODE_INSTANCE_CACHE_TTL` | `15` | Default timeout of instance cache in seconds |
 | `LINODE_ROUTES_CACHE_TTL_SECONDS` | `60` | Default timeout of route cache in seconds |
+| `LINODE_METADATA_TTL` | `300` | Default linode metadata timeout in seconds |
+| `K8S_NODECACHE_TTL` | `300` | Default timeout of k8s node cache in seconds |
 
 ### API Configuration
 

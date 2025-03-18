@@ -65,7 +65,7 @@ type routes struct {
 func newRoutes(client client.Client, instanceCache *instances) (cloudprovider.Routes, error) {
 	timeout := 60
 	if raw, ok := os.LookupEnv("LINODE_ROUTES_CACHE_TTL_SECONDS"); ok {
-		if t, _ := strconv.Atoi(raw); t > 0 {
+		if t, err := strconv.Atoi(raw); t > 0 && err == nil {
 			timeout = t
 		}
 	}
@@ -110,6 +110,11 @@ func (r *routes) getInstanceFromName(ctx context.Context, name string) (*linodeg
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
+	}
+
+	// fetch providerID from k8s node cache if it exists
+	if id, ok := registeredK8sNodeCache.getProviderID(name); ok {
+		node.Spec.ProviderID = id
 	}
 
 	// fetch instance with specified node name
@@ -235,6 +240,15 @@ func (r *routes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpr
 
 	var configuredRoutes []*cloudprovider.Route
 	for _, instance := range instances {
+		providerID := providerIDPrefix + strconv.Itoa(instance.ID)
+		label, found := registeredK8sNodeCache.getNodeLabel(providerID, instance.Label)
+		if !found {
+			klog.V(4).Infof("Node %s not found in k8s node cache, skipping listing its routes", instance.Label)
+			continue
+		}
+		// Update label to match with k8s registered label
+		instance.Label = label
+
 		instanceRoutes, err := r.getInstanceRoutes(ctx, instance.ID)
 		if err != nil {
 			klog.Errorf("Failed finding routes for instance id %d. Error: %v", instance.ID, err)
