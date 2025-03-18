@@ -14,10 +14,10 @@ HELM_VERSION            ?= v3.16.3
 # Dev Setup
 #####################################################################
 CLUSTER_NAME            ?= ccm-$(shell git rev-parse --short HEAD)
-SUBNET_CLUSTER_NAME		?= subnet-testing
-VPC_NAME				?= $(CLUSTER_NAME)
-MANIFEST_NAME			?= capl-cluster-manifests
-SUBNET_MANIFEST_NAME	?= subnet-testing-manifests
+SUBNET_CLUSTER_NAME     ?= subnet-testing
+VPC_NAME                ?= $(CLUSTER_NAME)
+MANIFEST_NAME           ?= capl-cluster-manifests
+SUBNET_MANIFEST_NAME    ?= subnet-testing-manifests
 K8S_VERSION             ?= "v1.31.2"
 CAPI_VERSION            ?= "v1.8.5"
 CAAPH_VERSION           ?= "v0.2.1"
