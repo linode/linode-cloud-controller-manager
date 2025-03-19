@@ -61,6 +61,18 @@ spec:
                 done
               done
 
+              # Grep logs of each cluster for IPs from the other cluster
+              echo "Checking logs of each CCM"
+              if ! [ $(KUBECONFIG=$FIRST_CONFIG kubectl logs daemonset/ccm-linode -n kube-system | grep "172.16" | wc -l) -eq 0 ]; then
+                echo "IP address from testing subnet found in logs of test cluster"
+                exit 1
+              fi
+
+              if ! [ $(KUBECONFIG=$SECOND_CONFIG kubectl logs daemonset/ccm-linode -n kube-system | grep "10.192" | wc -l) -eq 0 ]; then
+                echo "IP address from default subnet found in logs of second cluster"
+                exit 1
+              fi
+
             check:
               ($error == null): true
               (contains($stdout, 'Pod CIDR not found in VPC interface configuration')): false

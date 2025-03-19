@@ -227,9 +227,7 @@ e2e-test-subnet:
 	# Create the second cluster
 	MANIFEST_NAME=$(SUBNET_MANIFEST_NAME) CLUSTER_NAME=$(SUBNET_CLUSTER_NAME) KUBECONFIG_PATH=$(SUBNET_KUBECONFIG_PATH) \
 		make create-capl-cluster
-	# Patch both cluster CCM daemonsets with --subnet-names
-	KUBECONFIG=$(KUBECONFIG_PATH) kubectl -n kube-system patch daemonset ccm-linode --type='json' -p="[{'op': 'add', 'path': '/spec/template/spec/containers/0/args/-', 'value': '--subnet-names=default'}]" 
-	KUBECONFIG=$(SUBNET_KUBECONFIG_PATH) kubectl -n kube-system patch daemonset ccm-linode --type='json' -p="[{'op': 'add', 'path': '/spec/template/spec/containers/0/args/-', 'value': '--subnet-names=testing'}]" 
+	KUBECONFIG_PATH=$(SUBNET_KUBECONFIG_PATH) make patch-linode-ccm
 	# Run chainsaw test
 	LINODE_TOKEN=$(LINODE_TOKEN) \
 		FIRST_CONFIG=$(KUBECONFIG_PATH) \
