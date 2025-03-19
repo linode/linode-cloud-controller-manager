@@ -1,0 +1,78 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: subnet-filtering-test
+  labels:
+    all:
+spec:
+  bindings:
+    - name: fwname
+      value: (join('-', ['ccm-fwtest', env('CLUSTER_NAME')]))
+  namespace: "subnet-filtering-test"
+  steps:
+    - name: Check if the CCM for each cluster focus on their individual subnets
+      try:
+        - script:
+            content: |
+              set -e
+
+              if [ -z "$FIRST_CONFIG" ] || [ -z "$SECOND_CONFIG" ] || [ -z "$LINODE_TOKEN" ]; then
+                  echo "Error: FIRST_CONFIG, SECOND_CONFIG, and LINODE_TOKEN environment variables must be set"
+                  exit 1
+              fi
+
+              # Iterate through both clusters
+              for config in "$FIRST_CONFIG" "$SECOND_CONFIG"; do
+                # Get all node names
+                nodes=$(KUBECONFIG=$config kubectl get nodes -o jsonpath='{.items[*].metadata.name}')
+                if [ -z "$nodes" ]; then
+                    echo "Error: No nodes found in cluster"
+                    exit 1
+                fi
+
+                # Process each node
+                for node in $nodes; do
+                    echo "Checking node: $node"
+                    
+                    # Get pod CIDR and instance ID
+                    pod_cidr=$(KUBECONFIG=$config kubectl get node "$node" -o jsonpath='{.spec.podCIDR}')
+                    instance_id=$(KUBECONFIG=$config kubectl get node "$node" -o jsonpath='{.spec.providerID}' | sed 's/linode:\/\///')
+                    
+                    echo "  Pod CIDR: $pod_cidr"
+                    echo "  Instance ID: $instance_id"
+                    
+                    # Get interface details for this config
+                    interfaces=$(curl -s \
+                        -H "Authorization: Bearer $LINODE_TOKEN" \
+                        "https://api.linode.com/v4/linode/instances/$instance_id/configs" \
+                        | jq -r '.data[0].interfaces')
+                    
+                    # Check if pod CIDR is in the VPC interface IP ranges
+                    if echo "$interfaces" | jq -e --arg cidr "$pod_cidr" '.[] | select(.purpose == "vpc") | .ip_ranges[] | select(. == $cidr)' > /dev/null; then
+                        echo "Pod CIDR found in VPC interface configuration"
+                    else
+                        echo "Pod CIDR not found in VPC interface configuration"
+                        echo "Current VPC interface configuration:"
+                        echo "$interfaces" | jq '.[] | select(.purpose == "vpc")'
+                    fi
+                    
+                    echo "---"
+                done
+              done
+
+              # Grep logs of each cluster for IPs from the other cluster
+              echo "Checking logs of each CCM"
+              if ! [ $(KUBECONFIG=$FIRST_CONFIG kubectl logs daemonset/ccm-linode -n kube-system | grep "172.16" | wc -l) -eq 0 ]; then
+                echo "IP address from testing subnet found in logs of test cluster"
+                exit 1
+              fi
+
+              if ! [ $(KUBECONFIG=$SECOND_CONFIG kubectl logs daemonset/ccm-linode -n kube-system | grep "10.192" | wc -l) -eq 0 ]; then
+                echo "IP address from default subnet found in logs of second cluster"
+                exit 1
+              fi
+
+            check:
+              ($error == null): true
+              (contains($stdout, 'Pod CIDR not found in VPC interface configuration')): false
