@@ -9,6 +9,9 @@ For implementation details, see:
 - [Basic Service Examples](../examples/basic.md)
 - [Advanced Configuration Examples](../examples/advanced.md)
 
+NOTE:
+The keys and the values in [annotations must be strings](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/). In other words, you cannot use numeric, boolean, list or other types for either the keys or the values. Hence, one should double quote them when specifying in annotations to convert them to string.
+
 ## Available Annotations
 
 ### Basic Configuration
@@ -27,10 +30,10 @@ For implementation details, see:
 | `check-attempts` | int (1-30) | | Number of health check failures necessary to remove a back-end |
 | `check-passive` | bool | `false` | When `true`, `5xx` status codes will cause the health check to fail |
 | `preserve` | bool | `false` | When `true`, deleting a `LoadBalancer` service does not delete the underlying NodeBalancer |
-| `nodebalancer-id` | string | | The ID of the NodeBalancer to front the service |
+| `nodebalancer-id` | int | | The ID of the NodeBalancer to front the service |
 | `hostname-only-ingress` | bool | `false` | When `true`, the LoadBalancerStatus will only contain the Hostname |
 | `tags` | string | | A comma separated list of tags to be applied to the NodeBalancer instance |
-| `firewall-id` | string | | An existing Cloud Firewall ID to be attached to the NodeBalancer instance. See [Firewall Setup](firewall.md) |
+| `firewall-id` | int | | An existing Cloud Firewall ID to be attached to the NodeBalancer instance. See [Firewall Setup](firewall.md) |
 | `firewall-acl` | string | | The Firewall rules to be applied to the NodeBalancer. See [Firewall Configuration](#firewall-configuration) |
 | `nodebalancer-type` | string | | The type of NodeBalancer to create (options: common, premium). See [NodeBalancer Types](#nodebalancer-type) |
 | `enable-ipv6-ingress` | bool | `false` | When `true`, both IPv4 and IPv6 addresses will be included in the LoadBalancerStatus ingress |
