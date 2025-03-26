@@ -6,6 +6,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInitialize(t *testing.T) {
@@ -48,7 +49,7 @@ func TestInitialize(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.True(t, initialized)
 			}
 		})
@@ -60,7 +61,7 @@ func TestSetHubOnContext(t *testing.T) {
 	initialized = false
 	_ = Initialize("https://test@sentry.io/123", "test", "1.0.0")
 
-	ctx := context.Background()
+	ctx := t.Context()
 	newCtx := SetHubOnContext(ctx)
 
 	assert.True(t, sentry.HasHubOnContext(newCtx))
@@ -77,7 +78,7 @@ func TestGetHubFromContext(t *testing.T) {
 		{
 			name: "valid hub in context",
 			setupFunc: func() context.Context {
-				ctx := context.Background()
+				ctx := t.Context()
 				return SetHubOnContext(ctx)
 			},
 			initialized: true,
@@ -86,7 +87,7 @@ func TestGetHubFromContext(t *testing.T) {
 		{
 			name: "no hub in context",
 			setupFunc: func() context.Context {
-				return context.Background()
+				return t.Context()
 			},
 			initialized: true,
 			wantNil:     true,
@@ -94,7 +95,7 @@ func TestGetHubFromContext(t *testing.T) {
 		{
 			name: "sentry not initialized",
 			setupFunc: func() context.Context {
-				return context.Background()
+				return t.Context()
 			},
 			initialized: false,
 			wantNil:     true,
@@ -135,7 +136,7 @@ func TestSetTag(t *testing.T) {
 		{
 			name: "set tag with valid hub",
 			setupFunc: func() context.Context {
-				return SetHubOnContext(context.Background())
+				return SetHubOnContext(t.Context())
 			},
 			key:   "test-key",
 			value: "test-value",
@@ -143,7 +144,7 @@ func TestSetTag(t *testing.T) {
 		{
 			name: "set tag with no hub",
 			setupFunc: func() context.Context {
-				return context.Background()
+				return t.Context()
 			},
 			key:   "test-key",
 			value: "test-value",
@@ -172,14 +173,14 @@ func TestCaptureError(t *testing.T) {
 		{
 			name: "capture error with valid hub",
 			setupFunc: func() context.Context {
-				return SetHubOnContext(context.Background())
+				return SetHubOnContext(t.Context())
 			},
 			err: assert.AnError,
 		},
 		{
 			name: "capture error with no hub",
 			setupFunc: func() context.Context {
-				return context.Background()
+				return t.Context()
 			},
 			err: assert.AnError,
 		},

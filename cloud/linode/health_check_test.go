@@ -5,8 +5,9 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 	"github.com/linode/linodego"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 )
 
 func TestHealthCheck(t *testing.T) {
@@ -40,6 +41,8 @@ func TestHealthCheck(t *testing.T) {
 }
 
 func testSucceedingCallsToLinodeAPIHappenStopSignalNotFired(t *testing.T, client *mocks.MockClient) {
+	t.Helper()
+
 	writableStopCh := make(chan struct{})
 	readableStopCh := make(chan struct{})
 
@@ -61,6 +64,8 @@ func testSucceedingCallsToLinodeAPIHappenStopSignalNotFired(t *testing.T, client
 }
 
 func testFailingCallsToLinodeAPIHappenStopSignalFired(t *testing.T, client *mocks.MockClient) {
+	t.Helper()
+
 	writableStopCh := make(chan struct{})
 	readableStopCh := make(chan struct{})
 
@@ -94,6 +99,8 @@ func testFailingCallsToLinodeAPIHappenStopSignalFired(t *testing.T, client *mock
 }
 
 func testErrorCallsToLinodeAPIHappenStopSignalNotFired(t *testing.T, client *mocks.MockClient) {
+	t.Helper()
+
 	writableStopCh := make(chan struct{})
 	readableStopCh := make(chan struct{})
 

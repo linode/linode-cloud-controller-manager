@@ -3,16 +3,25 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: fw-use-specified-nb
+<<<<<<< HEAD
+=======
+  labels:
+    all:
+    lke:
+>>>>>>> main
 spec:
   bindings:
     - name: fwname
       value: (join('-', ['ccm-fwtest', env('CLUSTER_NAME')]))
   namespace: "fw-use-specified-nb"
   steps:
+<<<<<<< HEAD
     - name: Check if CCM is deployed
       try:
         - assert:
             file: ../assert-ccm-resources.yaml
+=======
+>>>>>>> main
     - name: Create firewall, Create pods and services
       try:
         - script:

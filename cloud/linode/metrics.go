@@ -3,9 +3,9 @@ package linode
 import (
 	"sync"
 
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
-
 	"k8s.io/component-base/metrics/legacyregistry"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 )
 
 var registerOnce sync.Once

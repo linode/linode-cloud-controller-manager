@@ -3,6 +3,7 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: lb-tcp-connection-health-check
+<<<<<<< HEAD
 spec:
   namespace: "lb-tcp-connection-health-check"
   steps:
@@ -10,6 +11,14 @@ spec:
       try:
         - assert:
             file: ../assert-ccm-resources.yaml
+=======
+  labels:
+    all:
+    lke:
+spec:
+  namespace: "lb-tcp-connection-health-check"
+  steps:
+>>>>>>> main
     - name: Create pods and services
       try:
         - apply:

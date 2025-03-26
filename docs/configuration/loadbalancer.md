@@ -18,6 +18,32 @@ When using NodeBalancers, the CCM automatically:
 
 For more details, see [Linode NodeBalancer Documentation](https://www.linode.com/docs/products/networking/nodebalancers/).
 
+### IPv6 Support
+
+NodeBalancers support both IPv4 and IPv6 ingress addresses. By default, the CCM uses only IPv4 address for LoadBalancer services. 
+
+You can enable IPv6 addresses globally for all services by setting the `enable-ipv6-for-loadbalancers` flag:
+
+```yaml
+spec:
+  template:
+    spec:
+      containers:
+        - name: ccm-linode
+          args:
+            - --enable-ipv6-for-loadbalancers=true
+```
+
+Alternatively, you can enable IPv6 addresses for individual services using the annotation:
+
+```yaml
+metadata:
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-ingress: "true"
+```
+
+When IPv6 is enabled (either globally or per-service), both IPv4 and IPv6 addresses will be included in the service's LoadBalancer status.
+
 ### Basic Configuration
 
 Create a LoadBalancer service:
@@ -120,10 +146,10 @@ metadata:
 
 ## BGP-based IP Sharing Implementation
 
-BGP-based IP sharing provides a more cost-effective solution for multiple LoadBalancer services. For detailed setup instructions, see [Cilium BGP Documentation](https://docs.cilium.io/en/stable/network/bgp-control-plane/).
+BGP-based IP sharing provides a more cost-effective solution for multiple LoadBalancer services. For detailed setup instructions, see [Cilium BGP Documentation](https://docs.cilium.io/en/stable/network/bgp-control-plane/bgp-control-plane/).
 
 ### Prerequisites
-- [Cilium CNI](https://docs.cilium.io/en/stable/network/bgp-control-plane/) with BGP control plane enabled
+- [Cilium CNI](https://docs.cilium.io/en/stable/network/bgp-control-plane/bgp-control-plane/) with BGP control plane enabled
 - Additional IP provisioning enabled on your account (contact [Linode Support](https://www.linode.com/support/))
 - Nodes labeled for BGP peering
 
@@ -149,6 +175,29 @@ kubectl label node my-node cilium-bgp-peering=true
 - `BGP_PEER_PREFIX`: Use your own BGP peer prefix instead of default one
 
 For more details, see [Environment Variables](environment.md#network-configuration).
+
+## Configuring NodeBalancers directly with VPC
+NodeBalancers can be configured to have VPC specific ips configured as backend nodes. It requires:
+1. VPC with a subnet and Linodes in VPC
+2. Each NodeBalancer created within that VPC needs a free /30 or bigger subnet from the subnet to which Linodes are connected
+
+Specify NodeBalancer backend ipv4 range when creating service:
+```yaml
+metadata:
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-backend-ipv4-range: "10.100.0.0/30"
+```
+
+By default, CCM uses first VPC and Subnet name configured with it to attach NodeBalancers to that VPC subnet. To overwrite those, use:
+```yaml
+metadata:
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-backend-ipv4-range: "10.100.0.4/30"
+    service.beta.kubernetes.io/linode-loadbalancer-vpc-name: "vpc1"
+    service.beta.kubernetes.io/linode-loadbalancer-subnet-name: "subnet1"
+```
+
+If CCM is started with `--nodebalancer-backend-ipv4-subnet` flag, then it will not allow provisioning of nodebalancer unless subnet specified in service annotation lie within the subnet specified using the flag. This is to prevent accidental overlap between nodebalancer backend ips and pod CIDRs.
 
 ## Advanced Configuration
 
@@ -198,9 +247,9 @@ metadata:
 - [Service Annotations](annotations.md)
 - [Firewall Configuration](firewall.md)
 - [Session Affinity](session-affinity.md)
-- [Environment Variables](environment.md)
+- [Environment Variables and Flags](environment.md)
 - [Route Configuration](routes.md)
 - [Linode NodeBalancer Documentation](https://www.linode.com/docs/products/networking/nodebalancers/)
-- [Cilium BGP Documentation](https://docs.cilium.io/en/stable/network/bgp-control-plane/)
+- [Cilium BGP Documentation](https://docs.cilium.io/en/stable/network/bgp-control-plane/bgp-control-plane/)
 - [Basic Service Examples](../examples/basic.md)
 - [Advanced Configuration Examples](../examples/advanced.md)

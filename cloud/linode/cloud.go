@@ -39,14 +39,18 @@ var Options struct {
 	EnableRouteController    bool
 	EnableTokenHealthChecker bool
 	// Deprecated: use VPCNames instead
-	VPCName               string
-	VPCNames              string
-	LoadBalancerType      string
-	BGPNodeSelector       string
-	IpHolderSuffix        string
-	LinodeExternalNetwork *net.IPNet
-	NodeBalancerTags      []string
-	GlobalStopChannel     chan<- struct{}
+	VPCName                       string
+	VPCNames                      string
+	SubnetNames                   string
+	LoadBalancerType              string
+	BGPNodeSelector               string
+	IpHolderSuffix                string
+	LinodeExternalNetwork         *net.IPNet
+	NodeBalancerTags              []string
+	DefaultNBType                 string
+	NodeBalancerBackendIPv4Subnet string
+	GlobalStopChannel             chan<- struct{}
+	EnableIPv6ForLoadBalancers    bool
 }
 
 type linodeCloud struct {
@@ -57,7 +61,10 @@ type linodeCloud struct {
 	linodeTokenHealthChecker *healthChecker
 }
 
-var instanceCache *instances
+var (
+	instanceCache     *instances
+	ipHolderCharLimit int = 23
+)
 
 func init() {
 	registerMetrics()
@@ -73,7 +80,7 @@ func init() {
 func newLinodeClientWithPrometheus(apiToken string, timeout time.Duration) (client.Client, error) {
 	linodeClient, err := client.New(apiToken, timeout)
 	if err != nil {
-		return nil, fmt.Errorf("client was not created succesfully: %w", err)
+		return nil, fmt.Errorf("client was not created successfully: %w", err)
 	}
 
 	if Options.LinodeGoDebug {
@@ -111,7 +118,8 @@ func newCloud() (cloudprovider.Interface, error) {
 	var healthChecker *healthChecker
 
 	if Options.EnableTokenHealthChecker {
-		authenticated, err := client.CheckClientAuthenticated(context.TODO(), linodeClient)
+		var authenticated bool
+		authenticated, err = client.CheckClientAuthenticated(context.TODO(), linodeClient)
 		if err != nil {
 			return nil, fmt.Errorf("linode client authenticated connection error: %w", err)
 		}
@@ -132,6 +140,12 @@ func newCloud() (cloudprovider.Interface, error) {
 		Options.VPCNames = Options.VPCName
 	}
 
+	// SubnetNames can't be used without VPCNames also being set
+	if Options.SubnetNames != "" && Options.VPCNames == "" {
+		klog.Warningf("failed to set flag subnet-names: vpc-names must be set to a non-empty value")
+		Options.SubnetNames = ""
+	}
+
 	instanceCache = newInstances(linodeClient)
 	routes, err := newRoutes(linodeClient, instanceCache)
 	if err != nil {
@@ -150,8 +164,8 @@ func newCloud() (cloudprovider.Interface, error) {
 		klog.Infof("Using IP holder suffix '%s'\n", Options.IpHolderSuffix)
 	}
 
-	if len(Options.IpHolderSuffix) > 23 {
-		msg := fmt.Sprintf("ip-holder-suffix must be 23 characters or less: %s is %d characters\n", Options.IpHolderSuffix, len(Options.IpHolderSuffix))
+	if len(Options.IpHolderSuffix) > ipHolderCharLimit {
+		msg := fmt.Sprintf("ip-holder-suffix must be %d characters or less: %s is %d characters\n", ipHolderCharLimit, Options.IpHolderSuffix, len(Options.IpHolderSuffix))
 		klog.Error(msg)
 		return nil, fmt.Errorf("%s", msg)
 	}
@@ -177,7 +191,12 @@ func (c *linodeCloud) Initialize(clientBuilder cloudprovider.ControllerClientBui
 		go c.linodeTokenHealthChecker.Run(stopCh)
 	}
 
-	serviceController := newServiceController(c.loadbalancers.(*loadbalancers), serviceInformer)
+	lb, assertion := c.loadbalancers.(*loadbalancers)
+	if !assertion {
+		klog.Error("type assertion during Initialize() failed")
+		return
+	}
+	serviceController := newServiceController(lb, serviceInformer)
 	go serviceController.Run(stopCh)
 
 	nodeController := newNodeController(kubeclient, c.client, nodeInformer, instanceCache)

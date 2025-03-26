@@ -1,17 +1,18 @@
 package linode
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/util/workqueue"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 )
 
 func Test_serviceController_Run(t *testing.T) {
@@ -23,14 +24,17 @@ func Test_serviceController_Run(t *testing.T) {
 	informer := informers.NewSharedInformerFactory(kubeClient, 0).Core().V1().Services()
 	mockQueue := workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[any]{Name: "test"})
 
-	loadbalancers := newLoadbalancers(client, "us-east").(*loadbalancers)
+	loadbalancers, assertion := newLoadbalancers(client, "us-east").(*loadbalancers)
+	if !assertion {
+		t.Error("type assertion failed")
+	}
 	svcCtrl := newServiceController(loadbalancers, informer)
 	svcCtrl.queue = mockQueue
 
 	svc := createTestService()
 	svc.Spec.Type = "LoadBalancer"
-	_, err := kubeClient.CoreV1().Services("test-ns").Create(context.TODO(), svc, metav1.CreateOptions{})
-	assert.NoError(t, err, "expected no error during svc creation")
+	_, err := kubeClient.CoreV1().Services("test-ns").Create(t.Context(), svc, metav1.CreateOptions{})
+	require.NoError(t, err, "expected no error during svc creation")
 
 	// Start the controller
 	stopCh := make(chan struct{})
@@ -38,7 +42,7 @@ func Test_serviceController_Run(t *testing.T) {
 
 	// Add svc to the informer
 	err = svcCtrl.informer.Informer().GetStore().Add(svc)
-	assert.NoError(t, err, "expected no error when adding svc to informer")
+	require.NoError(t, err, "expected no error when adding svc to informer")
 
 	// Allow some time for the queue to process
 	time.Sleep(1 * time.Second)

@@ -40,7 +40,7 @@ func (s *serviceController) Run(stopCh <-chan struct{}) {
 				return
 			}
 
-			if service.Spec.Type != "LoadBalancer" {
+			if service.Spec.Type != v1.ServiceTypeLoadBalancer {
 				return
 			}
 
@@ -57,7 +57,7 @@ func (s *serviceController) Run(stopCh <-chan struct{}) {
 				return
 			}
 
-			if newSvc.Spec.Type != "LoadBalancer" && oldSvc.Spec.Type == "LoadBalancer" {
+			if newSvc.Spec.Type != v1.ServiceTypeLoadBalancer && oldSvc.Spec.Type == v1.ServiceTypeLoadBalancer {
 				klog.Infof("ServiceController will handle service (%s) LoadBalancer deletion", getServiceNn(oldSvc))
 				s.queue.Add(oldSvc)
 			}
@@ -91,6 +91,7 @@ func (s *serviceController) processNextDeletion() bool {
 	}
 
 	err := s.handleServiceDeleted(service)
+	//nolint: errorlint //switching to errors.Is()/errors.As() causes errors with Code field
 	switch deleteErr := err.(type) {
 	case nil:
 		break
@@ -104,6 +105,7 @@ func (s *serviceController) processNextDeletion() bool {
 	default:
 		klog.Errorf("failed to delete NodeBalancer for service (%s); will not retry: %s", getServiceNn(service), err)
 	}
+
 	return true
 }
 

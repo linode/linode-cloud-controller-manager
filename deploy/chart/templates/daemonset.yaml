@@ -9,71 +9,128 @@ spec:
   selector:
     matchLabels:
       app: ccm-linode
+  {{- with .Values.updateStrategy }}
+  updateStrategy: 
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
   template:
     metadata:
       labels:
         app: ccm-linode
     spec:
+      {{- if ne .Values.rbacEnabled false }}
       serviceAccountName: ccm-linode
-      {{- if .Values.nodeSelector }}
+      {{- end }}
+      {{- with .Values.securityContext }}
+      securityContext:
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
       nodeSelector:
-{{ toYaml .Values.nodeSelector | indent 8 }}
+      {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if .Values.tolerations }}
+      {{- with .Values.affinity }}
+      affinity:
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
       tolerations:
-{{ toYaml .Values.tolerations | indent 8 }}
+      {{- toYaml . | nindent 8 }}
       {{- end }}
-      hostNetwork: true
+      hostNetwork: {{ if hasKey .Values "enableHostNetwork" }}{{ .Values.enableHostNetwork }}{{ else }}true{{ end }}
       containers:
         - image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           name: ccm-linode
           args:
             - --leader-elect-resource-lock=leases
-            - --v=3
+            - --v={{ default 3 .Values.logVerbosity }}
             - --secure-port=10253
             - --webhook-secure-port=0
-            {{- if .Values.linodegoDebug }}
-            - --linodego-debug={{ .Values.linodegoDebug }}
+            {{- with .Values.linodegoDebug }}
+            - --linodego-debug={{ . }}
+            {{- end }}
+            {{- $vpcNames := .Values.vpcNames }}
+            {{- if and .Values.routeController .Values.routeController.vpcNames }}
+            {{- $vpcNames = .Values.routeController.vpcNames }}
+            {{- end }}
+            {{- $vpcName := .Values.vpcName }}
+            {{- if and .Values.routeController .Values.routeController.vpcName }}
+            {{- $vpcName = .Values.routeController.vpcName }}
+            {{- end }}
+            {{- if and $vpcName $vpcNames }}
+            {{- fail "Both vpcName and vpcNames are set. Please use only vpcNames." }}
+            {{- end }}
+            {{- $subnetNames := .Values.subnetNames }}
+            {{- if and .Values.routeController .Values.routeController.subnetNames }}
+            {{- $subnetNames = .Values.routeController.subnetNames }}
             {{- end }}
             {{- if .Values.routeController }}
             - --enable-route-controller=true
-            {{- if and .Values.routeController.vpcName .Values.routeController.vpcNames }}
-            {{- fail "Both vpcName and vpcNames are set. Please use only vpcNames." }}
-            {{- end }}
-            {{- if not (or .Values.routeController.vpcName .Values.routeController.vpcNames) }}
+            {{- if not (or $vpcName $vpcNames) }}
             {{- fail "Neither vpcName nor vpcNames is set. Please set one of them." }}
-            {{- end }}
-            {{- if .Values.routeController.vpcName }}
-            - --vpc-name={{ .Values.routeController.vpcName }}
-            {{- end }}
-            {{- if .Values.routeController.vpcNames }}
-            - --vpc-names={{ .Values.routeController.vpcNames }}
             {{- end }}
             - --configure-cloud-routes={{ default true .Values.routeController.configureCloudRoutes }}
             - --cluster-cidr={{ required "A valid .Values.routeController.clusterCIDR is required" .Values.routeController.clusterCIDR }}
-            {{- if .Values.routeController.routeReconciliationPeriod }}
-            - --route-reconciliation-period={{ .Values.routeController.routeReconciliationPeriod }}
+            {{- with .Values.routeController.routeReconciliationPeriod }}
+            - --route-reconciliation-period={{ . }}
             {{- end }}
             {{- end }}
+            {{- with $vpcNames }}
+            - --vpc-names={{ . }}
+            {{- end }}
+            {{- with $vpcName }}
+            - --vpc-name={{ . }}
+            {{- end }}
+            {{- with $subnetNames }}
+            - --subnet-names={{ . }}
+            {{ end }}
             {{- if .Values.sharedIPLoadBalancing }}
-            {{- if .Values.sharedIPLoadBalancing.bgpNodeSelector }}
-            - --bgp-node-selector={{ .Values.sharedIPLoadBalancing.bgpNodeSelector }}
+            {{- with .Values.sharedIPLoadBalancing.bgpNodeSelector }}
+            - --bgp-node-selector={{ . }}
             {{- end }}
-            {{- if .Values.sharedIPLoadBalancing.ipHolderSuffix }}
-            - --ip-holder-suffix={{ .Values.sharedIPLoadBalancing.ipHolderSuffix }}
+            {{- with .Values.sharedIPLoadBalancing.ipHolderSuffix }}
+            - --ip-holder-suffix={{ . }}
             {{- end}}
             - --load-balancer-type={{ required "A valid .Values.sharedIPLoadBalancing.loadBalancerType is required for shared IP load-balancing" .Values.sharedIPLoadBalancing.loadBalancerType }}
             {{- end }}
-            {{- if .Values.tokenHealthChecker }}
-            - --enable-token-health-checker={{ .Values.tokenHealthChecker }}
+            {{- with .Values.tokenHealthChecker }}
+            - --enable-token-health-checker={{ . }}
             {{- end }}
-            {{- if .Values.nodeBalancerTags }}
-            - --nodebalancer-tags={{ join " " .Values.nodeBalancerTags }}
+            {{- with .Values.nodeBalancerTags }}
+            - --nodebalancer-tags={{ join " " . }}
             {{- end }}
             {{- if .Values.allowUnauthorizedMetrics }}
             - --authorization-always-allow-paths="/metrics"
             {{- end }}
+            {{- if .Values.defaultNBType }}
+            - --default-nodebalancer-type={{ .Values.defaultNBType }}
+            {{- end }}
+            {{- if .Values.enableIPv6ForLoadBalancers }}
+            - --enable-ipv6-for-loadbalancers={{ .Values.enableIPv6ForLoadBalancers }}
+            {{- end }}
+            {{- if .Values.nodeBalancerBackendIPv4Subnet }}
+            - --nodebalancer-backend-ipv4-subnet={{ .Values.nodeBalancerBackendIPv4Subnet }}
+            {{- end }}
+            {{- if .Values.extraArgs }}
+            {{- toYaml .Values.extraArgs | nindent 12 }}
+            {{- end }}
+          {{- with .Values.containerSecurityContext }}
+          securityContext:
+          {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe: 
+          {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe: 
+          {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources: 
+          {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
             - mountPath: /etc/kubernetes
               name: k8s
@@ -95,9 +152,13 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end}}
       volumes:
+        {{- with .Values.k8sVolume }}
+        {{- toYaml . | nindent 8 }}
+        {{- else }}
         - name: k8s
           hostPath:
             path: /etc/kubernetes
+        {{- end }}
         {{- with .Values.volumes}}
         {{- toYaml . | nindent 8 }}
         {{- end}}
