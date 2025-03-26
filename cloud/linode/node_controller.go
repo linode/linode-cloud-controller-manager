@@ -27,6 +27,7 @@ const (
 	informerResyncPeriod   = 1 * time.Minute
 	defaultMetadataTTL     = 300 * time.Second
 	defaultK8sNodeCacheTTL = 300 * time.Second
+	listNodeContextTimeout = 30 * time.Second
 )
 
 var registeredK8sNodeCache *k8sNodeCache = newK8sNodeCache()
@@ -68,7 +69,10 @@ func (c *k8sNodeCache) updateCache(kubeclient kubernetes.Interface) {
 		return
 	}
 
-	nodeList, err := kubeclient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	ctx, cancel := context.WithTimeout(context.Background(), listNodeContextTimeout)
+	defer cancel()
+
+	nodeList, err := kubeclient.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		klog.Errorf("failed to list nodes, cannot create/update k8s node cache: %s", err)
 		return
