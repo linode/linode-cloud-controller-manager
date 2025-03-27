@@ -93,7 +93,9 @@ func main() {
 	command.Flags().StringVar(&linode.Options.NodeBalancerBackendIPv4Subnet, "nodebalancer-backend-ipv4-subnet", "", "ipv4 subnet to use for NodeBalancer backends")
 	command.Flags().StringSliceVar(&linode.Options.NodeBalancerTags, "nodebalancer-tags", []string{}, "Linode tags to apply to all NodeBalancers")
 	command.Flags().BoolVar(&linode.Options.EnableIPv6ForLoadBalancers, "enable-ipv6-for-loadbalancers", false, "set both IPv4 and IPv6 addresses for all LoadBalancer services (when disabled, only IPv4 is used)")
-
+	command.Flags().BoolVar(&linode.Options.EnableNodeCIDRAllocation, "enable-node-cidr-allocation", false, "allocate cidrs to nodes")
+	command.Flags().StringVar(&linode.Options.ClusterIPv4CIDR, "cluster-ipv4-cidr", "", "ipv4 cidr range for cluster ips")
+	command.Flags().IntVar(&linode.Options.NodeCIDRMaskSizeIPv4, "node-cidr-mask-size-ipv4", 0, "ipv4 cidr mask size for node ips")
 	// Set static flags
 	command.Flags().VisitAll(func(fl *pflag.Flag) {
 		var err error
