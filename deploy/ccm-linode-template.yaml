@@ -77,10 +77,17 @@ spec:
       labels:
         app: ccm-linode
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: node-role.kubernetes.io/control-plane
+                  operator: Exists
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       serviceAccountName: ccm-linode
-      nodeSelector:
-        # The CCM will only run on a Node labelled as a master, you may want to change this
-        node-role.kubernetes.io/control-plane: ""
       tolerations:
         # The CCM can run on Nodes tainted as masters
         - key: "node-role.kubernetes.io/control-plane"
@@ -122,6 +129,11 @@ spec:
                 secretKeyRef:
                   name: ccm-linode
                   key: region
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
       volumes:
       - name: k8s
         hostPath:

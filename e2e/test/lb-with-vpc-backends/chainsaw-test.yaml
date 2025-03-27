@@ -2,12 +2,11 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  name: lb-with-proxyprotocol-set
+  name: lb-with-vpc-backends
   labels:
     all:
-    lke:
 spec:
-  namespace: "lb-with-proxyprotocol-set"
+  namespace: "lb-with-vpc-backends"
   steps:
     - name: Create pods and services
       try:
@@ -40,17 +39,7 @@ spec:
               name: svc-test
             status:
               (loadBalancer.ingress[0].ip != null): true
-    - name: Annotate service port 80 with v1 and 8080 with v2
-      try:
-        - script:
-            content: |
-              set -e
-              kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-port-80='{"proxy-protocol": "v1"}'
-              kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-port-8080='{"proxy-protocol": "v2"}'
-              sleep 10
-            check:
-              ($error == null): true
-    - name: Check NodeBalancerConfig for port 80 to have ProxyProtocol v1 and port 8080 to have ProxyProtocol v2
+    - name: Check NodeBalancerConfig for backend ips
       try:
         - script:
             content: |
@@ -63,14 +52,24 @@ spec:
                 -H "Content-Type: application/json" \
                 "https://api.linode.com/v4/nodebalancers/$nbid/configs")
 
-              port_80_v1=$(echo $nbconfig | jq -r '.data[] | select(.port == 80) | .proxy_protocol == "v1"')
-              port_8080_v2=$(echo $nbconfig | jq -r '.data[] | select(.port == 8080) | .proxy_protocol == "v2"')
+              config_id=$(echo $nbconfig | jq -r '.data[] | select(.port == 80) | .id')
 
-              if [[ $port_80_v1 == "true" && $port_8080_v2 == "true" ]]; then
-                  echo "Conditions met"
-              else
-                  echo "Conditions not met"
-              fi
+              # Get nodes from the config
+              nodes=$(curl -s \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                "https://api.linode.com/v4/nodebalancers/$nbid/configs/$config_id/nodes")
+
+              # Extract all addresses and remove ports
+              addresses=$(echo "$json_data" | jq -r '.data[].address' | sed 's/:[0-9]*$//')
+
+              for ip in $addresses; do
+                  if [[ $ip =~ ^10\.0\.0\.[0-9]+$ ]]; then
+                      echo "$ip is in the 10.0.0.0/8 subnet"
+                  else
+                      echo "$ip is NOT in the 10.0.0.0/8 subnet"
+                  fi
+              done
             check:
               ($error): ~
-              (contains($stdout, 'Conditions met')): true
+              (contains($stdout, 'is NOT in the 10.0.0.0/8 subnet')): false

@@ -4,7 +4,7 @@
     "clusterctl@latest",
     "docker@latest",
     "envsubst@latest",
-    "go@1.23.3",
+    "go@1.24.1",
     "golangci-lint@latest",
     "jq@latest",
     "kind@latest",
@@ -22,6 +22,7 @@
       "mgmt-and-capl-cluster": "make mgmt-and-capl-cluster",
       "e2e-test": "make e2e-test",
       "e2e-test-bgp": "make e2e-test-bgp",
+      "e2e-test-subnet": "make e2e-test-subnet",
       "cleanup-cluster": "make cleanup-cluster"
     }
   },

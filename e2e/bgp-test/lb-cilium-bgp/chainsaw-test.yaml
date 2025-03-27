@@ -3,6 +3,8 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: cilium-bgp-test
+  labels:
+    all:
 spec:
   namespace: "cilium-bgp-test"
   steps:

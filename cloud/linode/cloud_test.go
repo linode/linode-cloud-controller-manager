@@ -6,9 +6,11 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	cloudprovider "k8s.io/cloud-provider"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 )
 
 func TestNewCloudRouteControllerDisabled(t *testing.T) {
@@ -74,8 +76,8 @@ func TestNewCloud(t *testing.T) {
 			Options.VPCNames = ""
 		}()
 		_, err := newCloud()
-		assert.NoError(t, err, "expected no error if deprecated flag vpcname is set")
-		assert.Equal(t, Options.VPCNames, "tt", "expected vpcnames to be set to vpcname")
+		require.NoError(t, err, "expected no error if deprecated flag vpcname is set")
+		assert.Equal(t, "tt", Options.VPCNames, "expected vpcnames to be set to vpcname")
 	})
 
 	t.Run("should fail if incorrect loadbalancertype is set", func(t *testing.T) {

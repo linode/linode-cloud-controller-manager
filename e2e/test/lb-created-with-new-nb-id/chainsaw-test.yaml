@@ -3,13 +3,12 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: lb-created-with-new-nb-id
+  labels:
+    all:
+    lke:
 spec:
   namespace: "lb-created-with-new-nb-id"
   steps:
-    - name: Check if CCM is deployed
-      try:
-        - assert:
-            file: ../assert-ccm-resources.yaml
     - name: Create nodebalancer and create resources
       try:
         - script:

@@ -3,13 +3,12 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: lb-updated-with-nb-id
+  labels:
+    all:
+    lke:
 spec:
   namespace: "lb-updated-with-nb-id"
   steps:
-    - name: Check if CCM is deployed
-      try:
-        - assert:
-            file: ../assert-ccm-resources.yaml
     - name: Create pods and services
       try:
         - apply:

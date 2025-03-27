@@ -3,13 +3,12 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: lb-preserve-annotation-svc-delete
+  labels:
+    all:
+    lke:
 spec:
   namespace: "lb-preserve-annotation-svc-delete"
   steps:
-    - name: Check if CCM is deployed
-      try:
-        - assert:
-            file: ../assert-ccm-resources.yaml
     - name: Create resources
       try:
         - apply:

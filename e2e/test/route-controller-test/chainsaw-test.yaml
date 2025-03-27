@@ -3,16 +3,14 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: route-controller-test
+  labels:
+    all:
 spec:
   bindings:
     - name: fwname
       value: (join('-', ['ccm-fwtest', env('CLUSTER_NAME')]))
   namespace: "route-controller-test"
   steps:
-    - name: Check if CCM is deployed
-      try:
-        - assert:
-            file: ../assert-ccm-resources.yaml
     - name: Check if the route controller updated the config for the linode
       try:
         - script:
@@ -63,3 +61,72 @@ spec:
             check:
               ($error == null): true
               (contains($stdout, 'Pod CIDR not found in VPC interface configuration')): false
+    - name: Modify instance label using linodeAPI and check if it still has the route configured
+      try:
+        - script:
+            content: |
+              set -e
+
+              # Use last node to change its label
+              node=$(kubectl get nodes -o jsonpath='{.items[-1].metadata.name}')  
+              if [ -z "$node" ]; then
+                  echo "Error: No nodes found in cluster"
+                  exit 1
+              fi
+
+              instance_id=$(kubectl get node "$node" -o jsonpath='{.spec.providerID}' | sed 's/linode:\/\///')
+              pod_cidr=$(kubectl get node "$node" -o jsonpath='{.spec.podCIDR}')
+              newNodeName=${node}-test
+
+              # Change label of linode
+              resp=$(curl -X PUT --write-out "%{http_code}\n" \
+                  --silent --output /dev/null \
+                  -H "Authorization: Bearer $LINODE_TOKEN" \
+                  -H "Content-Type: application/json" \
+                  "https://api.linode.com/v4/linode/instances/$instance_id" \
+                  --data "{\"label\": \"$newNodeName\"}")
+
+              if [[ $resp != "200" ]]; then
+                  echo "Failed updating node label"
+                  exit 1
+              fi
+
+              currentLabel=$(curl -s \
+                  -H "Authorization: Bearer $LINODE_TOKEN" \
+                  "https://api.linode.com/v4/linode/instances/$instance_id" \
+                  | jq -r '.label')
+
+              if [[ $currentLabel == $newNodeName ]]; then
+                  echo "Labels match"
+              fi
+
+              # sleep for a minute for route_controller to reconcile few times
+              sleep 60
+
+              # Get interface details for this config
+              interfaces=$(curl -s \
+                  -H "Authorization: Bearer $LINODE_TOKEN" \
+                  "https://api.linode.com/v4/linode/instances/$instance_id/configs" \
+                  | jq -r '.data[0].interfaces')
+
+              # Check if pod CIDR still exists in the VPC interface IP ranges
+              if echo "$interfaces" | jq -e --arg cidr "$pod_cidr" '.[] | select(.purpose == "vpc") | .ip_ranges[] | select(. == $cidr)' > /dev/null; then
+                  echo "Pod CIDR found in VPC interface configuration"
+              else
+                  echo "Pod CIDR not found in VPC interface configuration"
+                  echo "Current VPC interface configuration:"
+                  echo "$interfaces" | jq '.[] | select(.purpose == "vpc")'
+              fi
+
+              # revert label to original value
+              curl -X PUT --write-out "%{http_code}\n" \
+                  --silent --output /dev/null \
+                  -H "Authorization: Bearer $LINODE_TOKEN" \
+                  -H "Content-Type: application/json" \
+                  "https://api.linode.com/v4/linode/instances/$instance_id" \
+                  --data "{\"label\": \"$node\"}"
+            check:
+              ($error == null): true
+              (contains($stdout, 'Failed updating node label')): false
+              (contains($stdout, 'Labels match')): true
+              (contains($stdout, 'Pod CIDR found in VPC interface configuration')): true

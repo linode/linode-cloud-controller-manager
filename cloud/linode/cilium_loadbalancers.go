@@ -13,7 +13,6 @@ import (
 	ciliumclient "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/typed/cilium.io/v2alpha1"
 	slimv1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/apis/meta/v1"
 	"github.com/google/uuid"
-	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
 	"github.com/linode/linodego"
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -23,6 +22,8 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
 )
 
 const (
@@ -68,6 +69,7 @@ var (
 		"ca-central":   15, // Toronto (Canada)
 		"us-iad":       17, // Washington, DC (USA)
 	}
+	BGPNodeSelectorFlagInputLen int = 2
 )
 
 // getExistingSharedIPsInCluster determines the list of addresses to share on nodes by checking the
@@ -293,10 +295,12 @@ func (l *loadbalancers) deleteSharedIP(ctx context.Context, service *v1.Service)
 	}
 	svcIngress := service.Status.LoadBalancer.Ingress
 	if len(svcIngress) > 0 && ipHolder != nil {
+		var nodeLinodeID int
+
 		for _, ingress := range svcIngress {
 			// delete the shared IP on the Linodes it's shared on
 			for _, node := range bgpNodes {
-				nodeLinodeID, err := parseProviderID(node.Spec.ProviderID)
+				nodeLinodeID, err = parseProviderID(node.Spec.ProviderID)
 				if err != nil {
 					return err
 				}
@@ -520,7 +524,7 @@ func (l *loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error 
 		}
 	} else {
 		kv := strings.Split(Options.BGPNodeSelector, "=")
-		if len(kv) != 2 {
+		if len(kv) != BGPNodeSelectorFlagInputLen {
 			return fmt.Errorf("invalid node selector %s", Options.BGPNodeSelector)
 		}
 

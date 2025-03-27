@@ -2,21 +2,12 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  name: lb-single-tls
+  name: lb-premium-nb
   labels:
     all:
-    lke:
 spec:
-  namespace: "lb-single-tls"
+  namespace: "lb-premium-nb"
   steps:
-    - name: Create secret
-      try:
-        - script:
-            content: |
-              set -e
-              kubectl -n $NAMESPACE create secret tls tls-secret --cert=../certificates/server.crt --key=../certificates/server.key
-            check:
-              ($error == null): true
     - name: Create pods and services
       try:
         - apply:
@@ -38,7 +29,7 @@ spec:
               name: svc-test
             status:
               (loadBalancer.ingress[0].ip != null): true
-    - name: Fetch loadbalancer ip and check if pod is reachable
+    - name: Fetch loadbalancer ip and check both pods reachable
       try:
         - script:
             content: |
@@ -48,8 +39,8 @@ spec:
               podnames=()
 
               for i in {1..10}; do
-                  if [[ ${#podnames[@]} -lt 1 ]]; then
-                      output=$(curl --resolve linode.test:80:$IP --cacert ../certificates/ca.crt -s https://linode.test:80 | jq -e .podName || true)
+                  if [[ ${#podnames[@]} -lt 2 ]]; then
+                      output=$(curl -s $IP:80 | jq -e .podName || true)
 
                       if [[ "$output" == *"test-"* ]]; then
                           unique=true
@@ -69,7 +60,7 @@ spec:
                   sleep 10
               done
 
-              if [[ ${#podnames[@]} -lt 1 ]]; then
+              if [[ ${#podnames[@]} -lt 2 ]]; then
                   echo "all pods failed to respond"
               else
                   echo "all pods responded"
@@ -77,15 +68,26 @@ spec:
             check:
               ($error == null): true
               (contains($stdout, 'all pods responded')): true
-    - name: Delete Pods
+    - name: Check nodebalancer type
       try:
-        - delete:
-            ref:
-              apiVersion: v1
-              kind: Pod
-    - name: Delete Service
-      try:
-        - delete:
-            ref:
-              apiVersion: v1
-              kind: Service
+      - script:
+          content: |
+            set -e
+
+            nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+            for i in {1..10}; do
+                type=$(curl -s --request GET \
+                  -H "Authorization: Bearer $LINODE_TOKEN" \
+                  -H "Content-Type: application/json" \
+                  -H "accept: application/json" \
+                  "https://api.linode.com/v4/nodebalancers/${nbid}" | jq -r '.type')
+
+                if [[ $type == "premium" ]]; then
+                    echo "nodebalancer type is premium"
+                    break
+                fi
+                sleep 5
+            done
+          check:
+            ($error == null): true
+            (contains($stdout, 'nodebalancer type is premium')): true

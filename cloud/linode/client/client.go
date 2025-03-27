@@ -11,9 +11,10 @@ import (
 	"os"
 	"time"
 
-	_ "github.com/hexdigest/gowrap"
 	"github.com/linode/linodego"
 	"k8s.io/klog/v2"
+
+	_ "github.com/hexdigest/gowrap"
 )
 
 const (
@@ -35,6 +36,7 @@ type Client interface {
 
 	ListVPCs(context.Context, *linodego.ListOptions) ([]linodego.VPC, error)
 	ListVPCIPAddresses(context.Context, int, *linodego.ListOptions) ([]linodego.VPCIP, error)
+	ListVPCSubnets(context.Context, int, *linodego.ListOptions) ([]linodego.VPCSubnet, error)
 
 	CreateNodeBalancer(context.Context, linodego.NodeBalancerCreateOptions) (*linodego.NodeBalancer, error)
 	GetNodeBalancer(context.Context, int) (*linodego.NodeBalancer, error)

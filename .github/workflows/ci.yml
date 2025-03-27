@@ -12,7 +12,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -38,7 +38,7 @@ jobs:
           base: ${{ github.ref }}
           filters: .github/filters.yml
 
-  build-test:
+  codecov:
     runs-on: ubuntu-latest
     environment: ${{ github.event.pull_request.head.repo.fork == true && 'prod-external' || 'prod' }}
     needs: changes
@@ -61,7 +61,6 @@ jobs:
             api.codecov.io:443
             ingest.codecov.io:443
             raw.githubusercontent.com:443
-            get.helm.sh:443
 
       - uses: actions/checkout@v4.2.2
         with:
@@ -70,17 +69,6 @@ jobs:
         with:
           go-version-file: go.mod
           check-latest: true
-
-      - name: Vet
-        run: make vet
-
-      - name: lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: v1.62.2
-
-      - name: Helm Lint
-        run: make helm-lint
 
       - name: Test
         run: make test
@@ -93,35 +81,6 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: linode/linode-cloud-controller-manager
 
-      - name: Build
-        run: make build
-
-  docker-build:
-    runs-on: ubuntu-latest
-    environment: ${{ github.event.pull_request.head.repo.fork == true && 'prod-external' || 'prod' }}
-    steps:
-      - uses: actions/checkout@v4.2.2
-        with:
-          fetch-depth: 0
-      - name: Docker Meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            linode/linode-cloud-controller-manager
-          tags: |
-            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
-            type=semver,pattern={{raw}},value=${{ github.ref_name }}
-      - name: Build Dockerfile
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: false
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            REV=${{ github.ref_name }}
-
   e2e-tests:
     runs-on: ubuntu-latest
     environment: ${{ github.event.pull_request.head.repo.fork == true && 'prod-external' || 'prod' }}
@@ -130,7 +89,7 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.github_token }}
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
-      IMG: linode/linode-cloud-controller-manager:${{ github.ref == 'refs/heads/main' && 'latest' || format('pr-{0}', github.event.number) || github.ref_name }}
+      IMG: linode/linode-cloud-controller-manager:${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'latest' || format('pr-{0}', github.event.pull_request.number) || github.ref_name }}
       LINODE_REGION: us-lax
       LINODE_CONTROL_PLANE_MACHINE_TYPE: g6-standard-2
       LINODE_MACHINE_TYPE: g6-standard-2
@@ -163,6 +122,9 @@ jobs:
 
       - name: Run Cilium BGP e2e test
         run: devbox run e2e-test-bgp
+
+      - name: Run subnet filtering test
+        run: devbox run e2e-test-subnet
 
       - name: Cleanup Resources
         if: always()
