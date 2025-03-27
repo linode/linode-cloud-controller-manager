@@ -3,24 +3,14 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: route-controller-test
-<<<<<<< HEAD
-=======
   labels:
     all:
->>>>>>> main
 spec:
   bindings:
     - name: fwname
       value: (join('-', ['ccm-fwtest', env('CLUSTER_NAME')]))
   namespace: "route-controller-test"
   steps:
-<<<<<<< HEAD
-    - name: Check if CCM is deployed
-      try:
-        - assert:
-            file: ../assert-ccm-resources.yaml
-=======
->>>>>>> main
     - name: Check if the route controller updated the config for the linode
       try:
         - script:
@@ -71,8 +61,6 @@ spec:
             check:
               ($error == null): true
               (contains($stdout, 'Pod CIDR not found in VPC interface configuration')): false
-<<<<<<< HEAD
-=======
     - name: Modify instance label using linodeAPI and check if it still has the route configured
       try:
         - script:
@@ -142,4 +130,3 @@ spec:
               (contains($stdout, 'Failed updating node label')): false
               (contains($stdout, 'Labels match')): true
               (contains($stdout, 'Pod CIDR found in VPC interface configuration')): true
->>>>>>> main

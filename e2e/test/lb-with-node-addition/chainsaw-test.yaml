@@ -3,21 +3,11 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: lb-with-node-addition
-<<<<<<< HEAD
-spec:
-  namespace: "lb-with-node-addition"
-  steps:
-    - name: Check if CCM is deployed
-      try:
-        - assert:
-            file: ../assert-ccm-resources.yaml
-=======
   labels:
     all:
 spec:
   namespace: "lb-with-node-addition"
   steps:
->>>>>>> main
     - name: Create resources
       try:
         - apply:

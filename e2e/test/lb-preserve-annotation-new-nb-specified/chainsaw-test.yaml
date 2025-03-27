@@ -3,22 +3,12 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: lb-preserve-annotation-new-nb-specified
-<<<<<<< HEAD
-spec:
-  namespace: "lb-preserve-annotation-new-nb-specified"
-  steps:
-    - name: Check if CCM is deployed
-      try:
-        - assert:
-            file: ../assert-ccm-resources.yaml
-=======
   labels:
     all:
     lke:
 spec:
   namespace: "lb-preserve-annotation-new-nb-specified"
   steps:
->>>>>>> main
     - name: Create resources
       try:
         - apply:

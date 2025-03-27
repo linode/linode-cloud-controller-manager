@@ -3,22 +3,12 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: lb-with-proxyprotocol-default-annotation
-<<<<<<< HEAD
-spec:
-  namespace: "lb-with-proxyprotocol-default-annotation"
-  steps:
-    - name: Check if CCM is deployed
-      try:
-        - assert:
-            file: ../assert-ccm-resources.yaml
-=======
   labels:
     all:
     lke:
 spec:
   namespace: "lb-with-proxyprotocol-default-annotation"
   steps:
->>>>>>> main
     - name: Create pods and services
       try:
         - apply:

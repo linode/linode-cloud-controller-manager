@@ -3,22 +3,12 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: lb-fw-update-acl
-<<<<<<< HEAD
-spec:
-  namespace: "lb-fw-update-acl"
-  steps:
-    - name: Check if CCM is deployed
-      try:
-        - assert:
-            file: ../assert-ccm-resources.yaml
-=======
   labels:
     all:
     lke:
 spec:
   namespace: "lb-fw-update-acl"
   steps:
->>>>>>> main
     - name: Create pods and services
       try:
         - apply:

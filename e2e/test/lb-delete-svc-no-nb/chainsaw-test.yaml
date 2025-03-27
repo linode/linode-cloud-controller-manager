@@ -3,22 +3,12 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   name: lb-delete-svc-no-nb
-<<<<<<< HEAD
-spec:
-  namespace: "lb-delete-svc-no-nb"
-  steps:
-    - name: Check if CCM is deployed
-      try:
-        - assert:
-            file: ../assert-ccm-resources.yaml
-=======
   labels:
     all:
     lke:
 spec:
   namespace: "lb-delete-svc-no-nb"
   steps:
->>>>>>> main
     - name: Create nodebalancer and create resources
       try:
         - script:
