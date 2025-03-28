@@ -26,6 +26,13 @@ require (
 )
 
 require (
+	github.com/distribution/reference v0.6.0 // indirect
+	github.com/onsi/gomega v1.35.1 // indirect
+	github.com/opencontainers/go-digest v1.0.0 // indirect
+	k8s.io/kubelet v0.0.0 // indirect
+)
+
+require (
 	cel.dev/expr v0.19.1 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
@@ -157,14 +164,34 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.32.0 // indirect
 	k8s.io/apiserver v0.32.3 // indirect
-	k8s.io/component-helpers v0.32.3 // indirect
+	k8s.io/component-helpers v0.32.3
 	k8s.io/controller-manager v0.32.3 // indirect
 	k8s.io/kms v0.32.3 // indirect
+	k8s.io/kube-controller-manager v0.32.3
 	k8s.io/kube-openapi v0.0.0-20241212222426-2c72e554b1e7 // indirect
+	k8s.io/kubernetes v1.32.3
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.1 // indirect
 	sigs.k8s.io/gateway-api v1.2.1 // indirect
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
 	sigs.k8s.io/mcs-api v0.1.1-0.20250116162235-62ede9a032dc // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.5.0 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
+)
+
+// Fixes for `unknown revision v0.0.0` reported by `go list -modfile=go.mod -m -json -mod=mod all`
+replace (
+	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.32.3
+	k8s.io/cri-api => k8s.io/cri-api v0.32.3
+	k8s.io/cri-client => k8s.io/cri-client v0.32.3
+	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.32.3
+	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.32.3
+	k8s.io/externaljwt => k8s.io/externaljwt v0.32.3
+	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.32.3
+	k8s.io/kube-proxy => k8s.io/kube-proxy v0.32.3
+	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.32.3
+	k8s.io/kubelet => k8s.io/kubelet v0.32.3
+	k8s.io/metrics => k8s.io/metrics v0.32.3
+	k8s.io/mount-utils => k8s.io/mount-utils v0.32.3
+	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.32.3
+	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.32.3
 )
