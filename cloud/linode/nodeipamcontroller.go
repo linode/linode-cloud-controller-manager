@@ -41,32 +41,32 @@ const (
 	defaultNodeMaskCIDRIPv6 = 64
 )
 
-func startNodeIpamController(stopCh <-chan struct{}, cloud cloudprovider.Interface, nodeInformer v1.NodeInformer, kubeclient kubernetes.Interface) (bool, error) {
+func startNodeIpamController(stopCh <-chan struct{}, cloud cloudprovider.Interface, nodeInformer v1.NodeInformer, kubeclient kubernetes.Interface) error {
 	var serviceCIDR *net.IPNet
 	var secondaryServiceCIDR *net.IPNet
 
 	// should we start nodeIPAM
-	if !Options.EnableNodeCIDRAllocation {
-		return false, nil
+	if !Options.AllocateNodeCIDRs {
+		return nil
 	}
 
 	// failure: bad cidrs in config
-	clusterCIDRs, dualStack, err := processCIDRs(Options.ClusterIPv4CIDR)
+	clusterCIDRs, dualStack, err := processCIDRs(Options.ClusterCIDRIPv4)
 	if err != nil {
-		return false, fmt.Errorf("processCIDRs failed: %v", err)
+		return fmt.Errorf("processCIDRs failed: %v", err)
 	}
 
 	// failure: more than one cidr but they are not configured as dual stack
 	if len(clusterCIDRs) > 1 && !dualStack {
-		return false, fmt.Errorf("len of ClusterCIDRs==%v and they are not configured as dual stack (at least one from each IPFamily", len(clusterCIDRs))
+		return fmt.Errorf("len of ClusterCIDRs==%v and they are not configured as dual stack (at least one from each IPFamily", len(clusterCIDRs))
 	}
 
 	// failure: more than cidrs is not allowed even with dual stack
 	if len(clusterCIDRs) > 2 {
-		return false, fmt.Errorf("len of clusters is:%v > more than max allowed of 2", len(clusterCIDRs))
+		return fmt.Errorf("len of clusters is:%v > more than max allowed of 2", len(clusterCIDRs))
 	}
 
-	/* TODO: enable when service cidr is supported
+	/* TODO: uncomment and fix if we want to support service cidr overlap with nodecidr
 	// service cidr processing
 	if len(strings.TrimSpace(nodeIPAMConfig.ServiceCIDR)) != 0 {
 		_, serviceCIDR, err = netutils.ParseCIDRSloppy(nodeIPAMConfig.ServiceCIDR)
@@ -97,7 +97,7 @@ func startNodeIpamController(stopCh <-chan struct{}, cloud cloudprovider.Interfa
 
 	nodeCIDRMaskSizes, err := setNodeCIDRMaskSizes(clusterCIDRs)
 	if err != nil {
-		return false, fmt.Errorf("setNodeCIDRMaskSizes failed: %v", err)
+		return fmt.Errorf("setNodeCIDRMaskSizes failed: %v", err)
 	}
 
 	ctx := wait.ContextForChannel(stopCh)
@@ -114,11 +114,11 @@ func startNodeIpamController(stopCh <-chan struct{}, cloud cloudprovider.Interfa
 		ipam.CIDRAllocatorType(ipam.RangeAllocatorType),
 	)
 	if err != nil {
-		return true, err
+		return err
 	}
 
 	go nodeIpamController.Run(ctx)
-	return true, nil
+	return nil
 }
 
 // processCIDRs is a helper function that works on a comma separated cidrs and returns

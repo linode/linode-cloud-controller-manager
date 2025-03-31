@@ -51,8 +51,8 @@ var Options struct {
 	NodeBalancerBackendIPv4Subnet string
 	GlobalStopChannel             chan<- struct{}
 	EnableIPv6ForLoadBalancers    bool
-	EnableNodeCIDRAllocation      bool
-	ClusterIPv4CIDR               string
+	AllocateNodeCIDRs             bool
+	ClusterCIDRIPv4               string
 	NodeCIDRMaskSizeIPv4          int
 }
 
@@ -190,7 +190,7 @@ func (c *linodeCloud) Initialize(clientBuilder cloudprovider.ControllerClientBui
 	serviceInformer := sharedInformer.Core().V1().Services()
 	nodeInformer := sharedInformer.Core().V1().Nodes()
 
-	if _, err := startNodeIpamController(stopCh, c, nodeInformer, kubeclient); err != nil {
+	if err := startNodeIpamController(stopCh, c, nodeInformer, kubeclient); err != nil {
 		klog.Fatal("starting of node ipam controller failed", err)
 	}
 
