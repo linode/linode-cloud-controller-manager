@@ -23,7 +23,6 @@ jobs:
     
     - name: Merge main into gh-pages
       run: |
-        git fetch --unshallow
         git checkout gh-pages
         git pull
         git merge --no-ff main -m "Automatically merge main into gh-pages"
