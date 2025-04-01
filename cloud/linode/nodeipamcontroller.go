@@ -33,6 +33,10 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
+const (
+	maxAllowedNodeCIDRs = 2
+)
+
 var (
 	// defaultNodeMaskCIDRIPv4 is default mask size for IPv4 node cidr
 	defaultNodeMaskCIDRIPv4 = 24
@@ -52,7 +56,7 @@ func startNodeIpamController(stopCh <-chan struct{}, cloud cloudprovider.Interfa
 	// failure: bad cidrs in config
 	clusterCIDRs, dualStack, err := processCIDRs(Options.ClusterCIDRIPv4)
 	if err != nil {
-		return fmt.Errorf("processCIDRs failed: %v", err)
+		return fmt.Errorf("processCIDRs failed: %w", err)
 	}
 
 	// failure: more than one cidr but they are not configured as dual stack
@@ -61,8 +65,8 @@ func startNodeIpamController(stopCh <-chan struct{}, cloud cloudprovider.Interfa
 	}
 
 	// failure: more than cidrs is not allowed even with dual stack
-	if len(clusterCIDRs) > 2 {
-		return fmt.Errorf("len of clusters is:%v > more than max allowed of 2", len(clusterCIDRs))
+	if len(clusterCIDRs) > maxAllowedNodeCIDRs {
+		return fmt.Errorf("len of clusters is:%v > more than max allowed of %d", len(clusterCIDRs), maxAllowedNodeCIDRs)
 	}
 
 	/* TODO: uncomment and fix if we want to support service cidr overlap with nodecidr
@@ -94,10 +98,7 @@ func startNodeIpamController(stopCh <-chan struct{}, cloud cloudprovider.Interfa
 	}
 	*/
 
-	nodeCIDRMaskSizes, err := setNodeCIDRMaskSizes(clusterCIDRs)
-	if err != nil {
-		return fmt.Errorf("setNodeCIDRMaskSizes failed: %v", err)
-	}
+	nodeCIDRMaskSizes := setNodeCIDRMaskSizes(clusterCIDRs)
 
 	ctx := wait.ContextForChannel(stopCh)
 
@@ -110,7 +111,7 @@ func startNodeIpamController(stopCh <-chan struct{}, cloud cloudprovider.Interfa
 		serviceCIDR,
 		secondaryServiceCIDR,
 		nodeCIDRMaskSizes,
-		ipam.CIDRAllocatorType(ipam.RangeAllocatorType),
+		ipam.RangeAllocatorType,
 	)
 	if err != nil {
 		return err
@@ -134,12 +135,15 @@ func processCIDRs(cidrsList string) ([]*net.IPNet, bool, error) {
 
 	// if cidrs has an error then the previous call will fail
 	// safe to ignore error checking on next call
-	dualstack, _ := netutils.IsDualStackCIDRs(cidrs)
+	dualstack, err := netutils.IsDualStackCIDRs(cidrs)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to perform dualstack check on cidrs: %w", err)
+	}
 
 	return cidrs, dualstack, nil
 }
 
-func setNodeCIDRMaskSizes(clusterCIDRs []*net.IPNet) ([]int, error) {
+func setNodeCIDRMaskSizes(clusterCIDRs []*net.IPNet) []int {
 	sortedSizes := func(maskSizeIPv4, maskSizeIPv6 int) []int {
 		nodeMaskCIDRs := make([]int, len(clusterCIDRs))
 
@@ -159,5 +163,5 @@ func setNodeCIDRMaskSizes(clusterCIDRs []*net.IPNet) ([]int, error) {
 	if Options.NodeCIDRMaskSizeIPv6 != 0 {
 		defaultNodeMaskCIDRIPv6 = Options.NodeCIDRMaskSizeIPv6
 	}
-	return sortedSizes(defaultNodeMaskCIDRIPv4, defaultNodeMaskCIDRIPv6), nil
+	return sortedSizes(defaultNodeMaskCIDRIPv4, defaultNodeMaskCIDRIPv6)
 }

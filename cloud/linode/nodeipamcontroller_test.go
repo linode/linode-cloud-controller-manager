@@ -24,8 +24,10 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/client-go/informers"
 	v1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	cloudprovider "k8s.io/cloud-provider"
 )
 
@@ -38,18 +40,16 @@ func Test_setNodeCIDRMaskSizes(t *testing.T) {
 	_, ipv4Net, _ := net.ParseCIDR("10.192.0.0/10")
 	_, ipv6Net, _ := net.ParseCIDR("fd00::/56")
 	tests := []struct {
-		name    string
-		args    args
-		want    []int
-		wantErr bool
+		name string
+		args args
+		want []int
 	}{
 		{
 			name: "empty cluster cidrs",
 			args: args{
 				clusterCIDRs: []*net.IPNet{},
 			},
-			want:    []int{},
-			wantErr: false,
+			want: []int{},
 		},
 		{
 			name: "single cidr",
@@ -61,8 +61,7 @@ func Test_setNodeCIDRMaskSizes(t *testing.T) {
 					},
 				},
 			},
-			want:    []int{defaultNodeMaskCIDRIPv4},
-			wantErr: false,
+			want: []int{defaultNodeMaskCIDRIPv4},
 		},
 		{
 			name: "two cidrs",
@@ -78,8 +77,7 @@ func Test_setNodeCIDRMaskSizes(t *testing.T) {
 					},
 				},
 			},
-			want:    []int{defaultNodeMaskCIDRIPv4, defaultNodeMaskCIDRIPv6},
-			wantErr: false,
+			want: []int{defaultNodeMaskCIDRIPv4, defaultNodeMaskCIDRIPv6},
 		},
 		{
 			name: "two cidrs with custom mask sizes",
@@ -97,8 +95,7 @@ func Test_setNodeCIDRMaskSizes(t *testing.T) {
 				ipv4NetMask: 25,
 				ipv6NetMask: 80,
 			},
-			want:    []int{25, 80},
-			wantErr: false,
+			want: []int{25, 80},
 		},
 	}
 	for _, tt := range tests {
@@ -115,11 +112,7 @@ func Test_setNodeCIDRMaskSizes(t *testing.T) {
 			if tt.args.ipv6NetMask != 0 {
 				Options.NodeCIDRMaskSizeIPv6 = tt.args.ipv6NetMask
 			}
-			got, err := setNodeCIDRMaskSizes(tt.args.clusterCIDRs)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("setNodeCIDRMaskSizes() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			got := setNodeCIDRMaskSizes(tt.args.clusterCIDRs)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("setNodeCIDRMaskSizes() = %v, want %v", got, tt.want)
 			}
@@ -208,6 +201,7 @@ func Test_startNodeIpamController(t *testing.T) {
 		allocateNodeCIDRs bool
 		clusterCIDR       string
 	}
+	kubeClient := fake.NewSimpleClientset()
 	tests := []struct {
 		name    string
 		args    args
@@ -260,6 +254,18 @@ func Test_startNodeIpamController(t *testing.T) {
 				clusterCIDR:       "10.192.0.0/10,fd00::/80,192.168.0.0/16",
 			},
 			wantErr: true,
+		},
+		{
+			name: "correct cidrs specified",
+			args: args{
+				stopCh:            make(<-chan struct{}),
+				cloud:             nil,
+				nodeInformer:      informers.NewSharedInformerFactory(kubeClient, 0).Core().V1().Nodes(),
+				kubeclient:        kubeClient,
+				allocateNodeCIDRs: true,
+				clusterCIDR:       "10.192.0.0/10",
+			},
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
