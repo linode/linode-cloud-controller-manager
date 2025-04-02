@@ -31,7 +31,7 @@ spec:
         - name: ccm-linode
           args:
             - --allocate-node-cidrs=true
-            - --cluster-cidr=10.192.0.0/10,fd00::/80
+            - --cluster-cidr=10.192.0.0/10,fd00::/56
             - --node-cidr-mask-size-ipv4=25
-            - --node-cidr-mask-size-ipv6=108
+            - --node-cidr-mask-size-ipv6=64
 ```

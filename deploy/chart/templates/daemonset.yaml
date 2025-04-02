@@ -51,11 +51,15 @@ spec:
             - --linodego-debug={{ . }}
             {{- end }}
             {{- $clusterCIDR := .Values.clusterCIDR }}
+            {{- if and .Values.routeController .Values.routeController.clusterCIDR }}
+            {{- $clusterCIDR = .Values.routeController.clusterCIDR }}
+            {{- end }}
+            {{- if .Values.enableNodeIPAM }}
             {{- with .Values.enableNodeIPAM }}
             - --allocate-node-cidrs={{ . }}
+            {{- end }}
             {{- if not $clusterCIDR }}
             {{- fail "clusterCIDR is required if enableNodeIPAM is set" }}
-            {{- end }}
             {{- end }}
             {{- with .Values.nodeCIDRMaskSizeIPv4 }}
             - --node-cidr-mask-size-ipv4={{ . }}
@@ -63,8 +67,6 @@ spec:
             {{- with .Values.nodeCIDRMaskSizeIPv6 }}
             - --node-cidr-mask-size-ipv6={{ . }}
             {{- end }}
-            {{- if and .Values.routeController .Values.routeController.clusterCIDR }}
-            {{- $clusterCIDR = .Values.routeController.clusterCIDR }}
             {{- end }}
             {{- $vpcNames := .Values.vpcNames }}
             {{- if and .Values.routeController .Values.routeController.vpcNames }}
@@ -102,7 +104,7 @@ spec:
             {{- end }}
             {{- with $subnetNames }}
             - --subnet-names={{ . }}
-            {{ end }}
+            {{- end }}
             {{- with $clusterCIDR }}
             - --cluster-cidr={{ . }}
             {{- end }}
