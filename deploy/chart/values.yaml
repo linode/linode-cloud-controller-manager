@@ -72,8 +72,14 @@ tolerations:
 #   vpcName: <name of VPC> [Deprecated: use vpcNames instead]
 #   vpcNames: <comma separated list of vpc names>
 #   subnetNames: <comma separated list of subnet names>
-#   clusterCIDR: 10.0.0.0/8
+#   clusterCIDR: 10.192.0.0/10
 #   configureCloudRoutes: true
+
+# This section adds ability to enable nodeipam-controller for ccm
+# enableNodeIPAM: false
+# clusterCIDR: 10.192.0.0/10
+# nodeCIDRMaskSizeIPv4: 24
+# nodeCIDRMaskSizeIPv6: 64
 
 # vpcs and subnets that node internal IPs will be assigned from (not required if already specified in routeController)
 # vpcName: <name of VPC> [Deprecated: use vpcNames instead]

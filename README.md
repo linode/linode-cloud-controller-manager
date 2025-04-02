@@ -47,6 +47,9 @@ A Cloud Controller Manager (CCM) is a Kubernetes control plane component that em
   - Manages network policies
   - Configures network routes for optimal communication
 
+#### NodeIPAM Controller
+- Manages and configures pod CIDRs to nodes
+
 ## Requirements
 
 - Kubernetes 1.22+
@@ -75,6 +78,7 @@ A Cloud Controller Manager (CCM) is a Kubernetes control plane component that em
   - [Firewall Setup](docs/configuration/firewall.md)
   - [Route Configuration](docs/configuration/routes.md)
   - [Session Affinity](docs/configuration/session-affinity.md)
+  - [NodeIPAM Configuration](docs/configuration/nodeipam.md)
 
 ### Examples and Development
 - [Examples](docs/examples/README.md) - Real-world usage examples
