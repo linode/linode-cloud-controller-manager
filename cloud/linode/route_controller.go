@@ -3,6 +3,7 @@ package linode
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -18,6 +19,8 @@ import (
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 )
+
+var ipv6ConfiguredRoutes []*cloudprovider.Route
 
 type routeCache struct {
 	Mu         sync.RWMutex
@@ -128,6 +131,17 @@ func (r *routes) getInstanceFromName(ctx context.Context, name string) (*linodeg
 
 // CreateRoute adds route's subnet to ip_ranges of target node's VPC interface
 func (r *routes) CreateRoute(ctx context.Context, clusterName string, nameHint string, route *cloudprovider.Route) error {
+	// ignore IPv6 CIDRs but make sure something gets assigned to them to avoid errors
+	ipAddr, _, err := net.ParseCIDR(route.DestinationCIDR)
+	if err != nil {
+		return err
+	}
+	if ipAddr.To4() == nil {
+		// "configure" the route so route controller doesn't keep creating it
+		ipv6ConfiguredRoutes = append(ipv6ConfiguredRoutes, route)
+		return nil
+	}
+
 	instance, err := r.getInstanceFromName(ctx, string(route.TargetNode))
 	if err != nil {
 		return err
@@ -272,5 +286,9 @@ func (r *routes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpr
 			}
 		}
 	}
+
+	// add in "configured" IPv6 routes so cloud-provider is happy
+	configuredRoutes = append(configuredRoutes, ipv6ConfiguredRoutes...)
+
 	return configuredRoutes, nil
 }
