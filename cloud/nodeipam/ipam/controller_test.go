@@ -17,6 +17,7 @@ limitations under the License.
 package ipam
 
 import (
+	"errors"
 	"net"
 	"testing"
 
@@ -49,7 +50,7 @@ TestCase:
 		for {
 			cidr, err := set.AllocateNext()
 			if err != nil {
-				if err == cidrset.ErrCIDRRangeNoCIDRsRemaining {
+				if errors.Is(err, cidrset.ErrCIDRRangeNoCIDRsRemaining) {
 					break
 				}
 				t.Errorf("set.AllocateNext() = %v, want %v", err, cidrset.ErrCIDRRangeNoCIDRsRemaining)
