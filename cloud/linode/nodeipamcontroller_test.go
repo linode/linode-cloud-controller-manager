@@ -33,65 +33,22 @@ import (
 
 func Test_setNodeCIDRMaskSizes(t *testing.T) {
 	type args struct {
-		clusterCIDRs []*net.IPNet
-		ipv4NetMask  int
-		ipv6NetMask  int
+		ipv4NetMask int
+		ipv6NetMask int
 	}
-	_, ipv4Net, _ := net.ParseCIDR("10.192.0.0/10")
-	_, ipv6Net, _ := net.ParseCIDR("fd00::/56")
 	tests := []struct {
 		name string
 		args args
 		want []int
 	}{
 		{
-			name: "empty cluster cidrs",
-			args: args{
-				clusterCIDRs: []*net.IPNet{},
-			},
-			want: []int{},
-		},
-		{
-			name: "single cidr",
-			args: args{
-				clusterCIDRs: []*net.IPNet{
-					{
-						IP:   ipv4Net.IP,
-						Mask: ipv4Net.Mask,
-					},
-				},
-			},
-			want: []int{defaultNodeMaskCIDRIPv4},
-		},
-		{
-			name: "two cidrs",
-			args: args{
-				clusterCIDRs: []*net.IPNet{
-					{
-						IP:   ipv4Net.IP,
-						Mask: ipv4Net.Mask,
-					},
-					{
-						IP:   ipv6Net.IP,
-						Mask: ipv6Net.Mask,
-					},
-				},
-			},
+			name: "default cidr mask sizes",
+			args: args{},
 			want: []int{defaultNodeMaskCIDRIPv4, defaultNodeMaskCIDRIPv6},
 		},
 		{
 			name: "two cidrs with custom mask sizes",
 			args: args{
-				clusterCIDRs: []*net.IPNet{
-					{
-						IP:   ipv4Net.IP,
-						Mask: ipv4Net.Mask,
-					},
-					{
-						IP:   ipv6Net.IP,
-						Mask: ipv6Net.Mask,
-					},
-				},
 				ipv4NetMask: 25,
 				ipv6NetMask: 80,
 			},
@@ -112,7 +69,7 @@ func Test_setNodeCIDRMaskSizes(t *testing.T) {
 			if tt.args.ipv6NetMask != 0 {
 				Options.NodeCIDRMaskSizeIPv6 = tt.args.ipv6NetMask
 			}
-			got := setNodeCIDRMaskSizes(tt.args.clusterCIDRs)
+			got := setNodeCIDRMaskSizes()
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("setNodeCIDRMaskSizes() = %v, want %v", got, tt.want)
 			}
@@ -125,22 +82,19 @@ func Test_processCIDRs(t *testing.T) {
 		cidrsList string
 	}
 	_, ipv4Net, _ := net.ParseCIDR("10.192.0.0/10")
-	_, ipv6Net, _ := net.ParseCIDR("fd00::/56")
 	tests := []struct {
-		name        string
-		args        args
-		want        []*net.IPNet
-		ipv6Enabled bool
-		wantErr     bool
+		name    string
+		args    args
+		want    []*net.IPNet
+		wantErr bool
 	}{
 		{
 			name: "empty cidr list",
 			args: args{
 				cidrsList: "",
 			},
-			want:        nil,
-			ipv6Enabled: false,
-			wantErr:     true,
+			want:    nil,
+			wantErr: true,
 		},
 		{
 			name: "valid ipv4 cidr",
@@ -153,40 +107,18 @@ func Test_processCIDRs(t *testing.T) {
 					Mask: ipv4Net.Mask,
 				},
 			},
-			ipv6Enabled: false,
-			wantErr:     false,
-		},
-		{
-			name: "valid ipv4 and ipv6 cidrs",
-			args: args{
-				cidrsList: "10.192.0.0/10,fd00::/56",
-			},
-			want: []*net.IPNet{
-				{
-					IP:   ipv4Net.IP,
-					Mask: ipv4Net.Mask,
-				},
-				{
-					IP:   ipv6Net.IP,
-					Mask: ipv6Net.Mask,
-				},
-			},
-			ipv6Enabled: true,
-			wantErr:     false,
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1, err := processCIDRs(tt.args.cidrsList)
+			got, err := processCIDRs(tt.args.cidrsList)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("processCIDRs() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("processCIDRs() got = %v, want %v", got, tt.want)
-			}
-			if got1 != tt.ipv6Enabled {
-				t.Errorf("processCIDRs() got1 = %v, want %v", got1, tt.ipv6Enabled)
 			}
 		})
 	}
@@ -232,26 +164,14 @@ func Test_startNodeIpamController(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "more than one ipv4 cidrs specified",
+			name: "more than one cidr specified",
 			args: args{
 				stopCh:            make(<-chan struct{}),
 				cloud:             nil,
 				nodeInformer:      nil,
 				kubeclient:        nil,
 				allocateNodeCIDRs: true,
-				clusterCIDR:       "10.192.0.0/10,192.168.0.0/16",
-			},
-			wantErr: true,
-		},
-		{
-			name: "more than two cidrs specified",
-			args: args{
-				stopCh:            make(<-chan struct{}),
-				cloud:             nil,
-				nodeInformer:      nil,
-				kubeclient:        nil,
-				allocateNodeCIDRs: true,
-				clusterCIDR:       "10.192.0.0/10,fd00::/80,192.168.0.0/16",
+				clusterCIDR:       "10.192.0.0/10,fd00::/80",
 			},
 			wantErr: true,
 		},
