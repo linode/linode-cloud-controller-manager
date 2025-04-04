@@ -381,6 +381,40 @@ func TestCreateRoute(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	v6Route := &cloudprovider.Route{
+		Name:            "route2",
+		TargetNode:      types.NodeName(name),
+		DestinationCIDR: "fd00::/64",
+	}
+	t.Run("should return no error if given a route with an IPv6 address", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
+		instanceCache := newInstances(client)
+		routeController, err := newRoutes(client, instanceCache)
+		require.NoError(t, err)
+
+		err = routeController.CreateRoute(ctx, "dummy", "dummy", v6Route)
+		assert.NoError(t, err)
+	})
+
+	badV6Route := &cloudprovider.Route{
+		Name:            "route2",
+		TargetNode:      types.NodeName(name),
+		DestinationCIDR: ":/64",
+	}
+	t.Run("should return error if IP address is not v4 or v6", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
+		instanceCache := newInstances(client)
+		routeController, err := newRoutes(client, instanceCache)
+		require.NoError(t, err)
+
+		err = routeController.CreateRoute(ctx, "dummy", "dummy", badV6Route)
+		assert.Error(t, err)
+	})
+
 	addressRange1 := "10.10.10.0/24"
 	routesInVPC := []linodego.VPCIP{
 		{
