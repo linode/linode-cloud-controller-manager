@@ -28,20 +28,21 @@ import (
 	v1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	cloudprovider "k8s.io/cloud-provider"
-	nodeipamcontroller "k8s.io/kubernetes/pkg/controller/nodeipam"
-	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	netutils "k8s.io/utils/net"
+
+	nodeipamcontroller "github.com/linode/linode-cloud-controller-manager/cloud/nodeipam"
+	"github.com/linode/linode-cloud-controller-manager/cloud/nodeipam/ipam"
 )
 
 const (
-	maxAllowedNodeCIDRs = 2
+	maxAllowedNodeCIDRsIPv4 = 1
 )
 
 var (
 	// defaultNodeMaskCIDRIPv4 is default mask size for IPv4 node cidr
 	defaultNodeMaskCIDRIPv4 = 24
 	// defaultNodeMaskCIDRIPv6 is default mask size for IPv6 node cidr
-	defaultNodeMaskCIDRIPv6 = 64
+	defaultNodeMaskCIDRIPv6 = 112
 )
 
 func startNodeIpamController(stopCh <-chan struct{}, cloud cloudprovider.Interface, nodeInformer v1.NodeInformer, kubeclient kubernetes.Interface) error {
@@ -54,19 +55,13 @@ func startNodeIpamController(stopCh <-chan struct{}, cloud cloudprovider.Interfa
 	}
 
 	// failure: bad cidrs in config
-	clusterCIDRs, dualStack, err := processCIDRs(Options.ClusterCIDRIPv4)
+	clusterCIDRs, err := processCIDRs(Options.ClusterCIDRIPv4)
 	if err != nil {
 		return fmt.Errorf("processCIDRs failed: %w", err)
 	}
 
-	// failure: more than one cidr but they are not configured as dual stack
-	if len(clusterCIDRs) > 1 && !dualStack {
-		return fmt.Errorf("len of ClusterCIDRs==%v and they are not configured as dual stack (at least one from each IPFamily", len(clusterCIDRs))
-	}
-
-	// failure: more than cidrs is not allowed even with dual stack
-	if len(clusterCIDRs) > maxAllowedNodeCIDRs {
-		return fmt.Errorf("len of clusters is:%v > more than max allowed of %d", len(clusterCIDRs), maxAllowedNodeCIDRs)
+	if len(clusterCIDRs) > maxAllowedNodeCIDRsIPv4 {
+		return fmt.Errorf("too many clusterCIDRs specified for ipv4, max allowed is %d", maxAllowedNodeCIDRsIPv4)
 	}
 
 	/* TODO: uncomment and fix if we want to support service cidr overlap with nodecidr
@@ -98,7 +93,7 @@ func startNodeIpamController(stopCh <-chan struct{}, cloud cloudprovider.Interfa
 	}
 	*/
 
-	nodeCIDRMaskSizes := setNodeCIDRMaskSizes(clusterCIDRs)
+	nodeCIDRMaskSizes := setNodeCIDRMaskSizes()
 
 	ctx := wait.ContextForChannel(stopCh)
 
@@ -111,7 +106,7 @@ func startNodeIpamController(stopCh <-chan struct{}, cloud cloudprovider.Interfa
 		serviceCIDR,
 		secondaryServiceCIDR,
 		nodeCIDRMaskSizes,
-		ipam.RangeAllocatorType,
+		ipam.CloudAllocatorType,
 	)
 	if err != nil {
 		return err
@@ -121,47 +116,25 @@ func startNodeIpamController(stopCh <-chan struct{}, cloud cloudprovider.Interfa
 	return nil
 }
 
-// processCIDRs is a helper function that works on a comma separated cidrs and returns
-// a list of typed cidrs
-// a flag if cidrs represents a dual stack
-// error if failed to parse any of the cidrs
-func processCIDRs(cidrsList string) ([]*net.IPNet, bool, error) {
+// processCIDR is a helper function that works on cidr and returns a list of typed cidrs
+// error if failed to parse the cidr
+func processCIDRs(cidrsList string) ([]*net.IPNet, error) {
 	cidrsSplit := strings.Split(strings.TrimSpace(cidrsList), ",")
 
 	cidrs, err := netutils.ParseCIDRs(cidrsSplit)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
-	// if cidrs has an error then the previous call will fail
-	// safe to ignore error checking on next call
-	dualstack, err := netutils.IsDualStackCIDRs(cidrs)
-	if err != nil {
-		return nil, false, fmt.Errorf("failed to perform dualstack check on cidrs: %w", err)
-	}
-
-	return cidrs, dualstack, nil
+	return cidrs, nil
 }
 
-func setNodeCIDRMaskSizes(clusterCIDRs []*net.IPNet) []int {
-	sortedSizes := func(maskSizeIPv4, maskSizeIPv6 int) []int {
-		nodeMaskCIDRs := make([]int, len(clusterCIDRs))
-
-		for idx, clusterCIDR := range clusterCIDRs {
-			if netutils.IsIPv6CIDR(clusterCIDR) {
-				nodeMaskCIDRs[idx] = maskSizeIPv6
-			} else {
-				nodeMaskCIDRs[idx] = maskSizeIPv4
-			}
-		}
-		return nodeMaskCIDRs
-	}
-
+func setNodeCIDRMaskSizes() []int {
 	if Options.NodeCIDRMaskSizeIPv4 != 0 {
 		defaultNodeMaskCIDRIPv4 = Options.NodeCIDRMaskSizeIPv4
 	}
 	if Options.NodeCIDRMaskSizeIPv6 != 0 {
 		defaultNodeMaskCIDRIPv6 = Options.NodeCIDRMaskSizeIPv6
 	}
-	return sortedSizes(defaultNodeMaskCIDRIPv4, defaultNodeMaskCIDRIPv6)
+	return []int{defaultNodeMaskCIDRIPv4, defaultNodeMaskCIDRIPv6}
 }
