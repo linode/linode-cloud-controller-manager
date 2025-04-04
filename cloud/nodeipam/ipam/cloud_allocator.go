@@ -23,13 +23,10 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog/v2"
-	netutils "k8s.io/utils/net"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	informers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -39,8 +36,10 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	nodeutil "k8s.io/component-helpers/node/util"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
 	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
+	netutils "k8s.io/utils/net"
 )
 
 type cloudAllocator struct {
@@ -58,11 +57,13 @@ type cloudAllocator struct {
 
 	// queues are where incoming work is placed to de-dup and to allow "easy"
 	// rate limited requeues on errors
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[any]
 }
 
-var _ CIDRAllocator = &cloudAllocator{}
-var nodeCIDRMaskSizeIPv6 = 112
+var (
+	_                    CIDRAllocator = &cloudAllocator{}
+	nodeCIDRMaskSizeIPv6               = 112
+)
 
 // NewLinodeCIDRAllocator returns a CIDRAllocator to allocate CIDRs for node
 // Caller must ensure subNetMaskSize is not less than cluster CIDR mask size.
@@ -97,7 +98,7 @@ func NewLinodeCIDRAllocator(ctx context.Context, client clientset.Interface, nod
 		nodesSynced: nodeInformer.Informer().HasSynced,
 		broadcaster: eventBroadcaster,
 		recorder:    recorder,
-		queue:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cidrallocator_node"),
+		queue:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[any](), "cidrallocator_node"),
 	}
 
 	if allocatorParams.ServiceCIDR != nil {
@@ -129,15 +130,15 @@ func NewLinodeCIDRAllocator(ctx context.Context, client clientset.Interface, nod
 		}
 	}
 
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
 			if err == nil {
 				ca.queue.Add(key)
 			}
 		},
-		UpdateFunc: func(old, new interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(new)
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			key, err := cache.MetaNamespaceKeyFunc(newObj)
 			if err == nil {
 				ca.queue.Add(key)
 			}
@@ -160,10 +161,12 @@ func NewLinodeCIDRAllocator(ctx context.Context, client clientset.Interface, nod
 			}
 			if err := ca.ReleaseCIDR(logger, node); err != nil {
 				utilruntime.HandleError(fmt.Errorf("error while processing CIDR Release: %w", err))
-
 			}
 		},
-	})
+	}); err != nil {
+		logger.Error(err, "Failed to add event handler to node informer")
+		return nil, err
+	}
 
 	return ca, nil
 }
@@ -247,7 +250,6 @@ func (c *cloudAllocator) processNextNodeWorkItem(ctx context.Context) bool {
 		logger.V(4).Info("Successfully synced", "key", key)
 		return nil
 	}(klog.FromContext(ctx), obj)
-
 	if err != nil {
 		utilruntime.HandleError(err)
 		return true
@@ -292,7 +294,7 @@ func (c *cloudAllocator) occupyCIDRs(node *v1.Node) error {
 			return fmt.Errorf("failed to parse node %s, CIDR %s", node.Name, node.Spec.PodCIDR)
 		}
 		if podCIDR.IP.To4() == nil {
-			fmt.Printf("Nothing to do for ipv6 CIDR")
+			klog.Infof("Nothing to occupy for ipv6 CIDR %v", podCIDR)
 			return nil
 		}
 		// If node has a pre allocate cidr that does not exist in our cidrs.
@@ -303,7 +305,7 @@ func (c *cloudAllocator) occupyCIDRs(node *v1.Node) error {
 		}
 
 		if err := c.cidrSet.Occupy(podCIDR); err != nil {
-			return fmt.Errorf("failed to mark cidr[%v] at idx [%v] as occupied for node: %v: %v", podCIDR, idx, node.Name, err)
+			return fmt.Errorf("failed to mark cidr[%v] at idx [%v] as occupied for node: %v: %w", podCIDR, idx, node.Name, err)
 		}
 	}
 	return nil
@@ -369,14 +371,14 @@ func (c *cloudAllocator) AllocateOrOccupyCIDR(ctx context.Context, node *v1.Node
 	podCIDR, err := c.cidrSet.AllocateNext()
 	if err != nil {
 		controllerutil.RecordNodeStatusChange(logger, c.recorder, node, "CIDRNotAvailable")
-		return fmt.Errorf("failed to allocate cidr from cluster cidr: %v", err)
+		return fmt.Errorf("failed to allocate cidr from cluster cidr: %w", err)
 	}
 	allocatedCIDRs[0] = podCIDR
 	if allocatedCIDRs[1], err = c.createIPv6CIDR(node); err != nil {
-		return fmt.Errorf("failed to assign IPv6 CIDR: %v", err)
+		return fmt.Errorf("failed to assign IPv6 CIDR: %w", err)
 	}
 
-	//queue the assignment
+	// queue the assignment
 	logger.V(4).Info("Putting node with CIDR into the work queue", "node", klog.KObj(node), "CIDR", allocatedCIDRs)
 	return c.updateCIDRsAllocation(ctx, node.Name, allocatedCIDRs)
 }
@@ -390,10 +392,10 @@ func (c *cloudAllocator) ReleaseCIDR(logger klog.Logger, node *v1.Node) error {
 	for idx, cidr := range node.Spec.PodCIDRs {
 		_, podCIDR, err := netutils.ParseCIDRSloppy(cidr)
 		if err != nil {
-			return fmt.Errorf("failed to parse CIDR %s on Node %v: %v", cidr, node.Name, err)
+			return fmt.Errorf("failed to parse CIDR %s on Node %v: %w", cidr, node.Name, err)
 		}
 		if podCIDR.IP.To4() == nil {
-			fmt.Printf("Nothing to do for ipv6 CIDR")
+			klog.Infof("Nothing to release for ipv6 CIDR %v", podCIDR)
 			continue
 		}
 
@@ -406,7 +408,7 @@ func (c *cloudAllocator) ReleaseCIDR(logger klog.Logger, node *v1.Node) error {
 
 		logger.V(4).Info("Release CIDR for node", "CIDR", cidr, "node", klog.KObj(node))
 		if err = c.cidrSet.Release(podCIDR); err != nil {
-			return fmt.Errorf("error when releasing CIDR %v: %v", cidr, err)
+			return fmt.Errorf("error when releasing CIDR %v: %w", cidr, err)
 		}
 	}
 	return nil

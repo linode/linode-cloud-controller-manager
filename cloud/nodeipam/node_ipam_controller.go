@@ -35,12 +35,6 @@ import (
 	"github.com/linode/linode-cloud-controller-manager/cloud/nodeipam/ipam"
 )
 
-// ipamController is an interface abstracting an interface for
-// legacy mode.
-type ipamController interface {
-	Run(ctx context.Context)
-}
-
 // Controller is the controller that manages node ipam state.
 type Controller struct {
 	allocatorType ipam.CIDRAllocatorType
@@ -55,7 +49,6 @@ type Controller struct {
 	nodeLister         corelisters.NodeLister
 	nodeInformerSynced cache.InformerSynced
 
-	legacyIPAM    ipamController
 	cidrAllocator ipam.CIDRAllocator
 }
 
@@ -73,8 +66,8 @@ func NewNodeIpamController(
 	serviceCIDR *net.IPNet,
 	secondaryServiceCIDR *net.IPNet,
 	nodeCIDRMaskSizes []int,
-	allocatorType ipam.CIDRAllocatorType) (*Controller, error) {
-
+	allocatorType ipam.CIDRAllocatorType,
+) (*Controller, error) {
 	if kubeClient == nil {
 		return nil, fmt.Errorf("kubeClient is nil when starting Controller")
 	}
