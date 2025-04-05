@@ -64,6 +64,10 @@ func startNodeIpamController(stopCh <-chan struct{}, cloud cloudprovider.Interfa
 		return fmt.Errorf("too many clusterCIDRs specified for ipv4, max allowed is %d", maxAllowedNodeCIDRsIPv4)
 	}
 
+	if clusterCIDRs[0].IP.To4() == nil {
+		return fmt.Errorf("clusterCIDR %s is not ipv4", clusterCIDRs[0].String())
+	}
+
 	/* TODO: uncomment and fix if we want to support service cidr overlap with nodecidr
 	// service cidr processing
 	if len(strings.TrimSpace(nodeIPAMConfig.ServiceCIDR)) != 0 {
