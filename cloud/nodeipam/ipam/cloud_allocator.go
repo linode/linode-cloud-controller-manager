@@ -183,8 +183,8 @@ func (c *cloudAllocator) Run(ctx context.Context) {
 
 	defer c.queue.ShutDown()
 
-	logger.Info("Starting range CIDR allocator")
-	defer logger.Info("Shutting down range CIDR allocator")
+	logger.Info("Starting linode's cloud CIDR allocator")
+	defer logger.Info("Shutting down linode's cloud CIDR allocator")
 
 	if !cache.WaitForNamedCacheSync("cidrallocator", ctx.Done(), c.nodesSynced) {
 		return
