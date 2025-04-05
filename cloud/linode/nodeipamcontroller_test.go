@@ -164,6 +164,18 @@ func Test_startNodeIpamController(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "ipv6 cidr specified",
+			args: args{
+				stopCh:            make(<-chan struct{}),
+				cloud:             nil,
+				nodeInformer:      nil,
+				kubeclient:        nil,
+				allocateNodeCIDRs: true,
+				clusterCIDR:       "fd00::/80",
+			},
+			wantErr: true,
+		},
+		{
 			name: "more than one cidr specified",
 			args: args{
 				stopCh:            make(<-chan struct{}),
