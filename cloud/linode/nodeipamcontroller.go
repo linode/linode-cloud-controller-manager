@@ -60,6 +60,10 @@ func startNodeIpamController(stopCh <-chan struct{}, cloud cloudprovider.Interfa
 		return fmt.Errorf("processCIDRs failed: %w", err)
 	}
 
+	if len(clusterCIDRs) == 0 {
+		return fmt.Errorf("no clusterCIDR specified. Must specify --cluster-cidr if --allocate-node-cidrs is set")
+	}
+
 	if len(clusterCIDRs) > maxAllowedNodeCIDRsIPv4 {
 		return fmt.Errorf("too many clusterCIDRs specified for ipv4, max allowed is %d", maxAllowedNodeCIDRsIPv4)
 	}
