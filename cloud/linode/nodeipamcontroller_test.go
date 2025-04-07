@@ -152,7 +152,19 @@ func Test_startNodeIpamController(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "incorrect cluster-cidrs specified",
+			name: "allocate-node-cidrs set but cluster-cidr not set",
+			args: args{
+				stopCh:            make(<-chan struct{}),
+				cloud:             nil,
+				nodeInformer:      nil,
+				kubeclient:        nil,
+				allocateNodeCIDRs: true,
+				clusterCIDR:       "",
+			},
+			wantErr: true,
+		},
+		{
+			name: "incorrect cluster-cidr specified",
 			args: args{
 				stopCh:            make(<-chan struct{}),
 				cloud:             nil,
