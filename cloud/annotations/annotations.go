@@ -36,6 +36,7 @@ const (
 
 	AnnLinodeNodePrivateIP = "node.k8s.linode.com/private-ip"
 	AnnLinodeHostUUID      = "node.k8s.linode.com/host-uuid"
+	AnnLinodeIPv6Range     = "node.k8s.linode.com/ipv6-range"
 
 	AnnLinodeNodeIPSharingUpdated = "node.k8s.linode.com/ip-sharing-updated"
 

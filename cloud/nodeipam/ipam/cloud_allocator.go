@@ -311,6 +311,19 @@ func (c *cloudAllocator) occupyCIDRs(node *v1.Node) error {
 	return nil
 }
 
+func (c *cloudAllocator) createIPv6CIDR(node *v1.Node) (*net.IPNet, error) {
+	ipv6Range, foundIPv6Annotation := node.Annotations["node.k8s.linode.com/ipv6-range"]
+	if !foundIPv6Annotation {
+		return nil, fmt.Errorf("no IPv6 range found for node %s", node.Name)
+	}
+	_, ipnet, err := net.ParseCIDR(fmt.Sprintf("%s/112", ipv6Range))
+	if err != nil {
+		return nil, fmt.Errorf("Error parsing CIDR:", err)
+	}
+	return ipnet, nil
+}
+
+/*
 // TODO: replace logic in this method with allocated node specific IPv6 CIDR
 // For now, we are converting node's public ipv4 address into two IPv6 blocks
 // and then generating ipv6 CIDR from it.
@@ -352,6 +365,7 @@ func (c *cloudAllocator) createIPv6CIDR(node *v1.Node) (*net.IPNet, error) {
 
 	return ipv6Embedded, nil
 }
+*/
 
 // WARNING: If you're adding any return calls or defer any more work from this
 // function you have to make sure to update nodesInProcessing properly with the

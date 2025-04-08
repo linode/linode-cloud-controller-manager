@@ -254,6 +254,19 @@ func (_d ClientWithPrometheus) ListFirewallDevices(ctx context.Context, firewall
 	return _d.base.ListFirewallDevices(ctx, firewallID, opts)
 }
 
+// ListIPv6Ranges implements Client
+func (_d ClientWithPrometheus) ListIPv6Ranges(ctx context.Context, opts *linodego.ListOptions) (ia1 []linodego.IPv6Range, err error) {
+	defer func() {
+		result := "ok"
+		if err != nil {
+			result = "error"
+		}
+
+		ClientMethodCounterVec.WithLabelValues("ListIPv6Ranges", result).Inc()
+	}()
+	return _d.base.ListIPv6Ranges(ctx, opts)
+}
+
 // ListInstances implements Client
 func (_d ClientWithPrometheus) ListInstances(ctx context.Context, lp1 *linodego.ListOptions) (ia1 []linodego.Instance, err error) {
 	defer func() {

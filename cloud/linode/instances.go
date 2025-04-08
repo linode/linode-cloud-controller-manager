@@ -36,6 +36,36 @@ type nodeCache struct {
 	nodes      map[int]linodeInstance
 	lastUpdate time.Time
 	ttl        time.Duration
+	ipv6ranges []linodego.IPv6Range
+}
+
+func (nc *nodeCache) getInstanceRegion(instance *linodego.Instance) (string, error) {
+	if instance.Region != "" {
+		return instance.Region, nil
+	}
+	return "", fmt.Errorf("instance %d has no region", instance.ID)
+}
+
+func (nc *nodeCache) getInstanceIPv6SLAAC(instance *linodego.Instance) (string, error) {
+	if instance.IPv6 != "" {
+		return strings.TrimSuffix(instance.IPv6, "/128"), nil
+	}
+	return "", fmt.Errorf("instance %d has no IPv6 SLAAC", instance.ID)
+}
+
+func (nc *nodeCache) GetInstanceIPv6Range(instance *linodego.Instance) (string, error) {
+	nc.Lock()
+	defer nc.Unlock()
+	instanceSLAAC, err := nc.getInstanceIPv6SLAAC(instance)
+	if err != nil {
+		return "", err
+	}
+	for _, ipv6Range := range nc.ipv6ranges {
+		if instance.Region == ipv6Range.Region && instanceSLAAC == ipv6Range.RouteTarget {
+			return ipv6Range.Range, nil
+		}
+	}
+	return "", fmt.Errorf("no IPv6 ranges found")
 }
 
 // getInstanceAddresses returns all addresses configured on a linode.
@@ -77,6 +107,10 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 	if err != nil {
 		return err
 	}
+	ipv6Ranges, err := client.ListIPv6Ranges(ctx, nil)
+	if err != nil {
+		return err
+	}
 
 	// If running within VPC, find instances and store their ips
 	vpcNodes := map[int][]string{}
@@ -113,6 +147,7 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 	}
 
 	nc.nodes = newNodes
+	nc.ipv6ranges = ipv6Ranges
 	nc.lastUpdate = time.Now()
 	return nil
 }

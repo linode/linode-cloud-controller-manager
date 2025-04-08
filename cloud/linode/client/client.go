@@ -31,6 +31,7 @@ type Client interface {
 	AddInstanceIPAddress(ctx context.Context, linodeID int, public bool) (*linodego.InstanceIP, error)
 	DeleteInstanceIPAddress(ctx context.Context, linodeID int, ipAddress string) error
 	ShareIPAddresses(ctx context.Context, opts linodego.IPAddressesShareOptions) error
+	ListIPv6Ranges(ctx context.Context, opts *linodego.ListOptions) ([]linodego.IPv6Range, error)
 
 	UpdateInstanceConfigInterface(context.Context, int, int, int, linodego.InstanceConfigInterfaceUpdateOptions) (*linodego.InstanceConfigInterface, error)
 

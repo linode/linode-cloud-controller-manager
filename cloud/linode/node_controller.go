@@ -274,9 +274,10 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 
 	uuid, foundLabel := node.Labels[annotations.AnnLinodeHostUUID]
 	configuredPrivateIP, foundAnnotation := node.Annotations[annotations.AnnLinodeNodePrivateIP]
+	ipv6Range, foundIPv6Annotation := node.Annotations[annotations.AnnLinodeIPv6Range]
 
 	metaAge := time.Since(lastUpdate)
-	if foundLabel && foundAnnotation && metaAge < s.ttl {
+	if foundLabel && foundAnnotation && foundIPv6Annotation && metaAge < s.ttl {
 		klog.V(3).InfoS("Skipping refresh, ttl not reached",
 			"node", klog.KObj(node),
 			"ttl", s.ttl,
@@ -291,6 +292,12 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 		return err
 	}
 
+	instanceIPv6Range, err := s.instances.nodeCache.GetInstanceIPv6Range(linode)
+	if err != nil {
+		klog.V(1).ErrorS(err, "Instance IPv6 range lookup error")
+		return err
+	}
+
 	expectedPrivateIP := ""
 	// linode API response for linode will contain only one private ip
 	// if any private ip is configured.
@@ -301,7 +308,7 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 		}
 	}
 
-	if uuid == linode.HostUUID && node.Spec.ProviderID != "" && configuredPrivateIP == expectedPrivateIP {
+	if instanceIPv6Range == ipv6Range && uuid == linode.HostUUID && node.Spec.ProviderID != "" && configuredPrivateIP == expectedPrivateIP {
 		s.SetLastMetadataUpdate(node.Name)
 		return nil
 	}
@@ -317,6 +324,10 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 		// Try to update the node UUID if it has not been set
 		if nodeResult.Labels[annotations.AnnLinodeHostUUID] != linode.HostUUID {
 			nodeResult.Labels[annotations.AnnLinodeHostUUID] = linode.HostUUID
+		}
+
+		if nodeResult.Annotations[annotations.AnnLinodeIPv6Range] != instanceIPv6Range && instanceIPv6Range != "" {
+			nodeResult.Annotations[annotations.AnnLinodeIPv6Range] = instanceIPv6Range
 		}
 
 		// Try to update the node ProviderID if it has not been set
