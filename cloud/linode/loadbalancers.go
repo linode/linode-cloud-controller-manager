@@ -628,8 +628,8 @@ func (l *loadbalancers) getNodeBalancerByIPv4(ctx context.Context, service *v1.S
 func (l *loadbalancers) getNodeBalancerByID(ctx context.Context, service *v1.Service, id int) (*linodego.NodeBalancer, error) {
 	nb, err := l.client.GetNodeBalancer(ctx, id)
 	if err != nil {
-		//nolint: errorlint //need type assertion for code field to work
-		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == http.StatusNotFound {
+		var targetError *linodego.Error
+		if errors.As(err, &targetError) && targetError.Code == http.StatusNotFound {
 			return nil, lbNotFoundError{serviceNn: getServiceNn(service), nodeBalancerID: id}
 		}
 		return nil, err
