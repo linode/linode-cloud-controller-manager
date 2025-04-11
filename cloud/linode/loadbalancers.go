@@ -553,7 +553,7 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 
 	nb, err := l.getNodeBalancerForService(ctx, service)
 	if err != nil {
-		var targetError *lbNotFoundError
+		var targetError lbNotFoundError
 		if errors.As(err, &targetError) {
 			klog.Infof("short-circuiting deletion for NodeBalancer for service (%s) as one does not exist: %s", serviceNn, err)
 			return nil
