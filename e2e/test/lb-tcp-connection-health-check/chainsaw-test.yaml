@@ -38,7 +38,9 @@ spec:
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
-              for i in {1..10}; do
+              echo "Nodebalancer ID: $nbid"
+
+              for i in {1..20}; do
                   nbconfig=$(curl -s \
                     -H "Authorization: Bearer $LINODE_TOKEN" \
                     -H "Content-Type: application/json" \
@@ -59,6 +61,13 @@ spec:
                       echo "All conditions met"
                       break
                   fi
+                  echo "Conditions not met, retrying in 15 seconds..."
+                  echo "check: $port_80_check"
+                  echo "interval: $port_80_interval"
+                  echo "timeout: $port_80_timeout"
+                  echo "attempts: $port_80_attempts"
+                  echo "protocol: $port_80_protocol"
+                  echo "up_nodes: $port_80_up_nodes"
                   sleep 15
               done
             check:
