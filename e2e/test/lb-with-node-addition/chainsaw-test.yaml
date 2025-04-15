@@ -37,6 +37,8 @@ spec:
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
+              echo "Nodebalancer ID: $nbid"
+
               for i in {1..10}; do
                   nbconfig=$(curl -s \
                     -H "Authorization: Bearer $LINODE_TOKEN" \
@@ -53,6 +55,8 @@ spec:
                       echo "all nodes up"
                       break
                   fi
+                  echo "Condition not met, waiting for all nodes to be ready"
+                  echo "port_80_up_nodes: $port_80_up_nodes"
                   sleep 15
               done
             check:
@@ -71,8 +75,9 @@ spec:
               sleep 180
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+              echo "Nodebalancer ID: $nbid"
 
-              for i in {1..10}; do
+              for i in {1..20}; do
                   nbconfig=$(curl -s \
                     -H "Authorization: Bearer $LINODE_TOKEN" \
                     -H "Content-Type: application/json" \
@@ -88,6 +93,8 @@ spec:
                       echo "all nodes up"
                       break
                   fi
+                  echo "Condition not met, waiting for all nodes to be ready"
+                  echo "port_80_up_nodes: $port_80_up_nodes"
                   sleep 20
               done
 

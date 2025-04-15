@@ -72,12 +72,16 @@ spec:
             content: |
               set -e
               IP=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].ip)
+              echo "loadbalancer ip: $IP"
 
-              for i in {1..10}; do
+              for i in {1..20}; do
                   port_80=$(curl -s $IP:80 | grep "test-" || true)
                   port_443=$(curl --resolve linode.test:443:$IP --cacert ../certificates/ca.crt -s https://linode.test:443 | grep "test-" || true)
 
                   if [[ -z $port_80 || -z $port_443 ]]; then
+                      echo "pod not reachable on port 80 or 443, retrying..."
+                      echo "port 80: $port_80"
+                      echo "port 443: $port_443"
                       sleep 20
                   else
                       echo "all pods responded"
