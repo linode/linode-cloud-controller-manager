@@ -2,6 +2,7 @@ package linode
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -91,19 +92,15 @@ func (s *serviceController) processNextDeletion() bool {
 	}
 
 	err := s.handleServiceDeleted(service)
-	//nolint: errorlint //switching to errors.Is()/errors.As() causes errors with Code field
-	switch deleteErr := err.(type) {
-	case nil:
-		break
-
-	case *linodego.Error:
-		if deleteErr.Code >= http.StatusInternalServerError || deleteErr.Code == http.StatusTooManyRequests {
+	var targetError *linodego.Error
+	if err != nil {
+		if errors.As(err, &targetError) &&
+			(targetError.Code >= http.StatusInternalServerError || targetError.Code == http.StatusTooManyRequests) {
 			klog.Errorf("failed to delete NodeBalancer for service (%s); retrying in 1 minute: %s", getServiceNn(service), err)
 			s.queue.AddAfter(service, retryInterval)
+		} else {
+			klog.Errorf("failed to delete NodeBalancer for service (%s); will not retry: %s", getServiceNn(service), err)
 		}
-
-	default:
-		klog.Errorf("failed to delete NodeBalancer for service (%s); will not retry: %s", getServiceNn(service), err)
 	}
 
 	return true

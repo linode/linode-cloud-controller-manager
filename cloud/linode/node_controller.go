@@ -2,6 +2,7 @@ package linode
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"strconv"
@@ -235,19 +236,15 @@ func (s *nodeController) processNext() bool {
 		return true
 	}
 	err := s.handleNode(context.TODO(), request.node)
-	//nolint: errorlint //switching to errors.Is()/errors.As() causes errors with Code field
-	switch deleteErr := err.(type) {
-	case nil:
-		break
-
-	case *linodego.Error:
-		if deleteErr.Code >= http.StatusInternalServerError || deleteErr.Code == http.StatusTooManyRequests {
+	if err != nil {
+		var targetError *linodego.Error
+		if errors.As(err, &targetError) &&
+			(targetError.Code >= http.StatusInternalServerError || targetError.Code == http.StatusTooManyRequests) {
 			klog.Errorf("failed to add metadata for node (%s); retrying in 1 minute: %s", request.node.Name, err)
 			s.queue.AddAfter(request, retryInterval)
+		} else {
+			klog.Errorf("failed to add metadata for node (%s); will not retry: %s", request.node.Name, err)
 		}
-
-	default:
-		klog.Errorf("failed to add metadata for node (%s); will not retry: %s", request.node.Name, err)
 	}
 
 	registeredK8sNodeCache.updateCache(s.kubeclient)
