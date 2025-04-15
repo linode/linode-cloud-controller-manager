@@ -39,7 +39,7 @@ spec:
 
               echo "Nodebalancer ID: $nbid"
 
-              for i in {1..10}; do
+              for i in {1..20}; do
                   nbconfig=$(curl -s \
                     -H "Authorization: Bearer $LINODE_TOKEN" \
                     -H "Content-Type: application/json" \
