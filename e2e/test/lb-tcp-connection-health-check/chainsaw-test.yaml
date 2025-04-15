@@ -61,14 +61,14 @@ spec:
                       echo "All conditions met"
                       break
                   fi
-                  echo "Conditions not met, retrying in 15 seconds..."
+                  echo "Conditions not met, retrying in 20 seconds..."
                   echo "check: $port_80_check"
                   echo "interval: $port_80_interval"
                   echo "timeout: $port_80_timeout"
                   echo "attempts: $port_80_attempts"
                   echo "protocol: $port_80_protocol"
                   echo "up_nodes: $port_80_up_nodes"
-                  sleep 15
+                  sleep 20
               done
             check:
               ($error == null): true

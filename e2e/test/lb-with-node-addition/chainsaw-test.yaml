@@ -57,7 +57,7 @@ spec:
                   fi
                   echo "Condition not met, waiting for all nodes to be ready"
                   echo "port_80_up_nodes: $port_80_up_nodes"
-                  sleep 15
+                  sleep 20
               done
             check:
               ($error == null): true
