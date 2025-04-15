@@ -61,6 +61,9 @@ spec:
                       echo "Condition met"
                       break
                   fi
+                  echo "Condition not met, waiting for 10 seconds and retrying..."
+                  echo "nbid: $nbid"
+                  echo "nbid2: $nbid2"
                   sleep 10
               done
             check:
