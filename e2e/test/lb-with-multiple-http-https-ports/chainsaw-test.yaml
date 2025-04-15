@@ -66,7 +66,7 @@ spec:
               IP=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].ip)
               echo "loadbalancer ip: $IP"
 
-              for i in {1..10}; do
+              for i in {1..20}; do
                   port_80=$(curl -s $IP:80 | grep "test-" || true)
                   port_8080=$(curl -s $IP:8080 | grep "test-" || true)
                   port_443=$(curl --resolve linode.test:443:$IP --cacert ../certificates/ca.crt -s https://linode.test:443 | grep "test-" || true)

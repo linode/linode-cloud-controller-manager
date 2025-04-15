@@ -54,7 +54,7 @@ spec:
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id=$nbid
               sleep 5
 
-              for i in {1..10}; do
+              for i in {1..20}; do
                   nbid2=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
                   if [[ $nbid == $nbid2 ]]; then
