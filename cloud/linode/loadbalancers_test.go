@@ -339,7 +339,19 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, a
 		t.Error("type assertion failed")
 	}
 	nodes := []*v1.Node{
-		{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node-1",
+			},
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.1.1",
+					},
+				},
+			},
+		},
 	}
 	nb, err := lb.buildLoadBalancerRequest(t.Context(), "linodelb", svc, nodes)
 	if err != nil {
@@ -2949,6 +2961,7 @@ func Test_getNodePrivateIP(t *testing.T) {
 		node     *v1.Node
 		address  string
 		subnetID int
+		err      error
 	}{
 		{
 			"node internal ip specified",
@@ -2964,6 +2977,7 @@ func Test_getNodePrivateIP(t *testing.T) {
 			},
 			"127.0.0.1",
 			0,
+			nil,
 		},
 		{
 			"node internal ip not specified",
@@ -2979,6 +2993,7 @@ func Test_getNodePrivateIP(t *testing.T) {
 			},
 			"",
 			0,
+			fmt.Errorf("node  has no internal IP or %s annotation", annotations.AnnLinodeNodePrivateIP),
 		},
 		{
 			"node internal ip annotation present",
@@ -2999,6 +3014,7 @@ func Test_getNodePrivateIP(t *testing.T) {
 			},
 			"192.168.42.42",
 			0,
+			nil,
 		},
 		{
 			"node internal ip annotation present and subnet id is not zero",
@@ -3019,13 +3035,18 @@ func Test_getNodePrivateIP(t *testing.T) {
 			},
 			"10.0.1.1",
 			100,
+			nil,
 		},
 	}
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
-			ip := getNodePrivateIP(test.node, test.subnetID)
-			if ip != test.address {
+			ip, err := getNodePrivateIP(test.node, test.subnetID)
+			if !reflect.DeepEqual(err, test.err) {
+				t.Error("unexpected error")
+				t.Logf("expected: %v", test.err)
+				t.Logf("actual: %v", err)
+			} else if ip != test.address {
 				t.Error("unexpected certificate")
 				t.Logf("expected: %q", test.address)
 				t.Logf("actual: %q", ip)
@@ -3061,15 +3082,39 @@ func testBuildLoadBalancerRequest(t *testing.T, client *linodego.Client, _ *fake
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "node-1",
 			},
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.1.1",
+					},
+				},
+			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "node-2",
 			},
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.1.2",
+					},
+				},
+			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "node-3",
+			},
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.1.3",
+					},
+				},
 			},
 		},
 	}
