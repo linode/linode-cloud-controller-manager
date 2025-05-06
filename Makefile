@@ -30,6 +30,7 @@ LINODE_OS               ?= linode/ubuntu22.04
 KUBECONFIG_PATH         ?= $(CURDIR)/test-cluster-kubeconfig.yaml
 SUBNET_KUBECONFIG_PATH	?= $(CURDIR)/subnet-testing-kubeconfig.yaml
 MGMT_KUBECONFIG_PATH    ?= $(CURDIR)/mgmt-cluster-kubeconfig.yaml
+GOLANGCI_LINT_VERSION   ?= v2.1.5
 
 # if the $DEVBOX_PACKAGES_DIR env variable exists that means we are within a devbox shell and can safely
 # use devbox's bin for our tools
@@ -64,8 +65,7 @@ vet: fmt
 
 .PHONY: lint
 lint:
-	docker run --rm -v "$(PWD):/var/work:ro" -w /var/work \
-		golangci/golangci-lint:latest golangci-lint run -c .golangci.yml
+	docker run --rm -w /workdir -v $(PWD):/workdir golangci/golangci-lint:$(GOLANGCI_LINT_VERSION) golangci-lint run -c .golangci.yml --fix
 
 .PHONY: gosec
 gosec: ## Run gosec against code.

@@ -889,7 +889,7 @@ func (l *loadbalancers) buildNodeBalancerNodeConfigRebuildOptions(node *v1.Node,
 		},
 	}
 	if subnetID != 0 {
-		nodeOptions.NodeBalancerNodeCreateOptions.SubnetID = subnetID
+		nodeOptions.SubnetID = subnetID
 	}
 	return nodeOptions
 }

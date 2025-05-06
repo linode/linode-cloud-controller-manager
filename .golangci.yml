@@ -1,111 +1,13 @@
+version: "2"
 run:
-  timeout: 5m
   issues-exit-code: 1
-
 output:
   formats:
-    - format: colored-line-number
-
-linters-settings:
-  cyclop:
-    max-complexity: 15
-
-  depguard:
-    rules:
-      main:
-        files:
-          - "$all"
-          - "!$test"
-        deny:
-          # TODO: Remove reflect from loadbalancers.go and reinstate this requirement
-          #- pkg: "reflect"
-          #  desc: "Reflection is never clear."
-          - pkg: "gob"
-            desc: "Please convert types manually"
-
-  dupl:
-    threshold: 100
-
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
-    exclude-functions:
-      - fmt:.*
-      - io/ioutil:^Read.*
-
-  gci:
-    sections:
-      - standard
-      - default
-      - blank
-      - dot
-      - prefix(github.com/linode/linode-cloud-controller-manager)
-
-  goconst:
-    min-len: 3
-    min-occurrences: 5
-
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
-
-    settings:
-      captLocal:
-        paramsOnly: true
-      rangeValCopy:
-        sizeThreshold: 32
-
-  gofmt:
-    simplify: true
-
-  goimports:
-    local-prefixes: github.com/linode/linode-cloud-controller-manager
-
-  govet:
-    enable:
-      - shadow
-
-  gosec:
-    confidence: "medium"
-    excludes:
-      - G115
-
-  mnd:
-    checks:
-      - case
-      - condition
-      - operation
-      - return
-      # Ignoring argument and assign due to the number of cases we're ignoring
-
-  nolintlint:
-    require-explanation: true
-    require-specific: true
-
-  prealloc:
-    simple: true
-    range-loops: true
-    for-loops: true
-
-  varnamelen:
-    min-name-length: 2
-
+    text:
+      path: stdout
 linters:
-  disable-all: true
+  default: none
   enable:
-    # these are enabled by default
-    - errcheck
-    - gosimple
-    - govet
-    - ineffassign
-    - staticcheck
-    - typecheck
-    - unused
-    - ginkgolinter 
     - asasalint
     - asciicheck
     - bidichk
@@ -113,94 +15,173 @@ linters:
     - containedctx
     - contextcheck
     - copyloopvar
-    #- cyclop
     - decorder
     - depguard
     - dogsled
     - dupl
     - dupword
     - durationcheck
+    - errcheck
     - errchkjson
     - errname
     - errorlint
     - exhaustive
     - forbidigo
     - forcetypeassert
-    - gci
+    - ginkgolinter
     - gocheckcompilerdirectives
-    - gofmt
-    - goimports
-    #- gocognit
+    - gochecksumtype
     - goconst
-    #- gocritic
-    - gofumpt
     - goprintffuncname
     - gosec
+    - gosmopolitan
+    - govet
     - importas
+    - ineffassign
     - loggercheck
     - maintidx
     - makezero
     - misspell
     - mnd
     - musttag
-    #- nestif
     - nilerr
+    - nilnesserr
     - nilnil
     - noctx
     - nolintlint
     - nosprintfhostport
-    #- paralleltest # adding t.Parallel() to tests broke so many and made others flaky
     - prealloc
     - predeclared
+    - protogetter
     - reassign
+    - recvcheck
+    - rowserrcheck
+    - spancheck
+    - sqlclosecheck
+    - staticcheck
     - testifylint
     - thelper
     - unconvert
     - unparam
+    - unused
     - usestdlibvars
     - usetesting
     - varnamelen
     - wastedassign
     - whitespace
-  
-  presets:
-    - bugs
-    - unused
-  fast: false
-
+    - zerologlint
+  settings:
+    cyclop:
+      max-complexity: 15
+    depguard:
+      rules:
+        main:
+          files:
+            - $all
+            - '!$test'
+          deny:
+            - pkg: gob
+              desc: Please convert types manually
+    dupl:
+      threshold: 100
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+      exclude-functions:
+        - fmt:.*
+        - io/ioutil:^Read.*
+    goconst:
+      min-len: 3
+      min-occurrences: 5
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - experimental
+        - opinionated
+        - performance
+        - style
+      settings:
+        captLocal:
+          paramsOnly: true
+        rangeValCopy:
+          sizeThreshold: 32
+    gosec:
+      excludes:
+        - G115
+      confidence: medium
+    govet:
+      enable:
+        - shadow
+    mnd:
+      checks:
+        - case
+        - condition
+        - operation
+        - return
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    prealloc:
+      simple: true
+      range-loops: true
+      for-loops: true
+    varnamelen:
+      min-name-length: 2
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - copyloopvar
+          - dupl
+          - errcheck
+          - gocyclo
+          - gosec
+          - maintidx
+          - unparam
+          - varnamelen
+        path: _test(ing)?\.go
+      - linters:
+          - gocritic
+        path: _test\.go
+        text: (unnamedResult|exitAfterDefer)
+      - linters:
+          - gosec
+        text: 'G101:'
+      - linters:
+          - gosec
+        text: 'G104:'
+    paths:
+      - zz_generated\..+\.go$
+      - third_party$
+      - builtin$
+      - examples$
 issues:
-  exclude-rules:
-    # Exclude some linters from running on tests files.
-    - path: _test(ing)?\.go
-      linters:
-        - gocyclo
-        - maintidx
-        - errcheck
-        - dupl
-        - gosec
-        - copyloopvar
-        - unparam
-        - varnamelen
-
-    # Ease some gocritic warnings on test files.
-    - path: _test\.go
-      text: "(unnamedResult|exitAfterDefer)"
-      linters:
-        - gocritic
-
-    - text: "G101:"
-      linters:
-        - gosec
-        - gas
-
-    - text: "G104:"
-      linters:
-        - gosec
-        - gas
-
-  exclude-use-default: false
-  new: false
   max-issues-per-linter: 0
   max-same-issues: 0
-  exclude-files:
-    - "zz_generated\\..+\\.go$"
+  new: false
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - blank
+        - dot
+        - prefix(github.com/linode/linode-cloud-controller-manager)
+    gofmt:
+      simplify: true
+    goimports:
+      local-prefixes:
+        - github.com/linode/linode-cloud-controller-manager
+  exclusions:
+    generated: lax
+    paths:
+      - zz_generated\..+\.go$
+      - third_party$
+      - builtin$
+      - examples$
