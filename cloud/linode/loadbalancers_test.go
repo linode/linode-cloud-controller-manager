@@ -647,7 +647,7 @@ func testUpdateNodeBalancerWithVPCBackend(t *testing.T, client *linodego.Client,
 	svc.Status.LoadBalancer = *lbStatus
 
 	stubService(fakeClientset, svc)
-	svc.ObjectMeta.SetAnnotations(map[string]string{
+	svc.SetAnnotations(map[string]string{
 		annotations.NodeBalancerBackendIPv4Range: "10.100.1.0/30",
 	})
 
@@ -953,7 +953,7 @@ func testUpdateLoadBalancerAddAnnotation(t *testing.T, client *linodego.Client, 
 	svc.Status.LoadBalancer = *lbStatus
 
 	stubService(fakeClientset, svc)
-	svc.ObjectMeta.SetAnnotations(map[string]string{
+	svc.SetAnnotations(map[string]string{
 		annotations.AnnLinodeThrottle: "10",
 	})
 
@@ -1028,7 +1028,7 @@ func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Clie
 	svc.Status.LoadBalancer = *lbStatus
 	stubService(fakeClientset, svc)
 
-	svc.ObjectMeta.SetAnnotations(map[string]string{
+	svc.SetAnnotations(map[string]string{
 		portConfigAnnotation: `{"protocol": "http"}`,
 	})
 
@@ -1140,7 +1140,7 @@ func testVeryLongServiceName(t *testing.T, client *linodego.Client, _ *fakeAPI) 
 	svc.Status.LoadBalancer = *lbStatus
 	stubService(fakeClientset, svc)
 
-	svc.ObjectMeta.SetAnnotations(map[string]string{
+	svc.SetAnnotations(map[string]string{
 		annotations.AnnLinodeCloudFirewallACL: `{
 			"denyList": {
 				"ipv4": ["192.168.1.0/32"],
@@ -1209,7 +1209,7 @@ func testUpdateLoadBalancerAddTags(t *testing.T, client *linodego.Client, _ *fak
 	stubService(fakeClientset, svc)
 
 	testTags := "test,new,tags"
-	svc.ObjectMeta.SetAnnotations(map[string]string{
+	svc.SetAnnotations(map[string]string{
 		annotations.AnnLinodeLoadBalancerTags: testTags,
 	})
 
@@ -1295,7 +1295,7 @@ func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *
 
 	stubService(fakeClientset, svc)
 	svc.Spec.Ports = append(svc.Spec.Ports, extraPort)
-	svc.ObjectMeta.SetAnnotations(map[string]string{
+	svc.SetAnnotations(map[string]string{
 		annotations.AnnLinodePortConfigPrefix + "443": `{ "protocol": "https", "tls-secret-name": "tls-secret"}`,
 	})
 	err = lb.UpdateLoadBalancer(t.Context(), "linodelb", svc, nodes)
@@ -1414,7 +1414,7 @@ func testUpdateLoadBalancerAddProxyProtocol(t *testing.T, client *linodego.Clien
 			}
 
 			svc.Status.LoadBalancer = *makeLoadBalancerStatus(svc, nodeBalancer)
-			svc.ObjectMeta.SetAnnotations(map[string]string{
+			svc.SetAnnotations(map[string]string{
 				annotations.AnnLinodeDefaultProxyProtocol: string(tc.proxyProtocolConfig),
 			})
 
@@ -1520,7 +1520,7 @@ func testUpdateLoadBalancerAddNewFirewall(t *testing.T, client *linodego.Client,
 		_ = fwClient.DeleteFirewall(t.Context(), fw)
 	}()
 
-	svc.ObjectMeta.SetAnnotations(map[string]string{
+	svc.SetAnnotations(map[string]string{
 		annotations.AnnLinodeCloudFirewallID: strconv.Itoa(fw.ID),
 	})
 
@@ -1648,7 +1648,7 @@ func testUpdateLoadBalancerAddNewFirewallACL(t *testing.T, client *linodego.Clie
 		t.Fatalf("unable to marshal json acl")
 	}
 
-	svc.ObjectMeta.SetAnnotations(map[string]string{
+	svc.SetAnnotations(map[string]string{
 		annotations.AnnLinodeCloudFirewallACL: string(aclString),
 	})
 
@@ -1720,7 +1720,7 @@ func testUpdateLoadBalancerDeleteFirewallRemoveACL(t *testing.T, client *linodeg
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
 
-	svc.ObjectMeta.SetAnnotations(map[string]string{
+	svc.SetAnnotations(map[string]string{
 		annotations.AnnLinodeCloudFirewallACL: `{
 			"allowList": {
 				"ipv4": ["2.2.2.2"]
@@ -1761,7 +1761,7 @@ func testUpdateLoadBalancerDeleteFirewallRemoveACL(t *testing.T, client *linodeg
 		t.Errorf("expected IP, got %v", fwIPs)
 	}
 
-	svc.ObjectMeta.SetAnnotations(map[string]string{})
+	svc.SetAnnotations(map[string]string{})
 
 	err = lb.UpdateLoadBalancer(t.Context(), "linodelb", svc, nodes)
 	if err != nil {
@@ -1818,7 +1818,7 @@ func testUpdateLoadBalancerUpdateFirewallRemoveACLaddID(t *testing.T, client *li
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
 
-	svc.ObjectMeta.SetAnnotations(map[string]string{
+	svc.SetAnnotations(map[string]string{
 		annotations.AnnLinodeCloudFirewallACL: `{
 			"allowList": {
 				"ipv4": ["2.2.2.2"]
@@ -1880,7 +1880,7 @@ func testUpdateLoadBalancerUpdateFirewallRemoveACLaddID(t *testing.T, client *li
 		_ = fwClient.DeleteFirewall(t.Context(), fw)
 	}()
 
-	svc.ObjectMeta.SetAnnotations(map[string]string{
+	svc.SetAnnotations(map[string]string{
 		annotations.AnnLinodeCloudFirewallID: strconv.Itoa(fw.ID),
 	})
 
@@ -1978,7 +1978,7 @@ func testUpdateLoadBalancerUpdateFirewallRemoveIDaddACL(t *testing.T, client *li
 		_ = fwClient.DeleteFirewall(t.Context(), fw)
 	}()
 
-	svc.ObjectMeta.SetAnnotations(map[string]string{
+	svc.SetAnnotations(map[string]string{
 		annotations.AnnLinodeCloudFirewallID: strconv.Itoa(fw.ID),
 	})
 
@@ -2014,7 +2014,7 @@ func testUpdateLoadBalancerUpdateFirewallRemoveIDaddACL(t *testing.T, client *li
 	if fwIPs == nil {
 		t.Errorf("expected IP, got %v", fwIPs)
 	}
-	svc.ObjectMeta.SetAnnotations(map[string]string{
+	svc.SetAnnotations(map[string]string{
 		annotations.AnnLinodeCloudFirewallACL: `{
 			"allowList": {
 				"ipv4": ["2.2.2.2"]
@@ -2136,7 +2136,7 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 	}
 
 	// Add ipv6 ips in allowList
-	svc.ObjectMeta.SetAnnotations(map[string]string{
+	svc.SetAnnotations(map[string]string{
 		annotations.AnnLinodeCloudFirewallACL: `{
 			"allowList": {
 				"ipv4": ["2.2.2.2/32", "3.3.3.3/32"],
@@ -2182,7 +2182,7 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 	}
 
 	// Update ips in allowList
-	svc.ObjectMeta.SetAnnotations(map[string]string{
+	svc.SetAnnotations(map[string]string{
 		annotations.AnnLinodeCloudFirewallACL: `{
 			"allowList": {
 				"ipv4": ["2.2.2.1/32", "3.3.3.3/32"],
@@ -2228,7 +2228,7 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 	}
 
 	// remove one ipv4 and one ipv6 ip from allowList
-	svc.ObjectMeta.SetAnnotations(map[string]string{
+	svc.SetAnnotations(map[string]string{
 		annotations.AnnLinodeCloudFirewallACL: `{
 			"allowList": {
 				"ipv4": ["3.3.3.3/32"],
@@ -2350,7 +2350,7 @@ func testUpdateLoadBalancerUpdateFirewall(t *testing.T, client *linodego.Client,
 		_ = fwClient.DeleteFirewall(t.Context(), fw)
 	}()
 
-	svc.ObjectMeta.SetAnnotations(map[string]string{
+	svc.SetAnnotations(map[string]string{
 		annotations.AnnLinodeCloudFirewallID: strconv.Itoa(fw.ID),
 	})
 	lbStatus, err := lb.EnsureLoadBalancer(t.Context(), "linodelb", svc, nodes)
@@ -2387,7 +2387,7 @@ func testUpdateLoadBalancerUpdateFirewall(t *testing.T, client *linodego.Client,
 		_ = fwClient.DeleteFirewall(t.Context(), firewallNew)
 	}()
 
-	svc.ObjectMeta.SetAnnotations(map[string]string{
+	svc.SetAnnotations(map[string]string{
 		annotations.AnnLinodeCloudFirewallID: strconv.Itoa(firewallNew.ID),
 	})
 
@@ -2482,7 +2482,7 @@ func testUpdateLoadBalancerDeleteFirewallRemoveID(t *testing.T, client *linodego
 		_ = fwClient.DeleteFirewall(t.Context(), fw)
 	}()
 
-	svc.ObjectMeta.SetAnnotations(map[string]string{
+	svc.SetAnnotations(map[string]string{
 		annotations.AnnLinodeCloudFirewallID: strconv.Itoa(fw.ID),
 	})
 
@@ -2511,7 +2511,7 @@ func testUpdateLoadBalancerDeleteFirewallRemoveID(t *testing.T, client *linodego
 		t.Fatalf("Attached firewallID not matching with created firewall")
 	}
 
-	svc.ObjectMeta.SetAnnotations(map[string]string{})
+	svc.SetAnnotations(map[string]string{})
 
 	err = lb.UpdateLoadBalancer(t.Context(), "linodelb", svc, nodes)
 	if err != nil {
@@ -2590,7 +2590,7 @@ func testUpdateLoadBalancerAddNodeBalancerID(t *testing.T, client *linodego.Clie
 	}
 
 	stubService(fakeClientset, svc)
-	svc.ObjectMeta.SetAnnotations(map[string]string{
+	svc.SetAnnotations(map[string]string{
 		annotations.AnnLinodeNodeBalancerID: strconv.Itoa(newNodeBalancer.ID),
 	})
 	err = lb.UpdateLoadBalancer(t.Context(), "linodelb", svc, nodes)
@@ -3644,7 +3644,7 @@ func testUpdateLoadBalancerNoNodes(t *testing.T, client *linodego.Client, _ *fak
 	}
 	svc.Status.LoadBalancer = *makeLoadBalancerStatus(svc, nodeBalancer)
 	stubService(fakeClientset, svc)
-	svc.ObjectMeta.SetAnnotations(map[string]string{
+	svc.SetAnnotations(map[string]string{
 		annotations.AnnLinodeNodeBalancerID: strconv.Itoa(nodeBalancer.ID),
 	})
 
