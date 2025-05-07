@@ -24,6 +24,7 @@ const (
 	maxRulesPerFirewall     = 25
 	accept                  = "ACCEPT"
 	drop                    = "DROP"
+	portRangeParts          = 2
 )
 
 var (
@@ -130,9 +131,88 @@ func ipsChanged(ips *linodego.NetworkAddresses, rules []linodego.FirewallRule) b
 	return false
 }
 
+func parsePorts(ports string) ([]int32, error) {
+	var result []int32
+	portParts := strings.Split(ports, ",")
+	for _, part := range portParts {
+		part = strings.TrimSpace(part)
+		if strings.Contains(part, "-") {
+			rangeParts := strings.Split(part, "-")
+			if len(rangeParts) != portRangeParts {
+				return nil, fmt.Errorf("invalid range format: %s", part)
+			}
+
+			start, err1 := strconv.ParseInt(rangeParts[0], 10, 32)
+			end, err2 := strconv.ParseInt(rangeParts[1], 10, 32)
+			if err1 != nil || err2 != nil {
+				return nil, fmt.Errorf("invalid number in range: %s", part)
+			}
+			if start > end {
+				return nil, fmt.Errorf("start greater than end in range: %s", part)
+			}
+
+			for i := start; i <= end; i++ {
+				result = append(result, int32(i))
+			}
+		} else {
+			port, err := strconv.ParseInt(part, 10, 32)
+			if err != nil {
+				return nil, fmt.Errorf("invalid port: %s", part)
+			}
+			result = append(result, int32(port))
+		}
+	}
+
+	return result, nil
+}
+
+func isPortsChanged(rules []linodego.FirewallRule, service *v1.Service) bool {
+	// Service has at least one port, so we can check if there are any rules in firewall
+	// We only care about the first rule, as all rules should have same ports
+	if len(rules) == 0 {
+		return true
+	}
+	oldPorts := rules[0].Ports
+	if oldPorts == "" {
+		return true
+	}
+	// Split the old ports by comma and convert to a slice of strings
+	oldPortsSlice, err := parsePorts(oldPorts)
+	if err != nil {
+		klog.Errorf("Error parsing old ports: %v", err)
+		return true
+	}
+	// Create a map to store the old ports for easy lookup
+	oldPortsMap := make(map[int32]struct{}, len(oldPortsSlice))
+	for _, port := range oldPortsSlice {
+		oldPortsMap[port] = struct{}{}
+	}
+	svcPortsMap := make(map[int32]struct{}, len(service.Spec.Ports))
+	for _, port := range service.Spec.Ports {
+		svcPortsMap[port.Port] = struct{}{}
+	}
+
+	// Check if the ports in the service are different from the old ports
+	for _, port := range service.Spec.Ports {
+		if _, ok := oldPortsMap[port.Port]; !ok {
+			return true
+		}
+	}
+
+	// Check if there are any old ports that are not in the service
+	for _, port := range oldPortsSlice {
+		if _, ok := svcPortsMap[port]; !ok {
+			return true
+		}
+	}
+
+	// If all ports match, return false
+	return false
+}
+
 // ruleChanged takes an old FirewallRuleSet and new aclConfig and returns if
 // the IPs of the FirewallRuleSet would be changed with the new ACL Config
-func ruleChanged(old linodego.FirewallRuleSet, newACL aclConfig) bool {
+func ruleChanged(old linodego.FirewallRuleSet, newACL aclConfig, service *v1.Service) bool {
 	var ips *linodego.NetworkAddresses
 	if newACL.AllowList != nil {
 		// this is a allowList, this means that the rules should have `DROP` as inboundpolicy
@@ -156,7 +236,7 @@ func ruleChanged(old linodego.FirewallRuleSet, newACL aclConfig) bool {
 		ips = newACL.DenyList
 	}
 
-	return ipsChanged(ips, old.Inbound)
+	return ipsChanged(ips, old.Inbound) || isPortsChanged(old.Inbound, service)
 }
 
 func chunkIPs(ips []string) [][]string {
@@ -463,7 +543,7 @@ func (l *LinodeClient) updateNodeBalancerFirewallWithACL(
 				return err
 			}
 
-			changed := ruleChanged(firewalls[0].Rules, acl)
+			changed := ruleChanged(firewalls[0].Rules, acl, service)
 			if !changed {
 				return nil
 			}
