@@ -282,6 +282,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 			name: "Create Load Balancer - Very long Service name",
 			f:    testVeryLongServiceName,
 		},
+		{
+			name: "getNodeBalancerByStatus with IPv4 and IPv6 addresses",
+			f:    testGetNodeBalancerByStatus,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -3657,6 +3661,70 @@ func testUpdateLoadBalancerNoNodes(t *testing.T, client *linodego.Client, _ *fak
 
 	if err := lb.UpdateLoadBalancer(t.Context(), "linodelb", svc, nodes); !stderrors.Is(err, errNoNodesAvailable) {
 		t.Errorf("UpdateLoadBalancer should return %v, got %v", errNoNodesAvailable, err)
+	}
+}
+
+func testGetNodeBalancerByStatus(t *testing.T, client *linodego.Client, _ *fakeAPI) {
+	t.Helper()
+
+	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	if !assertion {
+		t.Error("type assertion failed")
+	}
+	fakeClientset := fake.NewSimpleClientset()
+	lb.kubeClient = fakeClientset
+
+	for _, test := range []struct {
+		name    string
+		service *v1.Service
+	}{
+		{
+			name: "hostname only",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "hostname-ingress-" + randString(),
+					Annotations: map[string]string{annotations.AnnLinodeHostnameOnlyIngress: "true"},
+				},
+			},
+		},
+		{
+			name: "ipv4",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "ipv4-ingress-" + randString(),
+				},
+			},
+		},
+		{
+			name: "ipv4 and ipv6",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "ipv6-ingress-" + randString(),
+					Annotations: map[string]string{annotations.AnnLinodeEnableIPv6Ingress: "true"},
+				},
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			expectedNB, err := lb.createNodeBalancer(t.Context(), "linodelb", test.service, []*linodego.NodeBalancerConfigCreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			test.service.Status.LoadBalancer = *makeLoadBalancerStatus(test.service, expectedNB)
+
+			actualNB, err := lb.getNodeBalancerByStatus(t.Context(), test.service)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if expectedNB.ID != actualNB.ID {
+				t.Error("unexpected nodebalancer ID")
+				t.Logf("expected: %v", expectedNB.ID)
+				t.Logf("actual: %v", actualNB.ID)
+			}
+
+			_ = lb.EnsureLoadBalancerDeleted(t.Context(), "linodelb", test.service)
+		})
 	}
 }
 
