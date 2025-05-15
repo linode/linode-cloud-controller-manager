@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"reflect"
 	"strconv"
@@ -99,12 +100,17 @@ func (l *loadbalancers) getLatestServiceLoadBalancerStatus(ctx context.Context, 
 	return service.Status.LoadBalancer, nil
 }
 
-// getNodeBalancerByStatus attempts to get the NodeBalancer from the IPv4 specified in the
+// getNodeBalancerByStatus attempts to get the NodeBalancer from the IP or hostname specified in the
 // most recent LoadBalancer status.
 func (l *loadbalancers) getNodeBalancerByStatus(ctx context.Context, service *v1.Service) (nb *linodego.NodeBalancer, err error) {
 	for _, ingress := range service.Status.LoadBalancer.Ingress {
 		if ingress.IP != "" {
-			return l.getNodeBalancerByIPv4(ctx, service, ingress.IP)
+			address, err := netip.ParseAddr(ingress.IP)
+			if err != nil {
+				klog.Warningf("failed to parse IP address %s from service %s/%s status, error: %s", ingress.IP, service.Namespace, service.Name, err)
+			} else {
+				return l.getNodeBalancerByIP(ctx, service, address)
+			}
 		}
 		if ingress.Hostname != "" {
 			return l.getNodeBalancerByHostname(ctx, service, ingress.Hostname)
@@ -603,8 +609,14 @@ func (l *loadbalancers) getNodeBalancerByHostname(ctx context.Context, service *
 	return nil, lbNotFoundError{serviceNn: getServiceNn(service)}
 }
 
-func (l *loadbalancers) getNodeBalancerByIPv4(ctx context.Context, service *v1.Service, ipv4 string) (*linodego.NodeBalancer, error) {
-	filter := fmt.Sprintf(`{"ipv4": "%v"}`, ipv4)
+func (l *loadbalancers) getNodeBalancerByIP(ctx context.Context, service *v1.Service, ip netip.Addr) (*linodego.NodeBalancer, error) {
+	var filter string
+	if ip.Is6() {
+		filter = fmt.Sprintf(`{"ipv6": "%v"}`, ip.String())
+	} else {
+		filter = fmt.Sprintf(`{"ipv4": "%v"}`, ip.String())
+	}
+
 	lbs, err := l.client.ListNodeBalancers(ctx, &linodego.ListOptions{Filter: filter})
 	if err != nil {
 		return nil, err
@@ -612,7 +624,7 @@ func (l *loadbalancers) getNodeBalancerByIPv4(ctx context.Context, service *v1.S
 	if len(lbs) == 0 {
 		return nil, lbNotFoundError{serviceNn: getServiceNn(service)}
 	}
-	klog.V(2).Infof("found NodeBalancer (%d) for service (%s) via IPv4 (%s)", lbs[0].ID, getServiceNn(service), ipv4)
+	klog.V(2).Infof("found NodeBalancer (%d) for service (%s) via IP (%s)", lbs[0].ID, getServiceNn(service), ip.String())
 	return &lbs[0], nil
 }
 
