@@ -35,6 +35,57 @@ import (
 var (
 	errNoNodesAvailable          = errors.New("no nodes available for nodebalancer")
 	maxConnThrottleStringLen int = 20
+
+	// validProtocols is a map of valid protocols
+	validProtocols = map[string]bool{
+		string(linodego.ProtocolTCP):   true,
+		string(linodego.ProtocolUDP):   true,
+		string(linodego.ProtocolHTTP):  true,
+		string(linodego.ProtocolHTTPS): true,
+	}
+	// validProxyProtocols is a map of valid proxy protocols
+	validProxyProtocols = map[string]bool{
+		string(linodego.ProxyProtocolNone): true,
+		string(linodego.ProxyProtocolV1):   true,
+		string(linodego.ProxyProtocolV2):   true,
+	}
+	// validTCPAlgorithms is a map of valid TCP algorithms
+	validTCPAlgorithms = map[string]bool{
+		string(linodego.AlgorithmRoundRobin): true,
+		string(linodego.AlgorithmLeastConn):  true,
+		string(linodego.AlgorithmSource):     true,
+	}
+	// validUDPAlgorithms is a map of valid UDP algorithms
+	validUDPAlgorithms = map[string]bool{
+		string(linodego.AlgorithmRoundRobin): true,
+		string(linodego.AlgorithmRingHash):   true,
+		string(linodego.AlgorithmLeastConn):  true,
+	}
+	// validTCPStickiness is a map of valid HTTP stickiness options
+	validHTTPStickiness = map[string]bool{
+		string(linodego.StickinessNone):       true,
+		string(linodego.StickinessHTTPCookie): true,
+		string(linodego.StickinessTable):      true,
+	}
+	// validHTTPSStickiness is the same as validHTTPStickiness, but for HTTPS
+	validHTTPSStickiness = map[string]bool{
+		string(linodego.StickinessNone):       true,
+		string(linodego.StickinessHTTPCookie): true,
+		string(linodego.StickinessTable):      true,
+	}
+	// validUDPStickiness is a map of valid UDP stickiness options
+	validUDPStickiness = map[string]bool{
+		string(linodego.StickinessNone):     true,
+		string(linodego.StickinessSession):  true,
+		string(linodego.StickinessSourceIP): true,
+	}
+	// validNBConfigChecks is a map of valid NodeBalancer config checks
+	validNBConfigChecks = map[string]bool{
+		string(linodego.CheckNone):       true,
+		string(linodego.CheckHTTP):       true,
+		string(linodego.CheckHTTPBody):   true,
+		string(linodego.CheckConnection): true,
+	}
 )
 
 type lbNotFoundError struct {
@@ -61,6 +112,9 @@ type portConfigAnnotation struct {
 	TLSSecretName string `json:"tls-secret-name"`
 	Protocol      string `json:"protocol"`
 	ProxyProtocol string `json:"proxy-protocol"`
+	Algorithm     string `json:"algorithm"`
+	Stickiness    string `json:"stickiness"`
+	UDPCheckPort  string `json:"udp-check-port"`
 }
 
 type portConfig struct {
@@ -68,6 +122,9 @@ type portConfig struct {
 	Protocol      linodego.ConfigProtocol
 	ProxyProtocol linodego.ConfigProxyProtocol
 	Port          int
+	Algorithm     linodego.ConfigAlgorithm
+	Stickiness    linodego.ConfigStickiness
+	UDPCheckPort  int
 }
 
 // newLoadbalancers returns a cloudprovider.LoadBalancer whose concrete type is a *loadbalancer.
@@ -351,14 +408,8 @@ func (l *loadbalancers) updateNodeBalancer(
 
 	// Add or overwrite configs for each of the Service's ports
 	for _, port := range service.Spec.Ports {
-		if port.Protocol == v1.ProtocolUDP {
-			err := fmt.Errorf("error updating NodeBalancer Config: ports with the UDP protocol are not supported")
-			sentry.CaptureError(ctx, err)
-			return err
-		}
-
 		// Construct a new config for this port
-		newNBCfg, err := l.buildNodeBalancerConfig(ctx, service, int(port.Port))
+		newNBCfg, err := l.buildNodeBalancerConfig(ctx, service, port)
 		if err != nil {
 			sentry.CaptureError(ctx, err)
 			return err
@@ -408,7 +459,7 @@ func (l *loadbalancers) updateNodeBalancer(
 			subnetID = id
 		}
 		for _, node := range nodes {
-			newNodeOpts := l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort, subnetID)
+			newNodeOpts := l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort, subnetID, newNBCfg.Protocol)
 			oldNodeID, ok := oldNBNodeIDs[newNodeOpts.Address]
 			if ok {
 				newNodeOpts.ID = oldNodeID
@@ -726,22 +777,31 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 	return l.client.CreateNodeBalancer(ctx, createOpts)
 }
 
-func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1.Service, port int) (linodego.NodeBalancerConfig, error) {
+func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1.Service, port v1.ServicePort) (linodego.NodeBalancerConfig, error) {
 	portConfigResult, err := getPortConfig(service, port)
 	if err != nil {
 		return linodego.NodeBalancerConfig{}, err
 	}
 
-	health, err := getHealthCheckType(service)
+	health, err := getHealthCheckType(service, port)
 	if err != nil {
 		return linodego.NodeBalancerConfig{}, err
 	}
 
 	config := linodego.NodeBalancerConfig{
-		Port:          port,
+		Port:          int(port.Port),
 		Protocol:      portConfigResult.Protocol,
 		ProxyProtocol: portConfigResult.ProxyProtocol,
 		Check:         health,
+		Algorithm:     portConfigResult.Algorithm,
+	}
+
+	if portConfigResult.Stickiness != "" {
+		config.Stickiness = portConfigResult.Stickiness
+	}
+
+	if portConfigResult.UDPCheckPort != 0 {
+		config.UDPCheckPort = portConfigResult.UDPCheckPort
 	}
 
 	if health == linodego.CheckHTTP || health == linodego.CheckHTTPBody {
@@ -784,7 +844,9 @@ func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1
 	config.CheckAttempts = checkAttempts
 
 	checkPassive := true
-	if cp, ok := service.GetAnnotations()[annotations.AnnLinodeHealthCheckPassive]; ok {
+	if config.Protocol == linodego.ProtocolUDP {
+		checkPassive = false
+	} else if cp, ok := service.GetAnnotations()[annotations.AnnLinodeHealthCheckPassive]; ok {
 		if checkPassive, err = strconv.ParseBool(cp); err != nil {
 			return config, err
 		}
@@ -858,18 +920,14 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 	}
 
 	for _, port := range ports {
-		if port.Protocol == v1.ProtocolUDP {
-			return nil, fmt.Errorf("error creating NodeBalancer Config: ports with the UDP protocol are not supported")
-		}
-
-		config, err := l.buildNodeBalancerConfig(ctx, service, int(port.Port))
+		config, err := l.buildNodeBalancerConfig(ctx, service, port)
 		if err != nil {
 			return nil, err
 		}
 		createOpt := config.GetCreateOptions()
 
 		for _, n := range nodes {
-			createOpt.Nodes = append(createOpt.Nodes, l.buildNodeBalancerNodeConfigRebuildOptions(n, port.NodePort, subnetID).NodeBalancerNodeCreateOptions)
+			createOpt.Nodes = append(createOpt.Nodes, l.buildNodeBalancerNodeConfigRebuildOptions(n, port.NodePort, subnetID, config.Protocol).NodeBalancerNodeCreateOptions)
 		}
 
 		configs = append(configs, &createOpt)
@@ -889,16 +947,19 @@ func coerceString(str string, minLen, maxLen int, padding string) string {
 	return str
 }
 
-func (l *loadbalancers) buildNodeBalancerNodeConfigRebuildOptions(node *v1.Node, nodePort int32, subnetID int) linodego.NodeBalancerConfigRebuildNodeOptions {
+func (l *loadbalancers) buildNodeBalancerNodeConfigRebuildOptions(node *v1.Node, nodePort int32, subnetID int, protocol linodego.ConfigProtocol) linodego.NodeBalancerConfigRebuildNodeOptions {
 	nodeOptions := linodego.NodeBalancerConfigRebuildNodeOptions{
 		NodeBalancerNodeCreateOptions: linodego.NodeBalancerNodeCreateOptions{
 			Address: fmt.Sprintf("%v:%v", getNodePrivateIP(node, subnetID), nodePort),
 			// NodeBalancer backends must be 3-32 chars in length
 			// If < 3 chars, pad node name with "node-" prefix
 			Label:  coerceString(node.Name, 3, 32, "node-"),
-			Mode:   "accept",
 			Weight: 100,
 		},
+	}
+	// Mode is not set for UDP protocol
+	if protocol != linodego.ProtocolUDP {
+		nodeOptions.Mode = "accept"
 	}
 	if subnetID != 0 {
 		nodeOptions.SubnetID = subnetID
@@ -937,57 +998,70 @@ func (l *loadbalancers) retrieveKubeClient() error {
 	return nil
 }
 
-func getPortConfig(service *v1.Service, port int) (portConfig, error) {
+func getPortConfig(service *v1.Service, port v1.ServicePort) (portConfig, error) {
 	portConfigResult := portConfig{}
-	portConfigAnnotationResult, err := getPortConfigAnnotation(service, port)
+	portConfigResult.Port = int(port.Port)
+
+	portConfigAnnotationResult, err := getPortConfigAnnotation(service, int(port.Port))
 	if err != nil {
 		return portConfigResult, err
 	}
-	protocol := portConfigAnnotationResult.Protocol
-	if protocol == "" {
-		protocol = "tcp"
-		if p, ok := service.GetAnnotations()[annotations.AnnLinodeDefaultProtocol]; ok {
-			protocol = p
-		}
-	}
-	protocol = strings.ToLower(protocol)
 
-	proxyProtocol := portConfigAnnotationResult.ProxyProtocol
-	if proxyProtocol == "" {
-		proxyProtocol = string(linodego.ProxyProtocolNone)
-		for _, ann := range []string{annotations.AnnLinodeDefaultProxyProtocol, annLinodeProxyProtocolDeprecated} {
-			if pp, ok := service.GetAnnotations()[ann]; ok {
-				proxyProtocol = pp
-				break
-			}
-		}
+	// validate and set protocol
+	protocol, err := getPortProtocol(portConfigAnnotationResult, service, port)
+	if err != nil {
+		return portConfigResult, err
 	}
-
-	if protocol != "tcp" && protocol != "http" && protocol != "https" {
-		return portConfigResult, fmt.Errorf("invalid protocol: %q specified", protocol)
-	}
-
-	switch proxyProtocol {
-	case string(linodego.ProxyProtocolNone), string(linodego.ProxyProtocolV1), string(linodego.ProxyProtocolV2):
-		break
-	default:
-		return portConfigResult, fmt.Errorf("invalid NodeBalancer proxy protocol value '%s'", proxyProtocol)
-	}
-
-	portConfigResult.Port = port
 	portConfigResult.Protocol = linodego.ConfigProtocol(protocol)
+
+	// validate and set proxy protocol
+	proxyProtocol, err := getPortProxyProtocol(portConfigAnnotationResult, service, portConfigResult.Protocol)
+	if err != nil {
+		return portConfigResult, err
+	}
 	portConfigResult.ProxyProtocol = linodego.ConfigProxyProtocol(proxyProtocol)
+
+	// validate and set algorithm
+	algorithm, err := getPortAlgorithm(portConfigAnnotationResult, service, portConfigResult.Protocol)
+	if err != nil {
+		return portConfigResult, err
+	}
+	portConfigResult.Algorithm = linodego.ConfigAlgorithm(algorithm)
+
+	// set TLS secret name
 	portConfigResult.TLSSecretName = portConfigAnnotationResult.TLSSecretName
+
+	// validate and set udp check port
+	udpCheckPort, err := getPortUDPCheckPort(portConfigAnnotationResult, service, portConfigResult.Protocol)
+	if err != nil {
+		return portConfigResult, err
+	}
+	if protocol == string(linodego.ProtocolUDP) {
+		portConfigResult.UDPCheckPort = udpCheckPort
+	}
+
+	// validate and set stickiness
+	stickiness, err := getPortStickiness(portConfigAnnotationResult, service, portConfigResult.Protocol)
+	if err != nil {
+		return portConfigResult, err
+	}
+	// Stickiness is not supported for TCP protocol
+	if protocol != string(linodego.ProtocolTCP) {
+		portConfigResult.Stickiness = linodego.ConfigStickiness(stickiness)
+	}
 
 	return portConfigResult, nil
 }
 
-func getHealthCheckType(service *v1.Service) (linodego.ConfigCheck, error) {
+func getHealthCheckType(service *v1.Service, port v1.ServicePort) (linodego.ConfigCheck, error) {
 	hType, ok := service.GetAnnotations()[annotations.AnnLinodeHealthCheckType]
 	if !ok {
+		if port.Protocol == v1.ProtocolUDP {
+			return linodego.CheckNone, nil
+		}
 		return linodego.CheckConnection, nil
 	}
-	if hType != "none" && hType != "connection" && hType != "http" && hType != "http_body" {
+	if !validNBConfigChecks[hType] {
 		return "", fmt.Errorf("invalid health check type: %q specified in annotation: %q", hType, annotations.AnnLinodeHealthCheckType)
 	}
 	return linodego.ConfigCheck(hType), nil
