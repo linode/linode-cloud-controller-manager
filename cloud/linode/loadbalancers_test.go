@@ -2846,6 +2846,333 @@ func Test_getPortConfig(t *testing.T) {
 			nil,
 		},
 		{
+			"different algorithm specified for tcp protocol",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annotations.AnnLinodeDefaultProtocol:  "tcp",
+						annotations.AnnLinodeDefaultAlgorithm: string(linodego.AlgorithmSource),
+					},
+				},
+			},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolTCP,
+				Port:     443,
+			},
+			portConfig{
+				Port:          443,
+				Protocol:      "tcp",
+				ProxyProtocol: linodego.ProxyProtocolNone,
+				Algorithm:     linodego.AlgorithmSource,
+			},
+			nil,
+		},
+		{
+			"algorithm ring_hash is not allowed for tcp protocol",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annotations.AnnLinodeDefaultProtocol:  "tcp",
+						annotations.AnnLinodeDefaultAlgorithm: string(linodego.AlgorithmRingHash),
+					},
+				},
+			},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolTCP,
+				Port:     443,
+			},
+			portConfig{
+				Port:          443,
+				Protocol:      "tcp",
+				ProxyProtocol: linodego.ProxyProtocolNone,
+			},
+			fmt.Errorf("invalid algorithm: %q specified for TCP/HTTP/HTTPS protocol", string(linodego.AlgorithmRingHash)),
+		},
+		{
+			"default udp protocol specified",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annotations.AnnLinodeDefaultProtocol: "udp",
+					},
+				},
+			},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolUDP,
+				Port:     2222,
+			},
+			portConfig{
+				Port:          2222,
+				Protocol:      "udp",
+				ProxyProtocol: linodego.ProxyProtocolNone,
+				Algorithm:     linodego.AlgorithmRoundRobin,
+				Stickiness:    linodego.StickinessSession,
+				UDPCheckPort:  80,
+			},
+			nil,
+		},
+		{
+			"default udp protocol with different port specific udp check port specified",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annotations.AnnLinodeDefaultProtocol:           "udp",
+						annotations.AnnLinodePortConfigPrefix + "2222": `{"udp-check-port": "8080"}`,
+					},
+				},
+			},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolUDP,
+				Port:     2222,
+			},
+			portConfig{
+				Port:          2222,
+				Protocol:      "udp",
+				ProxyProtocol: linodego.ProxyProtocolNone,
+				Algorithm:     linodego.AlgorithmRoundRobin,
+				Stickiness:    linodego.StickinessSession,
+				UDPCheckPort:  8080,
+			},
+			nil,
+		},
+		{
+			"default udp protocol with different global udp check port specified",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annotations.AnnLinodeDefaultProtocol: "udp",
+						annotations.AnnLinodeUDPCheckPort:    "8080",
+					},
+				},
+			},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolUDP,
+				Port:     2222,
+			},
+			portConfig{
+				Port:          2222,
+				Protocol:      "udp",
+				ProxyProtocol: linodego.ProxyProtocolNone,
+				Algorithm:     linodego.AlgorithmRoundRobin,
+				Stickiness:    linodego.StickinessSession,
+				UDPCheckPort:  8080,
+			},
+			nil,
+		},
+		{
+			"invalid proxyprotocol specified for udp protocol",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annotations.AnnLinodeDefaultProtocol:      "udp",
+						annotations.AnnLinodeDefaultProxyProtocol: string(linodego.ProxyProtocolV1),
+					},
+				},
+			},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolUDP,
+				Port:     2222,
+			},
+			portConfig{
+				Port:     2222,
+				Protocol: "udp",
+			},
+			fmt.Errorf("proxy protocol [%s] is not supported for UDP", string(linodego.ProxyProtocolV1)),
+		},
+		{
+			"algorithm source is not allowed for udp protocol",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annotations.AnnLinodeDefaultProtocol:  "udp",
+						annotations.AnnLinodeDefaultAlgorithm: string(linodego.AlgorithmSource),
+					},
+				},
+			},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolUDP,
+				Port:     2222,
+			},
+			portConfig{
+				Port:          2222,
+				Protocol:      "udp",
+				ProxyProtocol: linodego.ProxyProtocolNone,
+			},
+			fmt.Errorf("invalid algorithm: %q specified for UDP protocol", string(linodego.AlgorithmSource)),
+		},
+		{
+			"udp_check_port should be within 1-65535",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annotations.AnnLinodeDefaultProtocol:           "udp",
+						annotations.AnnLinodePortConfigPrefix + "2222": `{"udp-check-port": "88888"}`,
+					},
+				},
+			},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolUDP,
+				Port:     2222,
+			},
+			portConfig{
+				Port:          2222,
+				Protocol:      "udp",
+				ProxyProtocol: linodego.ProxyProtocolNone,
+				Algorithm:     linodego.AlgorithmRoundRobin,
+			},
+			fmt.Errorf("UDPCheckPort must be between 1 and 65535, got %d", 88888),
+		},
+		{
+			"tls secret is not allowed for udp protocol",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annotations.AnnLinodeDefaultProtocol:           "udp",
+						annotations.AnnLinodePortConfigPrefix + "2222": `{"tls-secret-name": "test"}`,
+					},
+				},
+			},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolUDP,
+				Port:     2222,
+			},
+			portConfig{
+				Port:          2222,
+				Protocol:      "udp",
+				ProxyProtocol: linodego.ProxyProtocolNone,
+				Algorithm:     linodego.AlgorithmRoundRobin,
+			},
+			fmt.Errorf("specifying TLS secret name is not supported for UDP"),
+		},
+		{
+			"no error on stickiness for tcp protocol, it gets ignored",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annotations.AnnLinodeDefaultProtocol:          "tcp",
+						annotations.AnnLinodePortConfigPrefix + "443": `{"stickiness": "table"}`,
+					},
+				},
+			},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolUDP,
+				Port:     443,
+			},
+			portConfig{
+				Port:          443,
+				Protocol:      "tcp",
+				ProxyProtocol: linodego.ProxyProtocolNone,
+				Algorithm:     linodego.AlgorithmRoundRobin,
+			},
+			nil,
+		},
+		{
+			"stickiness table is not allowed for udp protocol",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annotations.AnnLinodeDefaultProtocol:   "udp",
+						annotations.AnnLinodeDefaultStickiness: string(linodego.StickinessTable),
+					},
+				},
+			},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolUDP,
+				Port:     2222,
+			},
+			portConfig{
+				Port:          2222,
+				Protocol:      "udp",
+				ProxyProtocol: linodego.ProxyProtocolNone,
+				Algorithm:     linodego.AlgorithmRoundRobin,
+				UDPCheckPort:  80,
+			},
+			fmt.Errorf("invalid stickiness: %q specified for UDP protocol", linodego.StickinessTable),
+		},
+		{
+			"stickiness session is not allowed for http protocol",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annotations.AnnLinodeDefaultProtocol:   "http",
+						annotations.AnnLinodeDefaultStickiness: string(linodego.StickinessSession),
+					},
+				},
+			},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolTCP,
+				Port:     443,
+			},
+			portConfig{
+				Port:          443,
+				Protocol:      "http",
+				ProxyProtocol: linodego.ProxyProtocolNone,
+				Algorithm:     linodego.AlgorithmRoundRobin,
+			},
+			fmt.Errorf("invalid stickiness: %q specified for HTTP protocol", linodego.StickinessSession),
+		},
+		{
+			"stickiness session is not allowed for https protocol",
+			&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: randString(),
+					UID:  "abc123",
+					Annotations: map[string]string{
+						annotations.AnnLinodeDefaultProtocol:   "https",
+						annotations.AnnLinodeDefaultStickiness: string(linodego.StickinessSession),
+					},
+				},
+			},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolTCP,
+				Port:     443,
+			},
+			portConfig{
+				Port:          443,
+				Protocol:      "https",
+				ProxyProtocol: linodego.ProxyProtocolNone,
+				Algorithm:     linodego.AlgorithmRoundRobin,
+			},
+			fmt.Errorf("invalid stickiness: %q specified for HTTPS protocol", linodego.StickinessSession),
+		},
+		{
 			"default capitalized protocol specified",
 			&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{

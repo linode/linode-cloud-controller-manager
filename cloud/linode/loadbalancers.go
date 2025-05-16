@@ -1028,7 +1028,10 @@ func getPortConfig(service *v1.Service, port v1.ServicePort) (portConfig, error)
 	}
 	portConfigResult.Algorithm = linodego.ConfigAlgorithm(algorithm)
 
-	// set TLS secret name
+	// set TLS secret name. Its only used for TCP and HTTPS protocols
+	if protocol == string(linodego.ProtocolUDP) && portConfigAnnotationResult.TLSSecretName != "" {
+		return portConfigResult, fmt.Errorf("specifying TLS secret name is not supported for UDP")
+	}
 	portConfigResult.TLSSecretName = portConfigAnnotationResult.TLSSecretName
 
 	// validate and set udp check port

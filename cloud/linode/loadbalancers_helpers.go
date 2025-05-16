@@ -48,6 +48,7 @@ func getPortProxyProtocol(portConfigAnnotationResult portConfigAnnotation, servi
 			}
 		}
 	}
+	proxyProtocol = strings.ToLower(proxyProtocol)
 
 	if !validProxyProtocols[proxyProtocol] {
 		return "", fmt.Errorf("invalid NodeBalancer proxy protocol value '%s'", proxyProtocol)
@@ -56,9 +57,6 @@ func getPortProxyProtocol(portConfigAnnotationResult portConfigAnnotation, servi
 	if protocol == linodego.ProtocolUDP {
 		if proxyProtocol != string(linodego.ProxyProtocolNone) {
 			return "", fmt.Errorf("proxy protocol [%s] is not supported for UDP", proxyProtocol)
-		}
-		if portConfigAnnotationResult.TLSSecretName != "" {
-			return "", fmt.Errorf("specifying TLS secret name is not supported for UDP")
 		}
 	}
 	return proxyProtocol, nil
@@ -78,6 +76,7 @@ func getPortAlgorithm(portConfigAnnotationResult portConfigAnnotation, service *
 		}
 	}
 	algorithm = strings.ToLower(algorithm)
+
 	if protocol == linodego.ProtocolUDP {
 		if !validUDPAlgorithms[algorithm] {
 			return "", fmt.Errorf("invalid algorithm: %q specified for UDP protocol", algorithm)
