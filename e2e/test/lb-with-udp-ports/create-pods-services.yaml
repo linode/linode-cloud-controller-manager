@@ -1,0 +1,47 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: lb-with-udp-ports
+  name: test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lb-with-udp-ports
+  template:
+    metadata:
+      labels:
+        app: lb-with-udp-ports
+    spec:
+      containers:
+      - image: rahulait/test-server:0.1
+        name: test
+        ports:
+        - name: udp
+          containerPort: 7070
+          protocol: UDP
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-test
+  labels:
+    app: lb-with-udp-ports
+spec:
+  type: LoadBalancer
+  selector:
+    app: lb-with-udp-ports
+  ports:
+    - name: udp
+      protocol: UDP
+      port: 7070
+      targetPort: 7070
+  sessionAffinity: None

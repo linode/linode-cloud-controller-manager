@@ -6,6 +6,8 @@ const (
 	AnnLinodeDefaultProtocol      = "service.beta.kubernetes.io/linode-loadbalancer-default-protocol"
 	AnnLinodePortConfigPrefix     = "service.beta.kubernetes.io/linode-loadbalancer-port-"
 	AnnLinodeDefaultProxyProtocol = "service.beta.kubernetes.io/linode-loadbalancer-default-proxy-protocol"
+	AnnLinodeDefaultAlgorithm     = "service.beta.kubernetes.io/linode-loadbalancer-default-algorithm"
+	AnnLinodeDefaultStickiness    = "service.beta.kubernetes.io/linode-loadbalancer-default-stickiness"
 
 	AnnLinodeCheckPath       = "service.beta.kubernetes.io/linode-loadbalancer-check-path"
 	AnnLinodeCheckBody       = "service.beta.kubernetes.io/linode-loadbalancer-check-body"
@@ -15,6 +17,8 @@ const (
 	AnnLinodeHealthCheckTimeout  = "service.beta.kubernetes.io/linode-loadbalancer-check-timeout"
 	AnnLinodeHealthCheckAttempts = "service.beta.kubernetes.io/linode-loadbalancer-check-attempts"
 	AnnLinodeHealthCheckPassive  = "service.beta.kubernetes.io/linode-loadbalancer-check-passive"
+
+	AnnLinodeUDPCheckPort = "service.beta.kubernetes.io/linode-loadbalancer-udp-check-port"
 
 	// AnnLinodeThrottle is the annotation specifying the value of the Client Connection
 	// Throttle, which limits the number of subsequent new connections per second from the

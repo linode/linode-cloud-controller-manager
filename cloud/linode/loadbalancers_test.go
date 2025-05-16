@@ -2704,6 +2704,7 @@ func Test_getPortConfig(t *testing.T) {
 	testcases := []struct {
 		name               string
 		service            *v1.Service
+		port               v1.ServicePort
 		expectedPortConfig portConfig
 		err                error
 	}{
@@ -2715,7 +2716,17 @@ func Test_getPortConfig(t *testing.T) {
 					UID:  "abc123",
 				},
 			},
-			portConfig{Port: 443, Protocol: "tcp", ProxyProtocol: linodego.ProxyProtocolNone},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolTCP,
+				Port:     443,
+			},
+			portConfig{
+				Port:          443,
+				Protocol:      "tcp",
+				ProxyProtocol: linodego.ProxyProtocolNone,
+				Algorithm:     linodego.AlgorithmRoundRobin,
+			},
 			nil,
 		},
 		{
@@ -2729,7 +2740,17 @@ func Test_getPortConfig(t *testing.T) {
 					},
 				},
 			},
-			portConfig{Port: 443, Protocol: "tcp", ProxyProtocol: linodego.ProxyProtocolV2},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolTCP,
+				Port:     443,
+			},
+			portConfig{
+				Port:          443,
+				Protocol:      "tcp",
+				ProxyProtocol: linodego.ProxyProtocolV2,
+				Algorithm:     linodego.AlgorithmRoundRobin,
+			},
 			nil,
 		},
 		{
@@ -2744,7 +2765,17 @@ func Test_getPortConfig(t *testing.T) {
 					},
 				},
 			},
-			portConfig{Port: 443, Protocol: "tcp", ProxyProtocol: linodego.ProxyProtocolV1},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolTCP,
+				Port:     443,
+			},
+			portConfig{
+				Port:          443,
+				Protocol:      "tcp",
+				ProxyProtocol: linodego.ProxyProtocolV1,
+				Algorithm:     linodego.AlgorithmRoundRobin,
+			},
 			nil,
 		},
 		{
@@ -2758,7 +2789,15 @@ func Test_getPortConfig(t *testing.T) {
 					},
 				},
 			},
-			portConfig{},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolTCP,
+				Port:     443,
+			},
+			portConfig{
+				Port:     443,
+				Protocol: "tcp",
+			},
 			fmt.Errorf("invalid NodeBalancer proxy protocol value '%s'", "invalid"),
 		},
 		{
@@ -2769,8 +2808,17 @@ func Test_getPortConfig(t *testing.T) {
 					UID:  "abc123",
 				},
 			},
-			portConfig{Port: 443, Protocol: "tcp", ProxyProtocol: linodego.ProxyProtocolNone},
-
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolTCP,
+				Port:     int32(443),
+			},
+			portConfig{
+				Port:          443,
+				Protocol:      "tcp",
+				ProxyProtocol: linodego.ProxyProtocolNone,
+				Algorithm:     linodego.AlgorithmRoundRobin,
+			},
 			nil,
 		},
 		{
@@ -2784,7 +2832,17 @@ func Test_getPortConfig(t *testing.T) {
 					},
 				},
 			},
-			portConfig{Port: 443, Protocol: "tcp", ProxyProtocol: linodego.ProxyProtocolNone},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolTCP,
+				Port:     443,
+			},
+			portConfig{
+				Port:          443,
+				Protocol:      "tcp",
+				ProxyProtocol: linodego.ProxyProtocolNone,
+				Algorithm:     linodego.AlgorithmRoundRobin,
+			},
 			nil,
 		},
 		{
@@ -2798,7 +2856,18 @@ func Test_getPortConfig(t *testing.T) {
 					},
 				},
 			},
-			portConfig{Port: 443, Protocol: "http", ProxyProtocol: linodego.ProxyProtocolNone},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolTCP,
+				Port:     443,
+			},
+			portConfig{
+				Port:          443,
+				Protocol:      "http",
+				ProxyProtocol: linodego.ProxyProtocolNone,
+				Algorithm:     linodego.AlgorithmRoundRobin,
+				Stickiness:    linodego.StickinessTable,
+			},
 			nil,
 		},
 		{
@@ -2812,7 +2881,14 @@ func Test_getPortConfig(t *testing.T) {
 					},
 				},
 			},
-			portConfig{},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolTCP,
+				Port:     443,
+			},
+			portConfig{
+				Port: 443,
+			},
 			fmt.Errorf("invalid protocol: %q specified", "invalid"),
 		},
 		{
@@ -2827,7 +2903,18 @@ func Test_getPortConfig(t *testing.T) {
 					},
 				},
 			},
-			portConfig{Port: 443, Protocol: "http", ProxyProtocol: linodego.ProxyProtocolNone},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolTCP,
+				Port:     443,
+			},
+			portConfig{
+				Port:          443,
+				Protocol:      "http",
+				ProxyProtocol: linodego.ProxyProtocolNone,
+				Algorithm:     linodego.AlgorithmRoundRobin,
+				Stickiness:    linodego.StickinessTable,
+			},
 			nil,
 		},
 		{
@@ -2841,7 +2928,18 @@ func Test_getPortConfig(t *testing.T) {
 					},
 				},
 			},
-			portConfig{Port: 443, Protocol: "http", ProxyProtocol: linodego.ProxyProtocolNone},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolTCP,
+				Port:     443,
+			},
+			portConfig{
+				Port:          443,
+				Protocol:      "http",
+				ProxyProtocol: linodego.ProxyProtocolNone,
+				Algorithm:     linodego.AlgorithmRoundRobin,
+				Stickiness:    linodego.StickinessTable,
+			},
 			nil,
 		},
 		{
@@ -2855,15 +2953,19 @@ func Test_getPortConfig(t *testing.T) {
 					},
 				},
 			},
-			portConfig{},
+			v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolTCP,
+				Port:     443,
+			},
+			portConfig{Port: 443},
 			fmt.Errorf("invalid protocol: %q specified", "invalid"),
 		},
 	}
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
-			testPort := 443
-			portConfigResult, err := getPortConfig(test.service, testPort)
+			portConfigResult, err := getPortConfig(test.service, test.port)
 
 			if !reflect.DeepEqual(portConfigResult, test.expectedPortConfig) {
 				t.Error("unexpected port config")
@@ -2931,7 +3033,12 @@ func Test_getHealthCheckType(t *testing.T) {
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
-			hType, err := getHealthCheckType(test.service)
+			port := v1.ServicePort{
+				Name:     "test",
+				Protocol: v1.ProtocolTCP,
+				Port:     int32(443),
+			}
+			hType, err := getHealthCheckType(test.service, port)
 			if !reflect.DeepEqual(hType, test.healthType) {
 				t.Error("unexpected health check type")
 				t.Logf("expected: %v", test.healthType)
