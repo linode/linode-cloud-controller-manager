@@ -191,4 +191,4 @@ replace (
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.33.0
 )
 
-replace github.com/linode/linodego => github.com/rahulait/linodego v1.50.1-0.20250512213210-59578922c237
+replace github.com/linode/linodego => github.com/rahulait/linodego v1.50.1-0.20250516215350-44c3ebbc3359
