@@ -70,6 +70,7 @@ Available protocols:
 - `tcp` (default)
 - `http`
 - `https`
+- `udp`
 
 Set the default protocol:
 ```yaml
