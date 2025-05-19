@@ -28,7 +28,7 @@ spec:
         app: udp-example
     spec:
       containers:
-      - name: nginx
+      - name: test-server
         image: rahulait/test-server:0.1
         ports:
         - containerPort: 7070
