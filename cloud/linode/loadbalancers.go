@@ -393,6 +393,9 @@ func (l *loadbalancers) updateNodeBalancer(
 		// Add all of the Nodes to the config
 		newNBNodes := make([]linodego.NodeBalancerConfigRebuildNodeOptions, 0, len(nodes))
 		subnetID := 0
+		if Options.NodeBalancerBackendIPv4SubnetID != 0 {
+			subnetID = Options.NodeBalancerBackendIPv4SubnetID
+		}
 		backendIPv4Range, ok := service.GetAnnotations()[annotations.NodeBalancerBackendIPv4Range]
 		if ok {
 			if err = validateNodeBalancerBackendIPv4Range(backendIPv4Range); err != nil {
@@ -696,6 +699,12 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 				IPv4Range: backendIPv4Range,
 			},
 		}
+	} else if Options.NodeBalancerBackendIPv4SubnetID != 0 {
+		createOpts.VPCs = []linodego.NodeBalancerVPCOptions{
+			{
+				SubnetID: Options.NodeBalancerBackendIPv4SubnetID,
+			},
+		}
 	}
 
 	fwid, ok := service.GetAnnotations()[annotations.AnnLinodeCloudFirewallID]
@@ -845,6 +854,10 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 	configs := make([]*linodego.NodeBalancerConfigCreateOptions, 0, len(ports))
 
 	subnetID := 0
+	if Options.NodeBalancerBackendIPv4SubnetID != 0 {
+		subnetID = Options.NodeBalancerBackendIPv4SubnetID
+	}
+	// Check for the NodeBalancerBackendIPv4Range annotation
 	backendIPv4Range, ok := service.GetAnnotations()[annotations.NodeBalancerBackendIPv4Range]
 	if ok {
 		if err := validateNodeBalancerBackendIPv4Range(backendIPv4Range); err != nil {
