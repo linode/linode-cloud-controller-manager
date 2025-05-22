@@ -151,3 +151,21 @@ func GetVPCIPAddresses(ctx context.Context, client client.Client, vpcName string
 	}
 	return resp, nil
 }
+
+func getNodeBalancerBackendIPv4SubnetID(client client.Client) int {
+	vpcName := strings.Split(Options.VPCNames, ",")[0]
+	// Get the VPC ID from the name
+	vpcID, err := GetVPCID(context.TODO(), client, vpcName)
+	if err != nil {
+		klog.Errorf("failed to get vpc id for %s: %v", vpcName, err)
+		return 0
+	}
+	// Get the subnet ID from the name
+	subnetID, err := GetSubnetID(context.TODO(), client, vpcID, Options.NodeBalancerBackendIPv4SubnetName)
+	if err != nil {
+		klog.Errorf("failed to get subnet id for %s: %v", Options.NodeBalancerBackendIPv4SubnetName, err)
+		return 0
+	}
+
+	return subnetID
+}

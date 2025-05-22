@@ -47,4 +47,5 @@ const (
 
 	NodeBalancerBackendVPCName    = "service.beta.kubernetes.io/linode-loadbalancer-backend-vpc-name"
 	NodeBalancerBackendSubnetName = "service.beta.kubernetes.io/linode-loadbalancer-backend-subnet-name"
+	NodeBalancerBackendSubnetID   = "service.beta.kubernetes.io/linode-loadbalancer-backend-subnet-id"
 )
