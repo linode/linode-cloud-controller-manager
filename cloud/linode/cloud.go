@@ -39,22 +39,24 @@ var Options struct {
 	EnableRouteController    bool
 	EnableTokenHealthChecker bool
 	// Deprecated: use VPCNames instead
-	VPCName                       string
-	VPCNames                      string
-	SubnetNames                   string
-	LoadBalancerType              string
-	BGPNodeSelector               string
-	IpHolderSuffix                string
-	LinodeExternalNetwork         *net.IPNet
-	NodeBalancerTags              []string
-	DefaultNBType                 string
-	NodeBalancerBackendIPv4Subnet string
-	GlobalStopChannel             chan<- struct{}
-	EnableIPv6ForLoadBalancers    bool
-	AllocateNodeCIDRs             bool
-	ClusterCIDRIPv4               string
-	NodeCIDRMaskSizeIPv4          int
-	NodeCIDRMaskSizeIPv6          int
+	VPCName                           string
+	VPCNames                          string
+	SubnetNames                       string
+	LoadBalancerType                  string
+	BGPNodeSelector                   string
+	IpHolderSuffix                    string
+	LinodeExternalNetwork             *net.IPNet
+	NodeBalancerTags                  []string
+	DefaultNBType                     string
+	NodeBalancerBackendIPv4Subnet     string
+	NodeBalancerBackendIPv4SubnetID   int
+	NodeBalancerBackendIPv4SubnetName string
+	GlobalStopChannel                 chan<- struct{}
+	EnableIPv6ForLoadBalancers        bool
+	AllocateNodeCIDRs                 bool
+	ClusterCIDRIPv4                   string
+	NodeCIDRMaskSizeIPv4              int
+	NodeCIDRMaskSizeIPv6              int
 }
 
 type linodeCloud struct {
@@ -148,6 +150,14 @@ func newCloud() (cloudprovider.Interface, error) {
 	if Options.SubnetNames != "" && Options.VPCNames == "" {
 		klog.Warningf("failed to set flag subnet-names: vpc-names must be set to a non-empty value")
 		Options.SubnetNames = ""
+	}
+
+	if Options.NodeBalancerBackendIPv4SubnetID != 0 && Options.NodeBalancerBackendIPv4SubnetName != "" {
+		return nil, fmt.Errorf("cannot have both node-balancer-backend-ipv4-subnet-id and node-balancer-backend-ipv4-subnet-name set")
+	}
+
+	if Options.NodeBalancerBackendIPv4SubnetName != "" {
+		Options.NodeBalancerBackendIPv4SubnetID = getNodeBalancerBackendIPv4SubnetID(linodeClient)
 	}
 
 	instanceCache = newInstances(linodeClient)
