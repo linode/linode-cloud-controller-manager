@@ -115,7 +115,10 @@ o/aoxqmE0mN1lyCPOa9UP//LlsREkWVKI3+Wld/xERtzf66hjcH+ilsXDxxpMEXo
 bSiPJQsGIKtQvyCaZY2szyOoeUGgOId+He7ITlezxKrjdj+1pLMESvAxKeo=
 -----END RSA PRIVATE KEY-----`
 
-const drop string = "DROP"
+const (
+	drop          string = "DROP"
+	defaultSubnet string = "default"
+)
 
 func TestCCMLoadBalancers(t *testing.T) {
 	testCases := []struct {
@@ -555,14 +558,14 @@ func testCreateNodeBalancerWithVPCBackend(t *testing.T, client *linodego.Client,
 		Options.SubnetNames = subnetNames
 	}()
 	Options.VPCNames = "test1"
-	Options.SubnetNames = "default"
+	Options.SubnetNames = defaultSubnet
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
 		Label:       "test1",
 		Description: "",
 		Region:      "us-west",
 		Subnets: []linodego.VPCSubnetCreateOptions{
 			{
-				Label: "default",
+				Label: defaultSubnet,
 				IPv4:  "10.0.0.0/8",
 			},
 		},
@@ -597,14 +600,14 @@ func testUpdateNodeBalancerWithVPCBackend(t *testing.T, client *linodego.Client,
 		Options.SubnetNames = subnetNames
 	}()
 	Options.VPCNames = "test1"
-	Options.SubnetNames = "default"
+	Options.SubnetNames = defaultSubnet
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
 		Label:       "test1",
 		Description: "",
 		Region:      "us-west",
 		Subnets: []linodego.VPCSubnetCreateOptions{
 			{
-				Label: "default",
+				Label: defaultSubnet,
 				IPv4:  "10.0.0.0/8",
 			},
 		},
@@ -684,7 +687,7 @@ func testCreateNodeBalancerWithVPCOnlySubnetFlag(t *testing.T, client *linodego.
 		Options.NodeBalancerBackendIPv4Subnet = nbBackendSubnet
 	}()
 	Options.VPCNames = "test-subflag"
-	Options.SubnetNames = "default"
+	Options.SubnetNames = defaultSubnet
 	Options.NodeBalancerBackendIPv4Subnet = "10.254.0.0/24"
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
 		Label:       "test-subflag",
@@ -692,7 +695,7 @@ func testCreateNodeBalancerWithVPCOnlySubnetFlag(t *testing.T, client *linodego.
 		Region:      "us-west",
 		Subnets: []linodego.VPCSubnetCreateOptions{
 			{
-				Label: "default",
+				Label: defaultSubnet,
 				IPv4:  "10.0.0.0/8",
 			},
 		},
@@ -778,14 +781,14 @@ func testCreateNodeBalancerWithVPCNoFlagOrAnnotation(t *testing.T, client *linod
 		Options.SubnetNames = subnetNames
 	}()
 	Options.VPCNames = "test-noflags"
-	Options.SubnetNames = "default"
+	Options.SubnetNames = defaultSubnet
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
 		Label:       "test-noflags",
 		Description: "",
 		Region:      "us-west",
 		Subnets: []linodego.VPCSubnetCreateOptions{
 			{
-				Label: "default",
+				Label: defaultSubnet,
 				IPv4:  "10.0.0.0/8",
 			},
 		},
@@ -861,14 +864,14 @@ func testCreateNodeBalancerWithVPCAnnotationOnly(t *testing.T, client *linodego.
 		Options.SubnetNames = subnetNames
 	}()
 	Options.VPCNames = "test-onlyannotation"
-	Options.SubnetNames = "default"
+	Options.SubnetNames = defaultSubnet
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
 		Label:       "test-onlyannotation",
 		Description: "",
 		Region:      "us-west",
 		Subnets: []linodego.VPCSubnetCreateOptions{
 			{
-				Label: "default",
+				Label: defaultSubnet,
 				IPv4:  "10.0.0.0/8",
 			},
 			{
@@ -950,7 +953,7 @@ func testCreateNodeBalancerWithVPCOnlySubnetIDFlag(t *testing.T, client *linodeg
 		Options.NodeBalancerBackendIPv4SubnetID = nbBackendSubnetID
 	}()
 	Options.VPCNames = "test1"
-	Options.SubnetNames = "default"
+	Options.SubnetNames = defaultSubnet
 	Options.NodeBalancerBackendIPv4SubnetID = 1111
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
 		Label:       "test-subid-flag",
@@ -958,7 +961,7 @@ func testCreateNodeBalancerWithVPCOnlySubnetIDFlag(t *testing.T, client *linodeg
 		Region:      "us-west",
 		Subnets: []linodego.VPCSubnetCreateOptions{
 			{
-				Label: "default",
+				Label: defaultSubnet,
 				IPv4:  "10.0.0.0/8",
 			},
 		},
@@ -1044,7 +1047,7 @@ func testCreateNodeBalancerWithVPCAnnotationOverwrite(t *testing.T, client *lino
 		Region:      "us-west",
 		Subnets: []linodego.VPCSubnetCreateOptions{
 			{
-				Label: "default",
+				Label: defaultSubnet,
 				IPv4:  "10.0.0.0/8",
 			},
 		},
