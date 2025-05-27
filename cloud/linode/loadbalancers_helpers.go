@@ -11,6 +11,12 @@ import (
 	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
 )
 
+const (
+	udpCheckPortDefault = 80
+	udpCheckPortMin     = 1
+	udpCheckPortMax     = 65535
+)
+
 // getPortProtocol returns the protocol for a given service port.
 // It checks the portConfigAnnotationResult for a specific port.
 // If not found, it checks the service annotations for the service.
@@ -94,7 +100,7 @@ func getPortAlgorithm(portConfigAnnotationResult portConfigAnnotation, service *
 // If not found, it checks the service annotations for the service.
 // It also validates the UDP check port against a range of valid ports (1-65535).
 func getPortUDPCheckPort(portConfigAnnotationResult portConfigAnnotation, service *v1.Service, protocol linodego.ConfigProtocol) (int, error) {
-	udpCheckPort := 80
+	udpCheckPort := udpCheckPortDefault
 	if protocol != linodego.ProtocolUDP {
 		return udpCheckPort, nil
 	}
@@ -114,7 +120,7 @@ func getPortUDPCheckPort(portConfigAnnotationResult portConfigAnnotation, servic
 	}
 
 	// Validate the UDP check port to be between 1 and 65535
-	if udpCheckPort < 1 || udpCheckPort > 65535 {
+	if udpCheckPort < udpCheckPortMin || udpCheckPort > udpCheckPortMax {
 		return udpCheckPort, fmt.Errorf("UDPCheckPort must be between 1 and 65535, got %d", udpCheckPort)
 	}
 	return udpCheckPort, nil
