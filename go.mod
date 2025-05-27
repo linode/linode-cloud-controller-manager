@@ -190,5 +190,3 @@ replace (
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.33.0
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.33.0
 )
-
-replace github.com/linode/linodego => github.com/rahulait/linodego v1.50.1-0.20250522183359-5da732de45af
