@@ -42,29 +42,22 @@ spec:
 
               echo "Nodebalancer ID: $nbid"
 
-              for i in {1..5}; do
-                  nbconfig=$(curl -sk \
-                    -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "Content-Type: application/json" \
-                    "$LINODE_URL/v4/nodebalancers/$nbid/configs" | jq '.data[] | select(.port == 7070)' || true )
-                  if [[ ! -z $nbconfig ]]; then
-                    echo "Nodebalancer config found, updating config algorithm"
-                    break      
-                  fi
-                  echo "Failed fetching nodebalancer config for port 7070, retrying in 20 seconds"
-                  sleep 20
-              done
-              
+              nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
+                    
+              echo "Nodebalancer config found, updating config algorithm"
               config_id=$(echo $nbconfig | jq -r '.id')
-              echo "$config_id"
 
-              curl --request PUT \
-                --url https://api.linode.com/v4beta/nodebalancers/$nbid/configs/$config_id \
+              curl -sk --request PUT \
+                --url $LINODE_URL/v4beta/nodebalancers/$nbid/configs/$config_id \
                 -H "Accept: application/json" \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 -H "Content-Type: application/json" \
                 --data '{"algorithm": "ring_hash"}'
 
+              echo "Verifying that algorithm is set to ring hash"
+              nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
+              algorithm=$(echo $nbconfig | jq -r '.algorithm')
             check:
               ($error == null): true
+              (algorithm == "ring_hash"): true
 

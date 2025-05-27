@@ -41,7 +41,7 @@ spec:
               echo "Nodebalancer ID: $nbid"
 
               for i in {1..20}; do
-                  nbconfig=$(curl -s \
+                  nbconfig=$(curl -sk \
                     -H "Authorization: Bearer $LINODE_TOKEN" \
                     -H "Content-Type: application/json" \
                     "https://api.linode.com/v4/nodebalancers/$nbid/configs" | jq '.data[] | select(.port == 7070)' || true)
@@ -51,9 +51,9 @@ spec:
                   fi
 
                   port_7070_check=$(echo $nbconfig | jq '.check == "none"')
-                  port_7070_interval=$(echo $nbconfig | jq '.check_interval == 10')
-                  port_7070_timeout=$(echo $nbconfig | jq '.check_timeout == 5')
-                  port_7070_attempts=$(echo $nbconfig | jq '.check_attempts == 4')
+                  port_7070_interval=$(echo $nbconfig | jq '.check_interval == 5')
+                  port_7070_timeout=$(echo $nbconfig | jq '.check_timeout == 3')
+                  port_7070_attempts=$(echo $nbconfig | jq '.check_attempts == 2')
                   port_7070_protocol=$(echo $nbconfig | jq '.protocol == "udp"')
                   port_7070_up_nodes=$(echo $nbconfig | jq '(.nodes_status.up)|tonumber >= 2')
 
