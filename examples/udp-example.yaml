@@ -1,0 +1,36 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: udp-lb
+spec:
+  type: LoadBalancer
+  selector:
+    app: udp-example
+  ports:
+    - name: udp
+      protocol: UDP
+      port: 7070
+      targetPort: 7070
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: udp-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: udp-example
+  template:
+    metadata:
+      labels:
+        app: udp-example
+    spec:
+      containers:
+      - name: test-server
+        image: rahulait/test-server:0.1
+        ports:
+        - containerPort: 7070
+          protocol: UDP
+

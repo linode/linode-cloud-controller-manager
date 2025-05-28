@@ -19,16 +19,19 @@ The keys and the values in [annotations must be strings](https://kubernetes.io/d
 | Annotation (Suffix) | Values | Default | Description |
 |--------------------|--------|---------|-------------|
 | `throttle` | `0`-`20` (`0` to disable) | `0` | Client Connection Throttle, which limits the number of subsequent new connections per second from the same client IP |
-| `default-protocol` | `tcp`, `http`, `https` | `tcp` | This annotation is used to specify the default protocol for Linode NodeBalancer |
+| `default-protocol` | `tcp`, `udp`, `http`, `https` | `tcp` | This annotation is used to specify the default protocol for Linode NodeBalancer |
 | `default-proxy-protocol` | `none`, `v1`, `v2` | `none` | Specifies whether to use a version of Proxy Protocol on the underlying NodeBalancer |
+| `default-algorithm` | `roundrobin`, `leastconn`, `source`, `ring_hash` | `roundrobin` | This annotation is used to specify the default algorithm for Linode NodeBalancer |
+| `default-stickiness` | `none`, `session`, `table`, `http_cookie`, `source_ip` | `session` (for UDP), `table` (for HTTP/HTTPs) | This annotation is used to specify the default stickiness for Linode NodeBalancer |
 | `port-*` | json object | | Specifies port specific NodeBalancer configuration. See [Port Configuration](#port-specific-configuration) |
-| `check-type` | `none`, `connection`, `http`, `http_body` | | The type of health check to perform against back-ends. See [Health Checks](loadbalancer.md#health-checks) |
+| `check-type` | `none`, `connection`, `http`, `http_body` | `none` for UDP, else `connection` | The type of health check to perform against back-ends. See [Health Checks](loadbalancer.md#health-checks) |
 | `check-path` | string | | The URL path to check on each back-end during health checks |
 | `check-body` | string | | Text which must be present in the response body to pass the health check |
-| `check-interval` | int | | Duration, in seconds, to wait between health checks |
-| `check-timeout` | int (1-30) | | Duration, in seconds, to wait for a health check to succeed |
-| `check-attempts` | int (1-30) | | Number of health check failures necessary to remove a back-end |
+| `check-interval` | int | `5` | Duration, in seconds, to wait between health checks |
+| `check-timeout` | int (1-30) | `3` | Duration, in seconds, to wait for a health check to succeed |
+| `check-attempts` | int (1-30) | `2` | Number of health check failures necessary to remove a back-end |
 | `check-passive` | bool | `false` | When `true`, `5xx` status codes will cause the health check to fail |
+| `udp-check-port` | int | `80` | Specifies health check port for UDP nodebalancer |
 | `preserve` | bool | `false` | When `true`, deleting a `LoadBalancer` service does not delete the underlying NodeBalancer |
 | `nodebalancer-id` | int | | The ID of the NodeBalancer to front the service |
 | `hostname-only-ingress` | bool | `false` | When `true`, the LoadBalancerStatus will only contain the Hostname |
@@ -49,16 +52,22 @@ The `port-*` annotation allows per-port configuration, encoded in JSON. For deta
 metadata:
   annotations:
     service.beta.kubernetes.io/linode-loadbalancer-port-443: |
-      "protocol": "https",
-      "tls-secret-name": "my-tls-secret",
-      "proxy-protocol": "v2"
-    }
+      {
+        "protocol": "https",
+        "tls-secret-name": "my-tls-secret",
+        "proxy-protocol": "v2",
+        "algorithm": "leastconn",
+        "stickiness": "http_cookie"
+      }
 ```
 
 Available port options:
 - `protocol`: Protocol for this port (tcp, http, https)
 - `tls-secret-name`: Name of TLS secret for HTTPS. The secret type should be `kubernetes.io/tls`
 - `proxy-protocol`: Proxy protocol version for this port
+- `algorithm`: Algorithm for this port
+- `stickiness`: Stickiness for this port
+- `udp-check-port`: UDP health check port for this port
 
 ### Deprecated Annotations
 
@@ -118,6 +127,7 @@ Linode supports nodebalancers of different types: common and premium. By default
 metadata:
   annotations:
     service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-type: premium
+```
 
 ### Nodebalancer VPC Configuration
 ```yaml

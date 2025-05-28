@@ -4,6 +4,7 @@ set -euxo pipefail
 
 kubectl apply -f ./http-nginx.yaml
 kubectl apply -f ./tcp-nginx.yaml
+kubectl apply -f ./udp-example.yaml
 
 openssl req -newkey rsa:4096 \
             -x509 \
