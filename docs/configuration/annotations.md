@@ -21,8 +21,8 @@ The keys and the values in [annotations must be strings](https://kubernetes.io/d
 | `throttle` | `0`-`20` (`0` to disable) | `0` | Client Connection Throttle, which limits the number of subsequent new connections per second from the same client IP |
 | `default-protocol` | `tcp`, `udp`, `http`, `https` | `tcp` | This annotation is used to specify the default protocol for Linode NodeBalancer |
 | `default-proxy-protocol` | `none`, `v1`, `v2` | `none` | Specifies whether to use a version of Proxy Protocol on the underlying NodeBalancer |
-| `default-algorithm` | `roundrobin`, `leastconn`, `source`, `ring_hash` | `roundrobin` | This annotation is used to specify the default alogrithm for Linode NodeBalancer |
-| `default-stickiness` | `none`, `session`, `table`, `http_cookie`, `source_ip` | `session` UDP, `table` HTTP/HTTPs | This annotation is used to specify the default stickiness for Linode NodeBalancer |
+| `default-algorithm` | `roundrobin`, `leastconn`, `source`, `ring_hash` | `roundrobin` | This annotation is used to specify the default algorithm for Linode NodeBalancer |
+| `default-stickiness` | `none`, `session`, `table`, `http_cookie`, `source_ip` | `session` (for UDP), `table` (for HTTP/HTTPs) | This annotation is used to specify the default stickiness for Linode NodeBalancer |
 | `port-*` | json object | | Specifies port specific NodeBalancer configuration. See [Port Configuration](#port-specific-configuration) |
 | `check-type` | `none`, `connection`, `http`, `http_body` | `none` for UDP, else `connection` | The type of health check to perform against back-ends. See [Health Checks](loadbalancer.md#health-checks) |
 | `check-path` | string | | The URL path to check on each back-end during health checks |
@@ -57,7 +57,7 @@ metadata:
         "tls-secret-name": "my-tls-secret",
         "proxy-protocol": "v2",
         "algorithm": "leastconn",
-        "stickiness": "http_cookie",
+        "stickiness": "http_cookie"
       }
 ```
 

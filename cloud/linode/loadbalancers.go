@@ -60,8 +60,8 @@ var (
 		string(linodego.AlgorithmRoundRobin): true,
 		string(linodego.AlgorithmRingHash):   true,
 		string(linodego.AlgorithmLeastConn):  true,
-	}
-	// validTCPStickiness is a map of valid HTTP stickiness options
+  }
+	// validHTTPStickiness is a map of valid HTTP stickiness options
 	validHTTPStickiness = map[string]bool{
 		string(linodego.StickinessNone):       true,
 		string(linodego.StickinessHTTPCookie): true,
