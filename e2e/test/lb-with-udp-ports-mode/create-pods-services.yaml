@@ -3,17 +3,17 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: lb-with-udp-ports-stickiness
+    app: lb-with-udp-ports-mode
   name: test
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: lb-with-udp-ports-stickiness
+      app: lb-with-udp-ports-mode
   template:
     metadata:
       labels:
-        app: lb-with-udp-ports-stickiness
+        app: lb-with-udp-ports-mode
     spec:
       containers:
       - image: rahulait/test-server:0.1
@@ -34,11 +34,11 @@ kind: Service
 metadata:
   name: svc-test
   labels:
-    app: lb-with-udp-ports-stickiness
+    app: lb-with-udp-ports-mode
 spec:
   type: LoadBalancer
   selector:
-    app: lb-with-udp-ports-stickiness
+    app: lb-with-udp-ports-mode
   ports:
     - name: udp
       protocol: UDP

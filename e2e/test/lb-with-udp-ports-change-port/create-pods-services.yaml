@@ -45,5 +45,3 @@ spec:
       port: 7070
       targetPort: 7070
   sessionAffinity: None
-
-

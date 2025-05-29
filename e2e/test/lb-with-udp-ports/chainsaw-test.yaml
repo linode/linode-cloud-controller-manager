@@ -41,11 +41,8 @@ spec:
               echo "Nodebalancer ID: $nbid"
 
               for i in {1..20}; do
-                  nbconfig=$(curl -sk \
-                    -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "Content-Type: application/json" \
-                    "https://api.linode.com/v4/nodebalancers/$nbid/configs" | jq '.data[] | select(.port == 7070)' || true)
-
+                  nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
+                  
                   if [[ -z $nbconfig ]]; then
                       echo "Failed fetching nodebalancer config for port 7070"
                   fi

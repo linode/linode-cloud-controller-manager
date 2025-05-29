@@ -60,6 +60,3 @@ spec:
             check:
               ($error == null): true
               (upd_check_port == "4500"): true
-
-
-

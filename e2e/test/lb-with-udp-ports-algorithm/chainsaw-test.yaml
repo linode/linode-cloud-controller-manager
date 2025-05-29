@@ -60,4 +60,3 @@ spec:
             check:
               ($error == null): true
               (algorithm == "ring_hash"): true
-
