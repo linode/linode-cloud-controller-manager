@@ -60,7 +60,7 @@ var (
 		string(linodego.AlgorithmRoundRobin): true,
 		string(linodego.AlgorithmRingHash):   true,
 		string(linodego.AlgorithmLeastConn):  true,
-  	}
+	}
 	// validHTTPStickiness is a map of valid HTTP stickiness options
 	validHTTPStickiness = map[string]bool{
 		string(linodego.StickinessNone):       true,
@@ -431,7 +431,7 @@ func (l *loadbalancers) updateNodeBalancer(
 			currentNBNodes, err = l.client.ListNodeBalancerNodes(ctx, nb.ID, currentNBCfg.ID, nil)
 			if err != nil {
 				// This error can be ignored, because if we fail to get nodes we can anyway rebuild the config from scratch,
-				// it would just cause the NB to reload config even if the node list did not change, so we prefer to send IDs when it is posible.
+				// it would just cause the NB to reload config even if the node list did not change, so we prefer to send IDs when it is possible.
 				klog.Warningf("Unable to list existing nodebalancer nodes for NB %d config %d, error: %s", nb.ID, newNBCfg.ID, err)
 			}
 			for _, node := range currentNBNodes {
