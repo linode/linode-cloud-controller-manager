@@ -32,6 +32,7 @@ spec:
     - name: Validate nodebalancer has 2 nodes
       try:
         - script:
+            timeout: 10m
             content: |
               set -e
 
@@ -40,10 +41,12 @@ spec:
               echo "Nodebalancer ID: $nbid"
 
               for i in {1..20}; do
-                  nbconfig=$(curl -s \
+                  response=$(curl -sf \
                     -H "Authorization: Bearer $LINODE_TOKEN" \
                     -H "Content-Type: application/json" \
-                    "https://api.linode.com/v4/nodebalancers/$nbid/configs" | jq '.data[]? | select(.port == 80)')
+                    "https://api.linode.com/v4/nodebalancers/$nbid/configs" || true)
+
+                  nbconfig=$(echo "$response" | jq '.data[]? | select(.port == 80)' || true)
 
                   if [[ -z $nbconfig ]]; then
                       echo "Failed fetching nodebalancer config for port 80"
@@ -65,6 +68,7 @@ spec:
     - name: Add new node and check nodebalancer gets updated
       try:
         - script:
+            timeout: 10m
             content: |
               set -e
 
@@ -78,24 +82,27 @@ spec:
               echo "Nodebalancer ID: $nbid"
 
               for i in {1..20}; do
-                  nbconfig=$(curl -s \
+                  response=$(curl -sf \
                     -H "Authorization: Bearer $LINODE_TOKEN" \
                     -H "Content-Type: application/json" \
-                    "https://api.linode.com/v4/nodebalancers/$nbid/configs" | jq '.data[]? | select(.port == 80)' || true)
+                    "https://api.linode.com/v4/nodebalancers/$nbid/configs" || true)
+
+                  nbconfig=$(echo "$response" | jq '.data[]? | select(.port == 80)' || true)
 
                   if [[ -z $nbconfig ]]; then
                       echo "Failed fetching nodebalancer config for port 80"
-                  fi
+                  else
+                      port_80_up_nodes=$(echo $nbconfig | jq '(.nodes_status.up)|tonumber == 3')
 
-                  port_80_up_nodes=$(echo $nbconfig | jq '(.nodes_status.up)|tonumber == 3')
-
-                  if [[ $port_80_up_nodes == "true" ]]; then
-                      echo "all nodes up"
-                      break
+                      if [[ $port_80_up_nodes == "true" ]]; then
+                          echo "all nodes up"
+                          break
+                      fi
+                      echo "Condition not met, waiting for all nodes to be ready"
+                      echo "nbconfig: $nbconfig"
+                      echo "port_80_up_nodes: $port_80_up_nodes"
+                      sleep 20
                   fi
-                  echo "Condition not met, waiting for all nodes to be ready"
-                  echo "port_80_up_nodes: $port_80_up_nodes"
-                  sleep 20
               done
 
               #KUBECONFIG=$MGMT_KUBECONFIG kubectl patch machinedeployment ${CLUSTER_NAME}-md-0 --type='merge' -p "{\"spec\":{\"replicas\":$current_replicas}}"

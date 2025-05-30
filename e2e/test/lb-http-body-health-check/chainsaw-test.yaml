@@ -33,6 +33,7 @@ spec:
     - name: Fetch nodebalancer config for port 80
       try:
         - script:
+            timeout: 10m
             content: |
               set -e
 
