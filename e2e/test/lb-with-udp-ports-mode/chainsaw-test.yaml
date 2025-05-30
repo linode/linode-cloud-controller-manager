@@ -45,22 +45,10 @@ spec:
               nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
               config_id=$(echo $nbconfig | jq -r '.id')
 
-              node_ip=$(curl -k \
+              mode=$(curl -s \
                 --url $LINODE_URL/v4beta/nodebalancers/$nbid/configs/$config_id/nodes \
                 -H 'accept: application/json' \
-                -H "Authorization: Bearer $LINODE_TOKEN" | jq -r '.data[0].address')
-
-              echo "Nodebalancer config found, adding a node"
-              curl -sk --request POST \
-                --url $LINODE_URL/v4beta/nodebalancers/$nbid/configs/$config_id/nodes \
-                -H 'accept: application/json' \
-                -H 'content-type: application/json' \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                --data '{"address": "$node_ip", "label": "node54321", "weight": 50}'
-
-              nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
-              mode=$(echo nbconfig | jq -r '.nodes[0].mode') 
-            
+                -H "Authorization: Bearer $LINODE_TOKEN" | jq -r '.data[0].mode')
             check:
               ($error == null): true
               (mode == "none"): true

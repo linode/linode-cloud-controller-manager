@@ -47,12 +47,7 @@ spec:
               echo "Nodebalancer config found, updating config upd_check_port"
               config_id=$(echo $nbconfig | jq -r '.id')
 
-              curl -sk --request PUT \
-                --url $LINODE_URL/v4beta/nodebalancers/$nbid/configs/$config_id \
-                -H "Accept: application/json" \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
-                --data '{"udp_check_port": 4500}'
+              kubectl annotate --overwrite svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-upd-check-port=4500
 
               echo "Verifying that udp_check_port is set to 4500"
               nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
