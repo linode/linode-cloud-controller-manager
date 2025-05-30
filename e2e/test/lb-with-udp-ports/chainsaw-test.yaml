@@ -34,18 +34,15 @@ spec:
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
               echo "Nodebalancer ID: $nbid"
 
               for i in {1..20}; do
-                  nbconfig=$(curl -s \
-                    -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "Content-Type: application/json" \
-                    "https://api.linode.com/v4/nodebalancers/$nbid/configs" | jq '.data[] | select(.port == 7070)' || true)
-
+                  nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
+                  
                   if [[ -z $nbconfig ]]; then
                       echo "Failed fetching nodebalancer config for port 7070"
                   fi
