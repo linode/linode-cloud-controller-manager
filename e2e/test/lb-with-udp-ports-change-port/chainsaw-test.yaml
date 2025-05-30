@@ -48,6 +48,7 @@ spec:
               config_id=$(echo $nbconfig | jq -r '.id')
 
               kubectl annotate --overwrite svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-upd-check-port=4500
+              sleep 5s
 
               echo "Verifying that udp_check_port is set to 4500"
               nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
