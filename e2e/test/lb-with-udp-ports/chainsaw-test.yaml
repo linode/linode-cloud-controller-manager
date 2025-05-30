@@ -34,7 +34,7 @@ spec:
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 

@@ -34,7 +34,7 @@ spec:
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
               
               echo "Starting e2e test"
 
