@@ -9,6 +9,24 @@ metadata:
 spec:
   namespace: "lb-delete-svc-no-nb"
   steps:
+    - name: Create dummy service
+      try:
+        - apply:
+            file: dummy-service.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that loadbalancer ip is assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-dummy
+            status:
+              (loadBalancer.ingress[0].ip != null): true
     - name: Create nodebalancer and create resources
       try:
         - script:
@@ -21,12 +39,28 @@ spec:
               re='^[0-9]+$'
               LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
 
+              # Get existing dummy nodebalancer id to get VPC config
+              dummy_nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh svc-dummy)
+
+              # Get VPC config if it exists
+              vpcconfig=$(curl -s \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                "https://api.linode.com/v4beta/nodebalancers/$dummy_nbid/vpcs")
+
+              SUBNET_ID=$(echo $vpcconfig | jq -r ".data[] | select(.nodebalancer_id == $dummy_nbid) | .subnet_id")
+
+              data="{\"label\": \"$LABEL\", \"region\": \"$REGION\", \"vpcs\": [{\"subnet_id\": $SUBNET_ID}]}"
+              if [[ -z $SUBNET_ID ]]; then
+                  data="{\"label\": \"$LABEL\", \"region\": \"$REGION\"}"
+              fi
+
               nbid=$(curl -s --request POST \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 -H "Content-Type: application/json" \
                 -H "accept: application/json" \
-                "https://api.linode.com/v4/nodebalancers" \
-                --data "{\"label\": \"$LABEL\", \"region\": \"$REGION\"}" | jq .id)
+                "https://api.linode.com/v4beta/nodebalancers" \
+                --data "$data" | jq .id)
 
               if ! [[ $nbid =~ $re ]]; then
                   echo "Nodebalancer id [$nbid] is incorrect, failed to create nodebalancer"
@@ -93,6 +127,8 @@ spec:
 
               if [[ $delete_resp == "200" ]]; then
                   echo "nodebalancer deleted"
+              else
+                  echo "Failed to delete nodebalancer, response code: $delete_resp"
               fi
 
               # Check to make sure nodebalancer is deleted

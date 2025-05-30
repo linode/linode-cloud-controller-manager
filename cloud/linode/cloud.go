@@ -157,7 +157,11 @@ func newCloud() (cloudprovider.Interface, error) {
 	}
 
 	if Options.NodeBalancerBackendIPv4SubnetName != "" {
-		Options.NodeBalancerBackendIPv4SubnetID = getNodeBalancerBackendIPv4SubnetID(linodeClient)
+		Options.NodeBalancerBackendIPv4SubnetID, err = getNodeBalancerBackendIPv4SubnetID(linodeClient)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get backend IPv4 subnet ID for subnet name %s: %w", Options.NodeBalancerBackendIPv4SubnetName, err)
+		}
+		klog.Infof("Using NodeBalancer backend IPv4 subnet ID %d for subnet name %s\n", Options.NodeBalancerBackendIPv4SubnetID, Options.NodeBalancerBackendIPv4SubnetName)
 	}
 
 	instanceCache = newInstances(linodeClient)

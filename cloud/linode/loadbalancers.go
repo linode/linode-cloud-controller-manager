@@ -729,33 +729,34 @@ func (l *loadbalancers) GetLinodeNBType(service *v1.Service) linodego.NodeBalanc
 // 4. NodeBalancerBackendIPv4Subnet flag
 // 5. Default to using the subnet ID of the service's VPC
 func (l *loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Service) ([]linodego.NodeBalancerVPCOptions, error) {
+	// Evaluate subnetID based on annotations or flags
 	subnetID, err := l.getSubnetIDForSVC(ctx, service)
 	if err != nil {
 		return nil, err
 	}
 
+	// Precedence 1: If the user has specified a NodeBalancerBackendIPv4Range, use that
 	backendIPv4Range, ok := service.GetAnnotations()[annotations.NodeBalancerBackendIPv4Range]
 	if ok {
 		if err := validateNodeBalancerBackendIPv4Range(backendIPv4Range); err != nil {
 			return nil, err
 		}
-	}
-
-	// If the user has specified NodeBalancerBackendIPv4Range annotation for service,
-	// use it for the NodeBalancer backend ipv4 range
-	if backendIPv4Range != "" {
-		vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
-			{
-				SubnetID:  subnetID,
-				IPv4Range: backendIPv4Range,
-			},
+		// If the user has specified a NodeBalancerBackendIPv4Range, use that
+		// for the NodeBalancer backend ipv4 range
+		if backendIPv4Range != "" {
+			vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
+				{
+					SubnetID:  subnetID,
+					IPv4Range: backendIPv4Range,
+				},
+			}
+			return vpcCreateOpts, nil
 		}
-		return vpcCreateOpts, nil
 	}
 
-	// If the user wants to overwrite the default VPC name or subnet name
-	// and have specified it in the annotations, use it for the NodeBalancer
-	// backend ipv4 range
+	// Precedence 2: If the user wants to overwrite the default VPC name or subnet name
+	// and have specified it in the annotations, use it to set subnetID
+	// and auto-allocate subnets from it for the NodeBalancer
 	_, vpcInAnnotation := service.GetAnnotations()[annotations.NodeBalancerBackendVPCName]
 	_, subnetInAnnotation := service.GetAnnotations()[annotations.NodeBalancerBackendSubnetName]
 	if vpcInAnnotation || subnetInAnnotation {
@@ -767,7 +768,7 @@ func (l *loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Ser
 		return vpcCreateOpts, nil
 	}
 
-	// If the user has specified a NodeBalancerBackendIPv4SubnetID, use that
+	// Precedence 3: If the user has specified a NodeBalancerBackendIPv4SubnetID, use that
 	// and auto-allocate subnets from it for the NodeBalancer
 	if Options.NodeBalancerBackendIPv4SubnetID != 0 {
 		vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
@@ -778,7 +779,7 @@ func (l *loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Ser
 		return vpcCreateOpts, nil
 	}
 
-	// If the user has specified a NodeBalancerBackendIPv4Subnet, use that
+	// Precedence 4: If the user has specified a NodeBalancerBackendIPv4Subnet, use that
 	// and auto-allocate subnets from it for the NodeBalancer
 	if Options.NodeBalancerBackendIPv4Subnet != "" {
 		vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
