@@ -151,3 +151,22 @@ func GetVPCIPAddresses(ctx context.Context, client client.Client, vpcName string
 	}
 	return resp, nil
 }
+
+// getNodeBalancerBackendIPv4SubnetID returns the subnet ID for the NodeBalancer backend IPv4 subnet.
+// It uses the first VPC name from Options.VPCNames to find the VPC ID and then retrieves the subnet ID
+// for the NodeBalancer backend IPv4 subnet name specified in Options.NodeBalancerBackendIPv4SubnetName.
+func getNodeBalancerBackendIPv4SubnetID(client client.Client) (int, error) {
+	vpcName := strings.Split(Options.VPCNames, ",")[0]
+	// Get the VPC ID from the name
+	vpcID, err := GetVPCID(context.TODO(), client, vpcName)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get vpc id for %s: %w", vpcName, err)
+	}
+	// Get the subnet ID from the name
+	subnetID, err := GetSubnetID(context.TODO(), client, vpcID, Options.NodeBalancerBackendIPv4SubnetName)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get subnet id for %s: %w", Options.NodeBalancerBackendIPv4SubnetName, err)
+	}
+
+	return subnetID, nil
+}

@@ -4,7 +4,12 @@ set -e
 
 re='^[0-9]+$'
 
-hostname=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].hostname)
+svcname="svc-test"
+if [[ -n "$1" ]]; then
+    svcname="$1"
+fi
+
+hostname=$(kubectl get svc $svcname -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].hostname)
 ip=$(echo $hostname | awk -F'.' '{gsub("-", ".", $1); print $1}')
 nbid=$(curl -s \
     -H "Authorization: Bearer $LINODE_TOKEN" \

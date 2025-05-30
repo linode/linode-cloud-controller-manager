@@ -80,13 +80,35 @@ func TestNewCloud(t *testing.T) {
 		assert.Equal(t, "tt", Options.VPCNames, "expected vpcnames to be set to vpcname")
 	})
 
+	t.Run("should fail if both nodeBalancerBackendIPv4SubnetID and nodeBalancerBackendIPv4SubnetName are set", func(t *testing.T) {
+		Options.VPCNames = "tt"
+		Options.NodeBalancerBackendIPv4SubnetID = 12345
+		Options.NodeBalancerBackendIPv4SubnetName = "test-subnet"
+		defer func() {
+			Options.VPCNames = ""
+			Options.NodeBalancerBackendIPv4SubnetID = 0
+			Options.NodeBalancerBackendIPv4SubnetName = ""
+		}()
+		_, err := newCloud()
+		assert.Error(t, err, "expected error when both nodeBalancerBackendIPv4SubnetID and nodeBalancerBackendIPv4SubnetName are set")
+	})
+
 	t.Run("should fail if incorrect loadbalancertype is set", func(t *testing.T) {
 		rtEnabled := Options.EnableRouteController
 		Options.EnableRouteController = false
 		Options.LoadBalancerType = "test"
+		Options.VPCNames = "vpc-test1,vpc-test2"
+		Options.NodeBalancerBackendIPv4SubnetName = "t1"
+		vpcIDs = map[string]int{"vpc-test1": 1, "vpc-test2": 2, "vpc-test3": 3}
+		subnetIDs = map[string]int{"t1": 1, "t2": 2, "t3": 3}
 		defer func() {
 			Options.LoadBalancerType = ""
 			Options.EnableRouteController = rtEnabled
+			Options.VPCNames = ""
+			Options.NodeBalancerBackendIPv4SubnetID = 0
+			Options.NodeBalancerBackendIPv4SubnetName = ""
+			vpcIDs = map[string]int{}
+			subnetIDs = map[string]int{}
 		}()
 		_, err := newCloud()
 		assert.Error(t, err, "expected error if incorrect loadbalancertype is set")
