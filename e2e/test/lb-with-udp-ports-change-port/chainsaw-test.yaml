@@ -53,6 +53,7 @@ spec:
               echo "Verifying that udp_check_port is set to 4500"
               nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
               upd_check_port=$(echo $nbconfig | jq -r '.upd_check_port')
+              echo "udp_check_port is $udp_check_port"
             check:
               ($error == null): true
-              (upd_check_port == "4500"): true
+              (contains($stdout, 'udp_check_port is 4500')): true

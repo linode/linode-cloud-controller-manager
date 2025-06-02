@@ -49,6 +49,7 @@ spec:
                 --url $LINODE_URL/v4beta/nodebalancers/$nbid/configs/$config_id/nodes \
                 -H 'accept: application/json' \
                 -H "Authorization: Bearer $LINODE_TOKEN" | jq -r '.data[0].mode')
+              echo "mode is $mode"
             check:
               ($error == null): true
-              (mode == "none"): true
+              (contains($stdout, 'mode is none')): true

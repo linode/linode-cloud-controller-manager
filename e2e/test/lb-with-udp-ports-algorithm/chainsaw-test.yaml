@@ -53,6 +53,7 @@ spec:
               echo "Verifying that algorithm is set to ring hash"
               nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
               algorithm=$(echo $nbconfig | jq -r '.algorithm')
+              echo "algorithm is $algorithm"
             check:
               ($error == null): true
-              (algorithm == "ring_hash"): true
+              (contains($stdout, 'algorithm is ring_hash')): true

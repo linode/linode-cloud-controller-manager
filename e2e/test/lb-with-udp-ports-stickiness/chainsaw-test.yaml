@@ -53,6 +53,7 @@ spec:
               echo "Verifying that stickiness is set to source_ip"
               nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
               stickiness=$(echo $nbconfig | jq -r '.stickiness')
+              echo "stickiness is $stickiness"
             check:
               ($error == null): true
-              (stickiness == "source_ip"): true
+              (contains($stdout, 'stickiness is source_ip')): true
