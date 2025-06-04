@@ -121,6 +121,10 @@ volumeMounts:
 #  - mountPath: /tmp/
 #    name: test-volume
 
+# Add podAnnotations and podLabels for customization
+podAnnotations: {}
+podLabels: {}
+
 resources:
   # requests:
   #   memory: "100Mi"
