@@ -10,7 +10,7 @@ nbid=$(curl -s \
     -H "Authorization: Bearer $LINODE_TOKEN" \
     -H "Content-Type: application/json" \
     -H "X-Filter: {\"ipv4\": \"$ip\"}" \
-    "https://api.linode.com/v4/nodebalancers" | jq .data[].id)
+    "$LINODE_URL/v4/nodebalancers" | jq .data[].id)
 
 if ! [[ $nbid =~ $re ]]; then
     echo "Nodebalancer id [$nbid] is incorrect"
