@@ -17,6 +17,13 @@ spec:
     metadata:
       labels:
         app: ccm-linode
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       {{- if ne .Values.rbacEnabled false }}
       serviceAccountName: ccm-linode
