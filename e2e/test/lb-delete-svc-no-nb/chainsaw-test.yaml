@@ -46,7 +46,7 @@ spec:
               vpcconfig=$(curl -s \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 -H "Content-Type: application/json" \
-                "https://api.linode.com/v4beta/nodebalancers/$dummy_nbid/vpcs")
+                "$LINODE_URL/v4beta/nodebalancers/$dummy_nbid/vpcs")
 
               SUBNET_ID=$(echo $vpcconfig | jq -r ".data[] | select(.nodebalancer_id == $dummy_nbid) | .subnet_id")
 
@@ -59,7 +59,7 @@ spec:
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 -H "Content-Type: application/json" \
                 -H "accept: application/json" \
-                "https://api.linode.com/v4beta/nodebalancers" \
+                "$LINODE_URL/v4beta/nodebalancers" \
                 --data "$data" | jq .id)
 
               if ! [[ $nbid =~ $re ]]; then
@@ -123,7 +123,7 @@ spec:
                 --silent --output /dev/null \
                 -X DELETE \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
-                "https://api.linode.com/v4/nodebalancers/$nbid")
+                "$LINODE_URL/v4/nodebalancers/$nbid")
 
               if [[ $delete_resp == "200" ]]; then
                   echo "nodebalancer deleted"
@@ -135,7 +135,7 @@ spec:
               old_nb_resp=$(curl --write-out "%{http_code}\n" \
                 --silent --output /dev/null \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
-                "https://api.linode.com/v4/nodebalancers/$nbid")
+                "$LINODE_URL/v4/nodebalancers/$nbid")
 
               if [[ $old_nb_resp == "404" ]]; then
                   echo "old nodebalancer not found"

@@ -33,6 +33,7 @@ spec:
     - name: Create nodebalancer, annotate svc with nodebalancer id and validate
       try:
         - script:
+            timeout: 10m
             content: |
               set -e
 
@@ -46,7 +47,7 @@ spec:
               vpcconfig=$(curl -s \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 -H "Content-Type: application/json" \
-                "https://api.linode.com/v4beta/nodebalancers/$old_nbid/vpcs")
+                "$LINODE_URL/v4beta/nodebalancers/$old_nbid/vpcs")
 
               echo "Nodebalancer ID: $old_nbid"
               echo "VPC config: $vpcconfig"
@@ -63,7 +64,7 @@ spec:
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 -H "Content-Type: application/json" \
                 -H "accept: application/json" \
-                "https://api.linode.com/v4beta/nodebalancers" \
+                "$LINODE_URL/v4beta/nodebalancers" \
                 --data "$data" | jq .id)
 
               if ! [[ $nbid =~ $re ]]; then

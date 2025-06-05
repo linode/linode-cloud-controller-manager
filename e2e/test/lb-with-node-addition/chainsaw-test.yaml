@@ -44,7 +44,7 @@ spec:
                   response=$(curl -sf \
                     -H "Authorization: Bearer $LINODE_TOKEN" \
                     -H "Content-Type: application/json" \
-                    "https://api.linode.com/v4/nodebalancers/$nbid/configs" || true)
+                    "$LINODE_URL/v4/nodebalancers/$nbid/configs" || true)
 
                   nbconfig=$(echo "$response" | jq '.data[]? | select(.port == 80)' || true)
 
@@ -85,7 +85,7 @@ spec:
                   response=$(curl -sf \
                     -H "Authorization: Bearer $LINODE_TOKEN" \
                     -H "Content-Type: application/json" \
-                    "https://api.linode.com/v4/nodebalancers/$nbid/configs" || true)
+                    "$LINODE_URL/v4/nodebalancers/$nbid/configs" || true)
 
                   nbconfig=$(echo "$response" | jq '.data[]? | select(.port == 80)' || true)
 

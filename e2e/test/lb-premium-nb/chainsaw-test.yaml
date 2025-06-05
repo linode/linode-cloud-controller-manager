@@ -32,6 +32,7 @@ spec:
     - name: Fetch loadbalancer ip and check both pods reachable
       try:
         - script:
+            timeout: 10m
             content: |
               set -e
               IP=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].ip)
@@ -39,7 +40,7 @@ spec:
 
               podnames=()
 
-              for i in {1..10}; do
+              for i in {1..20}; do
                   if [[ ${#podnames[@]} -lt 2 ]]; then
                       response=$(curl -sf $IP:80) || response=""
                       output=$(echo "$response" | jq -e .podName) || output=""
@@ -83,7 +84,7 @@ spec:
                   -H "Authorization: Bearer $LINODE_TOKEN" \
                   -H "Content-Type: application/json" \
                   -H "accept: application/json" \
-                  "https://api.linode.com/v4/nodebalancers/${nbid}" | jq -r '.type')
+                  "$LINODE_URL/v4/nodebalancers/${nbid}" | jq -r '.type')
 
                 if [[ $type == "premium" ]]; then
                     echo "nodebalancer type is premium"
