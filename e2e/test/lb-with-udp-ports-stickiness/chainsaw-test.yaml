@@ -1,0 +1,58 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: lb-with-udp-ports-stickiness
+  labels:
+    all:
+    lke:
+spec:
+  namespace: "lb-with-udp-ports-stickiness"
+  steps:
+    - name: Create pods and services
+      try:
+        - apply:
+            file: create-pods-services.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that loadbalancer ip is assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test
+            status:
+              (loadBalancer.ingress[0].ip != null): true
+    - name: Fetch nodebalancer config for port 7070
+      try:
+        - script:
+            content: |
+              set -euo pipefail
+              
+              echo "Starting e2e test"
+
+              nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+
+              echo "Nodebalancer ID: $nbid"
+
+              nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
+                    
+              echo "Nodebalancer config found, updating config stickiness"
+
+              kubectl annotate --overwrite svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-default-stickiness=source_ip
+              sleep 5s
+
+              echo "Verifying that stickiness is set to source_ip"
+              nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
+              stickiness=$(echo $nbconfig | jq -r '.stickiness')
+              echo "stickiness is $stickiness"
+            check:
+              ($error == null): true
+              (contains($stdout, 'stickiness is source_ip')): true

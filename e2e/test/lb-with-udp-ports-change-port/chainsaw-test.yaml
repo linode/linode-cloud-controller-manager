@@ -1,0 +1,58 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: lb-with-udp-ports-change-port
+  labels:
+    all:
+    lke:
+spec:
+  namespace: "lb-with-udp-ports-change-port"
+  steps:
+    - name: Create pods and services
+      try:
+        - apply:
+            file: create-pods-services.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that loadbalancer ip is assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test
+            status:
+              (loadBalancer.ingress[0].ip != null): true
+    - name: Fetch nodebalancer config for port 7070
+      try:
+        - script:
+            content: |
+              set -euo pipefail
+              
+              echo "Starting e2e test"
+
+              nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+
+              echo "Nodebalancer ID: $nbid"
+
+              nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
+                    
+              echo "Nodebalancer config found, updating config udp_check_port"
+
+              kubectl annotate --overwrite svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-udp-check-port=4500
+              sleep 5s
+
+              echo "Verifying that udp_check_port is set to 4500"
+              nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
+              udp_check_port=$(echo $nbconfig | jq -r '.udp_check_port')
+              echo "udp_check_port is $udp_check_port"
+            check:
+              ($error == null): true
+              (contains($stdout, 'udp_check_port is 4500')): true
