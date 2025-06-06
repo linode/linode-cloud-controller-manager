@@ -51,6 +51,7 @@ var Options struct {
 	NodeBalancerBackendIPv4Subnet     string
 	NodeBalancerBackendIPv4SubnetID   int
 	NodeBalancerBackendIPv4SubnetName string
+	DisableNodeBalancerVPCBackends    bool
 	GlobalStopChannel                 chan<- struct{}
 	EnableIPv6ForLoadBalancers        bool
 	AllocateNodeCIDRs                 bool
@@ -156,7 +157,10 @@ func newCloud() (cloudprovider.Interface, error) {
 		return nil, fmt.Errorf("cannot have both node-balancer-backend-ipv4-subnet-id and node-balancer-backend-ipv4-subnet-name set")
 	}
 
-	if Options.NodeBalancerBackendIPv4SubnetName != "" {
+	if Options.DisableNodeBalancerVPCBackends {
+		klog.Infof("NodeBalancer VPC backends are disabled, no VPC backends will be created for NodeBalancers")
+		Options.NodeBalancerBackendIPv4SubnetID = 0
+	} else if Options.NodeBalancerBackendIPv4SubnetName != "" {
 		Options.NodeBalancerBackendIPv4SubnetID, err = getNodeBalancerBackendIPv4SubnetID(linodeClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get backend IPv4 subnet ID for subnet name %s: %w", Options.NodeBalancerBackendIPv4SubnetName, err)

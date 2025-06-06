@@ -453,7 +453,7 @@ func (l *loadbalancers) updateNodeBalancer(
 				return err
 			}
 		}
-		if Options.VPCNames != "" {
+		if Options.VPCNames != "" && !Options.DisableNodeBalancerVPCBackends {
 			var id int
 			id, err = l.getSubnetIDForSVC(ctx, service)
 			if err != nil {
@@ -816,7 +816,7 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 		Type:               nbType,
 	}
 
-	if Options.VPCNames != "" {
+	if Options.VPCNames != "" && !Options.DisableNodeBalancerVPCBackends {
 		createOpts.VPCs, err = l.getVPCCreateOptions(ctx, service)
 		if err != nil {
 			return nil, err
@@ -998,7 +998,7 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 			return nil, err
 		}
 	}
-	if Options.VPCNames != "" {
+	if Options.VPCNames != "" && !Options.DisableNodeBalancerVPCBackends {
 		id, err := l.getSubnetIDForSVC(ctx, service)
 		if err != nil {
 			return nil, err
@@ -1175,9 +1175,9 @@ func getPortConfigAnnotation(service *v1.Service, port int) (portConfigAnnotatio
 }
 
 // getNodePrivateIP provides the Linode Backend IP the NodeBalancer will communicate with.
-// If a service specifies NodeBalancerBackendIPv4Range annotation, it will
+// If CCM runs within VPC and DisableNodeBalancerVPCBackends is set to false, it will
 // use NodeInternalIP of node.
-// For services which don't have NodeBalancerBackendIPv4Range annotation,
+// For services outside of VPC, it will use linode specific pirvate IP address
 // Backend IP can be overwritten to the one specified using AnnLinodeNodePrivateIP
 // annotation over the NodeInternalIP.
 func getNodePrivateIP(node *v1.Node, subnetID int) string {
