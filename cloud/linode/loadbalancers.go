@@ -1177,7 +1177,7 @@ func getPortConfigAnnotation(service *v1.Service, port int) (portConfigAnnotatio
 // getNodePrivateIP provides the Linode Backend IP the NodeBalancer will communicate with.
 // If CCM runs within VPC and DisableNodeBalancerVPCBackends is set to false, it will
 // use NodeInternalIP of node.
-// For services outside of VPC, it will use linode specific pirvate IP address
+// For services outside of VPC, it will use linode specific private IP address
 // Backend IP can be overwritten to the one specified using AnnLinodeNodePrivateIP
 // annotation over the NodeInternalIP.
 func getNodePrivateIP(node *v1.Node, subnetID int) string {

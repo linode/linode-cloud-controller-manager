@@ -97,6 +97,10 @@ tolerations:
 # This can also be controlled per-service using the "service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-ingress" annotation
 # enableIPv6ForLoadBalancers: true
 
+# disableNodeBalancerVPCBackends is used to disable the use of VPC backends for NodeBalancers.
+# When set to true, NodeBalancers will use linode private IPs for backends instead of VPC IPs.
+# disableNodeBalancerVPCBackends: false
+
 # nodeBalancerBackendIPv4Subnet is the subnet to use for the backend ips of the NodeBalancer
 # nodeBalancerBackendIPv4Subnet: ""
 

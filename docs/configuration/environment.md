@@ -49,7 +49,7 @@ The CCM supports the following flags:
 | `--nodebalancer-backend-ipv4-subnet` | `""` | ipv4 subnet to use for NodeBalancer backends |
 | `--nodebalancer-backend-ipv4-subnet-id` | `""` | ipv4 subnet id to use for NodeBalancer backends |
 | `--nodebalancer-backend-ipv4-subnet-name` | `""` | ipv4 subnet name to use for NodeBalancer backends |
-| `--disable-nodebalancer-vpc-backends` | `false` | use VPC specific ip-addresses for nodebalancer backend ips when running in VPC (set to `true` only for backward compatibility if needed) |
+| `--disable-nodebalancer-vpc-backends` | `false` | don't use VPC specific ip-addresses for nodebalancer backend ips when running in VPC (set to `true` for backward compatibility if needed) |
 | `--enable-ipv6-for-loadbalancers` | `false` | Set both IPv4 and IPv6 addresses for all LoadBalancer services (when disabled, only IPv4 is used). This can also be configured per-service using the `service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-ingress` annotation. |
 | `--node-cidr-mask-size-ipv4` | `24` | ipv4 cidr mask size for pod cidrs allocated to nodes |
 | `--node-cidr-mask-size-ipv6` | `64` | ipv6 cidr mask size for pod cidrs allocated to nodes |
@@ -107,7 +107,7 @@ To use dedicated subnet within VPC for nodebalancer backend ips, one can use one
 
 If no specific subnet is specified, by default, CCM will use the `default` subnet or the first subnet configured in `--subnet-names` flag for nodebalancer backend ips
 
-`--disable-nodebalancer-vpc-backends` disables using VPC specific ips as nodebalancer backends and relies on machines to have linode specific [private addresses](https://techdocs.akamai.com/cloud-computing/docs/managing-ip-addresses-on-a-compute-instance#ipv4). In future, this flag might get removed as this is added for backward compatibility for now. We encourage users not to use this flag if possible.
+`--disable-nodebalancer-vpc-backends` when set to `true` disables using VPC specific ips as nodebalancer backends and relies on machines to have linode specific [private addresses](https://techdocs.akamai.com/cloud-computing/docs/managing-ip-addresses-on-a-compute-instance#ipv4). In future, this flag might get removed as this is added for backward compatibility for now. We encourage users not to use this flag if possible.
 
 `--nodebalancer-backend-ipv4-subnet` can be used to make sure if nodebalancer backend ips are manually specified in service annotation, they lie within the specified subnet range.
 

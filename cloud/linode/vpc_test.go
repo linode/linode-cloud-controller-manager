@@ -225,13 +225,19 @@ func TestGetSubnetID(t *testing.T) {
 	})
 }
 
-func Test_getNodeBalancerBackendIPv4SubnetID(t *testing.T) {
+func TestGetNodeBalancerBackendIPv4SubnetID(t *testing.T) {
 	t.Run("VPC not found", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
 		currVPCNames := Options.VPCNames
-		defer func() { Options.VPCNames = currVPCNames }()
+		currVPCIDs := vpcIDs
+		currSubnetIDs := subnetIDs
+		defer func() {
+			Options.VPCNames = currVPCNames
+			vpcIDs = currVPCIDs
+			subnetIDs = currSubnetIDs
+		}()
 		Options.VPCNames = "vpc-test1,vpc-test2,vpc-test3"
 		vpcIDs = map[string]int{"vpc-test2": 2, "vpc-test3": 3}
 		subnetIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
