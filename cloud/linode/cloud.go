@@ -154,7 +154,7 @@ func newCloud() (cloudprovider.Interface, error) {
 	}
 
 	if Options.NodeBalancerBackendIPv4SubnetID != 0 && Options.NodeBalancerBackendIPv4SubnetName != "" {
-		return nil, fmt.Errorf("cannot have both node-balancer-backend-ipv4-subnet-id and node-balancer-backend-ipv4-subnet-name set")
+		return nil, fmt.Errorf("cannot have both --nodebalancer-backend-ipv4-subnet-id and --nodebalancer-backend-ipv4-subnet-name set")
 	}
 
 	if Options.DisableNodeBalancerVPCBackends {
