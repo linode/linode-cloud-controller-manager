@@ -127,7 +127,7 @@ spec:
                     -H "Authorization: Bearer $LINODE_TOKEN" \
                     -H "Content-Type: application/json" \
                     -H "accept: application/json" \
-                    "https://api.linode.com/v4/nodebalancers/${nbid}/firewalls" || true)
+                    "$LINODE_URL/v4/nodebalancers/${nbid}/firewalls" || true)
                   echo "$fw" | jq -r '.data[].rules.inbound[]'
                   if echo "$fw" | jq -r '.data[].rules.inbound[].ports' | grep 8080 ; then
                     echo "firewall rule updated with new port"

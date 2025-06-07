@@ -9,6 +9,24 @@ metadata:
 spec:
   namespace: "lb-delete-svc-use-new-nbid"
   steps:
+    - name: Create dummy service
+      try:
+        - apply:
+            file: dummy-service.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that loadbalancer ip is assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-dummy
+            status:
+              (loadBalancer.ingress[0].ip != null): true
     - name: Create nodebalancer and create resources
       try:
         - script:
@@ -21,12 +39,15 @@ spec:
               re='^[0-9]+$'
               LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
 
+              # Get data to use for new nodebalancer
+              data=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN LABEL=$LABEL REGION=$REGION ../scripts/get-nb-create-data.sh svc-dummy)
+
               nbid=$(curl -s --request POST \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 -H "Content-Type: application/json" \
                 -H "accept: application/json" \
-                "https://api.linode.com/v4/nodebalancers" \
-                --data "{\"label\": \"$LABEL\", \"region\": \"$REGION\"}" | jq .id)
+                "$LINODE_URL/v4beta/nodebalancers" \
+                --data "$data" | jq .id)
 
               if ! [[ $nbid =~ $re ]]; then
                   echo "Nodebalancer id [$nbid] is incorrect, failed to create nodebalancer"
@@ -82,12 +103,29 @@ spec:
 
               LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
 
+              # Get VPC config if it exists
+              vpcconfig=$(curl -s \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                "$LINODE_URL/v4beta/nodebalancers/$old_nbid/vpcs")
+
+              echo "Old Nodebalancer ID: $old_nbid"
+              echo "VPC config: $vpcconfig"
+
+              SUBNET_ID=$(echo $vpcconfig | jq -r ".data[] | select(.nodebalancer_id == $old_nbid) | .subnet_id")
+              echo "Subnet ID: $SUBNET_ID"
+
+              data="{\"label\": \"$LABEL\", \"region\": \"$REGION\", \"vpcs\": [{\"subnet_id\": $SUBNET_ID}]}"
+              if [[ -z $SUBNET_ID ]]; then
+                  data="{\"label\": \"$LABEL\", \"region\": \"$REGION\"}"
+              fi
+
               nbid=$(curl -s --request POST \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 -H "Content-Type: application/json" \
                 -H "accept: application/json" \
-                "https://api.linode.com/v4/nodebalancers" \
-                --data "{\"label\": \"$LABEL\", \"region\": \"$REGION\"}" | jq .id)
+                "$LINODE_URL/v4beta/nodebalancers" \
+                --data "$data" | jq .id)
 
               if ! [[ $nbid =~ $re ]]; then
                   echo "Nodebalancer id [$nbid] is incorrect, failed to create nodebalancer"
@@ -109,7 +147,7 @@ spec:
               old_nb_resp=$(curl --write-out "%{http_code}\n" \
                 --silent --output /dev/null \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
-                "https://api.linode.com/v4/nodebalancers/$old_nbid")
+                "$LINODE_URL/v4/nodebalancers/$old_nbid")
 
               if [[ $old_nb_resp == "404" ]]; then
                   echo "old nodebalancer not found"

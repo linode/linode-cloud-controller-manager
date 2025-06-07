@@ -46,7 +46,7 @@ spec:
                 --silent --output /dev/null \
                 -X GET \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
-                "https://api.linode.com/v4/nodebalancers/$nbid")
+                "$LINODE_URL/v4/nodebalancers/$nbid")
 
               if [[ $get_resp == "200" ]]; then
                   echo "nodebalancer exists"
@@ -57,7 +57,7 @@ spec:
                 --silent --output /dev/null \
                 -X DELETE \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
-                "https://api.linode.com/v4/nodebalancers/$nbid")
+                "$LINODE_URL/v4/nodebalancers/$nbid")
 
               if ! [[ $delete_resp == "200" ]]; then
                   echo "failed deleting nodebalancer"

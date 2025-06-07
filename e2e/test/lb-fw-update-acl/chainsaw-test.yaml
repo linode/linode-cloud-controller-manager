@@ -43,7 +43,7 @@ spec:
                     -H "Authorization: Bearer $LINODE_TOKEN" \
                     -H "Content-Type: application/json" \
                     -H "accept: application/json" \
-                    "https://api.linode.com/v4/nodebalancers/${nbid}/firewalls" || true)
+                    "$LINODE_URL/v4/nodebalancers/${nbid}/firewalls" || true)
                   
                   fwCount=$(echo $fw | jq '.data | length')
                   ips=$(echo $fw | jq '.data[].rules.inbound[].addresses.ipv4[]')
@@ -77,7 +77,7 @@ spec:
                     -H "Authorization: Bearer $LINODE_TOKEN" \
                     -H "Content-Type: application/json" \
                     -H "accept: application/json" \
-                    "https://api.linode.com/v4/nodebalancers/${nbid}/firewalls" || true)
+                    "$LINODE_URL/v4/nodebalancers/${nbid}/firewalls" || true)
                   
                   fwCount=$(echo $fw | jq -r '.data | length')
                   ips=$(echo $fw | jq -r '.data[].rules.inbound[].addresses.ipv4[]')

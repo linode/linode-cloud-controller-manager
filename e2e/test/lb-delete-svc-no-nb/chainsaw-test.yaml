@@ -9,6 +9,24 @@ metadata:
 spec:
   namespace: "lb-delete-svc-no-nb"
   steps:
+    - name: Create dummy service
+      try:
+        - apply:
+            file: dummy-service.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that loadbalancer ip is assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-dummy
+            status:
+              (loadBalancer.ingress[0].ip != null): true
     - name: Create nodebalancer and create resources
       try:
         - script:
@@ -21,12 +39,15 @@ spec:
               re='^[0-9]+$'
               LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
 
+              # Get data to use for new nodebalancer
+              data=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN LABEL=$LABEL REGION=$REGION ../scripts/get-nb-create-data.sh svc-dummy)
+
               nbid=$(curl -s --request POST \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 -H "Content-Type: application/json" \
                 -H "accept: application/json" \
-                "https://api.linode.com/v4/nodebalancers" \
-                --data "{\"label\": \"$LABEL\", \"region\": \"$REGION\"}" | jq .id)
+                "$LINODE_URL/v4beta/nodebalancers" \
+                --data "$data" | jq .id)
 
               if ! [[ $nbid =~ $re ]]; then
                   echo "Nodebalancer id [$nbid] is incorrect, failed to create nodebalancer"
@@ -89,17 +110,19 @@ spec:
                 --silent --output /dev/null \
                 -X DELETE \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
-                "https://api.linode.com/v4/nodebalancers/$nbid")
+                "$LINODE_URL/v4/nodebalancers/$nbid")
 
               if [[ $delete_resp == "200" ]]; then
                   echo "nodebalancer deleted"
+              else
+                  echo "Failed to delete nodebalancer, response code: $delete_resp"
               fi
 
               # Check to make sure nodebalancer is deleted
               old_nb_resp=$(curl --write-out "%{http_code}\n" \
                 --silent --output /dev/null \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
-                "https://api.linode.com/v4/nodebalancers/$nbid")
+                "$LINODE_URL/v4/nodebalancers/$nbid")
 
               if [[ $old_nb_resp == "404" ]]; then
                   echo "old nodebalancer not found"

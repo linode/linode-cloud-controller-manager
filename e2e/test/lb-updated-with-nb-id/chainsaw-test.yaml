@@ -33,39 +33,42 @@ spec:
     - name: Create nodebalancer, annotate svc with nodebalancer id and validate
       try:
         - script:
+            timeout: 10m
             content: |
               set -e
 
               re='^[0-9]+$'
               LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
 
+              # Get data to use for new nodebalancer
+              data=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN LABEL=$LABEL REGION=$REGION ../scripts/get-nb-create-data.sh svc-test)
+
               nbid=$(curl -s --request POST \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 -H "Content-Type: application/json" \
                 -H "accept: application/json" \
-                "https://api.linode.com/v4/nodebalancers" \
-                --data "{\"label\": \"$LABEL\", \"region\": \"$REGION\"}" | jq .id)
+                "$LINODE_URL/v4beta/nodebalancers" \
+                --data "$data" | jq .id)
 
               if ! [[ $nbid =~ $re ]]; then
                   echo "Nodebalancer id [$nbid] for label [$lABEL] is incorrect, failed to create nodebalancer"
-                  exit 1
+              else
+                  kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id=$nbid
+                  sleep 5
+
+                  for i in {1..20}; do
+                      nbid2=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+
+                      if [[ $nbid == $nbid2 ]]; then
+                          echo "Condition met"
+                          break
+                      fi
+                      echo "Condition not met, waiting for 20 seconds and retrying..."
+                      echo "nbid: $nbid"
+                      echo "nbid2: $nbid2"
+                      sleep 20
+                  done
               fi
-
-              kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id=$nbid
-              sleep 5
-
-              for i in {1..20}; do
-                  nbid2=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
-
-                  if [[ $nbid == $nbid2 ]]; then
-                      echo "Condition met"
-                      break
-                  fi
-                  echo "Condition not met, waiting for 20 seconds and retrying..."
-                  echo "nbid: $nbid"
-                  echo "nbid2: $nbid2"
-                  sleep 20
-              done
             check:
               ($error == null): true
               (contains($stdout, 'Condition met')): true

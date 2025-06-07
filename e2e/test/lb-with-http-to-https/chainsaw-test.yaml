@@ -69,6 +69,7 @@ spec:
     - name: Fetch loadbalancer ip and check if pod reachable on different ports with different protocols
       try:
         - script:
+            timeout: 10m
             content: |
               set -e
               IP=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].ip)

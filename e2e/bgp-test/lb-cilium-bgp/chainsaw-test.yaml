@@ -65,14 +65,14 @@ spec:
 
               delete_nanode() {
                 local NANODE_RESPONSE=$(curl -s -H "Authorization: Bearer $LINODE_TOKEN" \
-                  "https://api.linode.com/v4/linode/instances")
+                  "$LINODE_URL/v4/linode/instances")
                 
                 local NANODE_ID=$(echo "$NANODE_RESPONSE" | \
                   jq -r --arg cluster "$CLUSTER_NAME" '.data[] | select(.label | endswith($cluster)) | .id')
                 
                 if [ -n "$NANODE_ID" ]; then
                   curl -s -X DELETE -H "Authorization: Bearer $LINODE_TOKEN" \
-                    "https://api.linode.com/v4/linode/instances/$NANODE_ID" || true
+                    "$LINODE_URL/v4/linode/instances/$NANODE_ID" || true
                 fi
               }
 
@@ -94,7 +94,7 @@ spec:
                 echo "Node ID: $NODE_ID"
 
                 NODE_IP_RESPONSE=$(curl -s -H "Authorization: Bearer $LINODE_TOKEN" \
-                                 "https://api.linode.com/v4/linode/instances/$NODE_ID/ips")
+                                 "$LINODE_URL/v4/linode/instances/$NODE_ID/ips")
                 
                 SHARED_IPS=$(echo "$NODE_IP_RESPONSE" | jq -r '.ipv4.shared[]?.address // empty')
                 echo "shared IPs: $SHARED_IPS"
@@ -108,7 +108,7 @@ spec:
 
               # Check if the nanode has the shared IP
               NANODE_RESPONSE=$(curl -s -H "Authorization: Bearer $LINODE_TOKEN" \
-                "https://api.linode.com/v4/linode/instances")
+                "$LINODE_URL/v4/linode/instances")
               
               NANODE_ID=$(echo "$NANODE_RESPONSE" | \
                 jq -r --arg cluster "$CLUSTER_NAME" '.data[] | select(.label | endswith($cluster)) | .id')
@@ -119,7 +119,7 @@ spec:
               fi
 
               NANODE_IP_RESPONSE=$(curl -s -H "Authorization: Bearer $LINODE_TOKEN" \
-                "https://api.linode.com/v4/linode/instances/$NANODE_ID/ips")
+                "$LINODE_URL/v4/linode/instances/$NANODE_ID/ips")
               
               NANODE_IPS=$(echo "$NANODE_IP_RESPONSE" | jq -r '.ipv4.public[]?.address // empty')
               

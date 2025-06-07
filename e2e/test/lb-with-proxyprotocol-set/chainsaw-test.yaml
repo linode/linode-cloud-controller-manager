@@ -61,7 +61,7 @@ spec:
               nbconfig=$(curl -s \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 -H "Content-Type: application/json" \
-                "https://api.linode.com/v4/nodebalancers/$nbid/configs")
+                "$LINODE_URL/v4/nodebalancers/$nbid/configs")
 
               port_80_v1=$(echo $nbconfig | jq -r '.data[] | select(.port == 80) | .proxy_protocol == "v1"')
               port_8080_v2=$(echo $nbconfig | jq -r '.data[] | select(.port == 8080) | .proxy_protocol == "v2"')

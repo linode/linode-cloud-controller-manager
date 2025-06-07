@@ -224,3 +224,67 @@ func TestGetSubnetID(t *testing.T) {
 		}
 	})
 }
+
+func TestGetNodeBalancerBackendIPv4SubnetID(t *testing.T) {
+	t.Run("VPC not found", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
+		currVPCNames := Options.VPCNames
+		currVPCIDs := vpcIDs
+		currSubnetIDs := subnetIDs
+		defer func() {
+			Options.VPCNames = currVPCNames
+			vpcIDs = currVPCIDs
+			subnetIDs = currSubnetIDs
+		}()
+		Options.VPCNames = "vpc-test1,vpc-test2,vpc-test3"
+		vpcIDs = map[string]int{"vpc-test2": 2, "vpc-test3": 3}
+		subnetIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
+		client.EXPECT().ListVPCs(gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPC{}, errors.New("error"))
+		subnetID, err := getNodeBalancerBackendIPv4SubnetID(client)
+		require.Error(t, err)
+		if subnetID != 0 {
+			t.Errorf("getNodeBalancerBackendIPv4SubnetID() = %v, want %v", subnetID, 0)
+		}
+	})
+
+	t.Run("Subnet not found", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
+		currVPCNames := Options.VPCNames
+		defer func() { Options.VPCNames = currVPCNames }()
+		Options.VPCNames = "vpc-test1,vpc-test2,vpc-test3"
+		vpcIDs = map[string]int{"vpc-test1": 1, "vpc-test2": 2, "vpc-test3": 3}
+		subnetIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
+		client.EXPECT().ListVPCSubnets(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCSubnet{}, errors.New("error"))
+		subnetID, err := getNodeBalancerBackendIPv4SubnetID(client)
+		require.Error(t, err)
+		if subnetID != 0 {
+			t.Errorf("getNodeBalancerBackendIPv4SubnetID() = %v, want %v", subnetID, 0)
+		}
+	})
+
+	t.Run("Subnet found", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
+		currVPCNames := Options.VPCNames
+		currNodeBalancerBackendIPv4SubnetName := Options.NodeBalancerBackendIPv4SubnetName
+		defer func() {
+			Options.VPCNames = currVPCNames
+			Options.NodeBalancerBackendIPv4SubnetName = currNodeBalancerBackendIPv4SubnetName
+		}()
+		Options.VPCNames = "vpc-test1,vpc-test2,vpc-test3"
+		Options.NodeBalancerBackendIPv4SubnetName = "test4"
+		vpcIDs = map[string]int{"vpc-test1": 1, "vpc-test2": 2, "vpc-test3": 3}
+		subnetIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
+		client.EXPECT().ListVPCSubnets(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCSubnet{{ID: 4, Label: "test4"}}, nil)
+		subnetID, err := getNodeBalancerBackendIPv4SubnetID(client)
+		require.NoError(t, err)
+		if subnetID != 4 {
+			t.Errorf("getNodeBalancerBackendIPv4SubnetID() = %v, want %v", subnetID, 4)
+		}
+	})
+}

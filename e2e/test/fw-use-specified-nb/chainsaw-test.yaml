@@ -25,7 +25,7 @@ spec:
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 -H "Content-Type: application/json" \
                 -H "accept: application/json" \
-                "https://api.linode.com/v4/networking/firewalls" \
+                "$LINODE_URL/v4/networking/firewalls" \
                 --data "
               {
                 \"label\": \"$FWLABEL\",
@@ -86,7 +86,7 @@ spec:
                     -H "Authorization: Bearer $LINODE_TOKEN" \
                     -H "Content-Type: application/json" \
                     -H "X-Filter: {\"label\": \"$FWLABEL\"}" \
-                    "https://api.linode.com/v4/networking/firewalls" | jq .data[].id)
+                    "$LINODE_URL/v4/networking/firewalls" | jq .data[].id)
 
               if ! [[ $fwid =~ $re ]]; then
                   echo "Firewall id [$fwid] is incorrect, failed to fetch firewall"
@@ -102,7 +102,7 @@ spec:
                   fwconfig=$(curl -s \
                     -H "Authorization: Bearer $LINODE_TOKEN" \
                     -H "Content-Type: application/json" \
-                    "https://api.linode.com/v4/networking/firewalls/$fwid" || true)
+                    "$LINODE_URL/v4/networking/firewalls/$fwid" || true)
 
                   fw_attached_to_nb=$(echo $fwconfig | jq ".entities[] | select(.id == $nbid) | .id == $nbid")
 
@@ -117,7 +117,7 @@ spec:
               curl -s -X DELETE \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 -H "Content-Type: application/json" \
-                "https://api.linode.com/v4/networking/firewalls/$fwid"
+                "$LINODE_URL/v4/networking/firewalls/$fwid"
             check:
               ($error == null): true
               (contains($stdout, 'Conditions met')): true
