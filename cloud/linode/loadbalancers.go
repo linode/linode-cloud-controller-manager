@@ -949,13 +949,17 @@ func (l *loadbalancers) addTLSCert(ctx context.Context, service *v1.Service, nbC
 	return nil
 }
 
-// getSubnetIDForSVC returns the subnet ID for the service's VPC and subnet.
-// By default, first VPCName and SubnetName are used to calculate subnet id for the service.
-// If the service has annotations specifying VPCName and SubnetName, they are used instead.
+// getSubnetIDForSVC returns the subnet ID for the service when running within VPC.
+// Following precedence rules are applied:
+// 1. If the service has an annotation for NodeBalancerBackendSubnetID, use that.
+// 2. If the service has annotations specifying VPCName or SubnetName, use them.
+// 3. If CCM is configured with --nodebalancer-backend-ipv4-subnet-id, it will be used as the subnet ID.
+// 4. Else, use first VPCName and SubnetName to calculate subnet id for the service.
 func (l *loadbalancers) getSubnetIDForSVC(ctx context.Context, service *v1.Service) (int, error) {
 	if Options.VPCNames == "" {
 		return 0, fmt.Errorf("CCM not configured with VPC, cannot create NodeBalancer with specified annotation")
 	}
+	// Check if the service has an annotation for NodeBalancerBackendSubnetID
 	if specifiedSubnetID, ok := service.GetAnnotations()[annotations.NodeBalancerBackendSubnetID]; ok {
 		subnetID, err := strconv.Atoi(specifiedSubnetID)
 		if err != nil {
@@ -963,18 +967,31 @@ func (l *loadbalancers) getSubnetIDForSVC(ctx context.Context, service *v1.Servi
 		}
 		return subnetID, nil
 	}
+
+	specifiedVPCName, vpcOk := service.GetAnnotations()[annotations.NodeBalancerBackendVPCName]
+	specifiedSubnetName, subnetOk := service.GetAnnotations()[annotations.NodeBalancerBackendSubnetName]
+
+	// If no VPCName or SubnetName is specified in annotations, but NodeBalancerBackendIPv4SubnetID is set,
+	// use the NodeBalancerBackendIPv4SubnetID as the subnet ID.
+	if !vpcOk && !subnetOk && Options.NodeBalancerBackendIPv4SubnetID != 0 {
+		return Options.NodeBalancerBackendIPv4SubnetID, nil
+	}
+
 	vpcName := strings.Split(Options.VPCNames, ",")[0]
-	if specifiedVPCName, ok := service.GetAnnotations()[annotations.NodeBalancerBackendVPCName]; ok {
+	if vpcOk {
 		vpcName = specifiedVPCName
 	}
 	vpcID, err := GetVPCID(ctx, l.client, vpcName)
 	if err != nil {
 		return 0, err
 	}
+
 	subnetName := strings.Split(Options.SubnetNames, ",")[0]
-	if specifiedSubnetName, ok := service.GetAnnotations()[annotations.NodeBalancerBackendSubnetName]; ok {
+	if subnetOk {
 		subnetName = specifiedSubnetName
 	}
+
+	// Use the VPC ID and Subnet Name to get the subnet ID
 	return GetSubnetID(ctx, l.client, vpcID, subnetName)
 }
 
