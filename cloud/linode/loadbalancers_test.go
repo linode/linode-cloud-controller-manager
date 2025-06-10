@@ -115,7 +115,10 @@ o/aoxqmE0mN1lyCPOa9UP//LlsREkWVKI3+Wld/xERtzf66hjcH+ilsXDxxpMEXo
 bSiPJQsGIKtQvyCaZY2szyOoeUGgOId+He7ITlezxKrjdj+1pLMESvAxKeo=
 -----END RSA PRIVATE KEY-----`
 
-const drop string = "DROP"
+const (
+	drop          string = "DROP"
+	defaultSubnet string = "default"
+)
 
 func TestCCMLoadBalancers(t *testing.T) {
 	testCases := []struct {
@@ -163,7 +166,23 @@ func TestCCMLoadBalancers(t *testing.T) {
 			f:    testUpdateNodeBalancerWithVPCBackend,
 		},
 		{
-			name: "Create Load Balancer With VPC Backend - Overwrite VPC Name and Subnet with Annotation",
+			name: "Create Load Balancer With VPC Backend - Just specify Subnet flag",
+			f:    testCreateNodeBalancerWithVPCOnlySubnetFlag,
+		},
+		{
+			name: "Create Load Balancer With VPC Backend - Just specify Subnet id",
+			f:    testCreateNodeBalancerWithVPCOnlySubnetIDFlag,
+		},
+		{
+			name: "Create Load Balancer With VPC Backend - No specific flags or annotations",
+			f:    testCreateNodeBalancerWithVPCNoFlagOrAnnotation,
+		},
+		{
+			name: "Create Load Balancer With VPC Backend - annotations for vpc and subnet",
+			f:    testCreateNodeBalancerWithVPCAnnotationOnly,
+		},
+		{
+			name: "Create Load Balancer With VPC Backend - Specify subnet ID",
 			f:    testCreateNodeBalancerWithVPCAnnotationOverwrite,
 		},
 		{
@@ -527,17 +546,11 @@ func testCreateNodeBalancerWithGlobalTags(t *testing.T, client *linodego.Client,
 func testCreateNodeBalancerWithVPCBackend(t *testing.T, client *linodego.Client, f *fakeAPI) {
 	t.Helper()
 
-	// test when no VPCs are present
+	// provision vpc and test
 	ann := map[string]string{
 		annotations.NodeBalancerBackendIPv4Range: "10.100.0.0/30",
 	}
-	if err := testCreateNodeBalancer(t, client, f, ann, nil); err == nil {
-		t.Fatalf("expected nodebalancer creation to fail")
-	}
 
-	f.ResetRequests()
-
-	// provision vpc and test again
 	vpcNames := Options.VPCNames
 	subnetNames := Options.SubnetNames
 	defer func() {
@@ -545,14 +558,14 @@ func testCreateNodeBalancerWithVPCBackend(t *testing.T, client *linodego.Client,
 		Options.SubnetNames = subnetNames
 	}()
 	Options.VPCNames = "test1"
-	Options.SubnetNames = "default"
+	Options.SubnetNames = defaultSubnet
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
 		Label:       "test1",
 		Description: "",
 		Region:      "us-west",
 		Subnets: []linodego.VPCSubnetCreateOptions{
 			{
-				Label: "default",
+				Label: defaultSubnet,
 				IPv4:  "10.0.0.0/8",
 			},
 		},
@@ -587,14 +600,14 @@ func testUpdateNodeBalancerWithVPCBackend(t *testing.T, client *linodego.Client,
 		Options.SubnetNames = subnetNames
 	}()
 	Options.VPCNames = "test1"
-	Options.SubnetNames = "default"
+	Options.SubnetNames = defaultSubnet
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
 		Label:       "test1",
 		Description: "",
 		Region:      "us-west",
 		Subnets: []linodego.VPCSubnetCreateOptions{
 			{
-				Label: "default",
+				Label: defaultSubnet,
 				IPv4:  "10.0.0.0/8",
 			},
 		},
@@ -661,6 +674,360 @@ func testUpdateNodeBalancerWithVPCBackend(t *testing.T, client *linodego.Client,
 	}
 }
 
+func testCreateNodeBalancerWithVPCOnlySubnetFlag(t *testing.T, client *linodego.Client, f *fakeAPI) {
+	t.Helper()
+
+	// provision vpc and test
+	vpcNames := Options.VPCNames
+	subnetNames := Options.SubnetNames
+	nbBackendSubnet := Options.NodeBalancerBackendIPv4Subnet
+	defer func() {
+		Options.VPCNames = vpcNames
+		Options.SubnetNames = subnetNames
+		Options.NodeBalancerBackendIPv4Subnet = nbBackendSubnet
+	}()
+	Options.VPCNames = "test-subflag"
+	Options.SubnetNames = defaultSubnet
+	Options.NodeBalancerBackendIPv4Subnet = "10.254.0.0/24"
+	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
+		Label:       "test-subflag",
+		Description: "",
+		Region:      "us-west",
+		Subnets: []linodego.VPCSubnetCreateOptions{
+			{
+				Label: defaultSubnet,
+				IPv4:  "10.0.0.0/8",
+			},
+		},
+	})
+
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        randString(),
+			UID:         "foobar123",
+			Annotations: map[string]string{},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     randString(),
+					Protocol: "TCP",
+					Port:     int32(80),
+					NodePort: int32(30000),
+				},
+			},
+		},
+	}
+
+	nodes := []*v1.Node{
+		{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.0.2",
+					},
+				},
+			},
+		},
+	}
+
+	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	if !assertion {
+		t.Error("type assertion failed")
+	}
+	fakeClientset := fake.NewSimpleClientset()
+	lb.kubeClient = fakeClientset
+
+	defer func() {
+		_ = lb.EnsureLoadBalancerDeleted(t.Context(), "linodelb", svc)
+	}()
+
+	lbStatus, err := lb.EnsureLoadBalancer(t.Context(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
+	}
+	svc.Status.LoadBalancer = *lbStatus
+
+	stubService(fakeClientset, svc)
+	svc.SetAnnotations(map[string]string{
+		annotations.NodeBalancerBackendIPv4Range: "10.254.0.60/30",
+	})
+
+	err = lb.UpdateLoadBalancer(t.Context(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("UpdateLoadBalancer returned an error with updated annotations: %s", err)
+	}
+
+	// test with IPv4Range outside of defined NodeBalancer subnet
+	svc.SetAnnotations(map[string]string{
+		annotations.NodeBalancerBackendIPv4Range: "10.100.0.0/30",
+	})
+
+	err = lb.UpdateLoadBalancer(t.Context(), "linodelb", svc, nodes)
+	if err == nil {
+		t.Errorf("UpdateLoadBalancer should have returned an error when ipv4_range is outside of specified subnet: %s", err)
+	}
+}
+
+func testCreateNodeBalancerWithVPCNoFlagOrAnnotation(t *testing.T, client *linodego.Client, f *fakeAPI) {
+	t.Helper()
+
+	// provision vpc and test
+	vpcNames := Options.VPCNames
+	subnetNames := Options.SubnetNames
+	defer func() {
+		Options.VPCNames = vpcNames
+		Options.SubnetNames = subnetNames
+	}()
+	Options.VPCNames = "test-noflags"
+	Options.SubnetNames = defaultSubnet
+	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
+		Label:       "test-noflags",
+		Description: "",
+		Region:      "us-west",
+		Subnets: []linodego.VPCSubnetCreateOptions{
+			{
+				Label: defaultSubnet,
+				IPv4:  "10.0.0.0/8",
+			},
+		},
+	})
+
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        randString(),
+			UID:         "foobar123",
+			Annotations: map[string]string{},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     randString(),
+					Protocol: "TCP",
+					Port:     int32(80),
+					NodePort: int32(30000),
+				},
+			},
+		},
+	}
+
+	nodes := []*v1.Node{
+		{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.10.10.2",
+					},
+				},
+			},
+		},
+	}
+
+	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	if !assertion {
+		t.Error("type assertion failed")
+	}
+	fakeClientset := fake.NewSimpleClientset()
+	lb.kubeClient = fakeClientset
+
+	defer func() {
+		_ = lb.EnsureLoadBalancerDeleted(t.Context(), "linodelb", svc)
+	}()
+
+	lbStatus, err := lb.EnsureLoadBalancer(t.Context(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
+	}
+	svc.Status.LoadBalancer = *lbStatus
+
+	stubService(fakeClientset, svc)
+	svc.SetAnnotations(map[string]string{
+		annotations.NodeBalancerBackendIPv4Range: "10.254.0.60/30",
+	})
+
+	err = lb.UpdateLoadBalancer(t.Context(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("UpdateLoadBalancer returned an error with updated annotations: %s", err)
+	}
+}
+
+func testCreateNodeBalancerWithVPCAnnotationOnly(t *testing.T, client *linodego.Client, f *fakeAPI) {
+	t.Helper()
+
+	// provision vpc and test
+	vpcNames := Options.VPCNames
+	subnetNames := Options.SubnetNames
+	defer func() {
+		Options.VPCNames = vpcNames
+		Options.SubnetNames = subnetNames
+	}()
+	Options.VPCNames = "test-onlyannotation"
+	Options.SubnetNames = defaultSubnet
+	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
+		Label:       "test-onlyannotation",
+		Description: "",
+		Region:      "us-west",
+		Subnets: []linodego.VPCSubnetCreateOptions{
+			{
+				Label: defaultSubnet,
+				IPv4:  "10.0.0.0/8",
+			},
+			{
+				Label: "custom",
+				IPv4:  "192.168.0.0/24",
+			},
+		},
+	})
+
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: randString(),
+			UID:  "foobar123",
+			Annotations: map[string]string{
+				annotations.NodeBalancerBackendSubnetName: "custom",
+			},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     randString(),
+					Protocol: "TCP",
+					Port:     int32(80),
+					NodePort: int32(30000),
+				},
+			},
+		},
+	}
+
+	nodes := []*v1.Node{
+		{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.11.11.2",
+					},
+				},
+			},
+		},
+	}
+
+	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	if !assertion {
+		t.Error("type assertion failed")
+	}
+	fakeClientset := fake.NewSimpleClientset()
+	lb.kubeClient = fakeClientset
+
+	defer func() {
+		_ = lb.EnsureLoadBalancerDeleted(t.Context(), "linodelb", svc)
+	}()
+
+	lbStatus, err := lb.EnsureLoadBalancer(t.Context(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
+	}
+	svc.Status.LoadBalancer = *lbStatus
+
+	stubService(fakeClientset, svc)
+	svc.SetAnnotations(map[string]string{})
+
+	err = lb.UpdateLoadBalancer(t.Context(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("UpdateLoadBalancer returned an error with updated annotations: %s", err)
+	}
+}
+
+func testCreateNodeBalancerWithVPCOnlySubnetIDFlag(t *testing.T, client *linodego.Client, f *fakeAPI) {
+	t.Helper()
+
+	// provision vpc and test
+	vpcNames := Options.VPCNames
+	subnetNames := Options.SubnetNames
+	nbBackendSubnetID := Options.NodeBalancerBackendIPv4SubnetID
+	defer func() {
+		Options.VPCNames = vpcNames
+		Options.SubnetNames = subnetNames
+		Options.NodeBalancerBackendIPv4SubnetID = nbBackendSubnetID
+	}()
+	Options.VPCNames = "test1"
+	Options.SubnetNames = defaultSubnet
+	Options.NodeBalancerBackendIPv4SubnetID = 1111
+	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
+		Label:       "test-subid-flag",
+		Description: "",
+		Region:      "us-west",
+		Subnets: []linodego.VPCSubnetCreateOptions{
+			{
+				Label: defaultSubnet,
+				IPv4:  "10.0.0.0/8",
+			},
+		},
+	})
+
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        randString(),
+			UID:         "foobar123",
+			Annotations: map[string]string{},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     randString(),
+					Protocol: "TCP",
+					Port:     int32(80),
+					NodePort: int32(30000),
+				},
+			},
+		},
+	}
+
+	nodes := []*v1.Node{
+		{
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.0.3",
+					},
+				},
+			},
+		},
+	}
+
+	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	if !assertion {
+		t.Error("type assertion failed")
+	}
+	fakeClientset := fake.NewSimpleClientset()
+	lb.kubeClient = fakeClientset
+
+	defer func() {
+		_ = lb.EnsureLoadBalancerDeleted(t.Context(), "linodelb", svc)
+	}()
+
+	lbStatus, err := lb.EnsureLoadBalancer(t.Context(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
+	}
+	svc.Status.LoadBalancer = *lbStatus
+
+	stubService(fakeClientset, svc)
+
+	// test with annotation specifying subnet id
+	svc.SetAnnotations(map[string]string{
+		annotations.NodeBalancerBackendSubnetID: "2222",
+	})
+
+	err = lb.UpdateLoadBalancer(t.Context(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Errorf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
+	}
+}
+
 func testCreateNodeBalancerWithVPCAnnotationOverwrite(t *testing.T, client *linodego.Client, f *fakeAPI) {
 	t.Helper()
 
@@ -680,7 +1047,7 @@ func testCreateNodeBalancerWithVPCAnnotationOverwrite(t *testing.T, client *lino
 		Region:      "us-west",
 		Subnets: []linodego.VPCSubnetCreateOptions{
 			{
-				Label: "default",
+				Label: defaultSubnet,
 				IPv4:  "10.0.0.0/8",
 			},
 		},
