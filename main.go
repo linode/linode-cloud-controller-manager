@@ -95,6 +95,9 @@ func main() {
 	command.Flags().BoolVar(&linode.Options.EnableIPv6ForLoadBalancers, "enable-ipv6-for-loadbalancers", false, "set both IPv4 and IPv6 addresses for all LoadBalancer services (when disabled, only IPv4 is used)")
 	command.Flags().IntVar(&linode.Options.NodeCIDRMaskSizeIPv4, "node-cidr-mask-size-ipv4", 0, "ipv4 cidr mask size for pod cidrs allocated to nodes")
 	command.Flags().IntVar(&linode.Options.NodeCIDRMaskSizeIPv6, "node-cidr-mask-size-ipv6", 0, "ipv6 cidr mask size for pod cidrs allocated to nodes")
+	command.Flags().IntVar(&linode.Options.NodeBalancerBackendIPv4SubnetID, "nodebalancer-backend-ipv4-subnet-id", 0, "ipv4 subnet id to use for NodeBalancer backends")
+	command.Flags().StringVar(&linode.Options.NodeBalancerBackendIPv4SubnetName, "nodebalancer-backend-ipv4-subnet-name", "", "ipv4 subnet name to use for NodeBalancer backends")
+	command.Flags().BoolVar(&linode.Options.DisableNodeBalancerVPCBackends, "disable-nodebalancer-vpc-backends", false, "disables nodebalancer backends in VPCs (when enabled, nodebalancers will only have private IPs as backends for backward compatibility)")
 
 	// Set static flags
 	command.Flags().VisitAll(func(fl *pflag.Flag) {

@@ -444,12 +444,16 @@ func (l *loadbalancers) updateNodeBalancer(
 		// Add all of the Nodes to the config
 		newNBNodes := make([]linodego.NodeBalancerConfigRebuildNodeOptions, 0, len(nodes))
 		subnetID := 0
+		if Options.NodeBalancerBackendIPv4SubnetID != 0 {
+			subnetID = Options.NodeBalancerBackendIPv4SubnetID
+		}
 		backendIPv4Range, ok := service.GetAnnotations()[annotations.NodeBalancerBackendIPv4Range]
 		if ok {
 			if err = validateNodeBalancerBackendIPv4Range(backendIPv4Range); err != nil {
 				return err
 			}
-
+		}
+		if Options.VPCNames != "" && !Options.DisableNodeBalancerVPCBackends {
 			var id int
 			id, err = l.getSubnetIDForSVC(ctx, service)
 			if err != nil {
@@ -717,6 +721,86 @@ func (l *loadbalancers) GetLinodeNBType(service *v1.Service) linodego.NodeBalanc
 	return linodego.NodeBalancerPlanType(Options.DefaultNBType)
 }
 
+// getVPCCreateOptions returns the VPC options for the NodeBalancer creation.
+// Order of precedence:
+// 1. NodeBalancerBackendIPv4Range annotation
+// 2. NodeBalancerBackendVPCName and NodeBalancerBackendSubnetName annotation
+// 3. NodeBalancerBackendIPv4SubnetID/NodeBalancerBackendIPv4SubnetName flag
+// 4. NodeBalancerBackendIPv4Subnet flag
+// 5. Default to using the subnet ID of the service's VPC
+func (l *loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Service) ([]linodego.NodeBalancerVPCOptions, error) {
+	// Evaluate subnetID based on annotations or flags
+	subnetID, err := l.getSubnetIDForSVC(ctx, service)
+	if err != nil {
+		return nil, err
+	}
+
+	// Precedence 1: If the user has specified a NodeBalancerBackendIPv4Range, use that
+	backendIPv4Range, ok := service.GetAnnotations()[annotations.NodeBalancerBackendIPv4Range]
+	if ok {
+		if err := validateNodeBalancerBackendIPv4Range(backendIPv4Range); err != nil {
+			return nil, err
+		}
+		// If the user has specified a NodeBalancerBackendIPv4Range, use that
+		// for the NodeBalancer backend ipv4 range
+		if backendIPv4Range != "" {
+			vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
+				{
+					SubnetID:  subnetID,
+					IPv4Range: backendIPv4Range,
+				},
+			}
+			return vpcCreateOpts, nil
+		}
+	}
+
+	// Precedence 2: If the user wants to overwrite the default VPC name or subnet name
+	// and have specified it in the annotations, use it to set subnetID
+	// and auto-allocate subnets from it for the NodeBalancer
+	_, vpcInAnnotation := service.GetAnnotations()[annotations.NodeBalancerBackendVPCName]
+	_, subnetInAnnotation := service.GetAnnotations()[annotations.NodeBalancerBackendSubnetName]
+	if vpcInAnnotation || subnetInAnnotation {
+		vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
+			{
+				SubnetID: subnetID,
+			},
+		}
+		return vpcCreateOpts, nil
+	}
+
+	// Precedence 3: If the user has specified a NodeBalancerBackendIPv4SubnetID, use that
+	// and auto-allocate subnets from it for the NodeBalancer
+	if Options.NodeBalancerBackendIPv4SubnetID != 0 {
+		vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
+			{
+				SubnetID: Options.NodeBalancerBackendIPv4SubnetID,
+			},
+		}
+		return vpcCreateOpts, nil
+	}
+
+	// Precedence 4: If the user has specified a NodeBalancerBackendIPv4Subnet, use that
+	// and auto-allocate subnets from it for the NodeBalancer
+	if Options.NodeBalancerBackendIPv4Subnet != "" {
+		vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
+			{
+				SubnetID:            subnetID,
+				IPv4Range:           Options.NodeBalancerBackendIPv4Subnet,
+				IPv4RangeAutoAssign: true,
+			},
+		}
+		return vpcCreateOpts, nil
+	}
+
+	// Default to using the subnet ID of the service's VPC
+	vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
+		{
+			SubnetID: subnetID,
+		},
+	}
+	return vpcCreateOpts, nil
+}
+
 func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName string, service *v1.Service, configs []*linodego.NodeBalancerConfigCreateOptions) (lb *linodego.NodeBalancer, err error) {
 	connThrottle := getConnectionThrottle(service)
 
@@ -732,20 +816,10 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 		Type:               nbType,
 	}
 
-	backendIPv4Range, ok := service.GetAnnotations()[annotations.NodeBalancerBackendIPv4Range]
-	if ok {
-		if err := validateNodeBalancerBackendIPv4Range(backendIPv4Range); err != nil {
-			return nil, err
-		}
-		subnetID, err := l.getSubnetIDForSVC(ctx, service)
+	if Options.VPCNames != "" && !Options.DisableNodeBalancerVPCBackends {
+		createOpts.VPCs, err = l.getVPCCreateOptions(ctx, service)
 		if err != nil {
 			return nil, err
-		}
-		createOpts.VPCs = []linodego.NodeBalancerVPCOptions{
-			{
-				SubnetID:  subnetID,
-				IPv4Range: backendIPv4Range,
-			},
 		}
 	}
 
@@ -875,25 +949,49 @@ func (l *loadbalancers) addTLSCert(ctx context.Context, service *v1.Service, nbC
 	return nil
 }
 
-// getSubnetIDForSVC returns the subnet ID for the service's VPC and subnet.
-// By default, first VPCName and SubnetName are used to calculate subnet id for the service.
-// If the service has annotations specifying VPCName and SubnetName, they are used instead.
+// getSubnetIDForSVC returns the subnet ID for the service when running within VPC.
+// Following precedence rules are applied:
+// 1. If the service has an annotation for NodeBalancerBackendSubnetID, use that.
+// 2. If the service has annotations specifying VPCName or SubnetName, use them.
+// 3. If CCM is configured with --nodebalancer-backend-ipv4-subnet-id, it will be used as the subnet ID.
+// 4. Else, use first VPCName and SubnetName to calculate subnet id for the service.
 func (l *loadbalancers) getSubnetIDForSVC(ctx context.Context, service *v1.Service) (int, error) {
 	if Options.VPCNames == "" {
 		return 0, fmt.Errorf("CCM not configured with VPC, cannot create NodeBalancer with specified annotation")
 	}
+	// Check if the service has an annotation for NodeBalancerBackendSubnetID
+	if specifiedSubnetID, ok := service.GetAnnotations()[annotations.NodeBalancerBackendSubnetID]; ok {
+		subnetID, err := strconv.Atoi(specifiedSubnetID)
+		if err != nil {
+			return 0, err
+		}
+		return subnetID, nil
+	}
+
+	specifiedVPCName, vpcOk := service.GetAnnotations()[annotations.NodeBalancerBackendVPCName]
+	specifiedSubnetName, subnetOk := service.GetAnnotations()[annotations.NodeBalancerBackendSubnetName]
+
+	// If no VPCName or SubnetName is specified in annotations, but NodeBalancerBackendIPv4SubnetID is set,
+	// use the NodeBalancerBackendIPv4SubnetID as the subnet ID.
+	if !vpcOk && !subnetOk && Options.NodeBalancerBackendIPv4SubnetID != 0 {
+		return Options.NodeBalancerBackendIPv4SubnetID, nil
+	}
+
 	vpcName := strings.Split(Options.VPCNames, ",")[0]
-	if specifiedVPCName, ok := service.GetAnnotations()[annotations.NodeBalancerBackendVPCName]; ok {
+	if vpcOk {
 		vpcName = specifiedVPCName
 	}
 	vpcID, err := GetVPCID(ctx, l.client, vpcName)
 	if err != nil {
 		return 0, err
 	}
+
 	subnetName := strings.Split(Options.SubnetNames, ",")[0]
-	if specifiedSubnetName, ok := service.GetAnnotations()[annotations.NodeBalancerBackendSubnetName]; ok {
+	if subnetOk {
 		subnetName = specifiedSubnetName
 	}
+
+	// Use the VPC ID and Subnet Name to get the subnet ID
 	return GetSubnetID(ctx, l.client, vpcID, subnetName)
 }
 
@@ -907,11 +1005,17 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 	configs := make([]*linodego.NodeBalancerConfigCreateOptions, 0, len(ports))
 
 	subnetID := 0
+	if Options.NodeBalancerBackendIPv4SubnetID != 0 {
+		subnetID = Options.NodeBalancerBackendIPv4SubnetID
+	}
+	// Check for the NodeBalancerBackendIPv4Range annotation
 	backendIPv4Range, ok := service.GetAnnotations()[annotations.NodeBalancerBackendIPv4Range]
 	if ok {
 		if err := validateNodeBalancerBackendIPv4Range(backendIPv4Range); err != nil {
 			return nil, err
 		}
+	}
+	if Options.VPCNames != "" && !Options.DisableNodeBalancerVPCBackends {
 		id, err := l.getSubnetIDForSVC(ctx, service)
 		if err != nil {
 			return nil, err
@@ -1088,9 +1192,9 @@ func getPortConfigAnnotation(service *v1.Service, port int) (portConfigAnnotatio
 }
 
 // getNodePrivateIP provides the Linode Backend IP the NodeBalancer will communicate with.
-// If a service specifies NodeBalancerBackendIPv4Range annotation, it will
+// If CCM runs within VPC and DisableNodeBalancerVPCBackends is set to false, it will
 // use NodeInternalIP of node.
-// For services which don't have NodeBalancerBackendIPv4Range annotation,
+// For services outside of VPC, it will use linode specific private IP address
 // Backend IP can be overwritten to the one specified using AnnLinodeNodePrivateIP
 // annotation over the NodeInternalIP.
 func getNodePrivateIP(node *v1.Node, subnetID int) string {

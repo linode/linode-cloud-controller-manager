@@ -45,7 +45,7 @@ spec:
                     # Get interface details for this config
                     interfaces=$(curl -s \
                         -H "Authorization: Bearer $LINODE_TOKEN" \
-                        "https://api.linode.com/v4/linode/instances/$instance_id/configs" \
+                        "$LINODE_URL/v4/linode/instances/$instance_id/configs" \
                         | jq -r '.data[0].interfaces')
                     
                     # Check if pod CIDR is in the VPC interface IP ranges
