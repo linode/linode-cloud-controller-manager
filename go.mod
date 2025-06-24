@@ -164,7 +164,7 @@ require (
 	k8s.io/kms v0.33.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff // indirect
 	k8s.io/kubelet v0.33.0 // indirect
-	k8s.io/kubernetes v1.33.1
+	k8s.io/kubernetes v1.33.2
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.32.0 // indirect
 	sigs.k8s.io/gateway-api v1.3.0 // indirect
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
