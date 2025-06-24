@@ -185,6 +185,8 @@ spec:
             {{- if .Values.k8sServiceHost }}
             - name: KUBERNETES_SERVICE_HOST
               value: {{  .Values.k8sServiceHost }}
+            {{- end }}
+            {{- if .Values.k8sServicePort }}
             - name: KUBERNETES_SERVICE_PORT
               value: {{  .Values.k8sServicePort }}
             {{- end }}
