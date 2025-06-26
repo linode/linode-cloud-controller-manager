@@ -4,7 +4,7 @@ go 1.24.0
 
 toolchain go1.24.1
 
-replace github.com/linode/linodego v1.47.0 => github.com/hcwagner/linodego v0.0.0-20250429185452-1659a6d6e3fd
+replace github.com/linode/linodego v1.52.1 => github.com/hcwagner/linodego v0.0.0-20250626173934-e723581165ee
 
 require (
 	github.com/appscode/go v0.0.0-20201105063637-5613f3b8169f
