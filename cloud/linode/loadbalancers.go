@@ -393,9 +393,9 @@ func (l *loadbalancers) updateNodeBalancer(
 	// Check for IPv4 annotation change
 	if ipv4, ok := service.GetAnnotations()[annotations.AnnLinodeLoadBalancerIPv4]; ok && ipv4 != *nb.IPv4 {
 		// Log the error in the CCM's logfile
-		klog.Warningf("IPv4 annotation has changed for service (%s) from %s to %s, but NodeBalancer (%d) IP cannot be updated after creation", 
+		klog.Warningf("IPv4 annotation has changed for service (%s) from %s to %s, but NodeBalancer (%d) IP cannot be updated after creation",
 			getServiceNn(service), *nb.IPv4, ipv4, nb.ID)
-		
+
 		// Issue a k8s cluster event warning
 		l.createIPChangeWarningEvent(ctx, service, nb, ipv4)
 	}
@@ -894,10 +894,6 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 	return l.client.CreateNodeBalancer(ctx, createOpts)
 }
 
-<<<<<<< HEAD
-func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1.Service, port v1.ServicePort) (linodego.NodeBalancerConfig, error) {
-	portConfigResult, err := getPortConfig(service, port)
-=======
 // isValidPublicIPv4 checks if the given string is a valid public IPv4 address
 func isValidPublicIPv4(ipStr string) error {
 	ip := net.ParseIP(ipStr)
@@ -923,10 +919,8 @@ func isValidPublicIPv4(ipStr string) error {
 	return nil
 }
 
-//nolint:funlen
-func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1.Service, port int) (linodego.NodeBalancerConfig, error) {
-	portConfig, err := getPortConfig(service, port)
->>>>>>> f8fbdbe8 (Add creation/update handling for Service LB reserved IP annotation)
+func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1.Service, port v1.ServicePort) (linodego.NodeBalancerConfig, error) {
+	portConfigResult, err := getPortConfig(service, port)
 	if err != nil {
 		return linodego.NodeBalancerConfig{}, err
 	}
