@@ -42,6 +42,7 @@ const (
 	AnnLinodeHostUUID      = "node.k8s.linode.com/host-uuid"
 
 	AnnLinodeNodeIPSharingUpdated = "node.k8s.linode.com/ip-sharing-updated"
+	AnnExcludeNodeFromNb          = "node.k8s.linode.com/exclude-from-nb"
 
 	NodeBalancerBackendIPv4Range = "service.beta.kubernetes.io/linode-loadbalancer-backend-ipv4-range"
 
