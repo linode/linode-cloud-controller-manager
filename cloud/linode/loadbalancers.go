@@ -463,6 +463,11 @@ func (l *loadbalancers) updateNodeBalancer(
 			subnetID = id
 		}
 		for _, node := range nodes {
+			if _, ok := node.Annotations[annotations.AnnExcludeNodeFromNb]; ok {
+				klog.Infof("Node %s is excluded from NodeBalancer by annotation, skipping", node.Name)
+				continue
+			}
+
 			newNodeOpts := l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort, subnetID, newNBCfg.Protocol)
 			oldNodeID, ok := oldNBNodeIDs[newNodeOpts.Address]
 			if ok {
@@ -1031,6 +1036,10 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 		createOpt := config.GetCreateOptions()
 
 		for _, n := range nodes {
+			if _, ok := n.Annotations[annotations.AnnExcludeNodeFromNb]; ok {
+				klog.Infof("Node %s is excluded from NodeBalancer by annotation, skipping", n.Name)
+				continue
+			}
 			createOpt.Nodes = append(createOpt.Nodes, l.buildNodeBalancerNodeConfigRebuildOptions(n, port.NodePort, subnetID, config.Protocol).NodeBalancerNodeCreateOptions)
 		}
 
