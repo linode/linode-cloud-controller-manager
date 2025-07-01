@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"github.com/appscode/go/wait"
+	"github.com/golang/mock/gomock"
+	"github.com/linode/linodego"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -29,10 +31,14 @@ import (
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 )
 
 type testCase struct {
 	description     string
+	linodeClient    *mocks.MockClient
 	fakeNodeHandler *testutil.FakeNodeHandler
 	allocatorParams CIDRAllocatorParams
 	// key is index of the cidr allocated
@@ -44,9 +50,13 @@ type testCase struct {
 
 func TestOccupyPreExistingCIDR(t *testing.T) {
 	// all tests operate on a single node
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	client := mocks.NewMockClient(ctrl)
 	testCases := []testCase{
 		{
-			description: "success, single stack no node allocation",
+			description:  "success, single stack no node allocation",
+			linodeClient: client,
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -71,7 +81,8 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 			ctrlCreateFail:        false,
 		},
 		{
-			description: "success, single stack correct node allocation",
+			description:  "success, single stack correct node allocation",
+			linodeClient: client,
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -100,7 +111,8 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 		},
 		// failure cases
 		{
-			description: "fail, single stack incorrect node allocation",
+			description:  "fail, single stack incorrect node allocation",
+			linodeClient: client,
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -136,7 +148,7 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 			// Initialize the cloud allocator.
 			fakeNodeInformer := test.FakeNodeInformer(tc.fakeNodeHandler)
 			nodeList, _ := tc.fakeNodeHandler.List(tCtx, metav1.ListOptions{})
-			_, err := NewLinodeCIDRAllocator(tCtx, tc.fakeNodeHandler, fakeNodeInformer, tc.allocatorParams, nodeList)
+			_, err := NewLinodeCIDRAllocator(tCtx, tc.linodeClient, tc.fakeNodeHandler, fakeNodeInformer, tc.allocatorParams, nodeList)
 			if err == nil && tc.ctrlCreateFail {
 				t.Fatalf("creating cloud allocator was expected to fail, but it did not")
 			}
@@ -155,10 +167,14 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 		nodePollInterval = oldNodePollInterval
 	}()
 
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	client := mocks.NewMockClient(ctrl)
 	// all tests operate on a single node
 	testCases := []testCase{
 		{
-			description: "When there's no ServiceCIDR return first CIDR in range",
+			description:  "When there's no ServiceCIDR return first CIDR in range",
+			linodeClient: client,
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -188,11 +204,12 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			expectedAllocatedCIDR: map[int]string{
 				0: "127.123.234.0/30",
-				1: "fd00::acea:ecd3/112",
+				1: "2300:5800:2:1::/112",
 			},
 		},
 		{
-			description: "Correctly filter out ServiceCIDR",
+			description:  "Correctly filter out ServiceCIDR",
+			linodeClient: client,
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -226,11 +243,12 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			// it should return first /30 CIDR after service range
 			expectedAllocatedCIDR: map[int]string{
 				0: "127.123.234.64/30",
-				1: "fd00::acea:ecd3/112",
+				1: "2300:5800:2:1::/112",
 			},
 		},
 		{
-			description: "Correctly ignore already allocated CIDRs",
+			description:  "Correctly ignore already allocated CIDRs",
+			linodeClient: client,
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -266,11 +284,12 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			expectedAllocatedCIDR: map[int]string{
 				0: "127.123.234.76/30",
-				1: "fd00::acea:ecd3/112",
+				1: "2300:5800:2:1::/112",
 			},
 		},
 		{
-			description: "no double counting",
+			description:  "no double counting",
+			linodeClient: client,
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -332,7 +351,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			expectedAllocatedCIDR: map[int]string{
 				0: "10.10.1.0/24",
-				1: "fd00::acea:ecd3/112",
+				1: "2300:5800:2:1::/112",
 			},
 		},
 	}
@@ -343,7 +362,29 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 		fakeNodeInformer := test.FakeNodeInformer(tc.fakeNodeHandler)
 		nodeList, _ := tc.fakeNodeHandler.List(tCtx, metav1.ListOptions{})
 		// Initialize the range allocator.
-		allocator, err := NewLinodeCIDRAllocator(tCtx, tc.fakeNodeHandler, fakeNodeInformer, tc.allocatorParams, nodeList)
+		tc.linodeClient.EXPECT().ListInstances(gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.Instance{
+			{
+				ID: 12345,
+			},
+		}, nil)
+		tc.linodeClient.EXPECT().ListInstanceConfigs(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.InstanceConfig{
+			{
+				Interfaces: []linodego.InstanceConfigInterface{
+					{
+						VPCID:   ptr.To(12345),
+						Purpose: linodego.InterfacePurposeVPC,
+						IPv6: &linodego.InstanceConfigInterfaceIPv6{
+							Ranges: []linodego.InstanceConfigInterfaceIPv6Range{
+								{
+									Range: "2300:5800:2:1::/64",
+								},
+							},
+						},
+					},
+				},
+			},
+		}, nil)
+		allocator, err := NewLinodeCIDRAllocator(tCtx, tc.linodeClient, tc.fakeNodeHandler, fakeNodeInformer, tc.allocatorParams, nodeList)
 		if err != nil {
 			t.Errorf("%v: failed to create CIDRRangeAllocator with error %v", tc.description, err)
 			return
@@ -414,7 +455,8 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 	testCases := []testCase{
 		{
-			description: "When there's no ServiceCIDR return first CIDR in range",
+			description:  "When there's no ServiceCIDR return first CIDR in range",
+			linodeClient: nil,
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -442,7 +484,7 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 	_, tCtx := ktesting.NewTestContext(t)
 	testFunc := func(tc testCase) {
 		// Initialize the cloud allocator.
-		allocator, err := NewLinodeCIDRAllocator(tCtx, tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil)
+		allocator, err := NewLinodeCIDRAllocator(tCtx, tc.linodeClient, tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil)
 		if err != nil {
 			t.Logf("%v: failed to create NewLinodeCIDRAllocator with error %v", tc.description, err)
 		}
@@ -500,6 +542,7 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 
 type releaseTestCase struct {
 	description                      string
+	linodeClient                     *mocks.MockClient
 	fakeNodeHandler                  *testutil.FakeNodeHandler
 	allocatorParams                  CIDRAllocatorParams
 	expectedAllocatedCIDRFirstRound  map[int]string
@@ -516,9 +559,13 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 		nodePollInterval = oldNodePollInterval
 	}()
 
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	client := mocks.NewMockClient(ctrl)
 	testCases := []releaseTestCase{
 		{
-			description: "Correctly release preallocated CIDR",
+			description:  "Correctly release preallocated CIDR",
+			linodeClient: client,
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -558,7 +605,8 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 			},
 		},
 		{
-			description: "Correctly recycle CIDR",
+			description:  "Correctly recycle CIDR",
+			linodeClient: client,
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -603,7 +651,29 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
 	testFunc := func(tc releaseTestCase) {
 		// Initialize the range allocator.
-		allocator, _ := NewLinodeCIDRAllocator(tCtx, tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil)
+		tc.linodeClient.EXPECT().ListInstances(gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.Instance{
+			{
+				ID: 12345,
+			},
+		}, nil)
+		tc.linodeClient.EXPECT().ListInstanceConfigs(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.InstanceConfig{
+			{
+				Interfaces: []linodego.InstanceConfigInterface{
+					{
+						VPCID:   ptr.To(12345),
+						Purpose: linodego.InterfacePurposeVPC,
+						IPv6: &linodego.InstanceConfigInterfaceIPv6{
+							Ranges: []linodego.InstanceConfigInterfaceIPv6Range{
+								{
+									Range: "2300:5800:2:1::/64",
+								},
+							},
+						},
+					},
+				},
+			},
+		}, nil)
+		allocator, _ := NewLinodeCIDRAllocator(tCtx, tc.linodeClient, tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil)
 		rangeAllocator, ok := allocator.(*cloudAllocator)
 		if !ok {
 			t.Logf("%v: found non-default implementation of CIDRAllocator, skipping white-box test...", tc.description)
@@ -763,7 +833,7 @@ func TestNodeDeletionReleaseCIDR(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to get list of nodes %v", err)
 			}
-			allocator, err := NewLinodeCIDRAllocator(tCtx, fakeNodeHandler, fakeNodeInformer, allocatorParams, nodeList)
+			allocator, err := NewLinodeCIDRAllocator(tCtx, nil, fakeNodeHandler, fakeNodeInformer, allocatorParams, nodeList)
 			if err != nil {
 				t.Fatalf("failed to create NewLinodeCIDRAllocator: %v", err)
 			}

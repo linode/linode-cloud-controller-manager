@@ -26,6 +26,7 @@ type Client interface {
 	GetInstance(context.Context, int) (*linodego.Instance, error)
 	ListInstances(context.Context, *linodego.ListOptions) ([]linodego.Instance, error)
 	CreateInstance(ctx context.Context, opts linodego.InstanceCreateOptions) (*linodego.Instance, error)
+	ListInstanceConfigs(ctx context.Context, linodeID int, opts *linodego.ListOptions) ([]linodego.InstanceConfig, error)
 
 	GetInstanceIPAddresses(context.Context, int) (*linodego.InstanceIPAddressResponse, error)
 	AddInstanceIPAddress(ctx context.Context, linodeID int, public bool) (*linodego.InstanceIP, error)
