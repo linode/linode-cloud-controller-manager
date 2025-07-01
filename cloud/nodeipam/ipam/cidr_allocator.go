@@ -32,6 +32,8 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 )
 
 // CIDRAllocatorType is the type of the allocator to use.
@@ -94,7 +96,7 @@ type CIDRAllocatorParams struct {
 }
 
 // New creates a new CIDR range allocator.
-func New(ctx context.Context, kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer, allocatorType CIDRAllocatorType, allocatorParams CIDRAllocatorParams) (CIDRAllocator, error) {
+func New(ctx context.Context, linodeClient client.Client, kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer, allocatorType CIDRAllocatorType, allocatorParams CIDRAllocatorParams) (CIDRAllocator, error) {
 	nodeList, err := listNodes(ctx, kubeClient)
 	if err != nil {
 		return nil, err
@@ -102,7 +104,7 @@ func New(ctx context.Context, kubeClient clientset.Interface, cloud cloudprovide
 
 	switch allocatorType {
 	case CloudAllocatorType:
-		return NewLinodeCIDRAllocator(ctx, kubeClient, nodeInformer, allocatorParams, nodeList)
+		return NewLinodeCIDRAllocator(ctx, linodeClient, kubeClient, nodeInformer, allocatorParams, nodeList)
 	case RangeAllocatorType:
 		return nil, fmt.Errorf("RangeAllocatorType is not supported")
 	default:
