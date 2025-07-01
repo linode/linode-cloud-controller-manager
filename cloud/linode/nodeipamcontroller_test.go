@@ -28,7 +28,6 @@ import (
 	v1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	cloudprovider "k8s.io/cloud-provider"
 )
 
 func Test_setNodeCIDRMaskSizes(t *testing.T) {
@@ -127,7 +126,7 @@ func Test_processCIDRs(t *testing.T) {
 func Test_startNodeIpamController(t *testing.T) {
 	type args struct {
 		stopCh            <-chan struct{}
-		cloud             cloudprovider.Interface
+		cloud             linodeCloud
 		nodeInformer      v1.NodeInformer
 		kubeclient        kubernetes.Interface
 		allocateNodeCIDRs bool
@@ -143,7 +142,7 @@ func Test_startNodeIpamController(t *testing.T) {
 			name: "allocate-node-cidrs not set",
 			args: args{
 				stopCh:            make(<-chan struct{}),
-				cloud:             nil,
+				cloud:             linodeCloud{},
 				nodeInformer:      nil,
 				kubeclient:        nil,
 				allocateNodeCIDRs: false,
@@ -155,7 +154,7 @@ func Test_startNodeIpamController(t *testing.T) {
 			name: "allocate-node-cidrs set but cluster-cidr not set",
 			args: args{
 				stopCh:            make(<-chan struct{}),
-				cloud:             nil,
+				cloud:             linodeCloud{},
 				nodeInformer:      nil,
 				kubeclient:        nil,
 				allocateNodeCIDRs: true,
@@ -167,7 +166,7 @@ func Test_startNodeIpamController(t *testing.T) {
 			name: "incorrect cluster-cidr specified",
 			args: args{
 				stopCh:            make(<-chan struct{}),
-				cloud:             nil,
+				cloud:             linodeCloud{},
 				nodeInformer:      nil,
 				kubeclient:        nil,
 				allocateNodeCIDRs: true,
@@ -179,7 +178,7 @@ func Test_startNodeIpamController(t *testing.T) {
 			name: "ipv6 cidr specified",
 			args: args{
 				stopCh:            make(<-chan struct{}),
-				cloud:             nil,
+				cloud:             linodeCloud{},
 				nodeInformer:      nil,
 				kubeclient:        nil,
 				allocateNodeCIDRs: true,
@@ -191,7 +190,7 @@ func Test_startNodeIpamController(t *testing.T) {
 			name: "more than one cidr specified",
 			args: args{
 				stopCh:            make(<-chan struct{}),
-				cloud:             nil,
+				cloud:             linodeCloud{},
 				nodeInformer:      nil,
 				kubeclient:        nil,
 				allocateNodeCIDRs: true,
@@ -203,7 +202,7 @@ func Test_startNodeIpamController(t *testing.T) {
 			name: "correct cidrs specified",
 			args: args{
 				stopCh:            make(<-chan struct{}),
-				cloud:             nil,
+				cloud:             linodeCloud{},
 				nodeInformer:      informers.NewSharedInformerFactory(kubeClient, 0).Core().V1().Nodes(),
 				kubeclient:        kubeClient,
 				allocateNodeCIDRs: true,
@@ -222,7 +221,7 @@ func Test_startNodeIpamController(t *testing.T) {
 		Options.AllocateNodeCIDRs = tt.args.allocateNodeCIDRs
 		Options.ClusterCIDRIPv4 = tt.args.clusterCIDR
 		t.Run(tt.name, func(t *testing.T) {
-			if err := startNodeIpamController(tt.args.stopCh, tt.args.cloud, tt.args.nodeInformer, tt.args.kubeclient); (err != nil) != tt.wantErr {
+			if err := startNodeIpamController(tt.args.stopCh, &tt.args.cloud, tt.args.nodeInformer, tt.args.kubeclient); (err != nil) != tt.wantErr {
 				t.Errorf("startNodeIpamController() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

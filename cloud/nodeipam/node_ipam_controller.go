@@ -32,6 +32,7 @@ import (
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	"k8s.io/klog/v2"
 
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 	"github.com/linode/linode-cloud-controller-manager/cloud/nodeipam/ipam"
 )
 
@@ -40,6 +41,7 @@ type Controller struct {
 	allocatorType ipam.CIDRAllocatorType
 
 	cloud                cloudprovider.Interface
+	linodeClient         client.Client
 	clusterCIDRs         []*net.IPNet
 	serviceCIDR          *net.IPNet
 	secondaryServiceCIDR *net.IPNet
@@ -61,6 +63,7 @@ func NewNodeIpamController(
 	ctx context.Context,
 	nodeInformer coreinformers.NodeInformer,
 	cloud cloudprovider.Interface,
+	linodeClient client.Client,
 	kubeClient clientset.Interface,
 	clusterCIDRs []*net.IPNet,
 	serviceCIDR *net.IPNet,
@@ -85,6 +88,7 @@ func NewNodeIpamController(
 
 	ic := &Controller{
 		cloud:                cloud,
+		linodeClient:         linodeClient,
 		kubeClient:           kubeClient,
 		eventBroadcaster:     record.NewBroadcaster(record.WithContext(ctx)),
 		clusterCIDRs:         clusterCIDRs,
@@ -102,7 +106,7 @@ func NewNodeIpamController(
 		NodeCIDRMaskSizes:    nodeCIDRMaskSizes,
 	}
 
-	ic.cidrAllocator, err = ipam.New(ctx, kubeClient, cloud, nodeInformer, ic.allocatorType, allocatorParams)
+	ic.cidrAllocator, err = ipam.New(ctx, ic.linodeClient, kubeClient, cloud, nodeInformer, ic.allocatorType, allocatorParams)
 	if err != nil {
 		return nil, err
 	}

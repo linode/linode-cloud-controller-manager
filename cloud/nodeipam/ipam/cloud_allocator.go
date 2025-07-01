@@ -18,6 +18,7 @@ package ipam
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"time"
@@ -40,10 +41,15 @@ import (
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
 	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
 	netutils "k8s.io/utils/net"
+
+	linode "github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
+	"github.com/linode/linodego"
 )
 
 type cloudAllocator struct {
 	client clientset.Interface
+
+	linodeClient linode.Client
 	// cluster cidr as passed in during controller creation for ipv4 addresses
 	clusterCIDR *net.IPNet
 	// for clusterCIDR we maintain what is used and what is not
@@ -70,7 +76,7 @@ var (
 // Caller must always pass in a list of existing nodes so the new allocator.
 // Caller must ensure that ClusterCIDR is semantically correct
 // can initialize its CIDR map. NodeList is only nil in testing.
-func NewLinodeCIDRAllocator(ctx context.Context, client clientset.Interface, nodeInformer informers.NodeInformer, allocatorParams CIDRAllocatorParams, nodeList *v1.NodeList) (CIDRAllocator, error) {
+func NewLinodeCIDRAllocator(ctx context.Context, linodeClient linode.Client, client clientset.Interface, nodeInformer informers.NodeInformer, allocatorParams CIDRAllocatorParams, nodeList *v1.NodeList) (CIDRAllocator, error) {
 	logger := klog.FromContext(ctx)
 	if client == nil {
 		logger.Error(nil, "kubeClient is nil when starting CIDRAllocator")
@@ -91,14 +97,15 @@ func NewLinodeCIDRAllocator(ctx context.Context, client clientset.Interface, nod
 	nodeCIDRMaskSizeIPv6 = allocatorParams.NodeCIDRMaskSizes[1]
 
 	ca := &cloudAllocator{
-		client:      client,
-		clusterCIDR: allocatorParams.ClusterCIDRs[0],
-		cidrSet:     cidrSet,
-		nodeLister:  nodeInformer.Lister(),
-		nodesSynced: nodeInformer.Informer().HasSynced,
-		broadcaster: eventBroadcaster,
-		recorder:    recorder,
-		queue:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[any](), "cidrallocator_node"),
+		client:       client,
+		linodeClient: linodeClient,
+		clusterCIDR:  allocatorParams.ClusterCIDRs[0],
+		cidrSet:      cidrSet,
+		nodeLister:   nodeInformer.Lister(),
+		nodesSynced:  nodeInformer.Informer().HasSynced,
+		broadcaster:  eventBroadcaster,
+		recorder:     recorder,
+		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[any](), "cidrallocator_node"),
 	}
 
 	if allocatorParams.ServiceCIDR != nil {
@@ -120,7 +127,7 @@ func NewLinodeCIDRAllocator(ctx context.Context, client clientset.Interface, nod
 				continue
 			}
 			logger.V(4).Info("Node has CIDR, occupying it in CIDR map", "node", klog.KObj(&node), "podCIDR", node.Spec.PodCIDR)
-			if err := ca.occupyCIDRs(&node); err != nil {
+			if err := ca.occupyCIDRs(ctx, &node); err != nil {
 				// This will happen if:
 				// 1. We find garbage in the podCIDRs field. Retrying is useless.
 				// 2. CIDR out of range: This means a node CIDR has changed.
@@ -284,17 +291,20 @@ func (c *cloudAllocator) syncNode(ctx context.Context, key string) error {
 }
 
 // marks node.PodCIDRs[...] as used in allocator's tracked cidrSet
-func (c *cloudAllocator) occupyCIDRs(node *v1.Node) error {
+func (c *cloudAllocator) occupyCIDRs(ctx context.Context, node *v1.Node) error {
 	if len(node.Spec.PodCIDRs) == 0 {
 		return nil
 	}
+	logger := klog.FromContext(ctx)
 	for idx, cidr := range node.Spec.PodCIDRs {
 		_, podCIDR, err := netutils.ParseCIDRSloppy(cidr)
 		if err != nil {
 			return fmt.Errorf("failed to parse node %s, CIDR %s", node.Name, node.Spec.PodCIDR)
 		}
+		// IPv6 CIDRs are allocated from node specific ranges
+		// We don't track them in the cidrSet
 		if podCIDR.IP.To4() == nil {
-			klog.Infof("Nothing to occupy for ipv6 CIDR %v", podCIDR)
+			logger.V(4).Info("Nothing to occupy for ipv6 CIDR", "cidr", podCIDR)
 			return nil
 		}
 		// If node has a pre allocate cidr that does not exist in our cidrs.
@@ -311,42 +321,51 @@ func (c *cloudAllocator) occupyCIDRs(node *v1.Node) error {
 	return nil
 }
 
-// TODO: replace logic in this method with allocated node specific IPv6 CIDR
-// For now, we are converting node's public ipv4 address into two IPv6 blocks
-// and then generating ipv6 CIDR from it.
-// This is a temporary solution until we have a proper IPv6 CIDR allocation
-func (c *cloudAllocator) createIPv6CIDR(node *v1.Node) (*net.IPNet, error) {
-	publicAddr := ""
-	for _, address := range node.Status.Addresses {
-		if address.Type == v1.NodeExternalIP {
-			publicAddr = address.Address
-			break
+// allocateIPv6CIDR allocates an IPv6 CIDR for the given node.
+// It retrieves the instance configuration for the node and extracts the IPv6 range.
+// It then creates a new net.IPNet with the IPv6 address and mask size defined
+// by nodeCIDRMaskSizeIPv6. The function returns an error if it fails to retrieve
+// the instance configuration or parse the IPv6 range.
+func (c *cloudAllocator) allocateIPv6CIDR(node *v1.Node) (*net.IPNet, error) {
+	filter := map[string]string{"label": fmt.Sprintf("%s", node.Name)}
+	rawFilter, err := json.Marshal(filter)
+	if err != nil {
+		return nil, fmt.Errorf("json marshal should not have failed")
+	}
+	linodes, err := c.linodeClient.ListInstances(context.TODO(), linodego.NewListOptions(1, string(rawFilter)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to list linode instances: %w", err)
+	} else if len(linodes) == 0 {
+		return nil, fmt.Errorf("no linode instances found for node %s", node.Name)
+	} else if len(linodes) > 1 {
+		return nil, fmt.Errorf("multiple linode instances found for node %s, expected only one", node.Name)
+	}
+	configs, err := c.linodeClient.ListInstanceConfigs(context.TODO(), linodes[0].ID, &linodego.ListOptions{})
+	if err != nil || len(configs) == 0 {
+		return nil, fmt.Errorf("failed to list instance configs: %w", err)
+	}
+
+	ipv6Range := ""
+	for _, iface := range configs[0].Interfaces {
+		if iface.Purpose == linodego.InterfacePurposeVPC {
+			if iface.IPv6 != nil && iface.IPv6.Ranges != nil && len(iface.IPv6.Ranges) > 0 {
+				ipv6Range = iface.IPv6.Ranges[0].Range
+			}
 		}
 	}
-	if publicAddr == "" {
-		return nil, fmt.Errorf("no external IP found for node %s", node.Name)
+
+	if ipv6Range == "" {
+		return nil, fmt.Errorf("failed to find ipv6 range in instance config: %v", configs[0])
 	}
 
-	ip := net.ParseIP(publicAddr)
-	if ip == nil {
-		return nil, fmt.Errorf("invalid IP address")
+	ip, _, err := net.ParseCIDR(ipv6Range)
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing ipv6 range %s: %w", ipv6Range, err)
 	}
 
-	ip = ip.To4()
-	if ip == nil {
-		return nil, fmt.Errorf("not an IPv4 address")
-	}
-
-	// Convert to ipv6 format
-	// Example: IPv4 in hex: 172.234.236.211 → ac:ea:ec:d3
-	// Sample IPv6 format: fd00::ac:ea:ec:d3/112
-	ipv6 := make(net.IP, net.IPv6len)
-	ipv6[0] = 0xfd // fd00::/8
-	// Embed the IPv4 into the last 4 bytes (last 32 bits)
-	copy(ipv6[12:], ip)
 	mask := net.CIDRMask(nodeCIDRMaskSizeIPv6, 128)
 	ipv6Embedded := &net.IPNet{
-		IP:   ipv6,
+		IP:   ip.Mask(mask),
 		Mask: mask,
 	}
 
@@ -362,7 +381,7 @@ func (c *cloudAllocator) AllocateOrOccupyCIDR(ctx context.Context, node *v1.Node
 	}
 
 	if len(node.Spec.PodCIDRs) > 0 {
-		return c.occupyCIDRs(node)
+		return c.occupyCIDRs(ctx, node)
 	}
 
 	logger := klog.FromContext(ctx)
@@ -374,7 +393,7 @@ func (c *cloudAllocator) AllocateOrOccupyCIDR(ctx context.Context, node *v1.Node
 		return fmt.Errorf("failed to allocate cidr from cluster cidr: %w", err)
 	}
 	allocatedCIDRs[0] = podCIDR
-	if allocatedCIDRs[1], err = c.createIPv6CIDR(node); err != nil {
+	if allocatedCIDRs[1], err = c.allocateIPv6CIDR(node); err != nil {
 		return fmt.Errorf("failed to assign IPv6 CIDR: %w", err)
 	}
 
@@ -395,7 +414,7 @@ func (c *cloudAllocator) ReleaseCIDR(logger klog.Logger, node *v1.Node) error {
 			return fmt.Errorf("failed to parse CIDR %s on Node %v: %w", cidr, node.Name, err)
 		}
 		if podCIDR.IP.To4() == nil {
-			klog.Infof("Nothing to release for ipv6 CIDR %v", podCIDR)
+			logger.V(4).Info("Nothing to release for ipv6 CIDR", "cidr", podCIDR)
 			continue
 		}
 

@@ -315,6 +315,21 @@ func (mr *MockClientMockRecorder) ListFirewallDevices(arg0, arg1, arg2 interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListFirewallDevices", reflect.TypeOf((*MockClient)(nil).ListFirewallDevices), arg0, arg1, arg2)
 }
 
+// ListInstanceConfigs mocks base method.
+func (m *MockClient) ListInstanceConfigs(arg0 context.Context, arg1 int, arg2 *linodego.ListOptions) ([]linodego.InstanceConfig, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListInstanceConfigs", arg0, arg1, arg2)
+	ret0, _ := ret[0].([]linodego.InstanceConfig)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListInstanceConfigs indicates an expected call of ListInstanceConfigs.
+func (mr *MockClientMockRecorder) ListInstanceConfigs(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListInstanceConfigs", reflect.TypeOf((*MockClient)(nil).ListInstanceConfigs), arg0, arg1, arg2)
+}
+
 // ListInstances mocks base method.
 func (m *MockClient) ListInstances(arg0 context.Context, arg1 *linodego.ListOptions) ([]linodego.Instance, error) {
 	m.ctrl.T.Helper()

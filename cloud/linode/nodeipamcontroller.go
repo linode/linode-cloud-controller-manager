@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
-	cloudprovider "k8s.io/cloud-provider"
 	netutils "k8s.io/utils/net"
 
 	nodeipamcontroller "github.com/linode/linode-cloud-controller-manager/cloud/nodeipam"
@@ -45,7 +44,7 @@ var (
 	defaultNodeMaskCIDRIPv6 = 112
 )
 
-func startNodeIpamController(stopCh <-chan struct{}, cloud cloudprovider.Interface, nodeInformer v1.NodeInformer, kubeclient kubernetes.Interface) error {
+func startNodeIpamController(stopCh <-chan struct{}, cloud *linodeCloud, nodeInformer v1.NodeInformer, kubeclient kubernetes.Interface) error {
 	var serviceCIDR *net.IPNet
 	var secondaryServiceCIDR *net.IPNet
 
@@ -72,35 +71,6 @@ func startNodeIpamController(stopCh <-chan struct{}, cloud cloudprovider.Interfa
 		return fmt.Errorf("clusterCIDR %s is not ipv4", clusterCIDRs[0].String())
 	}
 
-	/* TODO: uncomment and fix if we want to support service cidr overlap with nodecidr
-	// service cidr processing
-	if len(strings.TrimSpace(nodeIPAMConfig.ServiceCIDR)) != 0 {
-		_, serviceCIDR, err = netutils.ParseCIDRSloppy(nodeIPAMConfig.ServiceCIDR)
-		if err != nil {
-			klog.ErrorS(err, "Unsuccessful parsing of service CIDR", "CIDR", nodeIPAMConfig.ServiceCIDR)
-		}
-	}
-
-	if len(strings.TrimSpace(nodeIPAMConfig.SecondaryServiceCIDR)) != 0 {
-		_, secondaryServiceCIDR, err = netutils.ParseCIDRSloppy(nodeIPAMConfig.SecondaryServiceCIDR)
-		if err != nil {
-			klog.ErrorS(err, "Unsuccessful parsing of service CIDR", "CIDR", nodeIPAMConfig.SecondaryServiceCIDR)
-		}
-	}
-
-	// the following checks are triggered if both serviceCIDR and secondaryServiceCIDR are provided
-	if serviceCIDR != nil && secondaryServiceCIDR != nil {
-		// should be dual stack (from different IPFamilies)
-		dualstackServiceCIDR, err := netutils.IsDualStackCIDRs([]*net.IPNet{serviceCIDR, secondaryServiceCIDR})
-		if err != nil {
-			return nil, false, fmt.Errorf("failed to perform dualstack check on serviceCIDR and secondaryServiceCIDR error:%v", err)
-		}
-		if !dualstackServiceCIDR {
-			return nil, false, fmt.Errorf("serviceCIDR and secondaryServiceCIDR are not dualstack (from different IPfamiles)")
-		}
-	}
-	*/
-
 	nodeCIDRMaskSizes := setNodeCIDRMaskSizes()
 
 	ctx := wait.ContextForChannel(stopCh)
@@ -109,6 +79,7 @@ func startNodeIpamController(stopCh <-chan struct{}, cloud cloudprovider.Interfa
 		ctx,
 		nodeInformer,
 		cloud,
+		cloud.client,
 		kubeclient,
 		clusterCIDRs,
 		serviceCIDR,
