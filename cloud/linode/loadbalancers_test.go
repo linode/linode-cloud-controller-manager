@@ -13,6 +13,7 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -4360,6 +4361,28 @@ func testMakeLoadBalancerStatusEnvVar(t *testing.T, client *linodego.Client, _ *
 	os.Unsetenv("LINODE_HOSTNAME_ONLY_INGRESS")
 }
 
+func getLatestNbNodesForService(t *testing.T, client *linodego.Client, svc *v1.Service, lb *loadbalancers) []linodego.NodeBalancerNode {
+	t.Helper()
+	nb, err := lb.getNodeBalancerByStatus(t.Context(), svc)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	cfgs, errConfigs := client.ListNodeBalancerConfigs(t.Context(), nb.ID, nil)
+	if errConfigs != nil {
+		t.Fatalf("expected no error getting configs, got %v", errConfigs)
+	}
+	slices.SortFunc(cfgs, func(a, b linodego.NodeBalancerConfig) int {
+		return a.ID - b.ID
+	})
+
+	// Verify nodes were created correctly (only non-excluded nodes)
+	nodeBalancerNodes, err := client.ListNodeBalancerNodes(t.Context(), nb.ID, cfgs[0].ID, nil)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	return nodeBalancerNodes
+}
+
 func testCleanupDoesntCall(t *testing.T, client *linodego.Client, fakeAPI *fakeAPI) {
 	t.Helper()
 
@@ -4482,7 +4505,7 @@ func testUpdateLoadBalancerNodeExcludedByAnnotation(t *testing.T, client *linode
 				Addresses: []v1.NodeAddress{
 					{
 						Type:    v1.NodeInternalIP,
-						Address: "127.0.0.1",
+						Address: "127.0.0.2",
 					},
 				},
 			},
@@ -4495,7 +4518,7 @@ func testUpdateLoadBalancerNodeExcludedByAnnotation(t *testing.T, client *linode
 				Addresses: []v1.NodeAddress{
 					{
 						Type:    v1.NodeInternalIP,
-						Address: "127.0.0.1",
+						Address: "127.0.0.3",
 					},
 				},
 			},
@@ -4507,18 +4530,7 @@ func testUpdateLoadBalancerNodeExcludedByAnnotation(t *testing.T, client *linode
 	if err != nil {
 		t.Fatalf("expected no error got %v", err)
 	}
-
-	nb, err := lb.getNodeBalancerByStatus(t.Context(), svc)
-	if err != nil {
-		t.Fatalf("expected no error got %v", err)
-	}
-
-	// Verify nodes were created correctly (only non-excluded nodes)
-	nodeBalancerNodes, err := client.ListNodeBalancerNodes(t.Context(), nb.ID, 0, nil)
-	if err != nil {
-		t.Fatalf("expected no error got %v", err)
-	}
-
+	nodeBalancerNodes := getLatestNbNodesForService(t, client, svc, lb)
 	// Should have only 2 nodes (node-1 and node-3), since node-2 is excluded
 	if len(nodeBalancerNodes) != 2 {
 		t.Errorf("expected 2 nodes, got %d", len(nodeBalancerNodes))
@@ -4560,7 +4572,7 @@ func testUpdateLoadBalancerNodeExcludedByAnnotation(t *testing.T, client *linode
 				Addresses: []v1.NodeAddress{
 					{
 						Type:    v1.NodeInternalIP,
-						Address: "127.0.0.1",
+						Address: "127.0.0.2",
 					},
 				},
 			},
@@ -4573,7 +4585,7 @@ func testUpdateLoadBalancerNodeExcludedByAnnotation(t *testing.T, client *linode
 				Addresses: []v1.NodeAddress{
 					{
 						Type:    v1.NodeInternalIP,
-						Address: "127.0.0.1",
+						Address: "127.0.0.3",
 					},
 				},
 			},
@@ -4581,15 +4593,12 @@ func testUpdateLoadBalancerNodeExcludedByAnnotation(t *testing.T, client *linode
 	}
 
 	// Update the load balancer with updated nodes
-	if err := lb.UpdateLoadBalancer(t.Context(), "linodelb", svc, updatedNodes); err != nil {
+	if err = lb.UpdateLoadBalancer(t.Context(), "linodelb", svc, updatedNodes); err != nil {
 		t.Fatalf("unexpected error updating LoadBalancer: %v", err)
 	}
 
 	// Verify nodes were updated correctly
-	nodeBalancerNodesAfterUpdate, err := client.ListNodeBalancerNodes(t.Context(), nb.ID, 0, nil)
-	if err != nil {
-		t.Fatalf("expected no error got %v", err)
-	}
+	nodeBalancerNodesAfterUpdate := getLatestNbNodesForService(t, client, svc, lb)
 
 	// Should have only 1 node (node-3), since both node-1 and node-2 are excluded
 	if len(nodeBalancerNodesAfterUpdate) != 1 {
@@ -4632,7 +4641,7 @@ func testUpdateLoadBalancerNodeExcludedByAnnotation(t *testing.T, client *linode
 				Addresses: []v1.NodeAddress{
 					{
 						Type:    v1.NodeInternalIP,
-						Address: "127.0.0.1",
+						Address: "127.0.0.2",
 					},
 				},
 			},
@@ -4648,16 +4657,22 @@ func testUpdateLoadBalancerNodeExcludedByAnnotation(t *testing.T, client *linode
 				Addresses: []v1.NodeAddress{
 					{
 						Type:    v1.NodeInternalIP,
-						Address: "127.0.0.1",
+						Address: "127.0.0.3",
 					},
 				},
 			},
 		},
 	}
 
-	err = lb.UpdateLoadBalancer(t.Context(), "linodelb", svc, allExcludedNodes)
-	if err == nil {
-		t.Errorf("expected error when all nodes are excluded, got nil")
+	if err = lb.UpdateLoadBalancer(t.Context(), "linodelb", svc, allExcludedNodes); err != nil {
+		t.Errorf("expected no error when all nodes are excluded, got %v", err)
+	}
+
+	// Verify nodes were updated correctly
+	nodeBalancerNodesAfterUpdate = getLatestNbNodesForService(t, client, svc, lb)
+	// Should have only 0 node (node-3), since all nodes are excluded
+	if len(nodeBalancerNodesAfterUpdate) != 0 {
+		t.Errorf("expected 0 nodes after update, got %d", len(nodeBalancerNodesAfterUpdate))
 	}
 }
 

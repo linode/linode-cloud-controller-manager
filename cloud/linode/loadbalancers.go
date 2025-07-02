@@ -467,7 +467,6 @@ func (l *loadbalancers) updateNodeBalancer(
 				klog.Infof("Node %s is excluded from NodeBalancer by annotation, skipping", node.Name)
 				continue
 			}
-
 			newNodeOpts := l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort, subnetID, newNBCfg.Protocol)
 			oldNodeID, ok := oldNBNodeIDs[newNodeOpts.Address]
 			if ok {
@@ -477,7 +476,6 @@ func (l *loadbalancers) updateNodeBalancer(
 			}
 			newNBNodes = append(newNBNodes, newNodeOpts)
 		}
-
 		// If there's no existing config, create it
 		var rebuildOpts linodego.NodeBalancerConfigRebuildOptions
 		if currentNBCfg == nil {
