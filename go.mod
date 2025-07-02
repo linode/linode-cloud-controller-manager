@@ -25,7 +25,10 @@ require (
 	k8s.io/utils v0.0.0-20250502105355-0f33e8f1c979
 )
 
-require sigs.k8s.io/randfill v1.0.0 // indirect
+require (
+	github.com/onsi/gomega v1.35.1 // indirect
+	sigs.k8s.io/randfill v1.0.0 // indirect
+)
 
 require (
 	cel.dev/expr v0.20.0 // indirect
@@ -96,7 +99,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/onsi/gomega v1.35.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opentracing/opentracing-go v1.2.1-0.20220228012449-10b1cf09e00b // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect

@@ -65,14 +65,14 @@ type cloudAllocator struct {
 	// queues are where incoming work is placed to de-dup and to allow "easy"
 	// rate limited requeues on errors
 	queue workqueue.TypedRateLimitingInterface[any]
+
+	// nodeCIDRMaskSizeIPv6 is the mask size for the IPv6 CIDR assigned to nodes.
+	nodeCIDRMaskSizeIPv6 int
 }
 
 const providerIDPrefix = "linode://"
 
-var (
-	_                    CIDRAllocator = &cloudAllocator{}
-	nodeCIDRMaskSizeIPv6               = 112
-)
+var _ CIDRAllocator = &cloudAllocator{}
 
 // NewLinodeCIDRAllocator returns a CIDRAllocator to allocate CIDRs for node
 // Caller must ensure subNetMaskSize is not less than cluster CIDR mask size.
@@ -95,20 +95,17 @@ func NewLinodeCIDRAllocator(ctx context.Context, linodeClient linode.Client, cli
 		return nil, err
 	}
 
-	// set nodeCIDRMaskSizeIPv6 to the second mask size
-	// this is used to assign the nodeCIDR for ipv6 addresses
-	nodeCIDRMaskSizeIPv6 = allocatorParams.NodeCIDRMaskSizes[1]
-
 	ca := &cloudAllocator{
-		client:       client,
-		linodeClient: linodeClient,
-		clusterCIDR:  allocatorParams.ClusterCIDRs[0],
-		cidrSet:      cidrSet,
-		nodeLister:   nodeInformer.Lister(),
-		nodesSynced:  nodeInformer.Informer().HasSynced,
-		broadcaster:  eventBroadcaster,
-		recorder:     recorder,
-		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[any](), "cidrallocator_node"),
+		client:               client,
+		linodeClient:         linodeClient,
+		clusterCIDR:          allocatorParams.ClusterCIDRs[0],
+		cidrSet:              cidrSet,
+		nodeLister:           nodeInformer.Lister(),
+		nodesSynced:          nodeInformer.Informer().HasSynced,
+		broadcaster:          eventBroadcaster,
+		recorder:             recorder,
+		queue:                workqueue.NewNamedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[any](), "cidrallocator_node"),
+		nodeCIDRMaskSizeIPv6: allocatorParams.NodeCIDRMaskSizes[1],
 	}
 
 	if allocatorParams.ServiceCIDR != nil {
@@ -302,7 +299,7 @@ func (c *cloudAllocator) occupyCIDRs(ctx context.Context, node *v1.Node) error {
 	for idx, cidr := range node.Spec.PodCIDRs {
 		_, podCIDR, err := netutils.ParseCIDRSloppy(cidr)
 		if err != nil {
-			return fmt.Errorf("failed to parse node %s, CIDR %s", node.Name, node.Spec.PodCIDR)
+			return fmt.Errorf("failed to parse node %s, CIDR %s", node.Name, cidr)
 		}
 		// IPv6 CIDRs are allocated from node specific ranges
 		// We don't track them in the cidrSet
@@ -366,7 +363,7 @@ func (c *cloudAllocator) allocateIPv6CIDR(ctx context.Context, node *v1.Node) (*
 		return nil, fmt.Errorf("failed parsing ipv6 range %s: %w", ipv6Range, err)
 	}
 
-	mask := net.CIDRMask(nodeCIDRMaskSizeIPv6, 128)
+	mask := net.CIDRMask(c.nodeCIDRMaskSizeIPv6, 128)
 	ipv6Embedded := &net.IPNet{
 		IP:   ip.Mask(mask),
 		Mask: mask,
