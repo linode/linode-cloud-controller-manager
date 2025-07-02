@@ -243,6 +243,18 @@ metadata:
     service.beta.kubernetes.io/linode-loadbalancer-tags: "production,web-tier"
 ```
 
+### Excluding nodes from nodebalancer
+Add the an annotation to the node object to exclude
+
+```yaml
+apiVersion: v1
+kind: Node
+metadata:
+  name: node-to-exclude
+  annotations:
+    node.k8s.linode.com/exclude-from-nb: "true"
+```
+
 ## Related Documentation
 
 - [Service Annotations](annotations.md)
