@@ -17,6 +17,7 @@ limitations under the License.
 package ipam
 
 import (
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -63,6 +64,9 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "node0",
 						},
+						Spec: v1.NodeSpec{
+							ProviderID: fmt.Sprintf("%s12345", providerIDPrefix),
+						},
 					},
 				},
 				Clientset: fake.NewSimpleClientset(),
@@ -90,7 +94,8 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 							Name: "node0",
 						},
 						Spec: v1.NodeSpec{
-							PodCIDRs: []string{"10.10.1.0/24"},
+							PodCIDRs:   []string{"10.10.1.0/24"},
+							ProviderID: fmt.Sprintf("%s12345", providerIDPrefix),
 						},
 					},
 				},
@@ -120,7 +125,8 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 							Name: "node0",
 						},
 						Spec: v1.NodeSpec{
-							PodCIDRs: []string{"172.10.1.0/24"},
+							PodCIDRs:   []string{"172.10.1.0/24"},
+							ProviderID: fmt.Sprintf("%s12345", providerIDPrefix),
 						},
 					},
 				},
@@ -181,6 +187,9 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "node0",
 						},
+						Spec: v1.NodeSpec{
+							ProviderID: fmt.Sprintf("%s12345", providerIDPrefix),
+						},
 						Status: v1.NodeStatus{
 							Addresses: []v1.NodeAddress{
 								{
@@ -215,6 +224,9 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "node0",
+						},
+						Spec: v1.NodeSpec{
+							ProviderID: fmt.Sprintf("%s12345", providerIDPrefix),
 						},
 						Status: v1.NodeStatus{
 							Addresses: []v1.NodeAddress{
@@ -254,6 +266,9 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "node0",
+						},
+						Spec: v1.NodeSpec{
+							ProviderID: fmt.Sprintf("%s12345", providerIDPrefix),
 						},
 						Status: v1.NodeStatus{
 							Addresses: []v1.NodeAddress{
@@ -297,7 +312,8 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 							Name: "node0",
 						},
 						Spec: v1.NodeSpec{
-							PodCIDRs: []string{"10.10.0.0/24"},
+							PodCIDRs:   []string{"10.10.0.0/24"},
+							ProviderID: fmt.Sprintf("%s12345", providerIDPrefix),
 						},
 						Status: v1.NodeStatus{
 							Addresses: []v1.NodeAddress{
@@ -313,7 +329,8 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 							Name: "node1",
 						},
 						Spec: v1.NodeSpec{
-							PodCIDRs: []string{"10.10.2.0/24"},
+							PodCIDRs:   []string{"10.10.2.0/24"},
+							ProviderID: fmt.Sprintf("%s22345", providerIDPrefix),
 						},
 						Status: v1.NodeStatus{
 							Addresses: []v1.NodeAddress{
@@ -327,6 +344,9 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "node2",
+						},
+						Spec: v1.NodeSpec{
+							ProviderID: fmt.Sprintf("%s32345", providerIDPrefix),
 						},
 						Status: v1.NodeStatus{
 							Addresses: []v1.NodeAddress{
@@ -361,12 +381,6 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 	testFunc := func(tc testCase) {
 		fakeNodeInformer := test.FakeNodeInformer(tc.fakeNodeHandler)
 		nodeList, _ := tc.fakeNodeHandler.List(tCtx, metav1.ListOptions{})
-		// Initialize the range allocator.
-		tc.linodeClient.EXPECT().ListInstances(gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.Instance{
-			{
-				ID: 12345,
-			},
-		}, nil)
 		tc.linodeClient.EXPECT().ListInstanceConfigs(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.InstanceConfig{
 			{
 				Interfaces: []linodego.InstanceConfigInterface{
@@ -462,6 +476,9 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "node0",
+						},
+						Spec: v1.NodeSpec{
+							ProviderID: fmt.Sprintf("%s12345", providerIDPrefix),
 						},
 					},
 				},
@@ -572,6 +589,9 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "node0",
 						},
+						Spec: v1.NodeSpec{
+							ProviderID: fmt.Sprintf("%s12345", providerIDPrefix),
+						},
 						Status: v1.NodeStatus{
 							Addresses: []v1.NodeAddress{
 								{
@@ -613,6 +633,9 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "node0",
 						},
+						Spec: v1.NodeSpec{
+							ProviderID: fmt.Sprintf("%s12345", providerIDPrefix),
+						},
 						Status: v1.NodeStatus{
 							Addresses: []v1.NodeAddress{
 								{
@@ -650,12 +673,6 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 	}
 	logger, tCtx := ktesting.NewTestContext(t)
 	testFunc := func(tc releaseTestCase) {
-		// Initialize the range allocator.
-		tc.linodeClient.EXPECT().ListInstances(gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.Instance{
-			{
-				ID: 12345,
-			},
-		}, nil)
 		tc.linodeClient.EXPECT().ListInstanceConfigs(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.InstanceConfig{
 			{
 				Interfaces: []linodego.InstanceConfigInterface{
@@ -782,8 +799,9 @@ func TestNodeDeletionReleaseCIDR(t *testing.T) {
 						Name: "node0",
 					},
 					Spec: v1.NodeSpec{
-						PodCIDR:  allocatedCIDR.String(),
-						PodCIDRs: []string{allocatedCIDR.String()},
+						PodCIDR:    allocatedCIDR.String(),
+						PodCIDRs:   []string{allocatedCIDR.String()},
+						ProviderID: fmt.Sprintf("%s12345", providerIDPrefix),
 					},
 				},
 			},
@@ -799,8 +817,9 @@ func TestNodeDeletionReleaseCIDR(t *testing.T) {
 						DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					},
 					Spec: v1.NodeSpec{
-						PodCIDR:  allocatedCIDR.String(),
-						PodCIDRs: []string{allocatedCIDR.String()},
+						PodCIDR:    allocatedCIDR.String(),
+						PodCIDRs:   []string{allocatedCIDR.String()},
+						ProviderID: fmt.Sprintf("%s12345", providerIDPrefix),
 					},
 				},
 			},

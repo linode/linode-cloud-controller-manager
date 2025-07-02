@@ -18,11 +18,13 @@ package ipam
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/linode/linodego"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -43,7 +45,6 @@ import (
 	netutils "k8s.io/utils/net"
 
 	linode "github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
-	"github.com/linode/linodego"
 )
 
 type cloudAllocator struct {
@@ -65,6 +66,8 @@ type cloudAllocator struct {
 	// rate limited requeues on errors
 	queue workqueue.TypedRateLimitingInterface[any]
 }
+
+const providerIDPrefix = "linode://"
 
 var (
 	_                    CIDRAllocator = &cloudAllocator{}
@@ -326,21 +329,21 @@ func (c *cloudAllocator) occupyCIDRs(ctx context.Context, node *v1.Node) error {
 // It then creates a new net.IPNet with the IPv6 address and mask size defined
 // by nodeCIDRMaskSizeIPv6. The function returns an error if it fails to retrieve
 // the instance configuration or parse the IPv6 range.
-func (c *cloudAllocator) allocateIPv6CIDR(node *v1.Node) (*net.IPNet, error) {
-	filter := map[string]string{"label": fmt.Sprintf("%s", node.Name)}
-	rawFilter, err := json.Marshal(filter)
-	if err != nil {
-		return nil, fmt.Errorf("json marshal should not have failed")
+func (c *cloudAllocator) allocateIPv6CIDR(ctx context.Context, node *v1.Node) (*net.IPNet, error) {
+	if node.Spec.ProviderID == "" {
+		return nil, fmt.Errorf("node %s has no ProviderID set, cannot calculate ipv6 range for it", node.Name)
 	}
-	linodes, err := c.linodeClient.ListInstances(context.TODO(), linodego.NewListOptions(1, string(rawFilter)))
-	if err != nil {
-		return nil, fmt.Errorf("failed to list linode instances: %w", err)
-	} else if len(linodes) == 0 {
-		return nil, fmt.Errorf("no linode instances found for node %s", node.Name)
-	} else if len(linodes) > 1 {
-		return nil, fmt.Errorf("multiple linode instances found for node %s, expected only one", node.Name)
+	// Extract the Linode ID from the ProviderID
+	if !strings.HasPrefix(node.Spec.ProviderID, providerIDPrefix) {
+		return nil, fmt.Errorf("node %s has invalid ProviderID %s, expected prefix '%s'", node.Name, node.Spec.ProviderID, providerIDPrefix)
 	}
-	configs, err := c.linodeClient.ListInstanceConfigs(context.TODO(), linodes[0].ID, &linodego.ListOptions{})
+	// Parse the Linode ID from the ProviderID
+	id, err := strconv.Atoi(strings.TrimPrefix(node.Spec.ProviderID, providerIDPrefix))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse Linode ID from ProviderID %s: %w", node.Spec.ProviderID, err)
+	}
+	// Retrieve the instance configuration for the Linode ID
+	configs, err := c.linodeClient.ListInstanceConfigs(ctx, id, &linodego.ListOptions{})
 	if err != nil || len(configs) == 0 {
 		return nil, fmt.Errorf("failed to list instance configs: %w", err)
 	}
@@ -393,7 +396,7 @@ func (c *cloudAllocator) AllocateOrOccupyCIDR(ctx context.Context, node *v1.Node
 		return fmt.Errorf("failed to allocate cidr from cluster cidr: %w", err)
 	}
 	allocatedCIDRs[0] = podCIDR
-	if allocatedCIDRs[1], err = c.allocateIPv6CIDR(node); err != nil {
+	if allocatedCIDRs[1], err = c.allocateIPv6CIDR(ctx, node); err != nil {
 		return fmt.Errorf("failed to assign IPv6 CIDR: %w", err)
 	}
 
