@@ -13,6 +13,7 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -296,6 +297,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 		{
 			name: "Update Load Balancer - No Nodes",
 			f:    testUpdateLoadBalancerNoNodes,
+		},
+		{
+			name: "Update Load Balancer - Node excluded by annotation",
+			f:    testUpdateLoadBalancerNodeExcludedByAnnotation,
 		},
 		{
 			name: "Create Load Balancer - Very long Service name",
@@ -4356,6 +4361,28 @@ func testMakeLoadBalancerStatusEnvVar(t *testing.T, client *linodego.Client, _ *
 	os.Unsetenv("LINODE_HOSTNAME_ONLY_INGRESS")
 }
 
+func getLatestNbNodesForService(t *testing.T, client *linodego.Client, svc *v1.Service, lb *loadbalancers) []linodego.NodeBalancerNode {
+	t.Helper()
+	nb, err := lb.getNodeBalancerByStatus(t.Context(), svc)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	cfgs, errConfigs := client.ListNodeBalancerConfigs(t.Context(), nb.ID, nil)
+	if errConfigs != nil {
+		t.Fatalf("expected no error getting configs, got %v", errConfigs)
+	}
+	slices.SortFunc(cfgs, func(a, b linodego.NodeBalancerConfig) int {
+		return a.ID - b.ID
+	})
+
+	// Verify nodes were created correctly (only non-excluded nodes)
+	nodeBalancerNodes, err := client.ListNodeBalancerNodes(t.Context(), nb.ID, cfgs[0].ID, nil)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	return nodeBalancerNodes
+}
+
 func testCleanupDoesntCall(t *testing.T, client *linodego.Client, fakeAPI *fakeAPI) {
 	t.Helper()
 
@@ -4407,6 +4434,246 @@ func testCleanupDoesntCall(t *testing.T, client *linodego.Client, fakeAPI *fakeA
 			t.Fatalf("expected requests %#v, got %#v instead", expectedRequests, fakeAPI.requests)
 		}
 	})
+}
+
+func testUpdateLoadBalancerNodeExcludedByAnnotation(t *testing.T, client *linodego.Client, _ *fakeAPI) {
+	t.Helper()
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        randString(),
+			UID:         "foobar123",
+			Annotations: map[string]string{},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:     randString(),
+					Protocol: "http",
+					Port:     int32(80),
+					NodePort: int32(8080),
+				},
+			},
+		},
+	}
+
+	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	if !assertion {
+		t.Error("type assertion failed")
+	}
+	defer func() {
+		_ = lb.EnsureLoadBalancerDeleted(t.Context(), "linodelb", svc)
+	}()
+
+	fakeClientset := fake.NewSimpleClientset()
+	lb.kubeClient = fakeClientset
+
+	nodeBalancer, err := client.CreateNodeBalancer(t.Context(), linodego.NodeBalancerCreateOptions{
+		Region: lb.zone,
+	})
+	if err != nil {
+		t.Fatalf("failed to create NodeBalancer: %s", err)
+	}
+	svc.Status.LoadBalancer = *makeLoadBalancerStatus(svc, nodeBalancer)
+	stubService(fakeClientset, svc)
+	svc.SetAnnotations(map[string]string{
+		annotations.AnnLinodeNodeBalancerID: strconv.Itoa(nodeBalancer.ID),
+	})
+
+	// setup done, test ensure/update
+	nodes := []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node-1",
+			},
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node-2",
+				Annotations: map[string]string{
+					annotations.AnnExcludeNodeFromNb: "true",
+				},
+			},
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.2",
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node-3",
+			},
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.3",
+					},
+				},
+			},
+		},
+	}
+
+	// Test initial creation - should only create nodes that aren't excluded
+	_, err = lb.EnsureLoadBalancer(t.Context(), "linodelb", svc, nodes)
+	if err != nil {
+		t.Fatalf("expected no error got %v", err)
+	}
+	nodeBalancerNodes := getLatestNbNodesForService(t, client, svc, lb)
+	// Should have only 2 nodes (node-1 and node-3), since node-2 is excluded
+	if len(nodeBalancerNodes) != 2 {
+		t.Errorf("expected 2 nodes, got %d", len(nodeBalancerNodes))
+	}
+
+	// Verify excluded node is not present
+	for _, nbNode := range nodeBalancerNodes {
+		if strings.Contains(nbNode.Label, "node-2") {
+			t.Errorf("excluded node 'node-2' should not be present in nodeBalancer nodes")
+		}
+	}
+
+	// Test Update operation
+	updatedNodes := []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node-1",
+				Annotations: map[string]string{
+					annotations.AnnExcludeNodeFromNb: "true", // Now exclude node-1
+				},
+			},
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node-2",
+				Annotations: map[string]string{
+					annotations.AnnExcludeNodeFromNb: "true", // Still excluded
+				},
+			},
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.2",
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node-3",
+			},
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.3",
+					},
+				},
+			},
+		},
+	}
+
+	// Update the load balancer with updated nodes
+	if err = lb.UpdateLoadBalancer(t.Context(), "linodelb", svc, updatedNodes); err != nil {
+		t.Fatalf("unexpected error updating LoadBalancer: %v", err)
+	}
+
+	// Verify nodes were updated correctly
+	nodeBalancerNodesAfterUpdate := getLatestNbNodesForService(t, client, svc, lb)
+
+	// Should have only 1 node (node-3), since both node-1 and node-2 are excluded
+	if len(nodeBalancerNodesAfterUpdate) != 1 {
+		t.Errorf("expected 1 node after update, got %d", len(nodeBalancerNodesAfterUpdate))
+	}
+
+	// Verify excluded nodes are not present
+	for _, nbNode := range nodeBalancerNodesAfterUpdate {
+		if strings.Contains(nbNode.Label, "node-1") || strings.Contains(nbNode.Label, "node-2") {
+			t.Errorf("excluded nodes should not be present in nodeBalancer nodes after update")
+		}
+	}
+
+	// Test edge case: all nodes excluded
+	allExcludedNodes := []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node-1",
+				Annotations: map[string]string{
+					annotations.AnnExcludeNodeFromNb: "true",
+				},
+			},
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node-2",
+				Annotations: map[string]string{
+					annotations.AnnExcludeNodeFromNb: "true",
+				},
+			},
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.2",
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node-3",
+				Annotations: map[string]string{
+					annotations.AnnExcludeNodeFromNb: "true",
+				},
+			},
+			Status: v1.NodeStatus{
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "127.0.0.3",
+					},
+				},
+			},
+		},
+	}
+
+	if err = lb.UpdateLoadBalancer(t.Context(), "linodelb", svc, allExcludedNodes); err != nil {
+		t.Errorf("expected no error when all nodes are excluded, got %v", err)
+	}
+
+	// Verify nodes were updated correctly
+	nodeBalancerNodesAfterUpdate = getLatestNbNodesForService(t, client, svc, lb)
+	// Should have only 0 node (node-3), since all nodes are excluded
+	if len(nodeBalancerNodesAfterUpdate) != 0 {
+		t.Errorf("expected 0 nodes after update, got %d", len(nodeBalancerNodesAfterUpdate))
+	}
 }
 
 func testUpdateLoadBalancerNoNodes(t *testing.T, client *linodego.Client, _ *fakeAPI) {
