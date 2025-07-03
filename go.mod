@@ -7,7 +7,7 @@ toolchain go1.24.1
 require (
 	github.com/appscode/go v0.0.0-20201105063637-5613f3b8169f
 	github.com/cilium/cilium v1.17.4
-	github.com/getsentry/sentry-go v0.33.0
+	github.com/getsentry/sentry-go v0.34.0
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
 	github.com/hexdigest/gowrap v1.4.2
