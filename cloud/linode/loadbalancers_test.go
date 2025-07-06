@@ -3913,7 +3913,7 @@ func Test_getNodePrivateIP(t *testing.T) {
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
-			ip := getNodePrivateIP(test.node, test.subnetID)
+			ip, _ := getNodePrivateIP(test.node, test.subnetID)
 			if ip != test.address {
 				t.Error("unexpected certificate")
 				t.Logf("expected: %q", test.address)

@@ -1076,9 +1076,9 @@ func coerceString(str string, minLen, maxLen int, padding string) string {
 }
 
 func (l *loadbalancers) buildNodeBalancerNodeConfigRebuildOptions(node *v1.Node, nodePort int32, subnetID int, protocol linodego.ConfigProtocol) (*linodego.NodeBalancerConfigRebuildNodeOptions, error) {
-	nodeIP := getNodePrivateIP(node, subnetID)
-	if nodeIP == "" {
-		return nil, fmt.Errorf("node %s does not have a private IP address", node.Name)
+	nodeIP, err := getNodePrivateIP(node, subnetID)
+	if err != nil {
+		return nil, fmt.Errorf("node %s does not have a private IP address: %w", node.Name, err)
 	}
 	nodeOptions := &linodego.NodeBalancerConfigRebuildNodeOptions{
 		NodeBalancerNodeCreateOptions: linodego.NodeBalancerNodeCreateOptions{
@@ -1225,23 +1225,23 @@ func getPortConfigAnnotation(service *v1.Service, port int) (portConfigAnnotatio
 // For services outside of VPC, it will use linode specific private IP address
 // Backend IP can be overwritten to the one specified using AnnLinodeNodePrivateIP
 // annotation over the NodeInternalIP.
-func getNodePrivateIP(node *v1.Node, subnetID int) string {
+func getNodePrivateIP(node *v1.Node, subnetID int) (string, error) {
 	if subnetID == 0 {
 		if address, exists := node.Annotations[annotations.AnnLinodeNodePrivateIP]; exists {
-			return address
+			return address, nil
 		}
 	}
 
 	klog.Infof("Node %s, assigned IP addresses: %v", node.Name, node.Status.Addresses)
 	for _, addr := range node.Status.Addresses {
 		if addr.Type == v1.NodeInternalIP {
-			return addr.Address
+			return addr.Address, nil
 		}
 	}
 
-	// If no internal IP is found, return an empty string.
-	klog.Warningf("No internal IP found for node %s, using empty string as backend IP", node.Name)
-	return ""
+	// If no private/internal IP is found, return error.
+	klog.V(4).Infof("No internal IP found for node %s", node.Name)
+	return "", fmt.Errorf("no internal IP found for node %s", node.Name)
 }
 
 func getTLSCertInfo(ctx context.Context, kubeClient kubernetes.Interface, namespace string, config portConfig) (string, string, error) {

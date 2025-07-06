@@ -52,7 +52,7 @@ spec:
                       echo "Failed fetching nodebalancer config for port 80"
                   fi
 
-                  port_80_up_nodes=$(echo $nbconfig | jq '(.nodes_status.up)|tonumber == 2')
+                  port_80_up_nodes=$(echo $nbconfig | jq '(.nodes_status.up)|tonumber >= 2')
 
                   if [[ $port_80_up_nodes == "true" ]]; then
                       echo "all nodes up"
@@ -92,7 +92,7 @@ spec:
                   if [[ -z $nbconfig ]]; then
                       echo "Failed fetching nodebalancer config for port 80"
                   else
-                      port_80_up_nodes=$(echo $nbconfig | jq '(.nodes_status.up)|tonumber == 3')
+                      port_80_up_nodes=$(echo $nbconfig | jq '(.nodes_status.up)|tonumber >= 3')
 
                       if [[ $port_80_up_nodes == "true" ]]; then
                           echo "all nodes up"
