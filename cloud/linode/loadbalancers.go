@@ -160,7 +160,14 @@ func (l *loadbalancers) getLatestServiceLoadBalancerStatus(ctx context.Context, 
 // getNodeBalancerByStatus attempts to get the NodeBalancer from the IP or hostname specified in the
 // most recent LoadBalancer status.
 func (l *loadbalancers) getNodeBalancerByStatus(ctx context.Context, service *v1.Service) (nb *linodego.NodeBalancer, err error) {
-	for _, ingress := range service.Status.LoadBalancer.Ingress {
+	lb := service.Status.LoadBalancer
+	updatedLb, err := l.getLatestServiceLoadBalancerStatus(ctx, service)
+	if err != nil {
+		klog.V(3).Infof("failed to get latest LoadBalancer status for service (%s): %v", getServiceNn(service), err)
+	} else {
+		lb = updatedLb
+	}
+	for _, ingress := range lb.Ingress {
 		if ingress.IP != "" {
 			address, err := netip.ParseAddr(ingress.IP)
 			if err != nil {
@@ -467,14 +474,19 @@ func (l *loadbalancers) updateNodeBalancer(
 				klog.Infof("Node %s is excluded from NodeBalancer by annotation, skipping", node.Name)
 				continue
 			}
-			newNodeOpts := l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort, subnetID, newNBCfg.Protocol)
+			var newNodeOpts *linodego.NodeBalancerConfigRebuildNodeOptions
+			newNodeOpts, err = l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort, subnetID, newNBCfg.Protocol)
+			if err != nil {
+				sentry.CaptureError(ctx, err)
+				return fmt.Errorf("failed to build NodeBalancer node config options for node %s: %w", node.Name, err)
+			}
 			oldNodeID, ok := oldNBNodeIDs[newNodeOpts.Address]
 			if ok {
 				newNodeOpts.ID = oldNodeID
 			} else {
 				klog.Infof("No preexisting node id for %v found.", newNodeOpts.Address)
 			}
-			newNBNodes = append(newNBNodes, newNodeOpts)
+			newNBNodes = append(newNBNodes, *newNodeOpts)
 		}
 		// If there's no existing config, create it
 		var rebuildOpts linodego.NodeBalancerConfigRebuildOptions
@@ -1033,12 +1045,17 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 		}
 		createOpt := config.GetCreateOptions()
 
-		for _, n := range nodes {
-			if _, ok := n.Annotations[annotations.AnnExcludeNodeFromNb]; ok {
-				klog.Infof("Node %s is excluded from NodeBalancer by annotation, skipping", n.Name)
+		for _, node := range nodes {
+			if _, ok := node.Annotations[annotations.AnnExcludeNodeFromNb]; ok {
+				klog.Infof("Node %s is excluded from NodeBalancer by annotation, skipping", node.Name)
 				continue
 			}
-			createOpt.Nodes = append(createOpt.Nodes, l.buildNodeBalancerNodeConfigRebuildOptions(n, port.NodePort, subnetID, config.Protocol).NodeBalancerNodeCreateOptions)
+			newNodeOpts, err := l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort, subnetID, config.Protocol)
+			if err != nil {
+				sentry.CaptureError(ctx, err)
+				return nil, fmt.Errorf("failed to build NodeBalancer node config options for node %s: %w", node.Name, err)
+			}
+			createOpt.Nodes = append(createOpt.Nodes, newNodeOpts.NodeBalancerNodeCreateOptions)
 		}
 
 		configs = append(configs, &createOpt)
@@ -1058,10 +1075,14 @@ func coerceString(str string, minLen, maxLen int, padding string) string {
 	return str
 }
 
-func (l *loadbalancers) buildNodeBalancerNodeConfigRebuildOptions(node *v1.Node, nodePort int32, subnetID int, protocol linodego.ConfigProtocol) linodego.NodeBalancerConfigRebuildNodeOptions {
-	nodeOptions := linodego.NodeBalancerConfigRebuildNodeOptions{
+func (l *loadbalancers) buildNodeBalancerNodeConfigRebuildOptions(node *v1.Node, nodePort int32, subnetID int, protocol linodego.ConfigProtocol) (*linodego.NodeBalancerConfigRebuildNodeOptions, error) {
+	nodeIP, err := getNodePrivateIP(node, subnetID)
+	if err != nil {
+		return nil, fmt.Errorf("node %s does not have a private IP address: %w", node.Name, err)
+	}
+	nodeOptions := &linodego.NodeBalancerConfigRebuildNodeOptions{
 		NodeBalancerNodeCreateOptions: linodego.NodeBalancerNodeCreateOptions{
-			Address: fmt.Sprintf("%v:%v", getNodePrivateIP(node, subnetID), nodePort),
+			Address: fmt.Sprintf("%v:%v", nodeIP, nodePort),
 			// NodeBalancer backends must be 3-32 chars in length
 			// If < 3 chars, pad node name with "node-" prefix
 			Label:  coerceString(node.Name, 3, 32, "node-"),
@@ -1075,7 +1096,7 @@ func (l *loadbalancers) buildNodeBalancerNodeConfigRebuildOptions(node *v1.Node,
 	if subnetID != 0 {
 		nodeOptions.SubnetID = subnetID
 	}
-	return nodeOptions
+	return nodeOptions, nil
 }
 
 func (l *loadbalancers) retrieveKubeClient() error {
@@ -1204,20 +1225,23 @@ func getPortConfigAnnotation(service *v1.Service, port int) (portConfigAnnotatio
 // For services outside of VPC, it will use linode specific private IP address
 // Backend IP can be overwritten to the one specified using AnnLinodeNodePrivateIP
 // annotation over the NodeInternalIP.
-func getNodePrivateIP(node *v1.Node, subnetID int) string {
+func getNodePrivateIP(node *v1.Node, subnetID int) (string, error) {
 	if subnetID == 0 {
 		if address, exists := node.Annotations[annotations.AnnLinodeNodePrivateIP]; exists {
-			return address
+			return address, nil
 		}
 	}
 
 	klog.Infof("Node %s, assigned IP addresses: %v", node.Name, node.Status.Addresses)
 	for _, addr := range node.Status.Addresses {
 		if addr.Type == v1.NodeInternalIP {
-			return addr.Address
+			return addr.Address, nil
 		}
 	}
-	return ""
+
+	// If no private/internal IP is found, return error.
+	klog.V(4).Infof("No internal IP found for node %s", node.Name)
+	return "", fmt.Errorf("no internal IP found for node %s", node.Name)
 }
 
 func getTLSCertInfo(ctx context.Context, kubeClient kubernetes.Interface, namespace string, config portConfig) (string, string, error) {
