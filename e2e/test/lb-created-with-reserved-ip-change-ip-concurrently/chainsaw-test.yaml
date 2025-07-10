@@ -1,0 +1,195 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: lb-created-with-reserved-ip-change-ip-concurrently
+  labels:
+    all:
+    lke:
+spec:
+  namespace: "lb-created-with-reserved-ip-change-ip-concurrently"
+  steps:
+    - name: create reserved ip and nodebalancer resources
+      try:
+        - script:
+            content: |
+              #!/bin/bash
+              set -e
+
+              re='^((25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})$'
+
+              reserved_ip=$(curl -s --request POST \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                -H "accept: application/json" \
+                "${LINODE_URL}/v4beta/networking/reserved/ips" \
+                --data "{\"region\": \"$REGION\"}" | jq .address)
+
+              reserved_ip=$(echo "$reserved_ip" | tr -d '"')
+              
+              if ! [[ $reserved_ip =~ $re ]]; then
+                  echo "Reserved ip [$reserved_ip] is incorrect, failed to create a reserved ip"
+              fi
+
+              reserved_ip2=$(curl -s --request POST \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                -H "accept: application/json" \
+                "${LINODE_URL}/v4beta/networking/reserved/ips" \
+                --data "{\"region\": \"$REGION\"}" | jq .address)
+
+              reserved_ip2=$(echo "$reserved_ip2" | tr -d '"')
+              
+              if ! [[ $reserved_ip2 =~ $re ]]; then
+                  echo "Reserved ip [$reserved_ip2] is incorrect, failed to create a reserved ip"
+              fi
+              
+              create_cm=$(kubectl -n $NAMESPACE create configmap reserved-ip-config --from-literal=ReservedIP=$reserved_ip --from-literal=ReservedIP2=$reserved_ip2 -o yaml --dry-run=client | kubectl apply -f -)
+              if [[ "$create_cm" != "configmap/reserved-ip-config created" ]]; then
+                echo "Unable to create configmap. Error: $create_cm"
+              fi
+
+              echo "{ \"reserved_ip\": \"$reserved_ip\" ,
+                \"reserved_ip2\": \"$reserved_ip2\"}"
+            check:
+              ($error == null): true
+              (contains($stdout, 'failed to create a reserved ip')): false
+              (contains($stdout, 'Unable to create configmap')): false
+            outputs:
+              - name: ip
+                value: (json_parse($stdout))
+        - apply:
+            file: create-pods-services.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that loadbalancer ip is assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test
+            status:
+              (loadBalancer.ingress[0].ip != null): true
+    - name: Change annotation and check for warning event
+      try:
+        - script:
+            content: |
+              #!/bin/bash
+              set -e
+
+              patch_annotation() {
+                VALUE=$1
+                kubectl -n $NAMESPACE patch service svc-test \
+                  -p "{\"metadata\":{\"annotations\":{\"service.beta.kubernetes.io/linode-loadbalancer-reserved-ipv4\":\"$VALUE\"}}}"
+              }
+
+              export -f patch_annotation
+              reserved_ip=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.ReservedIP}' -n $NAMESPACE)
+              if [ -z "$reserved_ip" ]; then
+                  echo "Error: No reserved ip found in configmap"
+              fi
+
+              reserved_ip2=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.ReservedIP2}' -n $NAMESPACE)
+              if [ -z "$reserved_ip2" ]; then
+                  echo "Error: No reserved ip found in configmap"
+              fi
+
+              parallel -j 2 patch_annotation ::: $reserved_ip2 "100.10.10.10"
+
+              sleep 20
+
+              all_events=$(kubectl get events -n $NAMESPACE)
+
+              events=$(kubectl get events -n $NAMESPACE --field-selector reason=NodeBalancerIPChangeIgnored --sort-by='.lastTimestamp' -o json)
+              num_events=$(echo $events | jq '.items | length')
+
+              #k8s scheduler will flatten the work queue of updates for an object into a single reconcile call. 
+              #If k8s scheduler squashes both the patches into 1 only 1 event is generated
+
+              if [[ num_events -eq 0 ]]; then
+                echo "Warning event not found"
+              else
+                message=$(echo $events | jq .items[0].message)
+                if [[ "$message" =~ ^\"IPv4\ annotation\ changed\ to\ $reserved_ip2,\ but\ NodeBalancer\ \([0-9]+\)\ IP\ cannot\ be\ updated\ after\ creation.\ It\ will\ remain\ $reserved_ip\"$ || "$message" =~ ^\"IPv4\ annotation\ changed\ to\ 100.10.10.10,\ but\ NodeBalancer\ \([0-9]+\)\ IP\ cannot\ be\ updated\ after\ creation.\ It\ will\ remain\ $reserved_ip\"$ ]]; then
+                  echo "First warning event found"
+                elif [[ num_events -eq 2 ]]; then
+                  message2=$(echo $events | jq .items[1].message)
+                  if [[ "$message2" =~ ^\"IPv4\ annotation\ changed\ to\ $reserved_ip2,\ but\ NodeBalancer\ \([0-9]+\)\ IP\ cannot\ be\ updated\ after\ creation.\ It\ will\ remain\ $reserved_ip\"$ || "$message2" =~ ^\"IPv4\ annotation\ changed\ to\ 100.10.10.10,\ but\ NodeBalancer\ \([0-9]+\)\ IP\ cannot\ be\ updated\ after\ creation.\ It\ will\ remain\ $reserved_ip\"$ ]]; then
+                    echo "Second warning event found"
+                  fi
+                fi
+              fi             
+            check:
+              ($error == null): true
+              (contains($stdout, 'No reserved ip found in configmap')): false
+              (contains($stdout, 'Warning event not found')): false
+    - name: get service ip and compare with reserved ip
+      try:
+        - script: 
+            content: |
+              set -e
+
+              reserved_ip=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.ReservedIP}' -n $NAMESPACE)
+              if [ -z "$reserved_ip" ]; then
+                  echo "Error: No reserved ip found in configmap"
+              fi
+
+              reserved_ip2=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.ReservedIP2}' -n $NAMESPACE)
+              if [ -z "$reserved_ip2" ]; then
+                  echo "Error: No reserved ip found in configmap"
+              fi
+              
+              service_ip=$(kubectl get svc svc-test -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+              if [ -z "$service_ip" ]; then
+                  echo "Error: No service ip found for service svc-test"
+              fi
+              echo "{\"service_ip\": $service_ip}"
+              echo "{\"reserved_ip\": $reserved_ip}"
+              if [[ "$service_ip" == "$reserved_ip" ]]; then
+                echo "IPs Match"
+              else
+                echo "IPs do not match"
+              fi
+
+              delete_rip=$(curl -s --request DELETE \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                "${LINODE_URL}/v4beta/networking/reserved/ips/$reserved_ip" )
+
+              if [[ "$delete_rip" == "{}" ]]; then
+                echo "Reserved IP $reserved_ip deleted successfully"
+              else
+                echo "Unable to delete reserved ip: $reserved_ip. Error: $delete_rip"
+              fi
+
+              delete_rip2=$(curl -s --request DELETE \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                "${LINODE_URL}/v4beta/networking/reserved/ips/$reserved_ip2" )
+
+              if [[ "$delete_rip2" == "{}" ]]; then
+                echo "Reserved IP $reserved_ip2 deleted successfully"
+              else
+                echo "Unable to delete reserved ip: $reserved_ip. Error: $delete_rip2"
+              fi
+
+              delete_cm=$(kubectl delete configmap reserved-ip-config -n $NAMESPACE)
+              if [[ "$delete_cm" == "configmap \"reserved-ip-config\" deleted" ]]; then
+                echo "Configmap deleted successfully"
+              else
+                echo "Unable to delete the configmap: $delete_cm. Error: $delete_cm"
+              fi
+            check:
+              ($error == null): true
+              (contains($stdout, 'No reserved ip found in configmap')): false
+              (contains($stdout, 'No service ip found for service svc-test')): false
+              (contains($stdout, 'IPs do not match')): false
+              (contains($stdout, 'Unable to delete the configmap')): false
+              (contains($stdout, 'Unable to delete reserved ip')): false
