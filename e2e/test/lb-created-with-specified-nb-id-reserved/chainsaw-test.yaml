@@ -132,7 +132,7 @@ spec:
               else
                 echo "IPs do not match"
               fi
-
+              sleep 20
               #Run a curl command to the service ip
               URL="http://$service_ip:80/"
               HTTP_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
