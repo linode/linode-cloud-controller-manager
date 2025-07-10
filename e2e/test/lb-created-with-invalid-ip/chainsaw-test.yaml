@@ -1,0 +1,94 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: lb-created-with-invalid-ip
+  labels:
+    all:
+    lke:
+spec:
+  namespace: "lb-created-with-invalid-ip"
+  steps:
+    - name: create reserved ip and nodebalancer resources
+      try:
+        - script:
+            content: |
+              set -e
+
+              invalid_ip="100.1000.1000.1000"
+
+              create_cm=$(kubectl -n $NAMESPACE create configmap invalid-ip-config --from-literal=InvalidIP=$invalid_ip -o yaml --dry-run=client | kubectl apply -f -)
+              if [[ "$create_cm" != "configmap/invalid-ip-config created" ]]; then
+                echo "Unable to create configmap. Error: $create_cm"
+              fi
+
+              echo "{\"invalid_ip\": \"$invalid_ip\"}"
+            check:
+              ($error == null): true
+              (contains($stdout, 'Unable to create configmap')): false
+            outputs:
+              - name: ip
+                value: (json_parse($stdout))
+        - apply:
+            file: create-pods-services.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that loadbalancer ip is not assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test
+            status:
+              (loadBalancer.ingress[0].ip == null): true
+    - name: get service ip and compare with invalid ip
+      try:
+        - script: 
+            content: |
+              set -e
+              
+              invalid_ip=$(kubectl get configmap invalid-ip-config -o=jsonpath='{.data.InvalidIP}' -n $NAMESPACE)
+              if [[ -z "$invalid_ip" ]]; then
+                  echo "Error: No invalid ip found in configmap"
+              fi
+
+              annotation="service.beta.kubernetes.io/linode-loadbalancer-reserved-ipv4"
+              events=$(kubectl get events -n $NAMESPACE --field-selector reason=SyncLoadBalancerFailed --sort-by='.lastTimestamp' -o json)
+              message=$(echo $events | jq .items[0].message)
+
+              if [[ "$message" =~ ^\"Error\ syncing\ load\ balancer:\ failed\ to\ ensure\ load\ balancer:\ invalid\ IPv4\ address\ in\ annotation\ $annotation:\ invalid\ IP\ address\ format:\ $invalid_ip\"$ ]]; then
+                echo "Warning event found"
+              else
+                echo "Warning event not found"
+              fi
+
+              service_ip=$(kubectl get svc svc-test -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+              if [[ "$service_ip" != "" ]]; then
+                  echo "Error: service ip found for service svc-test"
+              fi
+              echo "{\"service_ip\": $service_ip}"
+              echo "{\"invalid_ip\": $invalid_ip}"
+              if [[ "$service_ip" == "$invalid_ip" ]]; then
+                echo "Expected service ip to be null got the invalid ip: $invalid_ip"
+              fi
+
+              delete_cm=$(kubectl delete configmap invalid-ip-config -n $NAMESPACE)
+              if [[ "$delete_cm" == "configmap \"invalid-ip-config\" deleted" ]]; then
+                echo "Configmap deleted successfully"
+              else
+                echo "Unable to delete the configmap: $delete_cm. Error: $delete_cm"
+              fi
+
+            check:
+              ($error == null): true
+              (contains($stdout, 'Warning event not found')): false
+              (contains($stdout, 'No invalid ip found in configmap')): false
+              (contains($stdout, 'Unable to delete the configmap')): false
+              (contains($stdout, 'Expected service ip to be null got the invalid ip')): false

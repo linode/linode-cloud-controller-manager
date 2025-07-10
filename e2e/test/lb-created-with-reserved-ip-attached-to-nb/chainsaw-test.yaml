@@ -1,0 +1,151 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: lb-created-with-reserved-ip-attached-to-nb
+  labels:
+    all:
+    lke:
+spec:
+  namespace: "lb-created-with-reserved-ip-attached-to-nb"
+  steps:
+    - name: Create dummy service
+      try:
+        - apply:
+            file: dummy-service.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that loadbalancer ip is assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-dummy
+            status:
+              (loadBalancer.ingress[0].ip != null): true
+    - name: create reserved ip and nodebalancer resources
+      try:
+        - script:
+            content: |
+              set -e
+
+              re='^((25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})$'
+
+              reserved_ip=$(curl -s --request POST \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                -H "accept: application/json" \
+                "${LINODE_URL}/v4beta/networking/reserved/ips" \
+                --data "{\"region\": \"$REGION\"}" | jq .address)
+
+              reserved_ip=$(echo "$reserved_ip" | tr -d '"')
+              LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
+              data=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN LABEL=$LABEL REGION=$REGION ../scripts/get-nb-create-data.sh svc-dummy)
+              
+              payload=$(echo "$data" | jq --arg key "ipv4" --arg value "$reserved_ip" '.[$key] = $value')
+              
+              id_re='^[0-9]+$'
+
+              nb_id=$(curl -s --request POST \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                -H "accept: application/json" \
+                "${LINODE_URL}/v4beta/nodebalancers" \
+                --data "$payload" | jq .id)
+              
+              if ! [[ $nb_id =~ $id_re ]]; then
+                  echo "Nodebalancer ID [$nb_id] is incorrect, failed to create nodebalancer"
+              fi
+
+              echo "{\"reserved_ip\": \"$reserved_ip\",
+                      \"nb_id\": \"$nb_id\"}"
+
+              create_cm=$(kubectl -n $NAMESPACE create configmap nb-config --from-literal=Reserved_IP=$reserved_ip --from-literal=NB_ID=$nb_id -o yaml --dry-run=client | kubectl apply -f -)
+              if [[ "$create_cm" != "configmap/nb-config created" ]]; then
+                echo "Unable to create configmap. Error: $create_cm"
+              fi
+            check:
+              ($error == null): true
+              (contains($stdout, 'Unable to create configmap')): false
+              (contains($stdout, 'failed to create a reserved ip')): false
+              (contains($stdout, 'failed to create nodebalancer')): false
+            outputs:
+              - name: nb_conf
+                value: (json_parse($stdout))
+        - apply:
+            file: create-pods-services.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that loadbalancer ip is assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test
+            status:
+              (loadBalancer.ingress[0].ip == null): true
+    - name: get service ip and compare with reserved ip
+      try:
+        - script: 
+            content: |
+              set -e
+
+              reserved_ip=$(kubectl get configmap nb-config -o=jsonpath='{.data.Reserved_IP}' -n $NAMESPACE)
+              if [ -z "$reserved_ip" ]; then
+                  echo "Error: No reserved ip found in configmap"
+              fi
+
+              nb_id=$(kubectl get configmap nb-config -o=jsonpath='{.data.NB_ID}' -n $NAMESPACE)
+              if [ -z "$nb_id" ]; then
+                  echo "Error: No nb_id found in configmap"
+              fi
+
+              service_ip=$(kubectl get svc svc-test -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+              if [ "$service_ip" != "" ]; then
+                  echo "Error: Service ip found for service svc-test. Expected to be empty"
+              fi
+
+              echo "{\"service_ip\": $service_ip}"
+              echo "{\"reserved_ip\": $reserved_ip}"
+              if [[ "$service_ip" == "$reserved_ip" ]]; then
+                echo "IPs Match"
+              else
+                echo "IPs do not match"
+              fi
+
+              delete_rip=$(curl -s --request DELETE \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                "${LINODE_URL}/v4beta/networking/reserved/ips/$reserved_ip" )
+
+              if [[ "$delete_rip" == "{}" ]]; then
+                echo "Reserved IP $reserved_ip deleted successfully"
+              else
+                echo "Unable to delete reserved ip: $reserved_ip. Error: $delete_rip"
+              fi
+
+              delete_cm=$(kubectl delete configmap nb-config -n $NAMESPACE)
+              if [[ "$delete_cm" == "configmap \"nb-config\" deleted" ]]; then
+                echo "Configmap deleted successfully"
+              else
+                echo "Unable to delete the configmap: $delete_cm. Error: $delete_cm"
+              fi
+
+            check:
+              ($error == null): true
+              (contains($stdout, 'No reserved ip found in configmap')): false
+              (contains($stdout, 'Service ip found for service svc-test. Expected to be empty')): false
+              (contains($stdout, 'IPs do not match')): true
+              (contains($stdout, 'Unable to delete the configmap')): false
+              (contains($stdout, 'Unable to delete reserved ip')): false
