@@ -58,6 +58,7 @@ var Options struct {
 	ClusterCIDRIPv4                   string
 	NodeCIDRMaskSizeIPv4              int
 	NodeCIDRMaskSizeIPv6              int
+	LoadBalancerPrefix                string
 }
 
 type linodeCloud struct {
