@@ -72,6 +72,7 @@ type linodeCloud struct {
 var (
 	instanceCache     *instances
 	ipHolderCharLimit int = 23
+	LoadBalancerPrefixCharLimit int = 20
 )
 
 func init() {
@@ -190,6 +191,12 @@ func newCloud() (cloudprovider.Interface, error) {
 
 	if len(Options.IpHolderSuffix) > ipHolderCharLimit {
 		msg := fmt.Sprintf("ip-holder-suffix must be %d characters or less: %s is %d characters\n", ipHolderCharLimit, Options.IpHolderSuffix, len(Options.IpHolderSuffix))
+		klog.Error(msg)
+		return nil, fmt.Errorf("%s", msg)
+	}
+
+	if len(Options.LoadBalancerPrefix) > LoadBalancerPrefixCharLimit { 
+		msg := fmt.Sprintf("load-balancer-prefix must be %d characters or less: %s is %d characters\n", LoadBalancerPrefixCharLimit, Options.LoadBalancerPrefix, len(Options.LoadBalancerPrefix))
 		klog.Error(msg)
 		return nil, fmt.Errorf("%s", msg)
 	}
