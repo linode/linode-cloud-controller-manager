@@ -11,7 +11,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
 	github.com/hexdigest/gowrap v1.4.2
-	github.com/linode/linodego v1.52.1
+	github.com/linode/linodego v1.53.1-0.20250709175023-9b152d30578c
 	github.com/prometheus/client_golang v1.22.0
 	github.com/spf13/pflag v1.0.7
 	github.com/stretchr/testify v1.10.0
@@ -193,5 +193,3 @@ replace (
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.33.0
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.33.0
 )
-
-replace github.com/linode/linodego => github.com/rahulait/linodego v1.50.1-0.20250627182522-d11b61530cc5
