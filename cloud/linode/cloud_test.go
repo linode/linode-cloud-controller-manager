@@ -127,14 +127,14 @@ func TestNewCloud(t *testing.T) {
 		assert.Error(t, err, "expected error if ipholdersuffix is longer than 23 chars")
 	})
 
-	t.Run("should fail if load-balancer-prefix is longer than 19 chars", func(t *testing.T) {
-		prefix := Options.LoadBalancerPrefix
-		Options.LoadBalancerPrefix = strings.Repeat("a", 21)
+	t.Run("should fail if nodebalancer-prefix is longer than 19 chars", func(t *testing.T) {
+		prefix := Options.NodeBalancerPrefix
+		Options.NodeBalancerPrefix = strings.Repeat("a", 21)
 		defer func() {
-			Options.LoadBalancerPrefix = prefix
+			Options.NodeBalancerPrefix = prefix
 		}()
 		_, err := newCloud()
-		assert.Error(t, err, "expected error if load-balancer-prefix is longer than 19 chars")
+		assert.Error(t, err, "expected error if nodebalancer-prefix is longer than 19 chars")
 	})
 }
 
