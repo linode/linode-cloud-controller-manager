@@ -51,8 +51,7 @@ type Controller struct {
 	nodeLister         corelisters.NodeLister
 	nodeInformerSynced cache.InformerSynced
 
-	cidrAllocator                 ipam.CIDRAllocator
-	disableIPv6NodeCIDRAllocation bool
+	cidrAllocator ipam.CIDRAllocator
 }
 
 // NewNodeIpamController returns a new node IP Address Management controller to
