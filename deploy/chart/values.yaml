@@ -86,6 +86,7 @@ tolerations:
 # clusterCIDR: 10.192.0.0/10
 # nodeCIDRMaskSizeIPv4: 24
 # nodeCIDRMaskSizeIPv6: 64
+# disableIPv6NodeCIDRAllocation: false
 
 # vpcs and subnets that node internal IPs will be assigned from (not required if already specified in routeController)
 # vpcName: <name of VPC> [Deprecated: use vpcNames instead]
