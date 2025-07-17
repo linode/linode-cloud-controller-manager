@@ -86,6 +86,7 @@ func startNodeIpamController(stopCh <-chan struct{}, cloud *linodeCloud, nodeInf
 		secondaryServiceCIDR,
 		nodeCIDRMaskSizes,
 		ipam.CloudAllocatorType,
+		Options.DisableIPv6NodeCIDRAllocation,
 	)
 	if err != nil {
 		return err

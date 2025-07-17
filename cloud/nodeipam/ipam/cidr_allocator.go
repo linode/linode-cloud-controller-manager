@@ -92,7 +92,8 @@ type CIDRAllocatorParams struct {
 	// SecondaryServiceCIDR is secondary service cidr for cluster.
 	SecondaryServiceCIDR *net.IPNet
 	// NodeCIDRMaskSizes is list of node cidr mask sizes.
-	NodeCIDRMaskSizes []int
+	NodeCIDRMaskSizes             []int
+	DisableIPv6NodeCIDRAllocation bool
 }
 
 // New creates a new CIDR range allocator.

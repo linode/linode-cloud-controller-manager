@@ -68,6 +68,9 @@ spec:
             {{- if not $clusterCIDR }}
             {{- fail "clusterCIDR is required if enableNodeIPAM is set" }}
             {{- end }}
+            {{- with .Values.disableIPv6NodeCIDRAllocation }}
+            - --disable-ipv6-node-cidr-allocation={{ . }}
+            {{- end }}
             {{- with .Values.nodeCIDRMaskSizeIPv4 }}
             - --node-cidr-mask-size-ipv4={{ . }}
             {{- end }}

@@ -51,7 +51,8 @@ type Controller struct {
 	nodeLister         corelisters.NodeLister
 	nodeInformerSynced cache.InformerSynced
 
-	cidrAllocator ipam.CIDRAllocator
+	cidrAllocator                 ipam.CIDRAllocator
+	disableIPv6NodeCIDRAllocation bool
 }
 
 // NewNodeIpamController returns a new node IP Address Management controller to
@@ -70,6 +71,7 @@ func NewNodeIpamController(
 	secondaryServiceCIDR *net.IPNet,
 	nodeCIDRMaskSizes []int,
 	allocatorType ipam.CIDRAllocatorType,
+	disableIPv6NodeCIDRAllocation bool,
 ) (*Controller, error) {
 	if kubeClient == nil {
 		return nil, fmt.Errorf("kubeClient is nil when starting Controller")
@@ -100,10 +102,11 @@ func NewNodeIpamController(
 	var err error
 
 	allocatorParams := ipam.CIDRAllocatorParams{
-		ClusterCIDRs:         clusterCIDRs,
-		ServiceCIDR:          ic.serviceCIDR,
-		SecondaryServiceCIDR: ic.secondaryServiceCIDR,
-		NodeCIDRMaskSizes:    nodeCIDRMaskSizes,
+		ClusterCIDRs:                  clusterCIDRs,
+		ServiceCIDR:                   ic.serviceCIDR,
+		SecondaryServiceCIDR:          ic.secondaryServiceCIDR,
+		NodeCIDRMaskSizes:             nodeCIDRMaskSizes,
+		DisableIPv6NodeCIDRAllocation: disableIPv6NodeCIDRAllocation,
 	}
 
 	ic.cidrAllocator, err = ipam.New(ctx, ic.linodeClient, kubeClient, cloud, nodeInformer, ic.allocatorType, allocatorParams)

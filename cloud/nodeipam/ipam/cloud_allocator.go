@@ -68,6 +68,8 @@ type cloudAllocator struct {
 
 	// nodeCIDRMaskSizeIPv6 is the mask size for the IPv6 CIDR assigned to nodes.
 	nodeCIDRMaskSizeIPv6 int
+	// disableIPv6NodeCIDRAllocation is true if we should not allocate IPv6 CIDRs for nodes.
+	disableIPv6NodeCIDRAllocation bool
 }
 
 const providerIDPrefix = "linode://"
@@ -96,16 +98,17 @@ func NewLinodeCIDRAllocator(ctx context.Context, linodeClient linode.Client, cli
 	}
 
 	ca := &cloudAllocator{
-		client:               client,
-		linodeClient:         linodeClient,
-		clusterCIDR:          allocatorParams.ClusterCIDRs[0],
-		cidrSet:              cidrSet,
-		nodeLister:           nodeInformer.Lister(),
-		nodesSynced:          nodeInformer.Informer().HasSynced,
-		broadcaster:          eventBroadcaster,
-		recorder:             recorder,
-		queue:                workqueue.NewNamedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[any](), "cidrallocator_node"),
-		nodeCIDRMaskSizeIPv6: allocatorParams.NodeCIDRMaskSizes[1],
+		client:                        client,
+		linodeClient:                  linodeClient,
+		clusterCIDR:                   allocatorParams.ClusterCIDRs[0],
+		cidrSet:                       cidrSet,
+		nodeLister:                    nodeInformer.Lister(),
+		nodesSynced:                   nodeInformer.Informer().HasSynced,
+		broadcaster:                   eventBroadcaster,
+		recorder:                      recorder,
+		queue:                         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[any](), "cidrallocator_node"),
+		nodeCIDRMaskSizeIPv6:          allocatorParams.NodeCIDRMaskSizes[1],
+		disableIPv6NodeCIDRAllocation: allocatorParams.DisableIPv6NodeCIDRAllocation,
 	}
 
 	if allocatorParams.ServiceCIDR != nil {
@@ -393,13 +396,26 @@ func (c *cloudAllocator) AllocateOrOccupyCIDR(ctx context.Context, node *v1.Node
 		return fmt.Errorf("failed to allocate cidr from cluster cidr: %w", err)
 	}
 	allocatedCIDRs[0] = podCIDR
+
+	// If IPv6 CIDR allocation is disabled, log and return early.
+	if c.disableIPv6NodeCIDRAllocation {
+		logger.V(4).Info("IPv6 CIDR allocation disabled; using only IPv4", "node", klog.KObj(node))
+		return c.enqueueCIDRUpdate(ctx, node.Name, allocatedCIDRs)
+	}
+	// Allocate IPv6 CIDR for the node.
+	logger.V(4).Info("Allocating IPv6 CIDR", "node", klog.KObj(node))
 	if allocatedCIDRs[1], err = c.allocateIPv6CIDR(ctx, node); err != nil {
 		return fmt.Errorf("failed to assign IPv6 CIDR: %w", err)
 	}
 
-	// queue the assignment
-	logger.V(4).Info("Putting node with CIDR into the work queue", "node", klog.KObj(node), "CIDR", allocatedCIDRs)
-	return c.updateCIDRsAllocation(ctx, node.Name, allocatedCIDRs)
+	return c.enqueueCIDRUpdate(ctx, node.Name, allocatedCIDRs)
+}
+
+// enqueueCIDRUpdate adds the node name and CIDRs to the work queue for processing.
+func (c *cloudAllocator) enqueueCIDRUpdate(ctx context.Context, nodeName string, cidrs []*net.IPNet) error {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Putting node with CIDR into the work queue", "node", nodeName, "CIDR", cidrs)
+	return c.updateCIDRsAllocation(ctx, nodeName, cidrs)
 }
 
 // ReleaseCIDR marks node.podCIDRs[...] as unused in our tracked cidrSets
