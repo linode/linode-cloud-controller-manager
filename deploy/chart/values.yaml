@@ -116,6 +116,9 @@ tolerations:
 # nodeBalancerBackendIPv4SubnetName is the subnet name to use for the backend ips of the NodeBalancer
 # nodeBalancerBackendIPv4SubnetName: ""
 
+# nodeBalancerPrefix is used to add prefix for nodeBalacer name. Default is "ccm"
+# nodeBalancerPrefix: ""
+
 # This section adds the ability to pass environment variables to adjust CCM defaults
 # https://github.com/linode/linode-cloud-controller-manager/blob/master/cloud/linode/loadbalancers.go
 # LINODE_HOSTNAME_ONLY_INGRESS type bool is supported
