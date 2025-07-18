@@ -58,6 +58,7 @@ var Options struct {
 	ClusterCIDRIPv4                   string
 	NodeCIDRMaskSizeIPv4              int
 	NodeCIDRMaskSizeIPv6              int
+	NodeBalancerPrefix                string
 }
 
 type linodeCloud struct {
@@ -71,6 +72,7 @@ type linodeCloud struct {
 var (
 	instanceCache     *instances
 	ipHolderCharLimit int = 23
+	NodeBalancerPrefixCharLimit int = 19
 )
 
 func init() {
@@ -189,6 +191,12 @@ func newCloud() (cloudprovider.Interface, error) {
 
 	if len(Options.IpHolderSuffix) > ipHolderCharLimit {
 		msg := fmt.Sprintf("ip-holder-suffix must be %d characters or less: %s is %d characters\n", ipHolderCharLimit, Options.IpHolderSuffix, len(Options.IpHolderSuffix))
+		klog.Error(msg)
+		return nil, fmt.Errorf("%s", msg)
+	}
+
+	if len(Options.NodeBalancerPrefix) > NodeBalancerPrefixCharLimit { 
+		msg := fmt.Sprintf("nodebalancer-prefix must be %d characters or less: %s is %d characters\n", NodeBalancerPrefixCharLimit, Options.NodeBalancerPrefix, len(Options.NodeBalancerPrefix))
 		klog.Error(msg)
 		return nil, fmt.Errorf("%s", msg)
 	}

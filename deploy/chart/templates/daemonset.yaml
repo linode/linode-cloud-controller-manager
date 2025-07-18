@@ -156,6 +156,9 @@ spec:
             {{- if .Values.nodeBalancerBackendIPv4Subnet }}
             - --nodebalancer-backend-ipv4-subnet={{ .Values.nodeBalancerBackendIPv4Subnet }}
             {{- end }}
+            {{- if .Values.nodeBalancerPrefix }}
+            - --nodebalancer-prefix={{ .Values.nodeBalancerPrefix }}
+            {{- end }}
             {{- if .Values.extraArgs }}
             {{- toYaml .Values.extraArgs | nindent 12 }}
             {{- end }}
