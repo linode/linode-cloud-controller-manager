@@ -53,7 +53,7 @@ The CCM supports the following flags:
 | `--enable-ipv6-for-loadbalancers` | `false` | Set both IPv4 and IPv6 addresses for all LoadBalancer services (when disabled, only IPv4 is used). This can also be configured per-service using the `service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-ingress` annotation. |
 | `--node-cidr-mask-size-ipv4` | `24` | ipv4 cidr mask size for pod cidrs allocated to nodes |
 | `--node-cidr-mask-size-ipv6` | `64` | ipv6 cidr mask size for pod cidrs allocated to nodes |
-| `--nodebalancer-prefix` | `ccm` | Name prefix for LoadBalancers. (max. 19 char.) |
+| `--nodebalancer-prefix` | `ccm` | Name prefix for NoadBalancers. |
 
 ## Configuration Methods
 
