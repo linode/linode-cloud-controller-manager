@@ -79,13 +79,6 @@ spec:
             {{- if and .Values.routeController .Values.routeController.vpcNames }}
             {{- $vpcNames = .Values.routeController.vpcNames }}
             {{- end }}
-            {{- $vpcName := .Values.vpcName }}
-            {{- if and .Values.routeController .Values.routeController.vpcName }}
-            {{- $vpcName = .Values.routeController.vpcName }}
-            {{- end }}
-            {{- if and $vpcName $vpcNames }}
-            {{- fail "Both vpcName and vpcNames are set. Please use only vpcNames." }}
-            {{- end }}
             {{- $subnetNames := .Values.subnetNames }}
             {{- if and .Values.routeController .Values.routeController.subnetNames }}
             {{- $subnetNames = .Values.routeController.subnetNames }}
@@ -106,8 +99,8 @@ spec:
             {{- end }}
             {{- if .Values.routeController }}
             - --enable-route-controller=true
-            {{- if not (or $vpcName $vpcNames) }}
-            {{- fail "Neither vpcName nor vpcNames is set. Please set one of them." }}
+            {{- if not $vpcNames }}
+            {{- fail "vpcNames not set. Please set it when enabling route_controller for VPCs." }}
             {{- end }}
             {{- if not $clusterCIDR }}
             {{- fail "clusterCIDR is required if route-controller is enabled" }}
@@ -119,9 +112,6 @@ spec:
             {{- end }}
             {{- with $vpcNames }}
             - --vpc-names={{ . }}
-            {{- end }}
-            {{- with $vpcName }}
-            - --vpc-name={{ . }}
             {{- end }}
             {{- with $subnetNames }}
             - --subnet-names={{ . }}
