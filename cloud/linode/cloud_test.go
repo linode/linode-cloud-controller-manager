@@ -20,6 +20,7 @@ func TestNewCloudRouteControllerDisabled(t *testing.T) {
 	t.Setenv("LINODE_API_TOKEN", "dummyapitoken")
 	t.Setenv("LINODE_REGION", "us-east")
 	t.Setenv("LINODE_REQUEST_TIMEOUT_SECONDS", "10")
+	Options.NodeBalancerPrefix = "ccm"
 
 	t.Run("should not fail if vpc is empty and routecontroller is disabled", func(t *testing.T) {
 		Options.VPCName = ""
@@ -45,6 +46,7 @@ func TestNewCloud(t *testing.T) {
 	t.Setenv("LINODE_REQUEST_TIMEOUT_SECONDS", "10")
 	t.Setenv("LINODE_ROUTES_CACHE_TTL_SECONDS", "60")
 	Options.LinodeGoDebug = true
+	Options.NodeBalancerPrefix = "ccm"
 
 	t.Run("should fail if api token is empty", func(t *testing.T) {
 		t.Setenv("LINODE_API_TOKEN", "")
@@ -132,20 +134,11 @@ func TestNewCloud(t *testing.T) {
 		rtEnabled := Options.EnableRouteController
 		Options.EnableRouteController = false
 		Options.LoadBalancerType = "nodebalancer"
-		Options.VPCNames = "vpc-test1,vpc-test2"
-		Options.NodeBalancerBackendIPv4SubnetName = "t1"
-		vpcIDs = map[string]int{"vpc-test1": 1, "vpc-test2": 2, "vpc-test3": 3}
-		subnetIDs = map[string]int{"t1": 1, "t2": 2, "t3": 3}
 		Options.NodeBalancerPrefix = strings.Repeat("a", 21)
 		defer func() {
 			Options.NodeBalancerPrefix = prefix
 			Options.LoadBalancerType = ""
 			Options.EnableRouteController = rtEnabled
-			Options.VPCNames = ""
-			Options.NodeBalancerBackendIPv4SubnetID = 0
-			Options.NodeBalancerBackendIPv4SubnetName = ""
-			vpcIDs = map[string]int{}
-			subnetIDs = map[string]int{}
 		}()
 		_, err := newCloud()
 		t.Log(err)
@@ -158,25 +151,33 @@ func TestNewCloud(t *testing.T) {
 		rtEnabled := Options.EnableRouteController
 		Options.EnableRouteController = false
 		Options.LoadBalancerType = "nodebalancer"
-		Options.VPCNames = "vpc-test1,vpc-test2"
-		Options.NodeBalancerBackendIPv4SubnetName = "t1"
-		vpcIDs = map[string]int{"vpc-test1": 1, "vpc-test2": 2, "vpc-test3": 3}
-		subnetIDs = map[string]int{"t1": 1, "t2": 2, "t3": 3}
-		Options.NodeBalancerPrefix = strings.Repeat("a", 21)
+		Options.NodeBalancerPrefix = ""
 		defer func() {
 			Options.NodeBalancerPrefix = prefix
 			Options.LoadBalancerType = ""
 			Options.EnableRouteController = rtEnabled
-			Options.VPCNames = ""
-			Options.NodeBalancerBackendIPv4SubnetID = 0
-			Options.NodeBalancerBackendIPv4SubnetName = ""
-			vpcIDs = map[string]int{}
-			subnetIDs = map[string]int{}
 		}()
 		_, err := newCloud()
 		t.Log(err)
 		require.Error(t, err, "expected error if nodebalancer-prefix is empty")
-		require.ErrorContains(t, err, "nodebalancer-prefix cannot be empty")
+		require.ErrorContains(t, err, "nodebalancer-prefix must be no empty")
+	})
+
+	t.Run("should fail if nodebalancer-prefix name validation", func(t *testing.T) {
+		prefix := Options.NodeBalancerPrefix
+		rtEnabled := Options.EnableRouteController
+		Options.EnableRouteController = false
+		Options.LoadBalancerType = "nodebalancer"
+		Options.NodeBalancerPrefix = "\\+x"
+		defer func() {
+			Options.NodeBalancerPrefix = prefix
+			Options.LoadBalancerType = ""
+			Options.EnableRouteController = rtEnabled
+		}()
+		_, err := newCloud()
+		t.Log(err)
+		require.Error(t, err, "expected error if not validated nodebalancer-prefix")
+		require.ErrorContains(t, err, "nodebalancer-prefix must be no empty and use only letters, numbers, underscores, and dashes")
 	})
 }
 

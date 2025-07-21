@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"time"
+	"regexp"
 
 	"github.com/spf13/pflag"
 	"golang.org/x/exp/slices"
@@ -201,8 +202,9 @@ func newCloud() (cloudprovider.Interface, error) {
 		return nil, fmt.Errorf("%s", msg)
 	}
 
-	if len(Options.NodeBalancerPrefix) == 0 {
-		msg := "nodebalancer-prefix cannot be empty string"
+	validPrefix := regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+	if !validPrefix.MatchString(Options.NodeBalancerPrefix) {
+		msg := fmt.Sprintf("nodebalancer-prefix must be no empty and use only letters, numbers, underscores, and dashes: %s\n", Options.NodeBalancerPrefix)
 		klog.Error(msg)
 		return nil, fmt.Errorf("%s", msg)
 	}
