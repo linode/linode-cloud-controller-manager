@@ -149,12 +149,8 @@ func TestNewCloud(t *testing.T) {
 		}()
 		_, err := newCloud()
 		t.Log(err)
-		if !assert.Error(t, err, "expected error if nodebalancer-prefix is longer than 19 chars") {
-			t.Errorf("No error when nodebalancer-prefix is longer 19 than")
-		}
-		if !assert.ErrorContains(t, err, "nodebalancer-prefix") {
-			t.Errorf("Error message does not concern nodebalancer-prefix: %s", err)
-		}
+		require.Error(t, err, "expected error if nodebalancer-prefix is longer than 19 chars")
+		require.ErrorContains(t, err, "nodebalancer-prefix")
 	})
 }
 
