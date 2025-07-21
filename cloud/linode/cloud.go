@@ -70,8 +70,8 @@ type linodeCloud struct {
 }
 
 var (
-	instanceCache     *instances
-	ipHolderCharLimit int = 23
+	instanceCache               *instances
+	ipHolderCharLimit           int = 23
 	NodeBalancerPrefixCharLimit int = 19
 )
 
@@ -195,7 +195,7 @@ func newCloud() (cloudprovider.Interface, error) {
 		return nil, fmt.Errorf("%s", msg)
 	}
 
-	if len(Options.NodeBalancerPrefix) > NodeBalancerPrefixCharLimit { 
+	if len(Options.NodeBalancerPrefix) > NodeBalancerPrefixCharLimit {
 		msg := fmt.Sprintf("nodebalancer-prefix must be %d characters or less: %s is %d characters\n", NodeBalancerPrefixCharLimit, Options.NodeBalancerPrefix, len(Options.NodeBalancerPrefix))
 		klog.Error(msg)
 		return nil, fmt.Errorf("%s", msg)

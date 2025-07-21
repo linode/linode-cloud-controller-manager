@@ -129,12 +129,32 @@ func TestNewCloud(t *testing.T) {
 
 	t.Run("should fail if nodebalancer-prefix is longer than 19 chars", func(t *testing.T) {
 		prefix := Options.NodeBalancerPrefix
+		rtEnabled := Options.EnableRouteController
+		Options.EnableRouteController = false
+		Options.LoadBalancerType = "nodebalancer"
+		Options.VPCNames = "vpc-test1,vpc-test2"
+		Options.NodeBalancerBackendIPv4SubnetName = "t1"
+		vpcIDs = map[string]int{"vpc-test1": 1, "vpc-test2": 2, "vpc-test3": 3}
+		subnetIDs = map[string]int{"t1": 1, "t2": 2, "t3": 3}
 		Options.NodeBalancerPrefix = strings.Repeat("a", 21)
 		defer func() {
 			Options.NodeBalancerPrefix = prefix
+			Options.LoadBalancerType = ""
+			Options.EnableRouteController = rtEnabled
+			Options.VPCNames = ""
+			Options.NodeBalancerBackendIPv4SubnetID = 0
+			Options.NodeBalancerBackendIPv4SubnetName = ""
+			vpcIDs = map[string]int{}
+			subnetIDs = map[string]int{}
 		}()
 		_, err := newCloud()
-		assert.Error(t, err, "expected error if nodebalancer-prefix is longer than 19 chars")
+		t.Log(err)
+		if !assert.Error(t, err, "expected error if nodebalancer-prefix is longer than 19 chars") {
+			t.Errorf("No error when nodebalancer-prefix is longer 19 than")
+		}
+		if !assert.ErrorContains(t, err, "nodebalancer-prefix") {
+			t.Errorf("Error message does not concern nodebalancer-prefix: %s", err)
+		}
 	})
 }
 
