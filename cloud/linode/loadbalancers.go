@@ -227,7 +227,7 @@ func (l *loadbalancers) cleanupOldNodeBalancer(ctx context.Context, service *v1.
 // GetLoadBalancer will not modify service.
 func (l *loadbalancers) GetLoadBalancerName(_ context.Context, _ string, _ *v1.Service) string {
 	unixNano := strconv.FormatInt(time.Now().UnixNano(), 16)
-	return fmt.Sprintf("ccm-%s", unixNano[len(unixNano)-12:])
+	return fmt.Sprintf("%s-%s", Options.NodeBalancerPrefix, unixNano[len(unixNano)-12:])
 }
 
 // GetLoadBalancer returns the *v1.LoadBalancerStatus of service.
