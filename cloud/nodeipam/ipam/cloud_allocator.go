@@ -304,10 +304,10 @@ func (c *cloudAllocator) occupyCIDRs(ctx context.Context, node *v1.Node) error {
 		if err != nil {
 			return fmt.Errorf("failed to parse node %s, CIDR %s", node.Name, cidr)
 		}
-		// IPv6 CIDRs are allocated from node specific ranges
+		// IPv6 CIDRs are allocated from node-specific ranges
 		// We don't track them in the cidrSet
 		if podCIDR.IP.To4() == nil {
-			logger.V(4).Info("Nothing to occupy for ipv6 CIDR", "cidr", podCIDR)
+			logger.V(4).Info("Nothing to occupy for IPv6 CIDR", "cidr", podCIDR)
 			return nil
 		}
 		// If node has a pre allocate cidr that does not exist in our cidrs.
@@ -430,7 +430,7 @@ func (c *cloudAllocator) ReleaseCIDR(logger klog.Logger, node *v1.Node) error {
 			return fmt.Errorf("failed to parse CIDR %s on Node %v: %w", cidr, node.Name, err)
 		}
 		if podCIDR.IP.To4() == nil {
-			logger.V(4).Info("Nothing to release for ipv6 CIDR", "cidr", podCIDR)
+			logger.V(4).Info("Nothing to release for IPv6 CIDR", "cidr", podCIDR)
 			continue
 		}
 

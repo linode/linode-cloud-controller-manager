@@ -56,7 +56,7 @@ The CCM supports the following flags:
 | `--node-cidr-mask-size-ipv4` | Int | `24` | ipv4 cidr mask size for pod cidrs allocated to nodes |
 | `--node-cidr-mask-size-ipv6` | Int | `64` | ipv6 cidr mask size for pod cidrs allocated to nodes |
 | `--nodebalancer-prefix` | String | `ccm` | Name prefix for NoadBalancers. |
-| `--disable-ipv6-node-cidr-allocation` | Boolean | `false` | disables allocating ipv6 CIDR ranges to nodes when using CCM for node IPAM (set to `true` if ipv6 ranges are not configured on linode interfaces) |
+| `--disable-ipv6-node-cidr-allocation` | `false` | disables allocating IPv6 CIDR ranges to nodes when using CCM for node IPAM (set to `true` if IPv6 ranges are not configured on Linode interfaces) |
 
 ## Configuration Methods
 
