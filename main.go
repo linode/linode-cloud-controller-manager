@@ -98,7 +98,7 @@ func main() {
 	command.Flags().IntVar(&linode.Options.NodeBalancerBackendIPv4SubnetID, "nodebalancer-backend-ipv4-subnet-id", 0, "ipv4 subnet id to use for NodeBalancer backends")
 	command.Flags().StringVar(&linode.Options.NodeBalancerBackendIPv4SubnetName, "nodebalancer-backend-ipv4-subnet-name", "", "ipv4 subnet name to use for NodeBalancer backends")
 	command.Flags().BoolVar(&linode.Options.DisableNodeBalancerVPCBackends, "disable-nodebalancer-vpc-backends", false, "disables nodebalancer backends in VPCs (when enabled, nodebalancers will only have private IPs as backends for backward compatibility)")
-	command.Flags().StringVar(&linode.Options.NodeBalancerPrefix, "nodebalancer-prefix", "ccm", fmt.Sprintf("Name prefix for NoadBalancers. (max. %s char.)", linode.NodeBalancerPrefixCharLimit))
+	command.Flags().StringVar(&linode.Options.NodeBalancerPrefix, "nodebalancer-prefix", "ccm", fmt.Sprintf("Name prefix for NoadBalancers. (max. %v char.)", linode.NodeBalancerPrefixCharLimit))
 
 	// Set static flags
 	command.Flags().VisitAll(func(fl *pflag.Flag) {
