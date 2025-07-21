@@ -201,6 +201,12 @@ func newCloud() (cloudprovider.Interface, error) {
 		return nil, fmt.Errorf("%s", msg)
 	}
 
+	if len(Options.NodeBalancerPrefix) == 0 {
+		msg := "nodebalancer-prefix cannot be empty string"
+		klog.Error(msg)
+		return nil, fmt.Errorf("%s", msg)
+	}
+
 	// create struct that satisfies cloudprovider.Interface
 	lcloud := &linodeCloud{
 		client:                   linodeClient,

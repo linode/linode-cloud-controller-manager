@@ -152,6 +152,32 @@ func TestNewCloud(t *testing.T) {
 		require.Error(t, err, "expected error if nodebalancer-prefix is longer than 19 chars")
 		require.ErrorContains(t, err, "nodebalancer-prefix")
 	})
+
+	t.Run("should fail if nodebalancer-prefix is empty", func(t *testing.T) {
+		prefix := Options.NodeBalancerPrefix
+		rtEnabled := Options.EnableRouteController
+		Options.EnableRouteController = false
+		Options.LoadBalancerType = "nodebalancer"
+		Options.VPCNames = "vpc-test1,vpc-test2"
+		Options.NodeBalancerBackendIPv4SubnetName = "t1"
+		vpcIDs = map[string]int{"vpc-test1": 1, "vpc-test2": 2, "vpc-test3": 3}
+		subnetIDs = map[string]int{"t1": 1, "t2": 2, "t3": 3}
+		Options.NodeBalancerPrefix = strings.Repeat("a", 21)
+		defer func() {
+			Options.NodeBalancerPrefix = prefix
+			Options.LoadBalancerType = ""
+			Options.EnableRouteController = rtEnabled
+			Options.VPCNames = ""
+			Options.NodeBalancerBackendIPv4SubnetID = 0
+			Options.NodeBalancerBackendIPv4SubnetName = ""
+			vpcIDs = map[string]int{}
+			subnetIDs = map[string]int{}
+		}()
+		_, err := newCloud()
+		t.Log(err)
+		require.Error(t, err, "expected error if nodebalancer-prefix is empty")
+		require.ErrorContains(t, err, "nodebalancer-prefix cannot be empty")
+	})
 }
 
 func Test_linodeCloud_LoadBalancer(t *testing.T) {
