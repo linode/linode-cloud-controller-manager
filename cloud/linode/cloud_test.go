@@ -163,7 +163,7 @@ func TestNewCloud(t *testing.T) {
 		require.ErrorContains(t, err, "nodebalancer-prefix must be no empty")
 	})
 
-	t.Run("should fail if nodebalancer-prefix name validation", func(t *testing.T) {
+	t.Run("should fail if not validated nodebalancer-prefix", func(t *testing.T) {
 		prefix := Options.NodeBalancerPrefix
 		rtEnabled := Options.EnableRouteController
 		Options.EnableRouteController = false
