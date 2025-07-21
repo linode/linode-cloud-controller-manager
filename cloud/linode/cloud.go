@@ -35,12 +35,10 @@ var supportedLoadBalancerTypes = []string{ciliumLBType, nodeBalancerLBType}
 // We expect it to be initialized with flags external to this package, likely in
 // main.go
 var Options struct {
-	KubeconfigFlag           *pflag.Flag
-	LinodeGoDebug            bool
-	EnableRouteController    bool
-	EnableTokenHealthChecker bool
-	// Deprecated: use VPCNames instead
-	VPCName                           string
+	KubeconfigFlag                    *pflag.Flag
+	LinodeGoDebug                     bool
+	EnableRouteController             bool
+	EnableTokenHealthChecker          bool
 	VPCNames                          string
 	SubnetNames                       string
 	LoadBalancerType                  string
@@ -139,15 +137,6 @@ func newCloud() (cloudprovider.Interface, error) {
 		}
 
 		healthChecker = newHealthChecker(linodeClient, tokenHealthCheckPeriod, Options.GlobalStopChannel)
-	}
-
-	if Options.VPCName != "" && Options.VPCNames != "" {
-		return nil, fmt.Errorf("cannot have both vpc-name and vpc-names set")
-	}
-
-	if Options.VPCName != "" {
-		klog.Warningf("vpc-name flag is deprecated. Use vpc-names instead")
-		Options.VPCNames = Options.VPCName
 	}
 
 	// SubnetNames can't be used without VPCNames also being set

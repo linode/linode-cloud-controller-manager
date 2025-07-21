@@ -75,7 +75,6 @@ tolerations:
 
 # This section adds ability to enable route-controller for ccm
 # routeController:
-#   vpcName: <name of VPC> [Deprecated: use vpcNames instead]
 #   vpcNames: <comma separated list of vpc names>
 #   subnetNames: <comma separated list of subnet names>
 #   clusterCIDR: 10.192.0.0/10
@@ -88,7 +87,6 @@ tolerations:
 # nodeCIDRMaskSizeIPv6: 64
 
 # vpcs and subnets that node internal IPs will be assigned from (not required if already specified in routeController)
-# vpcName: <name of VPC> [Deprecated: use vpcNames instead]
 # vpcNames: <comma separated list of vpc names>
 # subnetNames: <comma separated list of subnet names>
 

@@ -7,7 +7,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	cloudprovider "k8s.io/cloud-provider"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
@@ -23,14 +22,14 @@ func TestNewCloudRouteControllerDisabled(t *testing.T) {
 	Options.NodeBalancerPrefix = "ccm"
 
 	t.Run("should not fail if vpc is empty and routecontroller is disabled", func(t *testing.T) {
-		Options.VPCName = ""
+		Options.VPCNames = ""
 		Options.EnableRouteController = false
 		_, err := newCloud()
 		assert.NoError(t, err)
 	})
 
 	t.Run("fail if vpcname is empty and routecontroller is enabled", func(t *testing.T) {
-		Options.VPCName = ""
+		Options.VPCNames = ""
 		Options.EnableRouteController = true
 		_, err := newCloud()
 		assert.Error(t, err)
@@ -58,28 +57,6 @@ func TestNewCloud(t *testing.T) {
 		t.Setenv("LINODE_REGION", "")
 		_, err := newCloud()
 		assert.Error(t, err, "expected error when linode region is empty")
-	})
-
-	t.Run("should fail if both vpcname and vpcnames are set", func(t *testing.T) {
-		Options.VPCName = "tt"
-		Options.VPCNames = "tt"
-		defer func() {
-			Options.VPCName = ""
-			Options.VPCNames = ""
-		}()
-		_, err := newCloud()
-		assert.Error(t, err, "expected error when both vpcname and vpcnames are set")
-	})
-
-	t.Run("should not fail if deprecated vpcname is set", func(t *testing.T) {
-		Options.VPCName = "tt"
-		defer func() {
-			Options.VPCName = ""
-			Options.VPCNames = ""
-		}()
-		_, err := newCloud()
-		require.NoError(t, err, "expected no error if deprecated flag vpcname is set")
-		assert.Equal(t, "tt", Options.VPCNames, "expected vpcnames to be set to vpcname")
 	})
 
 	t.Run("should fail if both nodeBalancerBackendIPv4SubnetID and nodeBalancerBackendIPv4SubnetName are set", func(t *testing.T) {
