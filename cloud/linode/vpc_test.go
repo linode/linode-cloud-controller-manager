@@ -288,3 +288,212 @@ func TestGetNodeBalancerBackendIPv4SubnetID(t *testing.T) {
 		}
 	})
 }
+
+func Test_validateVPCSubnetFlags(t *testing.T) {
+	tests := []struct {
+		name        string
+		vpcIDs      []int
+		vpcNames    []string
+		subnetIDs   []int
+		subnetNames []string
+		wantErr     bool
+	}{
+		{
+			name:        "invalid flags with vpc-names and vpc-ids set",
+			vpcIDs:      []int{1, 2},
+			vpcNames:    []string{"vpc1", "vpc2"},
+			subnetIDs:   []int{1},
+			subnetNames: []string{},
+			wantErr:     true,
+		},
+		{
+			name:        "invalid flags with subnet-names and subnet-ids set",
+			vpcIDs:      []int{},
+			vpcNames:    []string{"vpc1", "vpc2"},
+			subnetIDs:   []int{1, 2},
+			subnetNames: []string{"subnet1", "subnet2"},
+			wantErr:     true,
+		},
+		{
+			name:        "invalid flags with subnet-names and no vpc-names",
+			vpcIDs:      []int{},
+			vpcNames:    []string{},
+			subnetIDs:   []int{},
+			subnetNames: []string{"subnet1", "subnet2"},
+			wantErr:     true,
+		},
+		{
+			name:        "invalid flags with subnet-ids and no vpc-ids",
+			vpcIDs:      []int{},
+			vpcNames:    []string{},
+			subnetIDs:   []int{1, 2},
+			subnetNames: []string{},
+			wantErr:     true,
+		},
+		{
+			name:        "invalid flags with vpc-ids and no subnet-ids",
+			vpcIDs:      []int{1, 2},
+			vpcNames:    []string{},
+			subnetIDs:   []int{},
+			subnetNames: []string{},
+			wantErr:     true,
+		},
+		{
+			name:        "valid flags with vpc-names and subnet-names",
+			vpcIDs:      []int{},
+			vpcNames:    []string{"vpc1", "vpc2"},
+			subnetIDs:   []int{},
+			subnetNames: []string{"subnet1", "subnet2"},
+			wantErr:     false,
+		},
+		{
+			name:        "valid flags with vpc-ids and subnet-ids",
+			vpcIDs:      []int{1, 2},
+			vpcNames:    []string{},
+			subnetIDs:   []int{1, 2},
+			subnetNames: []string{},
+			wantErr:     false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			Options.VPCIDs = tt.vpcIDs
+			Options.VPCNames = tt.vpcNames
+			Options.SubnetIDs = tt.subnetIDs
+			Options.SubnetNames = tt.subnetNames
+			if err := validateVPCSubnetFlags(); (err != nil) != tt.wantErr {
+				t.Errorf("validateVPCSubnetFlags() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_resolveSubnetNames(t *testing.T) {
+	t.Run("empty subnet ids", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
+		optionsSubnetIDs := Options.SubnetIDs
+		currSubnetIDs := subnetIDs
+		defer func() {
+			Options.SubnetIDs = optionsSubnetIDs
+			subnetIDs = currSubnetIDs
+		}()
+		Options.SubnetIDs = []int{}
+		// client.EXPECT().GetVPCSubnet(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&linodego.VPCSubnet{}, errors.New("error"))
+		subnetNames, err := resolveSubnetNames(client, 10)
+		if err != nil {
+			t.Errorf("resolveSubnetNames() error = %v", err)
+			return
+		}
+		if len(subnetNames) != 0 {
+			t.Errorf("resolveSubnetNames() = %v, want %v", subnetNames, []string{})
+		}
+	})
+
+	t.Run("fails getting subnet ids", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
+		optionsSubnetIDs := Options.SubnetIDs
+		currSubnetIDs := subnetIDs
+		defer func() {
+			Options.SubnetIDs = optionsSubnetIDs
+			subnetIDs = currSubnetIDs
+		}()
+		Options.SubnetIDs = []int{1}
+		client.EXPECT().GetVPCSubnet(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&linodego.VPCSubnet{}, errors.New("error"))
+		_, err := resolveSubnetNames(client, 10)
+		require.Error(t, err)
+	})
+
+	t.Run("correctly resolves subnet names", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
+		optionsSubnetIDs := Options.SubnetIDs
+		currSubnetIDs := subnetIDs
+		defer func() {
+			Options.SubnetIDs = optionsSubnetIDs
+			subnetIDs = currSubnetIDs
+		}()
+		Options.SubnetIDs = []int{1}
+		client.EXPECT().GetVPCSubnet(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&linodego.VPCSubnet{ID: 1, Label: "subnet1"}, nil)
+		subnet, err := resolveSubnetNames(client, 10)
+		require.NoError(t, err)
+		require.Equal(t, []string{"subnet1"}, subnet, "Expected subnet names to match")
+	})
+}
+
+func Test_validateAndSetVPCSubnetFlags(t *testing.T) {
+	t.Run("invalid flags", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
+		Options.VPCIDs = []int{1, 2}
+		Options.SubnetIDs = []int{}
+		err := validateAndSetVPCSubnetFlags(client)
+		require.Error(t, err)
+	})
+
+	t.Run("valid flags with vpc-ids and subnet-ids", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
+		currVPCIDs := Options.VPCIDs
+		currSubnetIDs := Options.SubnetIDs
+		defer func() {
+			Options.VPCIDs = currVPCIDs
+			Options.SubnetIDs = currSubnetIDs
+			vpcIDs = map[string]int{}
+			subnetIDs = map[string]int{}
+		}()
+		Options.VPCIDs = []int{1}
+		Options.SubnetIDs = []int{1, 2}
+		client.EXPECT().GetVPC(gomock.Any(), gomock.Any()).Times(1).Return(&linodego.VPC{ID: 1, Label: "test"}, nil)
+		client.EXPECT().GetVPCSubnet(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return(&linodego.VPCSubnet{ID: 1, Label: "subnet1"}, nil)
+		err := validateAndSetVPCSubnetFlags(client)
+		require.NoError(t, err)
+	})
+
+	t.Run("error while making linode api call", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
+		currVPCIDs := Options.VPCIDs
+		currSubnetIDs := Options.SubnetIDs
+		defer func() {
+			Options.VPCIDs = currVPCIDs
+			Options.SubnetIDs = currSubnetIDs
+			vpcIDs = map[string]int{}
+			subnetIDs = map[string]int{}
+		}()
+		Options.VPCIDs = []int{1}
+		Options.SubnetIDs = []int{1, 2}
+		Options.VPCNames = []string{}
+		Options.SubnetNames = []string{}
+		client.EXPECT().GetVPC(gomock.Any(), gomock.Any()).Times(1).Return(nil, errors.New("error"))
+		err := validateAndSetVPCSubnetFlags(client)
+		require.Error(t, err)
+	})
+
+	t.Run("valid flags with vpc-names and subnet-names", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
+		currVPCNames := Options.VPCNames
+		currSubnetNames := Options.SubnetNames
+		defer func() {
+			Options.VPCNames = currVPCNames
+			Options.SubnetNames = currSubnetNames
+			vpcIDs = map[string]int{}
+			subnetIDs = map[string]int{}
+		}()
+		Options.VPCNames = []string{"vpc1"}
+		Options.SubnetNames = []string{"subnet1", "subnet2"}
+		Options.VPCIDs = []int{}
+		Options.SubnetIDs = []int{}
+		err := validateAndSetVPCSubnetFlags(client)
+		require.NoError(t, err)
+	})
+}

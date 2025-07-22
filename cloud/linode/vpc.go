@@ -170,9 +170,13 @@ func getNodeBalancerBackendIPv4SubnetID(client client.Client) (int, error) {
 
 func validateVPCSubnetFlags() error {
 	switch {
+	case len(Options.VPCIDs) > 0 && len(Options.SubnetIDs) == 0:
+		return fmt.Errorf("vpc-ids cannot be set without subnet-ids")
 	case len(Options.SubnetIDs) > 0 && len(Options.VPCIDs) == 0:
 		return fmt.Errorf("subnet-ids cannot be set without vpc-ids")
-	case len(Options.SubnetNames) > 0 && len(Options.VPCNames) == 0:
+	// since subnet-names defaults to "default", we also check if route-controller is enabled
+	// and if so, we require vpc-names to be set
+	case len(Options.SubnetNames) > 0 && len(Options.VPCNames) == 0 && Options.EnableRouteController:
 		return fmt.Errorf("subnet-names cannot be set without vpc-names")
 	case len(Options.VPCIDs) > 0 && len(Options.VPCNames) > 0:
 		return fmt.Errorf("cannot have both vpc-ids and vpc-names set")
