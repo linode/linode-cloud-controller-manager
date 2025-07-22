@@ -39,8 +39,7 @@ func (rc *routeCache) refreshRoutes(ctx context.Context, client client.Client) {
 	}
 
 	vpcNodes := map[int][]linodego.VPCIP{}
-	vpcNames := strings.Split(Options.VPCNames, ",")
-	for _, v := range vpcNames {
+	for _, v := range Options.VPCNames {
 		vpcName := strings.TrimSpace(v)
 		if vpcName == "" {
 			continue
@@ -74,7 +73,7 @@ func newRoutes(client client.Client, instanceCache *instances) (cloudprovider.Ro
 	}
 	klog.V(3).Infof("TTL for routeCache set to %d seconds", timeout)
 
-	if Options.EnableRouteController && Options.VPCNames == "" {
+	if Options.EnableRouteController && len(Options.VPCNames) == 0 {
 		return nil, fmt.Errorf("cannot enable route controller as vpc-names is empty")
 	}
 

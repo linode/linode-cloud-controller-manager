@@ -80,9 +80,8 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 
 	// If running within VPC, find instances and store their ips
 	vpcNodes := map[int][]string{}
-	vpcNames := strings.Split(Options.VPCNames, ",")
-	for _, v := range vpcNames {
-		vpcName := strings.TrimSpace(v)
+	for _, vpcName := range Options.VPCNames {
+		vpcName := strings.TrimSpace(vpcName)
 		if vpcName == "" {
 			continue
 		}
@@ -102,7 +101,7 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 	newNodes := make(map[int]linodeInstance, len(instances))
 	for index, instance := range instances {
 		// if running within VPC, only store instances in cache which are part of VPC
-		if Options.VPCNames != "" && len(vpcNodes[instance.ID]) == 0 {
+		if len(Options.VPCNames) > 0 && len(vpcNodes[instance.ID]) == 0 {
 			continue
 		}
 		node := linodeInstance{

@@ -34,6 +34,8 @@ type Client interface {
 
 	UpdateInstanceConfigInterface(context.Context, int, int, int, linodego.InstanceConfigInterfaceUpdateOptions) (*linodego.InstanceConfigInterface, error)
 
+	GetVPC(context.Context, int) (*linodego.VPC, error)
+	GetVPCSubnet(context.Context, int, int) (*linodego.VPCSubnet, error)
 	ListVPCs(context.Context, *linodego.ListOptions) ([]linodego.VPC, error)
 	ListVPCIPAddresses(context.Context, int, *linodego.ListOptions) ([]linodego.VPCIP, error)
 	ListVPCSubnets(context.Context, int, *linodego.ListOptions) ([]linodego.VPCSubnet, error)

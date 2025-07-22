@@ -19,9 +19,11 @@ import (
 )
 
 func TestListRoutes(t *testing.T) {
-	Options.VPCNames = "test,abc"
+	Options.VPCNames = []string{"test", "abc"}
 	vpcIDs["test"] = 1
 	vpcIDs["abc"] = 2
+	Options.SubnetNames = []string{"default"}
+	subnetIDs["default"] = 1
 	Options.EnableRouteController = true
 
 	nodeID := 123
@@ -312,7 +314,7 @@ func TestListRoutes(t *testing.T) {
 
 func TestCreateRoute(t *testing.T) {
 	ctx := t.Context()
-	Options.VPCNames = "dummy"
+	Options.VPCNames = []string{"dummy"}
 	vpcIDs["dummy"] = 1
 	Options.EnableRouteController = true
 
@@ -463,7 +465,7 @@ func TestCreateRoute(t *testing.T) {
 }
 
 func TestDeleteRoute(t *testing.T) {
-	Options.VPCNames = "dummy"
+	Options.VPCNames = []string{"dummy"}
 	vpcIDs["dummy"] = 1
 	Options.EnableRouteController = true
 

@@ -154,7 +154,7 @@ func TestGetVPCIPAddresses(t *testing.T) {
 		client := mocks.NewMockClient(ctrl)
 		sn := Options.SubnetNames
 		defer func() { Options.SubnetNames = sn }()
-		Options.SubnetNames = "subnet4"
+		Options.SubnetNames = []string{"subnet4"}
 		vpcIDs = map[string]int{"test1": 1}
 		subnetIDs = map[string]int{"subnet1": 1}
 		client.EXPECT().ListVPCs(gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPC{{ID: 10, Label: "test10"}}, nil)
@@ -238,7 +238,7 @@ func TestGetNodeBalancerBackendIPv4SubnetID(t *testing.T) {
 			vpcIDs = currVPCIDs
 			subnetIDs = currSubnetIDs
 		}()
-		Options.VPCNames = "vpc-test1,vpc-test2,vpc-test3"
+		Options.VPCNames = []string{"vpc-test1", "vpc-test2", "vpc-test3"}
 		vpcIDs = map[string]int{"vpc-test2": 2, "vpc-test3": 3}
 		subnetIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
 		client.EXPECT().ListVPCs(gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPC{}, errors.New("error"))
@@ -255,7 +255,7 @@ func TestGetNodeBalancerBackendIPv4SubnetID(t *testing.T) {
 		client := mocks.NewMockClient(ctrl)
 		currVPCNames := Options.VPCNames
 		defer func() { Options.VPCNames = currVPCNames }()
-		Options.VPCNames = "vpc-test1,vpc-test2,vpc-test3"
+		Options.VPCNames = []string{"vpc-test1", "vpc-test2", "vpc-test3"}
 		vpcIDs = map[string]int{"vpc-test1": 1, "vpc-test2": 2, "vpc-test3": 3}
 		subnetIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
 		client.EXPECT().ListVPCSubnets(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCSubnet{}, errors.New("error"))
@@ -276,7 +276,7 @@ func TestGetNodeBalancerBackendIPv4SubnetID(t *testing.T) {
 			Options.VPCNames = currVPCNames
 			Options.NodeBalancerBackendIPv4SubnetName = currNodeBalancerBackendIPv4SubnetName
 		}()
-		Options.VPCNames = "vpc-test1,vpc-test2,vpc-test3"
+		Options.VPCNames = []string{"vpc-test1", "vpc-test2", "vpc-test3"}
 		Options.NodeBalancerBackendIPv4SubnetName = "test4"
 		vpcIDs = map[string]int{"vpc-test1": 1, "vpc-test2": 2, "vpc-test3": 3}
 		subnetIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
