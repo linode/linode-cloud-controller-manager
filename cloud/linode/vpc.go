@@ -168,24 +168,51 @@ func getNodeBalancerBackendIPv4SubnetID(client client.Client) (int, error) {
 	return subnetID, nil
 }
 
-func validateVPCSubnetFlags() error {
-	switch {
-	case len(Options.VPCIDs) > 0 && len(Options.VPCNames) > 0:
+// validateBothNameAndIDNotSet checks if both VPC IDs and names are set.
+func validateBothNameAndIDNotSet() error {
+	if len(Options.VPCIDs) != 0 && len(Options.VPCNames) != 0 {
 		return fmt.Errorf("cannot have both vpc-ids and vpc-names set")
-	case len(Options.VPCIDs) > 0 && len(Options.SubnetIDs) == 0:
-		return fmt.Errorf("vpc-ids cannot be set without subnet-ids")
-	case len(Options.SubnetIDs) > 0 && len(Options.VPCIDs) == 0:
-		return fmt.Errorf("subnet-ids cannot be set without vpc-ids")
-	// since subnet-names defaults to "default", we also check if route-controller is enabled
-	// and if so, we require vpc-names to be set
-	case len(Options.SubnetNames) > 0 && len(Options.VPCNames) == 0 && Options.EnableRouteController:
-		return fmt.Errorf("subnet-names cannot be set without vpc-names")
-	case len(Options.VPCIDs) == 0:
-		return nil
 	}
 	return nil
 }
 
+// validateVPCAndSubnetPairing checks if both VPC and subnet IDs or names are set correctly.
+func validateVPCAndSubnetPairing() error {
+	if len(Options.VPCIDs) != 0 && len(Options.SubnetIDs) == 0 {
+		return fmt.Errorf("vpc-ids cannot be set without subnet-ids")
+	}
+	if len(Options.SubnetIDs) != 0 && len(Options.VPCIDs) == 0 {
+		return fmt.Errorf("subnet-ids cannot be set without vpc-ids")
+	}
+	return nil
+}
+
+// validateSubnetNamesWithRouteController checks if subnet-names are set without vpc-names
+func validateSubnetNamesWithRouteController() error {
+	if len(Options.SubnetNames) != 0 && len(Options.VPCNames) == 0 && Options.EnableRouteController {
+		return fmt.Errorf("subnet-names cannot be set without vpc-names")
+	}
+	return nil
+}
+
+// validateVPCSubnetFlags validates the VPC and subnet flags for the route controller.
+// It checks that both VPC and subnet IDs or names are set correctly, and that they are paired correctly.
+// It also checks that if subnet names are set, VPC names must also be set,
+// and that if subnet IDs are set, VPC IDs must also be set.
+func validateVPCSubnetFlags() error {
+	if err := validateBothNameAndIDNotSet(); err != nil {
+		return err
+	}
+	if err := validateVPCAndSubnetPairing(); err != nil {
+		return err
+	}
+	if err := validateSubnetNamesWithRouteController(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// resolveSubnetNames resolves subnet ids to names for the given VPC ID.
 func resolveSubnetNames(client client.Client, vpcID int) ([]string, error) {
 	subnetNames := []string{}
 	for _, subnetID := range Options.SubnetIDs {
@@ -201,6 +228,9 @@ func resolveSubnetNames(client client.Client, vpcID int) ([]string, error) {
 	return subnetNames, nil
 }
 
+// validateAndSetVPCSubnetFlags validates the VPC and subnet flags and sets the vpcNames and subnetNames options.
+// It retrieves the VPC names and subnet names from the Linode API based on the provided flags.
+// If subnet IDs are provided, it resolves the subnet names based on the first VPC ID.
 func validateAndSetVPCSubnetFlags(client client.Client) error {
 	// ignore default subnet-names if subnet-ids are set
 	if len(Options.SubnetIDs) > 0 {
@@ -224,6 +254,9 @@ func validateAndSetVPCSubnetFlags(client client.Client) error {
 		vpcIDs[vpc.Label] = vpcID
 		vpcNames = append(vpcNames, vpc.Label)
 
+		// we resolve subnet names only for the first VPC ID
+		// as there is no vpc to subnet mapping in input flags
+		// and we assume all subnets are in the same VPC
 		if idx == 0 && len(Options.SubnetIDs) > 0 {
 			subnetNames, err := resolveSubnetNames(client, vpcID)
 			if err != nil {
