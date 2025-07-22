@@ -307,14 +307,6 @@ func Test_validateVPCSubnetFlags(t *testing.T) {
 			wantErr:     true,
 		},
 		{
-			name:        "invalid flags with subnet-names and subnet-ids set",
-			vpcIDs:      []int{},
-			vpcNames:    []string{"vpc1", "vpc2"},
-			subnetIDs:   []int{1, 2},
-			subnetNames: []string{"subnet1", "subnet2"},
-			wantErr:     true,
-		},
-		{
 			name:        "invalid flags with subnet-names and no vpc-names",
 			vpcIDs:      []int{},
 			vpcNames:    []string{},

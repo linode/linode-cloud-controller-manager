@@ -39,8 +39,10 @@ The CCM supports the following flags:
 | `--linodego-debug` | `false` | Enables debug output for the LinodeAPI wrapper |
 | `--enable-route-controller` | `false` | Enables route_controller for CCM |
 | `--enable-token-health-checker` | `false` | Enables Linode API token health checker |
-| `--vpc-names` | `""` | Comma separated VPC names whose routes will be managed by route-controller |
-| `--subnet-names` | `""` | Comma separated subnet names whose routes will be managed by route-controller (requires vpc-names flag) |
+| `--vpc-names` | `[]` | Comma separated VPC names whose routes will be managed by route-controller |
+| `--subnet-names` | `["default"]` | Comma separated subnet names whose routes will be managed by route-controller (requires vpc-names flag) |
+| `--vpc-ids` | `[]` | Comma separated VPC ids whose routes will be managed by route-controller |
+| `--subnet-ids` | `[]` | Comma separated subnet ids whose routes will be managed by route-controller (requires vpc-ids flag) |
 | `--load-balancer-type` | `nodebalancer` | Configures which type of load-balancing to use (options: nodebalancer, cilium-bgp) |
 | `--bgp-node-selector` | `""` | Node selector to use to perform shared IP fail-over with BGP |
 | `--ip-holder-suffix` | `""` | Suffix to append to the IP holder name when using shared IP fail-over with BGP |
