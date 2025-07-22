@@ -185,8 +185,7 @@ func validateVPCSubnetFlags() error {
 }
 
 func resolveSubnetNames(client client.Client, vpcID int) ([]string, error) {
-	var subnetNames []string
-
+	subnetNames := []string{}
 	for _, subnetID := range Options.SubnetIDs {
 		subnet, err := client.GetVPCSubnet(context.TODO(), vpcID, subnetID)
 		if err != nil {
@@ -208,8 +207,7 @@ func validateAndSetVPCSubnetFlags(client client.Client) error {
 	Mu.Lock()
 	defer Mu.Unlock()
 
-	var vpcNames []string
-
+	vpcNames := []string{}
 	for idx, vpcID := range Options.VPCIDs {
 		vpc, err := client.GetVPC(context.TODO(), vpcID)
 		if err != nil {
