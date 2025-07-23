@@ -83,6 +83,20 @@ spec:
             {{- if and .Values.routeController .Values.routeController.subnetNames }}
             {{- $subnetNames = .Values.routeController.subnetNames }}
             {{- end }}
+            {{- $vpcIDs := .Values.vpcIDs }}
+            {{- if and .Values.routeController .Values.routeController.vpcIDs }}
+            {{- $vpcIDs = .Values.routeController.vpcIDs }}
+            {{- end }}
+            {{- $subnetIDs := .Values.subnetIDs }}
+            {{- if and .Values.routeController .Values.routeController.subnetIDs }}
+            {{- $subnetIDs = .Values.routeController.subnetIDs }}
+            {{- end }}
+            {{- if and $vpcIDs $vpcNames }}
+            {{- fail "Both vpcIDs and vpcNames are set. Please use only one." }}
+            {{- end }}
+            {{- if and $subnetIDs $subnetNames }}
+            {{- fail "Both subnetIDs and subnetNames are set. Please use only one." }}
+            {{- end }}
             {{- if .Values.disableNodeBalancerVPCBackends }}
             - --disable-nodebalancer-vpc-backends={{ .Values.disableNodeBalancerVPCBackends }}
             {{- end }}
@@ -99,8 +113,14 @@ spec:
             {{- end }}
             {{- if .Values.routeController }}
             - --enable-route-controller=true
-            {{- if not $vpcNames }}
-            {{- fail "vpcNames not set. Please set it when enabling route_controller for VPCs." }}
+            {{- if not (or $vpcNames $vpcIDs) }}
+            {{- fail "vpcNames or vpcIDs not set. Please set it when enabling route_controller for VPCs." }}
+            {{- end }}
+            {{- if and $vpcIDs (not $subnetIDs) }}
+            {{- fail "subnetIDs must be set when vpcIDs are set for route-controller" }}
+            {{- end }}
+            {{- if and $subnetIDs (not $vpcIDs) }}
+            {{- fail "vpcIDs must be set when subnetIDs are set for route-controller" }}
             {{- end }}
             {{- if not $clusterCIDR }}
             {{- fail "clusterCIDR is required if route-controller is enabled" }}
@@ -115,6 +135,12 @@ spec:
             {{- end }}
             {{- with $subnetNames }}
             - --subnet-names={{ . }}
+            {{- end }}
+            {{- with $vpcIDs }}
+            - --vpc-ids={{ . }}
+            {{- end }}
+            {{- with $subnetIDs }}
+            - --subnet-ids={{ . }}
             {{- end }}
             {{- with $clusterCIDR }}
             - --cluster-cidr={{ . }}

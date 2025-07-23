@@ -159,7 +159,7 @@ func TestMetadataRetrieval(t *testing.T) {
 		ipv6Addr := "2001::8a2e:370:7348"
 		linodeType := typeG6
 
-		Options.VPCNames = "test"
+		Options.VPCNames = []string{"test"}
 		vpcIDs["test"] = 1
 		Options.EnableRouteController = true
 
@@ -229,7 +229,7 @@ func TestMetadataRetrieval(t *testing.T) {
 			},
 		}, meta.NodeAddresses)
 
-		Options.VPCNames = ""
+		Options.VPCNames = []string{}
 	})
 
 	ipTests := []struct {

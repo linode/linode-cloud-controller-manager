@@ -241,6 +241,32 @@ func (_d ClientWithPrometheus) GetProfile(ctx context.Context) (pp1 *linodego.Pr
 	return _d.base.GetProfile(ctx)
 }
 
+// GetVPC implements Client
+func (_d ClientWithPrometheus) GetVPC(ctx context.Context, i1 int) (vp1 *linodego.VPC, err error) {
+	defer func() {
+		result := "ok"
+		if err != nil {
+			result = "error"
+		}
+
+		ClientMethodCounterVec.WithLabelValues("GetVPC", result).Inc()
+	}()
+	return _d.base.GetVPC(ctx, i1)
+}
+
+// GetVPCSubnet implements Client
+func (_d ClientWithPrometheus) GetVPCSubnet(ctx context.Context, i1 int, i2 int) (vp1 *linodego.VPCSubnet, err error) {
+	defer func() {
+		result := "ok"
+		if err != nil {
+			result = "error"
+		}
+
+		ClientMethodCounterVec.WithLabelValues("GetVPCSubnet", result).Inc()
+	}()
+	return _d.base.GetVPCSubnet(ctx, i1, i2)
+}
+
 // ListFirewallDevices implements Client
 func (_d ClientWithPrometheus) ListFirewallDevices(ctx context.Context, firewallID int, opts *linodego.ListOptions) (fa1 []linodego.FirewallDevice, err error) {
 	defer func() {

@@ -6,9 +6,9 @@ import (
 	"io"
 	"net"
 	"os"
+	"regexp"
 	"strconv"
 	"time"
-	"regexp"
 
 	"github.com/spf13/pflag"
 	"golang.org/x/exp/slices"
@@ -39,8 +39,10 @@ var Options struct {
 	LinodeGoDebug                     bool
 	EnableRouteController             bool
 	EnableTokenHealthChecker          bool
-	VPCNames                          string
-	SubnetNames                       string
+	VPCNames                          []string
+	VPCIDs                            []int
+	SubnetNames                       []string
+	SubnetIDs                         []int
 	LoadBalancerType                  string
 	BGPNodeSelector                   string
 	IpHolderSuffix                    string
@@ -139,10 +141,9 @@ func newCloud() (cloudprovider.Interface, error) {
 		healthChecker = newHealthChecker(linodeClient, tokenHealthCheckPeriod, Options.GlobalStopChannel)
 	}
 
-	// SubnetNames can't be used without VPCNames also being set
-	if Options.SubnetNames != "" && Options.VPCNames == "" {
-		klog.Warningf("failed to set flag subnet-names: vpc-names must be set to a non-empty value")
-		Options.SubnetNames = ""
+	err = validateAndSetVPCSubnetFlags(linodeClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate VPC and subnet flags: %w", err)
 	}
 
 	if Options.NodeBalancerBackendIPv4SubnetID != 0 && Options.NodeBalancerBackendIPv4SubnetName != "" {
