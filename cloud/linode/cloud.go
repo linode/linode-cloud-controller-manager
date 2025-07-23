@@ -56,6 +56,7 @@ var Options struct {
 	GlobalStopChannel                 chan<- struct{}
 	EnableIPv6ForLoadBalancers        bool
 	AllocateNodeCIDRs                 bool
+	DisableIPv6NodeCIDRAllocation     bool
 	ClusterCIDRIPv4                   string
 	NodeCIDRMaskSizeIPv4              int
 	NodeCIDRMaskSizeIPv6              int
