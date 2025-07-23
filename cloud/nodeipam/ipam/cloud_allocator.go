@@ -414,6 +414,9 @@ func (c *cloudAllocator) AllocateOrOccupyCIDR(ctx context.Context, node *v1.Node
 	// If IPv6 CIDR allocation is disabled, log and return early.
 	if c.disableIPv6NodeCIDRAllocation {
 		logger.V(4).Info("IPv6 CIDR allocation disabled; using only IPv4", "node", klog.KObj(node))
+		// remove the second CIDR from the allocatedCIDRs slice
+		// since we are not allocating IPv6 CIDR
+		allocatedCIDRs = allocatedCIDRs[:1]
 		return c.enqueueCIDRUpdate(ctx, node.Name, allocatedCIDRs)
 	}
 	// Allocate IPv6 CIDR for the node.
