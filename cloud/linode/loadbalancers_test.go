@@ -627,8 +627,8 @@ func testCreateNodeBalancerWithVPCBackend(t *testing.T, client *linodego.Client,
 		Options.VPCNames = vpcNames
 		Options.SubnetNames = subnetNames
 	}()
-	Options.VPCNames = "test1"
-	Options.SubnetNames = defaultSubnet
+	Options.VPCNames = []string{"test1"}
+	Options.SubnetNames = []string{defaultSubnet}
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
 		Label:       "test1",
 		Description: "",
@@ -669,8 +669,8 @@ func testUpdateNodeBalancerWithVPCBackend(t *testing.T, client *linodego.Client,
 		Options.VPCNames = vpcNames
 		Options.SubnetNames = subnetNames
 	}()
-	Options.VPCNames = "test1"
-	Options.SubnetNames = defaultSubnet
+	Options.VPCNames = []string{"test1"}
+	Options.SubnetNames = []string{defaultSubnet}
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
 		Label:       "test1",
 		Description: "",
@@ -757,8 +757,8 @@ func testCreateNodeBalancerWithVPCOnlySubnetFlag(t *testing.T, client *linodego.
 		Options.SubnetNames = subnetNames
 		Options.NodeBalancerBackendIPv4Subnet = nbBackendSubnet
 	}()
-	Options.VPCNames = "test-subflag"
-	Options.SubnetNames = defaultSubnet
+	Options.VPCNames = []string{"test-subflag"}
+	Options.SubnetNames = []string{defaultSubnet}
 	Options.NodeBalancerBackendIPv4Subnet = "10.254.0.0/24"
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
 		Label:       "test-subflag",
@@ -851,8 +851,8 @@ func testCreateNodeBalancerWithVPCNoFlagOrAnnotation(t *testing.T, client *linod
 		Options.VPCNames = vpcNames
 		Options.SubnetNames = subnetNames
 	}()
-	Options.VPCNames = "test-noflags"
-	Options.SubnetNames = defaultSubnet
+	Options.VPCNames = []string{"test-noflags"}
+	Options.SubnetNames = []string{defaultSubnet}
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
 		Label:       "test-noflags",
 		Description: "",
@@ -934,8 +934,8 @@ func testCreateNodeBalancerWithVPCAnnotationOnly(t *testing.T, client *linodego.
 		Options.VPCNames = vpcNames
 		Options.SubnetNames = subnetNames
 	}()
-	Options.VPCNames = "test-onlyannotation"
-	Options.SubnetNames = defaultSubnet
+	Options.VPCNames = []string{"test-onlyannotation"}
+	Options.SubnetNames = []string{defaultSubnet}
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
 		Label:       "test-onlyannotation",
 		Description: "",
@@ -1024,8 +1024,8 @@ func testCreateNodeBalancerWithVPCOnlySubnetIDFlag(t *testing.T, client *linodeg
 		Options.SubnetNames = subnetNames
 		Options.NodeBalancerBackendIPv4SubnetID = nbBackendSubnetID
 	}()
-	Options.VPCNames = "test1"
-	Options.SubnetNames = defaultSubnet
+	Options.VPCNames = []string{"test1"}
+	Options.SubnetNames = []string{defaultSubnet}
 	Options.NodeBalancerBackendIPv4SubnetID = 1111
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
 		Label:       "test-subid-flag",
@@ -1105,12 +1105,15 @@ func testCreateNodeBalancerWithVPCAnnotationOverwrite(t *testing.T, client *lino
 
 	// provision multiple vpcs
 	vpcNames := Options.VPCNames
+	subnetNames := Options.SubnetNames
 	nodebalancerBackendIPv4Subnet := Options.NodeBalancerBackendIPv4Subnet
 	defer func() {
 		Options.VPCNames = vpcNames
+		Options.SubnetNames = subnetNames
 		Options.NodeBalancerBackendIPv4Subnet = nodebalancerBackendIPv4Subnet
 	}()
-	Options.VPCNames = "test1"
+	Options.VPCNames = []string{"test1"}
+	Options.SubnetNames = []string{defaultSubnet}
 	Options.NodeBalancerBackendIPv4Subnet = "10.100.0.0/24"
 
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{

@@ -460,7 +460,7 @@ func (l *loadbalancers) updateNodeBalancer(
 				return err
 			}
 		}
-		if Options.VPCNames != "" && !Options.DisableNodeBalancerVPCBackends {
+		if len(Options.VPCNames) > 0 && !Options.DisableNodeBalancerVPCBackends {
 			var id int
 			id, err = l.getSubnetIDForSVC(ctx, service)
 			if err != nil {
@@ -831,7 +831,7 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 		Type:               nbType,
 	}
 
-	if Options.VPCNames != "" && !Options.DisableNodeBalancerVPCBackends {
+	if len(Options.VPCNames) > 0 && !Options.DisableNodeBalancerVPCBackends {
 		createOpts.VPCs, err = l.getVPCCreateOptions(ctx, service)
 		if err != nil {
 			return nil, err
@@ -971,7 +971,7 @@ func (l *loadbalancers) addTLSCert(ctx context.Context, service *v1.Service, nbC
 // 3. If CCM is configured with --nodebalancer-backend-ipv4-subnet-id, it will be used as the subnet ID.
 // 4. Else, use first VPCName and SubnetName to calculate subnet id for the service.
 func (l *loadbalancers) getSubnetIDForSVC(ctx context.Context, service *v1.Service) (int, error) {
-	if Options.VPCNames == "" {
+	if len(Options.VPCNames) == 0 {
 		return 0, fmt.Errorf("CCM not configured with VPC, cannot create NodeBalancer with specified annotation")
 	}
 	// Check if the service has an annotation for NodeBalancerBackendSubnetID
@@ -992,7 +992,7 @@ func (l *loadbalancers) getSubnetIDForSVC(ctx context.Context, service *v1.Servi
 		return Options.NodeBalancerBackendIPv4SubnetID, nil
 	}
 
-	vpcName := strings.Split(Options.VPCNames, ",")[0]
+	vpcName := Options.VPCNames[0]
 	if vpcOk {
 		vpcName = specifiedVPCName
 	}
@@ -1001,7 +1001,7 @@ func (l *loadbalancers) getSubnetIDForSVC(ctx context.Context, service *v1.Servi
 		return 0, err
 	}
 
-	subnetName := strings.Split(Options.SubnetNames, ",")[0]
+	subnetName := Options.SubnetNames[0]
 	if subnetOk {
 		subnetName = specifiedSubnetName
 	}
@@ -1030,7 +1030,7 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 			return nil, err
 		}
 	}
-	if Options.VPCNames != "" && !Options.DisableNodeBalancerVPCBackends {
+	if len(Options.VPCNames) > 0 && !Options.DisableNodeBalancerVPCBackends {
 		id, err := l.getSubnetIDForSVC(ctx, service)
 		if err != nil {
 			return nil, err

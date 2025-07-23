@@ -23,14 +23,14 @@ func TestNewCloudRouteControllerDisabled(t *testing.T) {
 	Options.NodeBalancerPrefix = "ccm"
 
 	t.Run("should not fail if vpc is empty and routecontroller is disabled", func(t *testing.T) {
-		Options.VPCNames = ""
+		Options.VPCNames = []string{}
 		Options.EnableRouteController = false
 		_, err := newCloud()
 		assert.NoError(t, err)
 	})
 
 	t.Run("fail if vpcname is empty and routecontroller is enabled", func(t *testing.T) {
-		Options.VPCNames = ""
+		Options.VPCNames = []string{}
 		Options.EnableRouteController = true
 		_, err := newCloud()
 		assert.Error(t, err)
@@ -61,11 +61,11 @@ func TestNewCloud(t *testing.T) {
 	})
 
 	t.Run("should fail if both nodeBalancerBackendIPv4SubnetID and nodeBalancerBackendIPv4SubnetName are set", func(t *testing.T) {
-		Options.VPCNames = "tt"
+		Options.VPCNames = []string{"tt"}
 		Options.NodeBalancerBackendIPv4SubnetID = 12345
 		Options.NodeBalancerBackendIPv4SubnetName = "test-subnet"
 		defer func() {
-			Options.VPCNames = ""
+			Options.VPCNames = []string{}
 			Options.NodeBalancerBackendIPv4SubnetID = 0
 			Options.NodeBalancerBackendIPv4SubnetName = ""
 		}()
@@ -77,14 +77,14 @@ func TestNewCloud(t *testing.T) {
 		rtEnabled := Options.EnableRouteController
 		Options.EnableRouteController = false
 		Options.LoadBalancerType = "test"
-		Options.VPCNames = "vpc-test1,vpc-test2"
+		Options.VPCNames = []string{"vpc-test1", "vpc-test2"}
 		Options.NodeBalancerBackendIPv4SubnetName = "t1"
 		vpcIDs = map[string]int{"vpc-test1": 1, "vpc-test2": 2, "vpc-test3": 3}
 		subnetIDs = map[string]int{"t1": 1, "t2": 2, "t3": 3}
 		defer func() {
 			Options.LoadBalancerType = ""
 			Options.EnableRouteController = rtEnabled
-			Options.VPCNames = ""
+			Options.VPCNames = []string{}
 			Options.NodeBalancerBackendIPv4SubnetID = 0
 			Options.NodeBalancerBackendIPv4SubnetName = ""
 			vpcIDs = map[string]int{}

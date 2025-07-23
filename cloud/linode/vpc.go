@@ -110,13 +110,11 @@ func GetVPCIPAddresses(ctx context.Context, client client.Client, vpcName string
 	resultFilter := ""
 
 	// Get subnet ID(s) from name(s) if subnet-names is specified
-	if Options.SubnetNames != "" {
-		// Get the IDs and store them
+	if len(Options.SubnetNames) > 0 {
 		// subnetIDList is a slice of strings for ease of use with resultFilter
-		subnetNames := strings.Split(Options.SubnetNames, ",")
 		subnetIDList := []string{}
 
-		for _, name := range subnetNames {
+		for _, name := range Options.SubnetNames {
 			// For caching
 			var subnetID int
 			subnetID, err = GetSubnetID(ctx, client, vpcID, name)
@@ -156,11 +154,10 @@ func GetVPCIPAddresses(ctx context.Context, client client.Client, vpcName string
 // It uses the first VPC name from Options.VPCNames to find the VPC ID and then retrieves the subnet ID
 // for the NodeBalancer backend IPv4 subnet name specified in Options.NodeBalancerBackendIPv4SubnetName.
 func getNodeBalancerBackendIPv4SubnetID(client client.Client) (int, error) {
-	vpcName := strings.Split(Options.VPCNames, ",")[0]
 	// Get the VPC ID from the name
-	vpcID, err := GetVPCID(context.TODO(), client, vpcName)
+	vpcID, err := GetVPCID(context.TODO(), client, Options.VPCNames[0])
 	if err != nil {
-		return 0, fmt.Errorf("failed to get vpc id for %s: %w", vpcName, err)
+		return 0, fmt.Errorf("failed to get vpc id for %s: %w", Options.VPCNames[0], err)
 	}
 	// Get the subnet ID from the name
 	subnetID, err := GetSubnetID(context.TODO(), client, vpcID, Options.NodeBalancerBackendIPv4SubnetName)
@@ -169,4 +166,108 @@ func getNodeBalancerBackendIPv4SubnetID(client client.Client) (int, error) {
 	}
 
 	return subnetID, nil
+}
+
+// validateBothNameAndIDNotSet checks if both VPC IDs and names are set.
+func validateBothNameAndIDNotSet() error {
+	if len(Options.VPCIDs) != 0 && len(Options.VPCNames) != 0 {
+		return fmt.Errorf("cannot have both vpc-ids and vpc-names set")
+	}
+	return nil
+}
+
+// validateVPCAndSubnetPairing checks if both VPC and subnet IDs or names are set correctly.
+func validateVPCAndSubnetPairing() error {
+	if len(Options.VPCIDs) != 0 && len(Options.SubnetIDs) == 0 {
+		return fmt.Errorf("vpc-ids cannot be set without subnet-ids")
+	}
+	if len(Options.SubnetIDs) != 0 && len(Options.VPCIDs) == 0 {
+		return fmt.Errorf("subnet-ids cannot be set without vpc-ids")
+	}
+	return nil
+}
+
+// validateSubnetNamesWithRouteController checks if subnet-names are set without vpc-names
+func validateSubnetNamesWithRouteController() error {
+	if len(Options.SubnetNames) != 0 && len(Options.VPCNames) == 0 && Options.EnableRouteController {
+		return fmt.Errorf("subnet-names cannot be set without vpc-names")
+	}
+	return nil
+}
+
+// validateVPCSubnetFlags validates the VPC and subnet flags for the route controller.
+// It checks that both VPC and subnet IDs or names are set correctly, and that they are paired correctly.
+// It also checks that if subnet names are set, VPC names must also be set,
+// and that if subnet IDs are set, VPC IDs must also be set.
+func validateVPCSubnetFlags() error {
+	if err := validateBothNameAndIDNotSet(); err != nil {
+		return err
+	}
+	if err := validateVPCAndSubnetPairing(); err != nil {
+		return err
+	}
+	if err := validateSubnetNamesWithRouteController(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// resolveSubnetNames resolves subnet ids to names for the given VPC ID.
+func resolveSubnetNames(client client.Client, vpcID int) ([]string, error) {
+	subnetNames := []string{}
+	for _, subnetID := range Options.SubnetIDs {
+		subnet, err := client.GetVPCSubnet(context.TODO(), vpcID, subnetID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get subnet %d for VPC %d: %w", subnetID, vpcID, err)
+		}
+
+		subnetIDs[subnet.Label] = subnet.ID
+		subnetNames = append(subnetNames, subnet.Label)
+	}
+
+	return subnetNames, nil
+}
+
+// validateAndSetVPCSubnetFlags validates the VPC and subnet flags and sets the vpcNames and subnetNames options.
+// It retrieves the VPC names and subnet names from the Linode API based on the provided flags.
+// If subnet IDs are provided, it resolves the subnet names based on the first VPC ID.
+func validateAndSetVPCSubnetFlags(client client.Client) error {
+	// ignore default subnet-names if subnet-ids are set
+	if len(Options.SubnetIDs) > 0 {
+		Options.SubnetNames = []string{}
+	}
+
+	if err := validateVPCSubnetFlags(); err != nil {
+		return err
+	}
+
+	Mu.Lock()
+	defer Mu.Unlock()
+
+	vpcNames := []string{}
+	for idx, vpcID := range Options.VPCIDs {
+		vpc, err := client.GetVPC(context.TODO(), vpcID)
+		if err != nil {
+			return fmt.Errorf("failed to get VPC %d: %w", vpcID, err)
+		}
+
+		vpcIDs[vpc.Label] = vpcID
+		vpcNames = append(vpcNames, vpc.Label)
+
+		// we resolve subnet names only for the first VPC ID
+		// as there is no vpc to subnet mapping in input flags
+		// and we assume all subnets are in the same VPC
+		if idx == 0 && len(Options.SubnetIDs) > 0 {
+			subnetNames, err := resolveSubnetNames(client, vpcID)
+			if err != nil {
+				return err
+			}
+			Options.SubnetNames = append(Options.SubnetNames, subnetNames...)
+		}
+	}
+
+	Options.VPCNames = append(Options.VPCNames, vpcNames...)
+	klog.V(3).Infof("VPC IDs: %v, VPC Names: %v, Subnet IDs: %v, Subnet Names: %v",
+		Options.VPCIDs, Options.VPCNames, Options.SubnetIDs, Options.SubnetNames)
+	return nil
 }
