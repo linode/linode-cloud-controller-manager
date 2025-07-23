@@ -324,6 +324,19 @@ func (c *cloudAllocator) occupyCIDRs(ctx context.Context, node *v1.Node) error {
 	return nil
 }
 
+// getIPv6RangeFromInterface extracts the IPv6 range from a Linode instance configuration interface.
+func getIPv6RangeFromInterface(iface linodego.InstanceConfigInterface) string {
+	if ipv6 := iface.IPv6; ipv6 != nil {
+		if len(ipv6.SLAAC) > 0 {
+			return ipv6.SLAAC[0].Range
+		}
+		if len(ipv6.Ranges) > 0 {
+			return ipv6.Ranges[0].Range
+		}
+	}
+	return ""
+}
+
 // allocateIPv6CIDR allocates an IPv6 CIDR for the given node.
 // It retrieves the instance configuration for the node and extracts the IPv6 range.
 // It then creates a new net.IPNet with the IPv6 address and mask size defined
@@ -351,8 +364,9 @@ func (c *cloudAllocator) allocateIPv6CIDR(ctx context.Context, node *v1.Node) (*
 	ipv6Range := ""
 	for _, iface := range configs[0].Interfaces {
 		if iface.Purpose == linodego.InterfacePurposeVPC {
-			if iface.IPv6 != nil && iface.IPv6.Ranges != nil && len(iface.IPv6.Ranges) > 0 {
-				ipv6Range = iface.IPv6.Ranges[0].Range
+			ipv6Range = getIPv6RangeFromInterface(iface)
+			if ipv6Range != "" {
+				break
 			}
 		}
 	}
