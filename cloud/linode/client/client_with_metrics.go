@@ -280,6 +280,19 @@ func (_d ClientWithPrometheus) ListFirewallDevices(ctx context.Context, firewall
 	return _d.base.ListFirewallDevices(ctx, firewallID, opts)
 }
 
+// ListInstanceConfigs implements Client
+func (_d ClientWithPrometheus) ListInstanceConfigs(ctx context.Context, linodeID int, opts *linodego.ListOptions) (ia1 []linodego.InstanceConfig, err error) {
+	defer func() {
+		result := "ok"
+		if err != nil {
+			result = "error"
+		}
+
+		ClientMethodCounterVec.WithLabelValues("ListInstanceConfigs", result).Inc()
+	}()
+	return _d.base.ListInstanceConfigs(ctx, linodeID, opts)
+}
+
 // ListInstances implements Client
 func (_d ClientWithPrometheus) ListInstances(ctx context.Context, lp1 *linodego.ListOptions) (ia1 []linodego.Instance, err error) {
 	defer func() {
