@@ -225,7 +225,7 @@ func (c *linodeCloud) Initialize(clientBuilder cloudprovider.ControllerClientBui
 		go c.linodeTokenHealthChecker.Run(stopCh)
 	}
 
-	lb, assertion := c.loadbalancers.(*loadbalancers)
+	lb, assertion := c.loadbalancers.(*Loadbalancers)
 	if !assertion {
 		klog.Error("type assertion during Initialize() failed")
 		return

@@ -75,7 +75,7 @@ var (
 // getExistingSharedIPsInCluster determines the list of addresses to share on nodes by checking the
 // CiliumLoadBalancerIPPools created by the CCM in createCiliumLBIPPool
 // NOTE: Cilium CRDs must be installed for this to work
-func (l *loadbalancers) getExistingSharedIPsInCluster(ctx context.Context) ([]string, error) {
+func (l *Loadbalancers) getExistingSharedIPsInCluster(ctx context.Context) ([]string, error) {
 	addrs := []string{}
 	if err := l.retrieveCiliumClientset(); err != nil {
 		return addrs, err
@@ -94,7 +94,7 @@ func (l *loadbalancers) getExistingSharedIPsInCluster(ctx context.Context) ([]st
 	return addrs, nil
 }
 
-func (l *loadbalancers) getExistingSharedIPs(ctx context.Context, ipHolder *linodego.Instance) ([]string, error) {
+func (l *Loadbalancers) getExistingSharedIPs(ctx context.Context, ipHolder *linodego.Instance) ([]string, error) {
 	if ipHolder == nil {
 		return nil, nil
 	}
@@ -110,7 +110,7 @@ func (l *loadbalancers) getExistingSharedIPs(ctx context.Context, ipHolder *lino
 }
 
 // shareIPs shares the given list of IP addresses on the given Node
-func (l *loadbalancers) shareIPs(ctx context.Context, addrs []string, node *v1.Node) error {
+func (l *Loadbalancers) shareIPs(ctx context.Context, addrs []string, node *v1.Node) error {
 	nodeLinodeID, err := parseProviderID(node.Spec.ProviderID)
 	if err != nil {
 		return err
@@ -151,7 +151,7 @@ func (l *loadbalancers) shareIPs(ctx context.Context, addrs []string, node *v1.N
 // perform IP sharing (via a specified node selector) have the expected IPs shared
 // in the event that a Node joins the cluster after the LoadBalancer Service already
 // exists
-func (l *loadbalancers) handleIPSharing(ctx context.Context, node *v1.Node, ipHolderSuffix string) error {
+func (l *Loadbalancers) handleIPSharing(ctx context.Context, node *v1.Node, ipHolderSuffix string) error {
 	// ignore cases where the provider ID has been set
 	if node.Spec.ProviderID == "" {
 		klog.Info("skipping IP while providerID is unset")
@@ -210,7 +210,7 @@ func (l *loadbalancers) handleIPSharing(ctx context.Context, node *v1.Node, ipHo
 
 // createSharedIP requests an additional IP that can be shared on Nodes to support
 // loadbalancing via Cilium LB IPAM + BGP Control Plane.
-func (l *loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node, ipHolderSuffix string) (string, error) {
+func (l *Loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node, ipHolderSuffix string) (string, error) {
 	ipHolder, err := l.ensureIPHolder(ctx, ipHolderSuffix)
 	if err != nil {
 		return "", err
@@ -267,7 +267,7 @@ func (l *loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node, ip
 
 // deleteSharedIP cleans up the shared IP for a LoadBalancer Service if it was assigned
 // by Cilium LB IPAM, removing it from the ip-holder
-func (l *loadbalancers) deleteSharedIP(ctx context.Context, service *v1.Service) error {
+func (l *Loadbalancers) deleteSharedIP(ctx context.Context, service *v1.Service) error {
 	err := l.retrieveKubeClient()
 	if err != nil {
 		return err
@@ -323,7 +323,7 @@ func (l *loadbalancers) deleteSharedIP(ctx context.Context, service *v1.Service)
 
 // To hold the IP in lieu of a proper IP reservation system, a special Nanode is
 // created but not booted and used to hold all shared IPs.
-func (l *loadbalancers) ensureIPHolder(ctx context.Context, suffix string) (*linodego.Instance, error) {
+func (l *Loadbalancers) ensureIPHolder(ctx context.Context, suffix string) (*linodego.Instance, error) {
 	ipHolder, err := l.getIPHolder(ctx, suffix)
 	if err != nil {
 		return nil, err
@@ -353,7 +353,7 @@ func (l *loadbalancers) ensureIPHolder(ctx context.Context, suffix string) (*lin
 	return ipHolder, nil
 }
 
-func (l *loadbalancers) getIPHolder(ctx context.Context, suffix string) (*linodego.Instance, error) {
+func (l *Loadbalancers) getIPHolder(ctx context.Context, suffix string) (*linodego.Instance, error) {
 	// even though we have updated the naming convention, leaving this in ensures we have backwards compatibility
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, l.zone)}
 	rawFilter, err := json.Marshal(filter)
@@ -407,7 +407,7 @@ func generateClusterScopedIPHolderLinodeName(zone, suffix string) (label string)
 	return label
 }
 
-func (l *loadbalancers) retrieveCiliumClientset() error {
+func (l *Loadbalancers) retrieveCiliumClientset() error {
 	if l.ciliumClient != nil {
 		return nil
 	}
@@ -432,7 +432,7 @@ func (l *loadbalancers) retrieveCiliumClientset() error {
 // for LoadBalancer Services not backed by a NodeBalancer, a CiliumLoadBalancerIPPool resource
 // will be created specifically for the Service with the requested shared IP
 // NOTE: Cilium CRDs must be installed for this to work
-func (l *loadbalancers) createCiliumLBIPPool(ctx context.Context, service *v1.Service, sharedIP string) (*v2alpha1.CiliumLoadBalancerIPPool, error) {
+func (l *Loadbalancers) createCiliumLBIPPool(ctx context.Context, service *v1.Service, sharedIP string) (*v2alpha1.CiliumLoadBalancerIPPool, error) {
 	if err := l.retrieveCiliumClientset(); err != nil {
 		return nil, err
 	}
@@ -459,7 +459,7 @@ func (l *loadbalancers) createCiliumLBIPPool(ctx context.Context, service *v1.Se
 }
 
 // NOTE: Cilium CRDs must be installed for this to work
-func (l *loadbalancers) deleteCiliumLBIPPool(ctx context.Context, service *v1.Service) error {
+func (l *Loadbalancers) deleteCiliumLBIPPool(ctx context.Context, service *v1.Service) error {
 	if err := l.retrieveCiliumClientset(); err != nil {
 		return err
 	}
@@ -472,7 +472,7 @@ func (l *loadbalancers) deleteCiliumLBIPPool(ctx context.Context, service *v1.Se
 }
 
 // NOTE: Cilium CRDs must be installed for this to work
-func (l *loadbalancers) getCiliumLBIPPool(ctx context.Context, service *v1.Service) (*v2alpha1.CiliumLoadBalancerIPPool, error) {
+func (l *Loadbalancers) getCiliumLBIPPool(ctx context.Context, service *v1.Service) (*v2alpha1.CiliumLoadBalancerIPPool, error) {
 	if err := l.retrieveCiliumClientset(); err != nil {
 		return nil, err
 	}
@@ -485,7 +485,7 @@ func (l *loadbalancers) getCiliumLBIPPool(ctx context.Context, service *v1.Servi
 }
 
 // NOTE: Cilium CRDs must be installed for this to work
-func (l *loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error {
+func (l *Loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error {
 	if raw, ok := os.LookupEnv("BGP_CUSTOM_ID_MAP"); ok && raw != "" {
 		klog.Info("BGP_CUSTOM_ID_MAP env variable specified, using it instead of the default region map")
 		if err := json.Unmarshal([]byte(raw), &regionIDMap); err != nil {

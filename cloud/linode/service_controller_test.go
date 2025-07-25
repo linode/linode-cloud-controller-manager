@@ -24,7 +24,7 @@ func Test_serviceController_Run(t *testing.T) {
 	informer := informers.NewSharedInformerFactory(kubeClient, 0).Core().V1().Services()
 	mockQueue := workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[any]{Name: "test"})
 
-	loadbalancers, assertion := newLoadbalancers(client, "us-east").(*loadbalancers)
+	loadbalancers, assertion := newLoadbalancers(client, "us-east").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -53,7 +53,7 @@ func Test_serviceController_Run(t *testing.T) {
 
 func Test_serviceController_processNextDeletion(t *testing.T) {
 	type fields struct {
-		loadbalancers *loadbalancers
+		loadbalancers *Loadbalancers
 		queue         workqueue.TypedDelayingInterface[any]
 		Client        *mocks.MockClient
 	}
@@ -70,7 +70,7 @@ func Test_serviceController_processNextDeletion(t *testing.T) {
 				loadbalancers: nil,
 			},
 			Setup: func(f *fields) {
-				f.loadbalancers = &loadbalancers{client: f.Client, zone: "test", loadBalancerType: Options.LoadBalancerType}
+				f.loadbalancers = &Loadbalancers{client: f.Client, zone: "test", loadBalancerType: Options.LoadBalancerType}
 				f.queue = workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[any]{Name: "testQueue"})
 				f.queue.Add("test")
 			},
@@ -83,7 +83,7 @@ func Test_serviceController_processNextDeletion(t *testing.T) {
 				loadbalancers: nil,
 			},
 			Setup: func(f *fields) {
-				f.loadbalancers = &loadbalancers{client: f.Client, zone: "test", loadBalancerType: Options.LoadBalancerType}
+				f.loadbalancers = &Loadbalancers{client: f.Client, zone: "test", loadBalancerType: Options.LoadBalancerType}
 				f.queue = workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[any]{Name: "testQueue"})
 				svc := createTestService()
 				f.queue.Add(svc)

@@ -370,7 +370,7 @@ func testCreateNodeBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI, a
 	for key, value := range annMap {
 		svc.Annotations[key] = value
 	}
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -484,7 +484,7 @@ func testCreateNodeBalancerWithNodeNoAddresses(t *testing.T, client *linodego.Cl
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -716,7 +716,7 @@ func testUpdateNodeBalancerWithVPCBackend(t *testing.T, client *linodego.Client,
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -803,7 +803,7 @@ func testCreateNodeBalancerWithVPCOnlySubnetFlag(t *testing.T, client *linodego.
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -896,7 +896,7 @@ func testCreateNodeBalancerWithVPCNoFlagOrAnnotation(t *testing.T, client *linod
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -985,7 +985,7 @@ func testCreateNodeBalancerWithVPCAnnotationOnly(t *testing.T, client *linodego.
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -1070,7 +1070,7 @@ func testCreateNodeBalancerWithVPCOnlySubnetIDFlag(t *testing.T, client *linodeg
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -1216,7 +1216,7 @@ func testUpdateLoadBalancerAddNode(t *testing.T, client *linodego.Client, f *fak
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -1381,7 +1381,7 @@ func testUpdateLoadBalancerAddAnnotation(t *testing.T, client *linodego.Client, 
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -1456,7 +1456,7 @@ func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Clie
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -1569,7 +1569,7 @@ func testVeryLongServiceName(t *testing.T, client *linodego.Client, _ *fakeAPI) 
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -1637,7 +1637,7 @@ func testUpdateLoadBalancerAddTags(t *testing.T, client *linodego.Client, _ *fak
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -1722,7 +1722,7 @@ func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *
 		NodePort: int32(30001),
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -1803,7 +1803,7 @@ func testUpdateLoadBalancerAddProxyProtocol(t *testing.T, client *linodego.Clien
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -1931,7 +1931,7 @@ func testUpdateLoadBalancerAddNewFirewall(t *testing.T, client *linodego.Client,
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -2032,7 +2032,7 @@ func testUpdateLoadBalancerAddNewFirewallACL(t *testing.T, client *linodego.Clie
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -2164,7 +2164,7 @@ func testUpdateLoadBalancerDeleteFirewallRemoveACL(t *testing.T, client *linodeg
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -2263,7 +2263,7 @@ func testUpdateLoadBalancerUpdateFirewallRemoveACLaddID(t *testing.T, client *li
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -2403,7 +2403,7 @@ func testUpdateLoadBalancerUpdateFirewallRemoveIDaddACL(t *testing.T, client *li
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -2550,7 +2550,7 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -2786,7 +2786,7 @@ func testUpdateLoadBalancerUpdateFirewall(t *testing.T, client *linodego.Client,
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -2919,7 +2919,7 @@ func testUpdateLoadBalancerDeleteFirewallRemoveID(t *testing.T, client *linodego
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -3020,7 +3020,7 @@ func testUpdateLoadBalancerAddNodeBalancerID(t *testing.T, client *linodego.Clie
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -3990,7 +3990,7 @@ func testBuildLoadBalancerRequest(t *testing.T, client *linodego.Client, _ *fake
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -4042,7 +4042,7 @@ func testEnsureLoadBalancerPreserveAnnotation(t *testing.T, client *linodego.Cli
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -4159,7 +4159,7 @@ func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client, fake *
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -4212,7 +4212,7 @@ func testEnsureExistingLoadBalancer(t *testing.T, client *linodego.Client, _ *fa
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -4467,7 +4467,7 @@ func testMakeLoadBalancerStatusEnvVar(t *testing.T, client *linodego.Client, _ *
 	os.Unsetenv("LINODE_HOSTNAME_ONLY_INGRESS")
 }
 
-func getLatestNbNodesForService(t *testing.T, client *linodego.Client, svc *v1.Service, lb *loadbalancers) []linodego.NodeBalancerNode {
+func getLatestNbNodesForService(t *testing.T, client *linodego.Client, svc *v1.Service, lb *Loadbalancers) []linodego.NodeBalancerNode {
 	t.Helper()
 	nb, err := lb.getNodeBalancerByStatus(t.Context(), svc)
 	if err != nil {
@@ -4511,7 +4511,7 @@ func testCleanupDoesntCall(t *testing.T, client *linodego.Client, fakeAPI *fakeA
 	}
 	svc.Status.LoadBalancer = *makeLoadBalancerStatus(svc, nb1)
 	svcAnn.Status.LoadBalancer = *makeLoadBalancerStatus(svcAnn, nb1)
-	lb, assertion := newLoadbalancers(client, region).(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, region).(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -4562,7 +4562,7 @@ func testUpdateLoadBalancerNodeExcludedByAnnotation(t *testing.T, client *linode
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -4805,7 +4805,7 @@ func testUpdateLoadBalancerNoNodes(t *testing.T, client *linodego.Client, _ *fak
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -4843,7 +4843,7 @@ func testUpdateLoadBalancerNoNodes(t *testing.T, client *linodego.Client, _ *fak
 func testGetNodeBalancerByStatus(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	t.Helper()
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -4908,7 +4908,7 @@ func testGetNodeBalancerByStatus(t *testing.T, client *linodego.Client, _ *fakeA
 func testGetNodeBalancerForServiceIDDoesNotExist(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	t.Helper()
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -4952,7 +4952,7 @@ func testGetNodeBalancerForServiceIDDoesNotExist(t *testing.T, client *linodego.
 func testEnsureNewLoadBalancerWithNodeBalancerID(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	t.Helper()
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -5051,7 +5051,7 @@ func testEnsureNewLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI
 			},
 		},
 	}
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -5069,7 +5069,7 @@ func testEnsureNewLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI
 func testGetLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	t.Helper()
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, "us-west").(*Loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -5492,7 +5492,7 @@ func Test_loadbalancers_GetLinodeNBType(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l := &loadbalancers{
+			l := &Loadbalancers{
 				client:           tt.fields.client,
 				zone:             tt.fields.zone,
 				kubeClient:       tt.fields.kubeClient,
