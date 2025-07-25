@@ -204,7 +204,7 @@ func newCloud() (cloudprovider.Interface, error) {
 	lcloud := &linodeCloud{
 		client:                   linodeClient,
 		instances:                instanceCache,
-		loadbalancers:            newLoadbalancers(linodeClient, region),
+		loadbalancers:            NewLoadbalancers(linodeClient, region),
 		routes:                   routes,
 		linodeTokenHealthChecker: healthChecker,
 	}

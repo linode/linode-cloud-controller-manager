@@ -127,8 +127,8 @@ type portConfig struct {
 	UDPCheckPort  int
 }
 
-// newLoadbalancers returns a cloudprovider.LoadBalancer whose concrete type is a *loadbalancer.
-func newLoadbalancers(client client.Client, zone string) cloudprovider.LoadBalancer {
+// NewLoadbalancers returns a cloudprovider.LoadBalancer whose concrete type is a *loadbalancer.
+func NewLoadbalancers(client client.Client, zone string) cloudprovider.LoadBalancer {
 	return &Loadbalancers{client: client, zone: zone, loadBalancerType: Options.LoadBalancerType}
 }
 
