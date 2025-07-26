@@ -159,8 +159,8 @@ func (l *Loadbalancers) handleIPSharing(ctx context.Context, node *v1.Node, ipHo
 	}
 	// If performing Service load-balancing via IP sharing + BGP, check for a special annotation
 	// added by the CCM gets set when load-balancer IPs have been successfully shared on the node
-	if Options.BGPNodeSelector != "" {
-		kv := strings.Split(Options.BGPNodeSelector, "=")
+	if l.options.BGPNodeSelector != "" {
+		kv := strings.Split(l.options.BGPNodeSelector, "=")
 		// Check if node should be participating in IP sharing via the given selector
 		if val, ok := node.Labels[kv[0]]; !ok || len(kv) != 2 || val != kv[1] {
 			// not a selected Node
@@ -243,7 +243,7 @@ func (l *Loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node, ip
 	}
 
 	// share the IPs with nodes participating in Cilium BGP peering
-	if Options.BGPNodeSelector == "" {
+	if l.options.BGPNodeSelector == "" {
 		for _, node := range nodes {
 			if _, ok := node.Labels[commonControlPlaneLabel]; !ok {
 				if err = l.shareIPs(ctx, addrs, node); err != nil {
@@ -252,7 +252,7 @@ func (l *Loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node, ip
 			}
 		}
 	} else {
-		kv := strings.Split(Options.BGPNodeSelector, "=")
+		kv := strings.Split(l.options.BGPNodeSelector, "=")
 		for _, node := range nodes {
 			if val, ok := node.Labels[kv[0]]; ok && len(kv) == 2 && val == kv[1] {
 				if err = l.shareIPs(ctx, addrs, node); err != nil {
@@ -273,7 +273,7 @@ func (l *Loadbalancers) deleteSharedIP(ctx context.Context, service *v1.Service)
 		return err
 	}
 	nodeList, err := l.kubeClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{
-		LabelSelector: Options.BGPNodeSelector,
+		LabelSelector: l.options.BGPNodeSelector,
 	})
 	if err != nil {
 		return err
@@ -282,8 +282,8 @@ func (l *Loadbalancers) deleteSharedIP(ctx context.Context, service *v1.Service)
 
 	serviceNn := getServiceNn(service)
 	var ipHolderSuffix string
-	if Options.IpHolderSuffix != "" {
-		ipHolderSuffix = Options.IpHolderSuffix
+	if l.options.IpHolderSuffix != "" {
+		ipHolderSuffix = l.options.IpHolderSuffix
 		klog.V(3).Infof("using parameter-based IP Holder suffix %s for Service %s", ipHolderSuffix, serviceNn)
 	}
 
@@ -415,7 +415,7 @@ func (l *Loadbalancers) retrieveCiliumClientset() error {
 		kubeConfig *rest.Config
 		err        error
 	)
-	kubeconfigFlag := Options.KubeconfigFlag
+	kubeconfigFlag := l.options.KubeconfigFlag
 	if kubeconfigFlag == nil || kubeconfigFlag.Value.String() == "" {
 		kubeConfig, err = rest.InClusterConfig()
 	} else {
@@ -513,7 +513,7 @@ func (l *Loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error 
 	// otherwise create it
 	var nodeSelector slimv1.LabelSelector
 	// If no BGPNodeSelector is specified, select all worker nodes.
-	if Options.BGPNodeSelector == "" {
+	if l.options.BGPNodeSelector == "" {
 		nodeSelector = slimv1.LabelSelector{
 			MatchExpressions: []slimv1.LabelSelectorRequirement{
 				{
@@ -523,9 +523,9 @@ func (l *Loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error 
 			},
 		}
 	} else {
-		kv := strings.Split(Options.BGPNodeSelector, "=")
+		kv := strings.Split(l.options.BGPNodeSelector, "=")
 		if len(kv) != BGPNodeSelectorFlagInputLen {
-			return fmt.Errorf("invalid node selector %s", Options.BGPNodeSelector)
+			return fmt.Errorf("invalid node selector %s", l.options.BGPNodeSelector)
 		}
 
 		nodeSelector = slimv1.LabelSelector{MatchLabels: map[string]string{kv[0]: kv[1]}}

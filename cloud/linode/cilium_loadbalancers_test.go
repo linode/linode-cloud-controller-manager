@@ -222,7 +222,7 @@ func testNoBGPNodeLabel(t *testing.T, mc *mocks.MockClient) {
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
-	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
+	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType, &Options}
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
 	rawFilter, err := json.Marshal(filter)
@@ -277,7 +277,7 @@ func testUnsupportedRegion(t *testing.T, mc *mocks.MockClient) {
 	kubeClient, _ := k8sClient.NewFakeClientset()
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
 	addService(t, kubeClient, svc)
-	lb := &Loadbalancers{mc, "us-foobar", kubeClient, ciliumClient, ciliumLBType}
+	lb := &Loadbalancers{mc, "us-foobar", kubeClient, ciliumClient, ciliumLBType, &Options}
 
 	lbStatus, err := lb.EnsureLoadBalancer(t.Context(), clusterName, svc, nodes)
 	if err == nil {
@@ -289,7 +289,7 @@ func testUnsupportedRegion(t *testing.T, mc *mocks.MockClient) {
 
 	// Use BGP custom id map
 	t.Setenv("BGP_CUSTOM_ID_MAP", "{'us-foobar': 2}")
-	lb = &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
+	lb = &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType, &Options}
 	lbStatus, err = lb.EnsureLoadBalancer(t.Context(), clusterName, svc, nodes)
 	if err == nil {
 		t.Fatal("expected not nil error")
@@ -310,7 +310,7 @@ func testCreateWithExistingIPHolderWithOldIpHolderNamingConvention(t *testing.T,
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
-	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
+	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType, &Options}
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
 	rawFilter, err := json.Marshal(filter)
@@ -355,7 +355,7 @@ func testCreateWithExistingIPHolderWithNewIpHolderNamingConvention(t *testing.T,
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
-	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
+	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType, &Options}
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
 	rawFilter, err := json.Marshal(filter)
@@ -400,7 +400,7 @@ func testCreateWithExistingIPHolderWithNewIpHolderNamingConventionUsingLongSuffi
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
-	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
+	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType, &Options}
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
 	rawFilter, err := json.Marshal(filter)
@@ -445,7 +445,7 @@ func testCreateWithNoExistingIPHolderUsingNoSuffix(t *testing.T, mc *mocks.MockC
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
-	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
+	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType, &Options}
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
 	rawFilter, err := json.Marshal(filter)
@@ -497,7 +497,7 @@ func testCreateWithNoExistingIPHolderUsingShortSuffix(t *testing.T, mc *mocks.Mo
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
-	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
+	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType, &Options}
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
 	rawFilter, err := json.Marshal(filter)
@@ -549,7 +549,7 @@ func testCreateWithNoExistingIPHolderUsingLongSuffix(t *testing.T, mc *mocks.Moc
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
-	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
+	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType, &Options}
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
 	rawFilter, err := json.Marshal(filter)
@@ -599,7 +599,7 @@ func testEnsureCiliumLoadBalancerDeletedWithOldIpHolderNamingConvention(t *testi
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
-	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
+	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType, &Options}
 
 	dummySharedIP := dummyIP
 	svc.Status.LoadBalancer = v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{{IP: dummySharedIP}}}
@@ -632,7 +632,7 @@ func testEnsureCiliumLoadBalancerDeletedWithNewIpHolderNamingConvention(t *testi
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
-	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
+	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType, &Options}
 
 	dummySharedIP := dummyIP
 	svc.Status.LoadBalancer = v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{{IP: dummySharedIP}}}
@@ -669,7 +669,7 @@ func testCiliumUpdateLoadBalancerAddNodeWithOldIpHolderNamingConvention(t *testi
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
-	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
+	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType, &Options}
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
 	rawFilter, err := json.Marshal(filter)
@@ -732,7 +732,7 @@ func testCiliumUpdateLoadBalancerAddNodeWithNewIpHolderNamingConvention(t *testi
 	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
-	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
+	lb := &Loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType, &Options}
 
 	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone)}
 	rawFilter, err := json.Marshal(filter)
