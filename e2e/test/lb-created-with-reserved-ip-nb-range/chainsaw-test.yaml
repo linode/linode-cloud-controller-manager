@@ -7,11 +7,17 @@ metadata:
     all:
     lke:
 spec:
+  bindings:
+    - name: fwname
+      value: (join('-', ['ccm-fwtest', env('CLUSTER_NAME')]))
   namespace: "lb-created-with-reserved-ip-nb-range"
   steps:
     - name: Create nodebalancer and create resources
       try:
         - script:
+            env:
+              - name: FWLABEL
+                value: ($fwname)
             outputs:
               - name: ip
                 value: (json_parse($stdout))
@@ -62,10 +68,41 @@ spec:
                   echo "Error deleting the nodebalancer"
               fi
 
-              reserved_ip=$ip
-              echo "{\"reserved_ip\": \"$reserved_ip\"}"
+              fw_id=$(curl -s --request POST \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                -H "accept: application/json" \
+                "$LINODE_URL/v4/networking/firewalls" \
+                --data "
+              {
+                \"label\": \"$FWLABEL\",
+                \"rules\": {
+                  \"inbound\": [{
+                    \"action\": \"ACCEPT\",
+                    \"label\": \"inbound-rule123\",
+                    \"description\": \"inbound rule123\",
+                    \"ports\": \"80\",
+                    \"protocol\": \"TCP\",
+                    \"addresses\": {
+                      \"ipv4\": [\"0.0.0.0/0\"]
+                    }
+                  }],
+                  \"inbound_policy\": \"ACCEPT\",
+                  \"outbound_policy\": \"ACCEPT\"
+                }
+              }
+              " | jq .id)
+              
+              sleep 5
+              if [ $fw_id == null ]; then
+                echo "failed to create firewall"
+              fi
 
-              create_cm=$(kubectl -n $NAMESPACE create configmap reserved-ip-config --from-literal=ReservedIP=$reserved_ip -o yaml --dry-run=client | kubectl apply -f -)
+              reserved_ip=$ip
+              echo "{\"reserved_ip\": \"$reserved_ip\",
+                    \"fw_id\": \"$fw_id\"}"
+
+              create_cm=$(kubectl -n $NAMESPACE create configmap reserved-ip-config --from-literal=ReservedIP=$reserved_ip --from-literal=FW_ID=$fw_id -o yaml --dry-run=client | kubectl apply -f -)
               if [[ "$create_cm" != "configmap/reserved-ip-config created" ]]; then
                 echo "Unable to create configmap. Error: $create_cm"
               fi
@@ -75,6 +112,7 @@ spec:
               (contains($stdout, 'Unable to update the IP')): false
               (contains($stdout, 'Error deleting the nodebalancer')): false
               (contains($stdout, 'Unable to create configmap')): false
+              (contains($stdout, 'failed to create firewall')): false
         - apply:
             file: create-pods-services.yaml 
       catch:
@@ -117,6 +155,31 @@ spec:
                 echo "IPs do not match"
               fi
 
+              #Run a curl command to the service ip
+              URL="http://$service_ip:80/"
+              HTTP_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+              if [ "$HTTP_RESPONSE" -eq 200 ]; then
+                 echo "Request was successful (HTTP 200)"
+              else
+                 echo "Request failed with response code: $HTTP_RESPONSE"
+              fi
+
+              fw_id=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.FW_ID}' -n $NAMESPACE)
+              if [ -z "$fw_id" ]; then
+                  echo "Error: No firewall id found in configmap"
+              fi
+
+              delete_fw=$(curl -s -X DELETE \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                "$LINODE_URL/v4/networking/firewalls/$fw_id")
+
+              if [[ "$delete_fw" == "{}" ]]; then
+                echo "Firewall $fw_id deleted successfully"
+              else
+                echo "Unable to delete firewall: $fw_id. Error: $delete_fw"
+              fi
+
               delete_rip=$(curl -s --request DELETE \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 -H "Content-Type: application/json" \
@@ -139,6 +202,9 @@ spec:
               (contains($stdout, 'No reserved ip found in configmap')): false
               (contains($stdout, 'No service ip found for service svc-test')): false
               (contains($stdout, 'IPs do not match')): false
+              (contains($stdout, 'No firewall id found in configmap')): false
+              (contains($stdout, 'Request failed with response code')): false
+              (contains($stdout, 'Unable to delete firewall')): false
               (contains($stdout, 'Unable to delete the configmap')): false
               (contains($stdout, 'Unable to delete reserved ip')): false
           

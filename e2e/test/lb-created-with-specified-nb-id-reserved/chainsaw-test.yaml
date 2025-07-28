@@ -133,14 +133,6 @@ spec:
                 echo "IPs do not match"
               fi
               sleep 20
-              #Run a curl command to the service ip
-              URL="http://$service_ip:80/"
-              HTTP_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
-              if [ "$HTTP_RESPONSE" -eq 200 ]; then
-                  echo "Request was successful (HTTP 200)"
-              else
-                  echo "Request failed with response code: $HTTP_RESPONSE"
-              fi
 
               delete_rip=$(curl -s --request DELETE \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
@@ -166,6 +158,5 @@ spec:
               (contains($stdout, 'No service ip found for service svc-test')): false
               (contains($stdout, 'IPs do not match')): false
               (contains($stdout, 'NB IDs do not match')): false
-              (contains($stdout, 'Request failed with response code')): false
               (contains($stdout, 'Unable to delete the configmap')): false
               (contains($stdout, 'Unable to delete reserved ip')): false

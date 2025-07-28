@@ -35,6 +35,7 @@ metadata:
   name: svc-test
   annotations:
     service.beta.kubernetes.io/linode-loadbalancer-reserved-ipv4: ($ip.reserved_ip)
+    service.beta.kubernetes.io/linode-loadbalancer-firewall-id: ($ip.fw_id)
   labels:
     app: created-with-reserved-ip-linode-range
 spec:
