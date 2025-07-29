@@ -487,26 +487,24 @@ func (l *Loadbalancers) updateNodeBalancer(
 			subnetID = id
 		}
 
-		if len(nodes) > 0 {
-			for _, node := range nodes {
-				if _, ok := node.Annotations[annotations.AnnExcludeNodeFromNb]; ok {
-					klog.Infof("Node %s is excluded from NodeBalancer by annotation, skipping", node.Name)
-					continue
-				}
-				var newNodeOpts *linodego.NodeBalancerConfigRebuildNodeOptions
-				newNodeOpts, err = l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort, subnetID, newNBCfg.Protocol)
-				if err != nil {
-					sentry.CaptureError(ctx, err)
-					return fmt.Errorf("failed to build NodeBalancer node config options for node %s: %w", node.Name, err)
-				}
-				oldNodeID, ok := oldNBNodeIDs[newNodeOpts.Address]
-				if ok {
-					newNodeOpts.ID = oldNodeID
-				} else {
-					klog.Infof("No preexisting node id for %v found.", newNodeOpts.Address)
-				}
-				newNBNodes = append(newNBNodes, *newNodeOpts)
+		for _, node := range nodes {
+			if _, ok := node.Annotations[annotations.AnnExcludeNodeFromNb]; ok {
+				klog.Infof("Node %s is excluded from NodeBalancer by annotation, skipping", node.Name)
+				continue
 			}
+			var newNodeOpts *linodego.NodeBalancerConfigRebuildNodeOptions
+			newNodeOpts, err = l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort, subnetID, newNBCfg.Protocol)
+			if err != nil {
+				sentry.CaptureError(ctx, err)
+				return fmt.Errorf("failed to build NodeBalancer node config options for node %s: %w", node.Name, err)
+			}
+			oldNodeID, ok := oldNBNodeIDs[newNodeOpts.Address]
+			if ok {
+				newNodeOpts.ID = oldNodeID
+			} else {
+				klog.Infof("No preexisting node id for %v found.", newNodeOpts.Address)
+			}
+			newNBNodes = append(newNBNodes, *newNodeOpts)
 		}
 		// If there's no existing config, create it
 		var rebuildOpts linodego.NodeBalancerConfigRebuildOptions
@@ -556,11 +554,10 @@ func (l *Loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 		}
 
 		// make sure that IPs are shared properly on the Node if using load-balancers not backed by NodeBalancers
-		if len(nodes) > 0 {
-			for _, node := range nodes {
-				if err = l.handleIPSharing(ctx, node, ipHolderSuffix); err != nil {
-					return err
-				}
+
+		for _, node := range nodes {
+			if err = l.handleIPSharing(ctx, node, ipHolderSuffix); err != nil {
+				return err
 			}
 		}
 		return nil
@@ -1073,19 +1070,17 @@ func (l *Loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 		}
 		createOpt := config.GetCreateOptions()
 
-		if len(nodes) > 0 {
-			for _, node := range nodes {
-				if _, ok := node.Annotations[annotations.AnnExcludeNodeFromNb]; ok {
-					klog.Infof("Node %s is excluded from NodeBalancer by annotation, skipping", node.Name)
-					continue
-				}
-				newNodeOpts, err := l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort, subnetID, config.Protocol)
-				if err != nil {
-					sentry.CaptureError(ctx, err)
-					return nil, fmt.Errorf("failed to build NodeBalancer node config options for node %s: %w", node.Name, err)
-				}
-				createOpt.Nodes = append(createOpt.Nodes, newNodeOpts.NodeBalancerNodeCreateOptions)
+		for _, node := range nodes {
+			if _, ok := node.Annotations[annotations.AnnExcludeNodeFromNb]; ok {
+				klog.Infof("Node %s is excluded from NodeBalancer by annotation, skipping", node.Name)
+				continue
 			}
+			newNodeOpts, err := l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort, subnetID, config.Protocol)
+			if err != nil {
+				sentry.CaptureError(ctx, err)
+				return nil, fmt.Errorf("failed to build NodeBalancer node config options for node %s: %w", node.Name, err)
+			}
+			createOpt.Nodes = append(createOpt.Nodes, newNodeOpts.NodeBalancerNodeCreateOptions)
 		}
 
 		configs = append(configs, &createOpt)
