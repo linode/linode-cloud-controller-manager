@@ -4950,7 +4950,7 @@ func testGetNodeBalancerForServiceIDDoesNotExist(t *testing.T, client *linodego.
 		},
 	}
 
-	_, err := lb.getNodeBalancerForService(t.Context(), svc)
+	_, err := lb.GetNodeBalancerForService(t.Context(), svc)
 	if err == nil {
 		t.Fatal("expected getNodeBalancerForService to return an error")
 	}

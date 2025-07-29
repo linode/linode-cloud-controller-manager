@@ -144,7 +144,7 @@ func NewLoadbalancers(client client.Client, zone string) cloudprovider.LoadBalan
 	return NewLoadbalancersWithOptions(client, zone, &Options)
 }
 
-func (l *Loadbalancers) getNodeBalancerForService(ctx context.Context, service *v1.Service) (*linodego.NodeBalancer, error) {
+func (l *Loadbalancers) GetNodeBalancerForService(ctx context.Context, service *v1.Service) (*linodego.NodeBalancer, error) {
 	rawID := service.GetAnnotations()[annotations.AnnLinodeNodeBalancerID]
 	id, idErr := strconv.Atoi(rawID)
 	hasIDAnn := idErr == nil && id != 0
@@ -217,7 +217,7 @@ func (l *Loadbalancers) cleanupOldNodeBalancer(ctx context.Context, service *v1.
 		}
 	}
 
-	nb, err := l.getNodeBalancerForService(ctx, service)
+	nb, err := l.GetNodeBalancerForService(ctx, service)
 	if err != nil {
 		return err
 	}
@@ -257,7 +257,7 @@ func (l *Loadbalancers) GetLoadBalancer(ctx context.Context, clusterName string,
 		}, true, nil
 	}
 
-	nb, err := l.getNodeBalancerForService(ctx, service)
+	nb, err := l.GetNodeBalancerForService(ctx, service)
 	if err != nil {
 		var targetError lbNotFoundError
 		if errors.As(err, &targetError) {
@@ -333,7 +333,7 @@ func (l *Loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	// Handle LoadBalancers backed by NodeBalancers
 	var nb *linodego.NodeBalancer
 
-	nb, err = l.getNodeBalancerForService(ctx, service)
+	nb, err = l.GetNodeBalancerForService(ctx, service)
 	if err == nil {
 		if err = l.updateNodeBalancer(ctx, clusterName, service, nodes, nb); err != nil {
 			sentry.CaptureError(ctx, err)
@@ -486,24 +486,27 @@ func (l *Loadbalancers) updateNodeBalancer(
 			}
 			subnetID = id
 		}
-		for _, node := range nodes {
-			if _, ok := node.Annotations[annotations.AnnExcludeNodeFromNb]; ok {
-				klog.Infof("Node %s is excluded from NodeBalancer by annotation, skipping", node.Name)
-				continue
+
+		if len(nodes) > 0 {
+			for _, node := range nodes {
+				if _, ok := node.Annotations[annotations.AnnExcludeNodeFromNb]; ok {
+					klog.Infof("Node %s is excluded from NodeBalancer by annotation, skipping", node.Name)
+					continue
+				}
+				var newNodeOpts *linodego.NodeBalancerConfigRebuildNodeOptions
+				newNodeOpts, err = l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort, subnetID, newNBCfg.Protocol)
+				if err != nil {
+					sentry.CaptureError(ctx, err)
+					return fmt.Errorf("failed to build NodeBalancer node config options for node %s: %w", node.Name, err)
+				}
+				oldNodeID, ok := oldNBNodeIDs[newNodeOpts.Address]
+				if ok {
+					newNodeOpts.ID = oldNodeID
+				} else {
+					klog.Infof("No preexisting node id for %v found.", newNodeOpts.Address)
+				}
+				newNBNodes = append(newNBNodes, *newNodeOpts)
 			}
-			var newNodeOpts *linodego.NodeBalancerConfigRebuildNodeOptions
-			newNodeOpts, err = l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort, subnetID, newNBCfg.Protocol)
-			if err != nil {
-				sentry.CaptureError(ctx, err)
-				return fmt.Errorf("failed to build NodeBalancer node config options for node %s: %w", node.Name, err)
-			}
-			oldNodeID, ok := oldNBNodeIDs[newNodeOpts.Address]
-			if ok {
-				newNodeOpts.ID = oldNodeID
-			} else {
-				klog.Infof("No preexisting node id for %v found.", newNodeOpts.Address)
-			}
-			newNBNodes = append(newNBNodes, *newNodeOpts)
 		}
 		// If there's no existing config, create it
 		var rebuildOpts linodego.NodeBalancerConfigRebuildOptions
@@ -553,9 +556,11 @@ func (l *Loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 		}
 
 		// make sure that IPs are shared properly on the Node if using load-balancers not backed by NodeBalancers
-		for _, node := range nodes {
-			if err = l.handleIPSharing(ctx, node, ipHolderSuffix); err != nil {
-				return err
+		if len(nodes) > 0 {
+			for _, node := range nodes {
+				if err = l.handleIPSharing(ctx, node, ipHolderSuffix); err != nil {
+					return err
+				}
 			}
 		}
 		return nil
@@ -569,7 +574,7 @@ func (l *Loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 		return fmt.Errorf("failed to get latest LoadBalancer status for service (%s): %w", getServiceNn(service), err)
 	}
 
-	nb, err := l.getNodeBalancerForService(ctx, serviceWithStatus)
+	nb, err := l.GetNodeBalancerForService(ctx, serviceWithStatus)
 	if err != nil {
 		sentry.CaptureError(ctx, err)
 		return err
@@ -644,7 +649,7 @@ func (l *Loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 		return nil
 	}
 
-	nb, err := l.getNodeBalancerForService(ctx, service)
+	nb, err := l.GetNodeBalancerForService(ctx, service)
 	if err != nil {
 		var targetError lbNotFoundError
 		if errors.As(err, &targetError) {
@@ -1068,17 +1073,19 @@ func (l *Loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 		}
 		createOpt := config.GetCreateOptions()
 
-		for _, node := range nodes {
-			if _, ok := node.Annotations[annotations.AnnExcludeNodeFromNb]; ok {
-				klog.Infof("Node %s is excluded from NodeBalancer by annotation, skipping", node.Name)
-				continue
+		if len(nodes) > 0 {
+			for _, node := range nodes {
+				if _, ok := node.Annotations[annotations.AnnExcludeNodeFromNb]; ok {
+					klog.Infof("Node %s is excluded from NodeBalancer by annotation, skipping", node.Name)
+					continue
+				}
+				newNodeOpts, err := l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort, subnetID, config.Protocol)
+				if err != nil {
+					sentry.CaptureError(ctx, err)
+					return nil, fmt.Errorf("failed to build NodeBalancer node config options for node %s: %w", node.Name, err)
+				}
+				createOpt.Nodes = append(createOpt.Nodes, newNodeOpts.NodeBalancerNodeCreateOptions)
 			}
-			newNodeOpts, err := l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort, subnetID, config.Protocol)
-			if err != nil {
-				sentry.CaptureError(ctx, err)
-				return nil, fmt.Errorf("failed to build NodeBalancer node config options for node %s: %w", node.Name, err)
-			}
-			createOpt.Nodes = append(createOpt.Nodes, newNodeOpts.NodeBalancerNodeCreateOptions)
 		}
 
 		configs = append(configs, &createOpt)
