@@ -80,7 +80,7 @@ func (l *Loadbalancers) getExistingSharedIPsInCluster(ctx context.Context) ([]st
 	if err := l.retrieveCiliumClientset(); err != nil {
 		return addrs, err
 	}
-	pools, err := l.ciliumClient.CiliumLoadBalancerIPPools().List(ctx, metav1.ListOptions{
+	pools, err := l.CiliumClient.CiliumLoadBalancerIPPools().List(ctx, metav1.ListOptions{
 		LabelSelector: "app.kubernetes.io/managed-by=linode-ccm",
 	})
 	if err != nil {
@@ -98,7 +98,7 @@ func (l *Loadbalancers) getExistingSharedIPs(ctx context.Context, ipHolder *lino
 	if ipHolder == nil {
 		return nil, nil
 	}
-	ipHolderAddrs, err := l.client.GetInstanceIPAddresses(ctx, ipHolder.ID)
+	ipHolderAddrs, err := l.Client.GetInstanceIPAddresses(ctx, ipHolder.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -118,14 +118,14 @@ func (l *Loadbalancers) shareIPs(ctx context.Context, addrs []string, node *v1.N
 	if err = l.retrieveKubeClient(); err != nil {
 		return err
 	}
-	if err = l.client.ShareIPAddresses(ctx, linodego.IPAddressesShareOptions{
+	if err = l.Client.ShareIPAddresses(ctx, linodego.IPAddressesShareOptions{
 		IPs:      addrs,
 		LinodeID: nodeLinodeID,
 	}); err != nil {
 		return err
 	}
 	// need to make sure node is up-to-date
-	node, err = l.kubeClient.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
+	node, err = l.KubeClient.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -134,7 +134,7 @@ func (l *Loadbalancers) shareIPs(ctx context.Context, addrs []string, node *v1.N
 	}
 	node.Labels[annotations.AnnLinodeNodeIPSharingUpdated] = "true"
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		_, err := l.kubeClient.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
+		_, err := l.KubeClient.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
 		return err
 	})
 	if retryErr != nil {
@@ -159,8 +159,8 @@ func (l *Loadbalancers) handleIPSharing(ctx context.Context, node *v1.Node, ipHo
 	}
 	// If performing Service load-balancing via IP sharing + BGP, check for a special annotation
 	// added by the CCM gets set when load-balancer IPs have been successfully shared on the node
-	if l.options.BGPNodeSelector != "" {
-		kv := strings.Split(l.options.BGPNodeSelector, "=")
+	if l.Options.BGPNodeSelector != "" {
+		kv := strings.Split(l.Options.BGPNodeSelector, "=")
 		// Check if node should be participating in IP sharing via the given selector
 		if val, ok := node.Labels[kv[0]]; !ok || len(kv) != 2 || val != kv[1] {
 			// not a selected Node
@@ -216,7 +216,7 @@ func (l *Loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node, ip
 		return "", err
 	}
 
-	newSharedIP, err := l.client.AddInstanceIPAddress(ctx, ipHolder.ID, true)
+	newSharedIP, err := l.Client.AddInstanceIPAddress(ctx, ipHolder.ID, true)
 	if err != nil {
 		return "", err
 	}
@@ -243,7 +243,7 @@ func (l *Loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node, ip
 	}
 
 	// share the IPs with nodes participating in Cilium BGP peering
-	if l.options.BGPNodeSelector == "" {
+	if l.Options.BGPNodeSelector == "" {
 		for _, node := range nodes {
 			if _, ok := node.Labels[commonControlPlaneLabel]; !ok {
 				if err = l.shareIPs(ctx, addrs, node); err != nil {
@@ -252,7 +252,7 @@ func (l *Loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node, ip
 			}
 		}
 	} else {
-		kv := strings.Split(l.options.BGPNodeSelector, "=")
+		kv := strings.Split(l.Options.BGPNodeSelector, "=")
 		for _, node := range nodes {
 			if val, ok := node.Labels[kv[0]]; ok && len(kv) == 2 && val == kv[1] {
 				if err = l.shareIPs(ctx, addrs, node); err != nil {
@@ -272,8 +272,8 @@ func (l *Loadbalancers) deleteSharedIP(ctx context.Context, service *v1.Service)
 	if err != nil {
 		return err
 	}
-	nodeList, err := l.kubeClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{
-		LabelSelector: l.options.BGPNodeSelector,
+	nodeList, err := l.KubeClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{
+		LabelSelector: l.Options.BGPNodeSelector,
 	})
 	if err != nil {
 		return err
@@ -282,8 +282,8 @@ func (l *Loadbalancers) deleteSharedIP(ctx context.Context, service *v1.Service)
 
 	serviceNn := getServiceNn(service)
 	var ipHolderSuffix string
-	if l.options.IpHolderSuffix != "" {
-		ipHolderSuffix = l.options.IpHolderSuffix
+	if l.Options.IpHolderSuffix != "" {
+		ipHolderSuffix = l.Options.IpHolderSuffix
 		klog.V(3).Infof("using parameter-based IP Holder suffix %s for Service %s", ipHolderSuffix, serviceNn)
 	}
 
@@ -304,14 +304,14 @@ func (l *Loadbalancers) deleteSharedIP(ctx context.Context, service *v1.Service)
 				if err != nil {
 					return err
 				}
-				err = l.client.DeleteInstanceIPAddress(ctx, nodeLinodeID, ingress.IP)
+				err = l.Client.DeleteInstanceIPAddress(ctx, nodeLinodeID, ingress.IP)
 				if IgnoreLinodeAPIError(err, http.StatusNotFound) != nil {
 					return err
 				}
 			}
 
 			// finally delete the shared IP on the ip-holder
-			err = l.client.DeleteInstanceIPAddress(ctx, ipHolder.ID, ingress.IP)
+			err = l.Client.DeleteInstanceIPAddress(ctx, ipHolder.ID, ingress.IP)
 			if IgnoreLinodeAPIError(err, http.StatusNotFound) != nil {
 				return err
 			}
@@ -331,9 +331,9 @@ func (l *Loadbalancers) ensureIPHolder(ctx context.Context, suffix string) (*lin
 	if ipHolder != nil {
 		return ipHolder, nil
 	}
-	label := generateClusterScopedIPHolderLinodeName(l.zone, suffix)
-	ipHolder, err = l.client.CreateInstance(ctx, linodego.InstanceCreateOptions{
-		Region:   l.zone,
+	label := generateClusterScopedIPHolderLinodeName(l.Zone, suffix)
+	ipHolder, err = l.Client.CreateInstance(ctx, linodego.InstanceCreateOptions{
+		Region:   l.Zone,
 		Type:     "g6-nanode-1",
 		Label:    label,
 		RootPass: uuid.NewString(),
@@ -355,14 +355,14 @@ func (l *Loadbalancers) ensureIPHolder(ctx context.Context, suffix string) (*lin
 
 func (l *Loadbalancers) getIPHolder(ctx context.Context, suffix string) (*linodego.Instance, error) {
 	// even though we have updated the naming convention, leaving this in ensures we have backwards compatibility
-	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, l.zone)}
+	filter := map[string]string{"label": fmt.Sprintf("%s-%s", ipHolderLabelPrefix, l.Zone)}
 	rawFilter, err := json.Marshal(filter)
 	if err != nil {
 		panic("this should not have failed")
 	}
 	var ipHolder *linodego.Instance
 	// TODO (rk): should we switch to using GET instead of LIST? we would be able to wrap logic around errors
-	linodes, err := l.client.ListInstances(ctx, linodego.NewListOptions(1, string(rawFilter)))
+	linodes, err := l.Client.ListInstances(ctx, linodego.NewListOptions(1, string(rawFilter)))
 	if err != nil {
 		return nil, err
 	}
@@ -373,12 +373,12 @@ func (l *Loadbalancers) getIPHolder(ctx context.Context, suffix string) (*linode
 		// a) an ip holder instance does not exist yet
 		// or
 		// b) another cluster already holds the linode grant to an ip holder using the old naming convention
-		filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(l.zone, suffix)}
+		filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(l.Zone, suffix)}
 		rawFilter, err = json.Marshal(filter)
 		if err != nil {
 			panic("this should not have failed")
 		}
-		linodes, err = l.client.ListInstances(ctx, linodego.NewListOptions(1, string(rawFilter)))
+		linodes, err = l.Client.ListInstances(ctx, linodego.NewListOptions(1, string(rawFilter)))
 		if err != nil {
 			return nil, err
 		}
@@ -408,14 +408,14 @@ func generateClusterScopedIPHolderLinodeName(zone, suffix string) (label string)
 }
 
 func (l *Loadbalancers) retrieveCiliumClientset() error {
-	if l.ciliumClient != nil {
+	if l.CiliumClient != nil {
 		return nil
 	}
 	var (
 		kubeConfig *rest.Config
 		err        error
 	)
-	kubeconfigFlag := l.options.KubeconfigFlag
+	kubeconfigFlag := l.Options.KubeconfigFlag
 	if kubeconfigFlag == nil || kubeconfigFlag.Value.String() == "" {
 		kubeConfig, err = rest.InClusterConfig()
 	} else {
@@ -424,7 +424,7 @@ func (l *Loadbalancers) retrieveCiliumClientset() error {
 	if err != nil {
 		return err
 	}
-	l.ciliumClient, err = ciliumclient.NewForConfig(kubeConfig)
+	l.CiliumClient, err = ciliumclient.NewForConfig(kubeConfig)
 
 	return err
 }
@@ -455,7 +455,7 @@ func (l *Loadbalancers) createCiliumLBIPPool(ctx context.Context, service *v1.Se
 		},
 	}
 
-	return l.ciliumClient.CiliumLoadBalancerIPPools().Create(ctx, ciliumLBIPPool, metav1.CreateOptions{})
+	return l.CiliumClient.CiliumLoadBalancerIPPools().Create(ctx, ciliumLBIPPool, metav1.CreateOptions{})
 }
 
 // NOTE: Cilium CRDs must be installed for this to work
@@ -464,7 +464,7 @@ func (l *Loadbalancers) deleteCiliumLBIPPool(ctx context.Context, service *v1.Se
 		return err
 	}
 
-	return l.ciliumClient.CiliumLoadBalancerIPPools().Delete(
+	return l.CiliumClient.CiliumLoadBalancerIPPools().Delete(
 		ctx,
 		fmt.Sprintf("%s-%s-pool", service.Namespace, service.Name),
 		metav1.DeleteOptions{},
@@ -477,7 +477,7 @@ func (l *Loadbalancers) getCiliumLBIPPool(ctx context.Context, service *v1.Servi
 		return nil, err
 	}
 
-	return l.ciliumClient.CiliumLoadBalancerIPPools().Get(
+	return l.CiliumClient.CiliumLoadBalancerIPPools().Get(
 		ctx,
 		fmt.Sprintf("%s-%s-pool", service.Namespace, service.Name),
 		metav1.GetOptions{},
@@ -492,15 +492,15 @@ func (l *Loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error 
 			return err
 		}
 	}
-	regionID, ok := regionIDMap[l.zone]
+	regionID, ok := regionIDMap[l.Zone]
 	if !ok {
-		return fmt.Errorf("unsupported region for BGP: %s", l.zone)
+		return fmt.Errorf("unsupported region for BGP: %s", l.Zone)
 	}
 	if err := l.retrieveCiliumClientset(); err != nil {
 		return err
 	}
 	// check if policy already exists
-	policy, err := l.ciliumClient.CiliumBGPPeeringPolicies().Get(ctx, ciliumBGPPeeringPolicyName, metav1.GetOptions{})
+	policy, err := l.CiliumClient.CiliumBGPPeeringPolicies().Get(ctx, ciliumBGPPeeringPolicyName, metav1.GetOptions{})
 	if err != nil && !k8serrors.IsNotFound(err) {
 		klog.Infof("Failed to get CiliumBGPPeeringPolicy: %s", err.Error())
 		return err
@@ -513,7 +513,7 @@ func (l *Loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error 
 	// otherwise create it
 	var nodeSelector slimv1.LabelSelector
 	// If no BGPNodeSelector is specified, select all worker nodes.
-	if l.options.BGPNodeSelector == "" {
+	if l.Options.BGPNodeSelector == "" {
 		nodeSelector = slimv1.LabelSelector{
 			MatchExpressions: []slimv1.LabelSelectorRequirement{
 				{
@@ -523,9 +523,9 @@ func (l *Loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error 
 			},
 		}
 	} else {
-		kv := strings.Split(l.options.BGPNodeSelector, "=")
+		kv := strings.Split(l.Options.BGPNodeSelector, "=")
 		if len(kv) != BGPNodeSelectorFlagInputLen {
-			return fmt.Errorf("invalid node selector %s", l.options.BGPNodeSelector)
+			return fmt.Errorf("invalid node selector %s", l.Options.BGPNodeSelector)
 		}
 
 		nodeSelector = slimv1.LabelSelector{MatchLabels: map[string]string{kv[0]: kv[1]}}
@@ -581,7 +581,7 @@ func (l *Loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error 
 	}
 
 	klog.Info("Creating CiliumBGPPeeringPolicy")
-	_, err = l.ciliumClient.CiliumBGPPeeringPolicies().Create(ctx, ciliumBGPPeeringPolicy, metav1.CreateOptions{})
+	_, err = l.CiliumClient.CiliumBGPPeeringPolicies().Create(ctx, ciliumBGPPeeringPolicy, metav1.CreateOptions{})
 
 	return err
 }

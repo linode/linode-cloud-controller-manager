@@ -101,12 +101,12 @@ func (e lbNotFoundError) Error() string {
 }
 
 type Loadbalancers struct {
-	client           client.Client
-	zone             string
-	kubeClient       kubernetes.Interface
-	ciliumClient     ciliumclient.CiliumV2alpha1Interface
-	loadBalancerType string
-	options          *OptionsConfig
+	Client           client.Client
+	Zone             string
+	KubeClient       kubernetes.Interface
+	CiliumClient     ciliumclient.CiliumV2alpha1Interface
+	LoadBalancerType string
+	Options          *OptionsConfig
 }
 
 type portConfigAnnotation struct {
@@ -131,10 +131,10 @@ type portConfig struct {
 // NewLoadbalancersWithOptions returns a cloudprovider.LoadBalancer with custom options
 func NewLoadbalancersWithOptions(client client.Client, zone string, options *OptionsConfig) cloudprovider.LoadBalancer {
 	return &Loadbalancers{
-		client:           client,
-		zone:             zone,
-		loadBalancerType: options.LoadBalancerType,
-		options:          options,
+		Client:           client,
+		Zone:             zone,
+		LoadBalancerType: options.LoadBalancerType,
+		Options:          options,
 	}
 }
 
@@ -162,7 +162,7 @@ func (l *Loadbalancers) getLatestServiceLoadBalancerStatus(ctx context.Context, 
 		return v1.LoadBalancerStatus{}, err
 	}
 
-	service, err = l.kubeClient.CoreV1().Services(service.Namespace).Get(ctx, service.Name, metav1.GetOptions{})
+	service, err = l.KubeClient.CoreV1().Services(service.Namespace).Get(ctx, service.Name, metav1.GetOptions{})
 	if err != nil {
 		return v1.LoadBalancerStatus{}, err
 	}
@@ -226,7 +226,7 @@ func (l *Loadbalancers) cleanupOldNodeBalancer(ctx context.Context, service *v1.
 		return nil
 	}
 
-	if err := l.client.DeleteNodeBalancer(ctx, previousNB.ID); err != nil {
+	if err := l.Client.DeleteNodeBalancer(ctx, previousNB.ID); err != nil {
 		return err
 	}
 
@@ -239,7 +239,7 @@ func (l *Loadbalancers) cleanupOldNodeBalancer(ctx context.Context, service *v1.
 // GetLoadBalancer will not modify service.
 func (l *Loadbalancers) GetLoadBalancerName(_ context.Context, _ string, _ *v1.Service) string {
 	unixNano := strconv.FormatInt(time.Now().UnixNano(), 16)
-	return fmt.Sprintf("%s-%s", l.options.NodeBalancerPrefix, unixNano[len(unixNano)-12:])
+	return fmt.Sprintf("%s-%s", l.Options.NodeBalancerPrefix, unixNano[len(unixNano)-12:])
 }
 
 // GetLoadBalancer returns the *v1.LoadBalancerStatus of service.
@@ -251,7 +251,7 @@ func (l *Loadbalancers) GetLoadBalancer(ctx context.Context, clusterName string,
 	sentry.SetTag(ctx, "service", service.Name)
 
 	// Handle LoadBalancers backed by Cilium
-	if l.loadBalancerType == ciliumLBType {
+	if l.LoadBalancerType == ciliumLBType {
 		return &v1.LoadBalancerStatus{
 			Ingress: service.Status.LoadBalancer.Ingress,
 		}, true, nil
@@ -282,7 +282,7 @@ func (l *Loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	serviceNn := getServiceNn(service)
 
 	// Handle LoadBalancers backed by Cilium
-	if l.loadBalancerType == ciliumLBType {
+	if l.LoadBalancerType == ciliumLBType {
 		klog.Infof("handling LoadBalancer Service %s as %s", serviceNn, ciliumLBClass)
 
 		if err = l.ensureCiliumBGPPeeringPolicy(ctx); err != nil {
@@ -308,8 +308,8 @@ func (l *Loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 		}
 
 		var ipHolderSuffix string
-		if l.options.IpHolderSuffix != "" {
-			ipHolderSuffix = l.options.IpHolderSuffix
+		if l.Options.IpHolderSuffix != "" {
+			ipHolderSuffix = l.Options.IpHolderSuffix
 			klog.Infof("using parameter-based IP Holder suffix %s for Service %s", ipHolderSuffix, serviceNn)
 		}
 
@@ -380,12 +380,12 @@ func (l *Loadbalancers) updateNodeBalancer(
 	nodes []*v1.Node,
 	nb *linodego.NodeBalancer,
 ) (err error) {
-	if len(nodes) == 0 && !l.options.AllowEmptyNodeBalancerBackends {
+	if len(nodes) == 0 && !l.Options.AllowEmptyNodeBalancerBackends {
 		return fmt.Errorf("%w: service %s", errNoNodesAvailable, getServiceNn(service))
 	}
 
 	// Log warning when updating NodeBalancer without nodes
-	if len(nodes) == 0 && l.options.AllowEmptyNodeBalancerBackends {
+	if len(nodes) == 0 && l.Options.AllowEmptyNodeBalancerBackends {
 		klog.Warningf("Updating NodeBalancer for service (%s) without backend nodes - load balancer will be non-functional until nodes are added", getServiceNn(service))
 	}
 
@@ -393,7 +393,7 @@ func (l *Loadbalancers) updateNodeBalancer(
 	if connThrottle != nb.ClientConnThrottle {
 		update := nb.GetUpdateOptions()
 		update.ClientConnThrottle = &connThrottle
-		nb, err = l.client.UpdateNodeBalancer(ctx, nb.ID, update)
+		nb, err = l.Client.UpdateNodeBalancer(ctx, nb.ID, update)
 		if err != nil {
 			sentry.CaptureError(ctx, err)
 			return err
@@ -404,21 +404,21 @@ func (l *Loadbalancers) updateNodeBalancer(
 	if !reflect.DeepEqual(nb.Tags, tags) {
 		update := nb.GetUpdateOptions()
 		update.Tags = &tags
-		nb, err = l.client.UpdateNodeBalancer(ctx, nb.ID, update)
+		nb, err = l.Client.UpdateNodeBalancer(ctx, nb.ID, update)
 		if err != nil {
 			sentry.CaptureError(ctx, err)
 			return err
 		}
 	}
 
-	fwClient := firewall.LinodeClient{Client: l.client}
+	fwClient := firewall.LinodeClient{Client: l.Client}
 	err = fwClient.UpdateNodeBalancerFirewall(ctx, l.GetLoadBalancerName(ctx, clusterName, service), tags, service, nb)
 	if err != nil {
 		return err
 	}
 
 	// Get all of the NodeBalancer's configs
-	nbCfgs, err := l.client.ListNodeBalancerConfigs(ctx, nb.ID, nil)
+	nbCfgs, err := l.Client.ListNodeBalancerConfigs(ctx, nb.ID, nil)
 	if err != nil {
 		sentry.CaptureError(ctx, err)
 		return err
@@ -452,7 +452,7 @@ func (l *Loadbalancers) updateNodeBalancer(
 		if currentNBCfg != nil {
 			// Obtain list of current NB nodes and convert it to map of node IDs
 			var currentNBNodes []linodego.NodeBalancerNode
-			currentNBNodes, err = l.client.ListNodeBalancerNodes(ctx, nb.ID, currentNBCfg.ID, nil)
+			currentNBNodes, err = l.Client.ListNodeBalancerNodes(ctx, nb.ID, currentNBCfg.ID, nil)
 			if err != nil {
 				// This error can be ignored, because if we fail to get nodes we can anyway rebuild the config from scratch,
 				// it would just cause the NB to reload config even if the node list did not change, so we prefer to send IDs when it is possible.
@@ -468,8 +468,8 @@ func (l *Loadbalancers) updateNodeBalancer(
 		// Add all of the Nodes to the config
 		newNBNodes := make([]linodego.NodeBalancerConfigRebuildNodeOptions, 0, len(nodes))
 		subnetID := 0
-		if l.options.NodeBalancerBackendIPv4SubnetID != 0 {
-			subnetID = l.options.NodeBalancerBackendIPv4SubnetID
+		if l.Options.NodeBalancerBackendIPv4SubnetID != 0 {
+			subnetID = l.Options.NodeBalancerBackendIPv4SubnetID
 		}
 		backendIPv4Range, ok := service.GetAnnotations()[annotations.NodeBalancerBackendIPv4Range]
 		if ok {
@@ -477,7 +477,7 @@ func (l *Loadbalancers) updateNodeBalancer(
 				return err
 			}
 		}
-		if len(l.options.VPCNames) > 0 && !l.options.DisableNodeBalancerVPCBackends {
+		if len(l.Options.VPCNames) > 0 && !l.Options.DisableNodeBalancerVPCBackends {
 			var id int
 			id, err = l.getSubnetIDForSVC(ctx, service)
 			if err != nil {
@@ -513,7 +513,7 @@ func (l *Loadbalancers) updateNodeBalancer(
 		if currentNBCfg == nil {
 			createOpts := newNBCfg.GetCreateOptions()
 
-			currentNBCfg, err = l.client.CreateNodeBalancerConfig(ctx, nb.ID, createOpts)
+			currentNBCfg, err = l.Client.CreateNodeBalancerConfig(ctx, nb.ID, createOpts)
 			if err != nil {
 				sentry.CaptureError(ctx, err)
 				return fmt.Errorf("[port %d] error creating NodeBalancer config: %w", int(port.Port), err)
@@ -530,7 +530,7 @@ func (l *Loadbalancers) updateNodeBalancer(
 
 		rebuildOpts.Nodes = newNBNodes
 
-		if _, err = l.client.RebuildNodeBalancerConfig(ctx, nb.ID, currentNBCfg.ID, rebuildOpts); err != nil {
+		if _, err = l.Client.RebuildNodeBalancerConfig(ctx, nb.ID, currentNBCfg.ID, rebuildOpts); err != nil {
 			sentry.CaptureError(ctx, err)
 			return fmt.Errorf("[port %d] error rebuilding NodeBalancer config: %w", int(port.Port), err)
 		}
@@ -546,12 +546,12 @@ func (l *Loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 	sentry.SetTag(ctx, "service", service.Name)
 
 	// handle LoadBalancers backed by Cilium
-	if l.loadBalancerType == ciliumLBType {
+	if l.LoadBalancerType == ciliumLBType {
 		klog.Infof("handling update for LoadBalancer Service %s/%s as %s", service.Namespace, service.Name, ciliumLBClass)
 		serviceNn := getServiceNn(service)
 		var ipHolderSuffix string
-		if l.options.IpHolderSuffix != "" {
-			ipHolderSuffix = l.options.IpHolderSuffix
+		if l.Options.IpHolderSuffix != "" {
+			ipHolderSuffix = l.Options.IpHolderSuffix
 			klog.V(3).Infof("using parameter-based IP Holder suffix %s for Service %s", ipHolderSuffix, serviceNn)
 		}
 
@@ -601,7 +601,7 @@ func (l *Loadbalancers) deleteUnusedConfigs(ctx context.Context, nbConfigs []lin
 			}
 		}
 		if !found {
-			if err := l.client.DeleteNodeBalancerConfig(ctx, nbc.NodeBalancerID, nbc.ID); err != nil {
+			if err := l.Client.DeleteNodeBalancerConfig(ctx, nbc.NodeBalancerID, nbc.ID); err != nil {
 				return err
 			}
 		}
@@ -626,7 +626,7 @@ func (l *Loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 	sentry.SetTag(ctx, "service", service.Name)
 
 	// Handle LoadBalancers backed by Cilium
-	if l.loadBalancerType == ciliumLBType {
+	if l.LoadBalancerType == ciliumLBType {
 		klog.Infof("handling LoadBalancer Service %s/%s as %s", service.Namespace, service.Name, ciliumLBClass)
 		if err := l.deleteSharedIP(ctx, service); err != nil {
 			return err
@@ -672,12 +672,12 @@ func (l *Loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 		return nil
 	}
 
-	fwClient := firewall.LinodeClient{Client: l.client}
+	fwClient := firewall.LinodeClient{Client: l.Client}
 	if err = fwClient.DeleteNodeBalancerFirewall(ctx, service, nb); err != nil {
 		return err
 	}
 
-	if err = l.client.DeleteNodeBalancer(ctx, nb.ID); err != nil {
+	if err = l.Client.DeleteNodeBalancer(ctx, nb.ID); err != nil {
 		klog.Errorf("failed to delete NodeBalancer (%d) for service (%s): %s", nb.ID, serviceNn, err)
 		sentry.CaptureError(ctx, err)
 		return err
@@ -688,7 +688,7 @@ func (l *Loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 }
 
 func (l *Loadbalancers) getNodeBalancerByHostname(ctx context.Context, service *v1.Service, hostname string) (*linodego.NodeBalancer, error) {
-	lbs, err := l.client.ListNodeBalancers(ctx, nil)
+	lbs, err := l.Client.ListNodeBalancers(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -709,7 +709,7 @@ func (l *Loadbalancers) getNodeBalancerByIP(ctx context.Context, service *v1.Ser
 		filter = fmt.Sprintf(`{"ipv4": "%v"}`, ip.String())
 	}
 
-	lbs, err := l.client.ListNodeBalancers(ctx, &linodego.ListOptions{Filter: filter})
+	lbs, err := l.Client.ListNodeBalancers(ctx, &linodego.ListOptions{Filter: filter})
 	if err != nil {
 		return nil, err
 	}
@@ -721,7 +721,7 @@ func (l *Loadbalancers) getNodeBalancerByIP(ctx context.Context, service *v1.Ser
 }
 
 func (l *Loadbalancers) getNodeBalancerByID(ctx context.Context, service *v1.Service, id int) (*linodego.NodeBalancer, error) {
-	nb, err := l.client.GetNodeBalancer(ctx, id)
+	nb, err := l.Client.GetNodeBalancer(ctx, id)
 	if err != nil {
 		var targetError *linodego.Error
 		if errors.As(err, &targetError) && targetError.Code == http.StatusNotFound {
@@ -738,7 +738,7 @@ func (l *Loadbalancers) GetLoadBalancerTags(_ context.Context, clusterName strin
 		tags = append(tags, clusterName)
 	}
 
-	tags = append(tags, l.options.NodeBalancerTags...)
+	tags = append(tags, l.Options.NodeBalancerTags...)
 
 	tagStr, ok := service.GetAnnotations()[annotations.AnnLinodeLoadBalancerTags]
 	if ok {
@@ -755,7 +755,7 @@ func (l *Loadbalancers) GetLinodeNBType(service *v1.Service) linodego.NodeBalanc
 		return linodego.NBTypePremium
 	}
 
-	return linodego.NodeBalancerPlanType(l.options.DefaultNBType)
+	return linodego.NodeBalancerPlanType(l.Options.DefaultNBType)
 }
 
 // getVPCCreateOptions returns the VPC options for the NodeBalancer creation.
@@ -807,10 +807,10 @@ func (l *Loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Ser
 
 	// Precedence 3: If the user has specified a NodeBalancerBackendIPv4SubnetID, use that
 	// and auto-allocate subnets from it for the NodeBalancer
-	if l.options.NodeBalancerBackendIPv4SubnetID != 0 {
+	if l.Options.NodeBalancerBackendIPv4SubnetID != 0 {
 		vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
 			{
-				SubnetID: l.options.NodeBalancerBackendIPv4SubnetID,
+				SubnetID: l.Options.NodeBalancerBackendIPv4SubnetID,
 			},
 		}
 		return vpcCreateOpts, nil
@@ -818,11 +818,11 @@ func (l *Loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Ser
 
 	// Precedence 4: If the user has specified a NodeBalancerBackendIPv4Subnet, use that
 	// and auto-allocate subnets from it for the NodeBalancer
-	if l.options.NodeBalancerBackendIPv4Subnet != "" {
+	if l.Options.NodeBalancerBackendIPv4Subnet != "" {
 		vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
 			{
 				SubnetID:            subnetID,
-				IPv4Range:           l.options.NodeBalancerBackendIPv4Subnet,
+				IPv4Range:           l.Options.NodeBalancerBackendIPv4Subnet,
 				IPv4RangeAutoAssign: true,
 			},
 		}
@@ -846,14 +846,14 @@ func (l *Loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 	nbType := l.GetLinodeNBType(service)
 	createOpts := linodego.NodeBalancerCreateOptions{
 		Label:              &label,
-		Region:             l.zone,
+		Region:             l.Zone,
 		ClientConnThrottle: &connThrottle,
 		Configs:            configs,
 		Tags:               tags,
 		Type:               nbType,
 	}
 
-	if len(l.options.VPCNames) > 0 && !l.options.DisableNodeBalancerVPCBackends {
+	if len(l.Options.VPCNames) > 0 && !l.Options.DisableNodeBalancerVPCBackends {
 		createOpts.VPCs, err = l.getVPCCreateOptions(ctx, service)
 		if err != nil {
 			return nil, err
@@ -876,7 +876,7 @@ func (l *Loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 				return nil, err
 			}
 
-			fw, err := l.client.CreateFirewall(ctx, *fwcreateOpts)
+			fw, err := l.Client.CreateFirewall(ctx, *fwcreateOpts)
 			if err != nil {
 				return nil, err
 			}
@@ -885,7 +885,7 @@ func (l *Loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 		// no need to deal with firewalls, continue creating nb's
 	}
 
-	return l.client.CreateNodeBalancer(ctx, createOpts)
+	return l.Client.CreateNodeBalancer(ctx, createOpts)
 }
 
 func (l *Loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1.Service, port v1.ServicePort) (linodego.NodeBalancerConfig, error) {
@@ -979,7 +979,7 @@ func (l *Loadbalancers) addTLSCert(ctx context.Context, service *v1.Service, nbC
 		return err
 	}
 
-	nbConfig.SSLCert, nbConfig.SSLKey, err = getTLSCertInfo(ctx, l.kubeClient, service.Namespace, config)
+	nbConfig.SSLCert, nbConfig.SSLKey, err = getTLSCertInfo(ctx, l.KubeClient, service.Namespace, config)
 	if err != nil {
 		return err
 	}
@@ -993,7 +993,7 @@ func (l *Loadbalancers) addTLSCert(ctx context.Context, service *v1.Service, nbC
 // 3. If CCM is configured with --nodebalancer-backend-ipv4-subnet-id, it will be used as the subnet ID.
 // 4. Else, use first VPCName and SubnetName to calculate subnet id for the service.
 func (l *Loadbalancers) getSubnetIDForSVC(ctx context.Context, service *v1.Service) (int, error) {
-	if len(l.options.VPCNames) == 0 {
+	if len(l.Options.VPCNames) == 0 {
 		return 0, fmt.Errorf("CCM not configured with VPC, cannot create NodeBalancer with specified annotation")
 	}
 	// Check if the service has an annotation for NodeBalancerBackendSubnetID
@@ -1010,37 +1010,37 @@ func (l *Loadbalancers) getSubnetIDForSVC(ctx context.Context, service *v1.Servi
 
 	// If no VPCName or SubnetName is specified in annotations, but NodeBalancerBackendIPv4SubnetID is set,
 	// use the NodeBalancerBackendIPv4SubnetID as the subnet ID.
-	if !vpcOk && !subnetOk && l.options.NodeBalancerBackendIPv4SubnetID != 0 {
-		return l.options.NodeBalancerBackendIPv4SubnetID, nil
+	if !vpcOk && !subnetOk && l.Options.NodeBalancerBackendIPv4SubnetID != 0 {
+		return l.Options.NodeBalancerBackendIPv4SubnetID, nil
 	}
 
-	vpcName := l.options.VPCNames[0]
+	vpcName := l.Options.VPCNames[0]
 	if vpcOk {
 		vpcName = specifiedVPCName
 	}
-	vpcID, err := GetVPCID(ctx, l.client, vpcName)
+	vpcID, err := GetVPCID(ctx, l.Client, vpcName)
 	if err != nil {
 		return 0, err
 	}
 
-	subnetName := l.options.SubnetNames[0]
+	subnetName := l.Options.SubnetNames[0]
 	if subnetOk {
 		subnetName = specifiedSubnetName
 	}
 
 	// Use the VPC ID and Subnet Name to get the subnet ID
-	return GetSubnetID(ctx, l.client, vpcID, subnetName)
+	return GetSubnetID(ctx, l.Client, vpcID, subnetName)
 }
 
 // buildLoadBalancerRequest returns a linodego.NodeBalancer
 // requests for service across nodes.
 func (l *Loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*linodego.NodeBalancer, error) {
-	if len(nodes) == 0 && !l.options.AllowEmptyNodeBalancerBackends {
+	if len(nodes) == 0 && !l.Options.AllowEmptyNodeBalancerBackends {
 		return nil, fmt.Errorf("%w: cluster %s, service %s", errNoNodesAvailable, clusterName, getServiceNn(service))
 	}
 
 	// Log warning when creating NodeBalancer without nodes
-	if len(nodes) == 0 && l.options.AllowEmptyNodeBalancerBackends {
+	if len(nodes) == 0 && l.Options.AllowEmptyNodeBalancerBackends {
 		klog.Warningf("Creating NodeBalancer for service (%s) without backend nodes - load balancer will be non-functional until nodes are added", getServiceNn(service))
 	}
 
@@ -1048,8 +1048,8 @@ func (l *Loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 	configs := make([]*linodego.NodeBalancerConfigCreateOptions, 0, len(ports))
 
 	subnetID := 0
-	if l.options.NodeBalancerBackendIPv4SubnetID != 0 {
-		subnetID = l.options.NodeBalancerBackendIPv4SubnetID
+	if l.Options.NodeBalancerBackendIPv4SubnetID != 0 {
+		subnetID = l.Options.NodeBalancerBackendIPv4SubnetID
 	}
 	// Check for the NodeBalancerBackendIPv4Range annotation
 	backendIPv4Range, ok := service.GetAnnotations()[annotations.NodeBalancerBackendIPv4Range]
@@ -1058,7 +1058,7 @@ func (l *Loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 			return nil, err
 		}
 	}
-	if len(l.options.VPCNames) > 0 && !l.options.DisableNodeBalancerVPCBackends {
+	if len(l.Options.VPCNames) > 0 && !l.Options.DisableNodeBalancerVPCBackends {
 		id, err := l.getSubnetIDForSVC(ctx, service)
 		if err != nil {
 			return nil, err
@@ -1130,7 +1130,7 @@ func (l *Loadbalancers) buildNodeBalancerNodeConfigRebuildOptions(node *v1.Node,
 }
 
 func (l *Loadbalancers) retrieveKubeClient() error {
-	if l.kubeClient != nil {
+	if l.KubeClient != nil {
 		return nil
 	}
 
@@ -1141,7 +1141,7 @@ func (l *Loadbalancers) retrieveKubeClient() error {
 
 	// Check to see if --kubeconfig was set. If it was, build a kubeconfig from the given file.
 	// Otherwise, use the in-cluster config.
-	kubeconfigFlag := l.options.KubeconfigFlag
+	kubeconfigFlag := l.Options.KubeconfigFlag
 	if kubeconfigFlag == nil || kubeconfigFlag.Value.String() == "" {
 		kubeConfig, err = rest.InClusterConfig()
 	} else {
@@ -1152,7 +1152,7 @@ func (l *Loadbalancers) retrieveKubeClient() error {
 		return err
 	}
 
-	l.kubeClient, err = kubernetes.NewForConfig(kubeConfig)
+	l.KubeClient, err = kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
 		return err
 	}
@@ -1334,7 +1334,7 @@ func (l *Loadbalancers) makeLoadBalancerStatus(service *v1.Service, nb *linodego
 	}
 
 	// Check for per-service IPv6 annotation first, then fall back to global setting
-	useIPv6 := getServiceBoolAnnotation(service, annotations.AnnLinodeEnableIPv6Ingress) || l.options.EnableIPv6ForLoadBalancers
+	useIPv6 := getServiceBoolAnnotation(service, annotations.AnnLinodeEnableIPv6Ingress) || l.Options.EnableIPv6ForLoadBalancers
 
 	// When IPv6 is enabled (either per-service or globally), include both IPv4 and IPv6
 	if useIPv6 && nb.IPv6 != nil && *nb.IPv6 != "" {
@@ -1387,15 +1387,15 @@ func getServiceBoolAnnotation(service *v1.Service, name string) bool {
 // validateNodeBalancerBackendIPv4Range validates the NodeBalancerBackendIPv4Range
 // annotation to be within the NodeBalancerBackendIPv4Subnet if it is set.
 func (l *Loadbalancers) validateNodeBalancerBackendIPv4Range(backendIPv4Range string) error {
-	if l.options.NodeBalancerBackendIPv4Subnet == "" {
+	if l.Options.NodeBalancerBackendIPv4Subnet == "" {
 		return nil
 	}
-	withinCIDR, err := isCIDRWithinCIDR(l.options.NodeBalancerBackendIPv4Subnet, backendIPv4Range)
+	withinCIDR, err := isCIDRWithinCIDR(l.Options.NodeBalancerBackendIPv4Subnet, backendIPv4Range)
 	if err != nil {
 		return fmt.Errorf("invalid IPv4 range: %w", err)
 	}
 	if !withinCIDR {
-		return fmt.Errorf("IPv4 range %s is not within the subnet %s", backendIPv4Range, l.options.NodeBalancerBackendIPv4Subnet)
+		return fmt.Errorf("IPv4 range %s is not within the subnet %s", backendIPv4Range, l.Options.NodeBalancerBackendIPv4Subnet)
 	}
 	return nil
 }
