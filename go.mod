@@ -12,7 +12,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hexdigest/gowrap v1.4.2
 	github.com/linode/linodego v1.53.1-0.20250709175023-9b152d30578c
-	github.com/prometheus/client_golang v1.22.0
+	github.com/prometheus/client_golang v1.23.0
 	github.com/spf13/pflag v1.0.7
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/exp v0.0.0-20241215155358-4a5509556b9e
@@ -105,9 +105,9 @@ require (
 	github.com/petermattis/goid v0.0.0-20241211131331-93ee7e083c43 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_model v0.6.1 // indirect
-	github.com/prometheus/common v0.62.0 // indirect
-	github.com/prometheus/procfs v0.15.1 // indirect
+	github.com/prometheus/client_model v0.6.2 // indirect
+	github.com/prometheus/common v0.65.0 // indirect
+	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/sagikazarmark/locafero v0.6.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/sasha-s/go-deadlock v0.3.5 // indirect
