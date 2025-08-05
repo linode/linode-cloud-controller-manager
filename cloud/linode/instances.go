@@ -96,6 +96,20 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 			}
 			vpcNodes[r.LinodeID] = append(vpcNodes[r.LinodeID], *r.Address)
 		}
+
+		resp, err = GetVPCIPv6Addresses(ctx, client, vpcName)
+		if err != nil {
+			klog.Errorf("failed updating instances cache for VPC %s. Error: %s", vpcName, err.Error())
+			continue
+		}
+		for _, r := range resp {
+			if len(r.IPv6Addresses) == 0 {
+				continue
+			}
+			for _, ipv6 := range r.IPv6Addresses {
+				vpcNodes[r.LinodeID] = append(vpcNodes[r.LinodeID], ipv6.SLAACAddress)
+			}
+		}
 	}
 
 	newNodes := make(map[int]linodeInstance, len(instances))

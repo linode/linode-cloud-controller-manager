@@ -150,6 +150,55 @@ func GetVPCIPAddresses(ctx context.Context, client client.Client, vpcName string
 	return resp, nil
 }
 
+func GetVPCIPv6Addresses(ctx context.Context, client client.Client, vpcName string) ([]linodego.VPCIP, error) {
+	vpcID, err := GetVPCID(ctx, client, strings.TrimSpace(vpcName))
+	if err != nil {
+		return nil, err
+	}
+
+	resultFilter := ""
+
+	// Get subnet ID(s) from name(s) if subnet-names is specified
+	if len(Options.SubnetNames) > 0 {
+		// subnetIDList is a slice of strings for ease of use with resultFilter
+		subnetIDList := []string{}
+
+		for _, name := range Options.SubnetNames {
+			// For caching
+			var subnetID int
+			subnetID, err = GetSubnetID(ctx, client, vpcID, name)
+			// Don't filter subnets we can't find
+			if err != nil {
+				klog.Errorf("subnet %s not found due to error: %v. Skipping.", name, err)
+				continue
+			}
+
+			// For use with the JSON filter
+			subnetIDList = append(subnetIDList, strconv.Itoa(subnetID))
+		}
+
+		// Assign the list of IDs to a stringified JSON filter
+		var filter []byte
+		filter, err = json.Marshal(subnetFilter{SubnetID: strings.Join(subnetIDList, ",")})
+		if err != nil {
+			klog.Error("could not create JSON filter for subnet_id")
+		}
+		resultFilter = string(filter)
+	}
+
+	resp, err := client.ListVPCIPv6Addresses(ctx, vpcID, linodego.NewListOptions(0, resultFilter))
+	if err != nil {
+		if linodego.ErrHasStatus(err, http.StatusNotFound) {
+			Mu.Lock()
+			defer Mu.Unlock()
+			klog.Errorf("vpc %s not found. Deleting entry from cache", vpcName)
+			delete(vpcIDs, vpcName)
+		}
+		return nil, err
+	}
+	return resp, nil
+}
+
 // getNodeBalancerBackendIPv4SubnetID returns the subnet ID for the NodeBalancer backend IPv4 subnet.
 // It uses the first VPC name from Options.VPCNames to find the VPC ID and then retrieves the subnet ID
 // for the NodeBalancer backend IPv4 subnet name specified in Options.NodeBalancerBackendIPv4SubnetName.
