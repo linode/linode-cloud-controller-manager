@@ -31,10 +31,8 @@ const (
 
 var supportedLoadBalancerTypes = []string{ciliumLBType, nodeBalancerLBType}
 
-// Options is a configuration object for this cloudprovider implementation.
-// We expect it to be initialized with flags external to this package, likely in
-// main.go
-var Options struct {
+// OptionsConfig defines the configuration structure for cloud controller options
+type OptionsConfig struct {
 	KubeconfigFlag                    *pflag.Flag
 	LinodeGoDebug                     bool
 	EnableRouteController             bool
@@ -61,7 +59,12 @@ var Options struct {
 	NodeCIDRMaskSizeIPv4              int
 	NodeCIDRMaskSizeIPv6              int
 	NodeBalancerPrefix                string
+	AllowEmptyNodeBalancerBackends    bool
 }
+
+// Options is the global configuration instance used by the CCM.
+// We expect it to be initialized with flags external to this package, likely in main.go
+var Options OptionsConfig
 
 type linodeCloud struct {
 	client                   client.Client
@@ -204,7 +207,7 @@ func newCloud() (cloudprovider.Interface, error) {
 	lcloud := &linodeCloud{
 		client:                   linodeClient,
 		instances:                instanceCache,
-		loadbalancers:            newLoadbalancers(linodeClient, region),
+		loadbalancers:            NewLoadbalancers(linodeClient, region),
 		routes:                   routes,
 		linodeTokenHealthChecker: healthChecker,
 	}
@@ -225,7 +228,7 @@ func (c *linodeCloud) Initialize(clientBuilder cloudprovider.ControllerClientBui
 		go c.linodeTokenHealthChecker.Run(stopCh)
 	}
 
-	lb, assertion := c.loadbalancers.(*loadbalancers)
+	lb, assertion := c.loadbalancers.(*LoadBalancers)
 	if !assertion {
 		klog.Error("type assertion during Initialize() failed")
 		return

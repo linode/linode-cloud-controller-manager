@@ -24,7 +24,7 @@ func Test_serviceController_Run(t *testing.T) {
 	informer := informers.NewSharedInformerFactory(kubeClient, 0).Core().V1().Services()
 	mockQueue := workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[any]{Name: "test"})
 
-	loadbalancers, assertion := newLoadbalancers(client, "us-east").(*loadbalancers)
+	loadbalancers, assertion := NewLoadbalancers(client, "us-east").(*LoadBalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
@@ -53,7 +53,7 @@ func Test_serviceController_Run(t *testing.T) {
 
 func Test_serviceController_processNextDeletion(t *testing.T) {
 	type fields struct {
-		loadbalancers *loadbalancers
+		loadbalancers *LoadBalancers
 		queue         workqueue.TypedDelayingInterface[any]
 		Client        *mocks.MockClient
 	}
@@ -70,7 +70,7 @@ func Test_serviceController_processNextDeletion(t *testing.T) {
 				loadbalancers: nil,
 			},
 			Setup: func(f *fields) {
-				f.loadbalancers = &loadbalancers{client: f.Client, zone: "test", loadBalancerType: Options.LoadBalancerType}
+				f.loadbalancers = &LoadBalancers{Client: f.Client, Zone: "test", LoadBalancerType: Options.LoadBalancerType}
 				f.queue = workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[any]{Name: "testQueue"})
 				f.queue.Add("test")
 			},
@@ -83,7 +83,7 @@ func Test_serviceController_processNextDeletion(t *testing.T) {
 				loadbalancers: nil,
 			},
 			Setup: func(f *fields) {
-				f.loadbalancers = &loadbalancers{client: f.Client, zone: "test", loadBalancerType: Options.LoadBalancerType}
+				f.loadbalancers = &LoadBalancers{Client: f.Client, Zone: "test", LoadBalancerType: Options.LoadBalancerType}
 				f.queue = workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[any]{Name: "testQueue"})
 				svc := createTestService()
 				f.queue.Add(svc)
@@ -105,7 +105,7 @@ func Test_serviceController_processNextDeletion(t *testing.T) {
 			tt.Setup(&tt.fields)
 			s.loadbalancers = tt.fields.loadbalancers
 			s.queue = tt.fields.queue
-			s.loadbalancers.client = tt.fields.Client
+			s.loadbalancers.Client = tt.fields.Client
 			if got := s.processNextDeletion(); got != tt.want {
 				t.Errorf("serviceController.processNextDeletion() = %v, want %v", got, tt.want)
 			}
