@@ -39,12 +39,22 @@ type nodeCache struct {
 }
 
 // getInstanceAddresses returns all addresses configured on a linode.
-func (nc *nodeCache) getInstanceAddresses(instance linodego.Instance, vpcips []string) []nodeIP {
+func (nc *nodeCache) getInstanceAddresses(instance linodego.Instance, vpcips []string, vpcIPv6AddrTypes map[string]v1.NodeAddressType) []nodeIP {
 	ips := []nodeIP{}
+
+	// We store vpc IPv6 addrs separately so that we can list them after IPv4 addresses.
+	// Ordering matters in k8s, first address marked as externalIP will be used as external IP for node.
+	// We prefer to use IPv4 address as external IP if possible, so we list them first.
+	vpcIPv6Addrs := []nodeIP{}
 
 	// If vpc ips are present, list them first
 	for _, ip := range vpcips {
 		ipType := v1.NodeInternalIP
+		if _, ok := vpcIPv6AddrTypes[ip]; ok {
+			ipType = vpcIPv6AddrTypes[ip]
+			vpcIPv6Addrs = append(vpcIPv6Addrs, nodeIP{ip: ip, ipType: ipType})
+			continue
+		}
 		ips = append(ips, nodeIP{ip: ip, ipType: ipType})
 	}
 
@@ -55,6 +65,9 @@ func (nc *nodeCache) getInstanceAddresses(instance linodego.Instance, vpcips []s
 		}
 		ips = append(ips, nodeIP{ip: ip.String(), ipType: ipType})
 	}
+
+	// Add vpc IPv6 addresses after IPv4 addresses
+	ips = append(ips, vpcIPv6Addrs...)
 
 	if instance.IPv6 != "" {
 		ips = append(ips, nodeIP{ip: strings.TrimSuffix(instance.IPv6, "/128"), ipType: v1.NodeExternalIP})
@@ -80,6 +93,7 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 
 	// If running within VPC, find instances and store their ips
 	vpcNodes := map[int][]string{}
+	vpcIPv6AddrTypes := map[string]v1.NodeAddressType{}
 	for _, name := range Options.VPCNames {
 		vpcName := strings.TrimSpace(name)
 		if vpcName == "" {
@@ -106,8 +120,13 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 			if len(r.IPv6Addresses) == 0 {
 				continue
 			}
+			vpcIPv6AddrType := v1.NodeInternalIP
+			if r.IPv6IsPublic != nil && *r.IPv6IsPublic {
+				vpcIPv6AddrType = v1.NodeExternalIP
+			}
 			for _, ipv6 := range r.IPv6Addresses {
 				vpcNodes[r.LinodeID] = append(vpcNodes[r.LinodeID], ipv6.SLAACAddress)
+				vpcIPv6AddrTypes[ipv6.SLAACAddress] = vpcIPv6AddrType
 			}
 		}
 	}
@@ -120,7 +139,7 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 		}
 		node := linodeInstance{
 			instance: &instances[index],
-			ips:      nc.getInstanceAddresses(instance, vpcNodes[instance.ID]),
+			ips:      nc.getInstanceAddresses(instance, vpcNodes[instance.ID], vpcIPv6AddrTypes),
 		}
 		newNodes[instance.ID] = node
 	}
