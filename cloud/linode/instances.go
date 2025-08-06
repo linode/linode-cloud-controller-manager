@@ -104,11 +104,11 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 			klog.Errorf("failed updating instances cache for VPC %s. Error: %s", vpcName, err.Error())
 			continue
 		}
-		for _, r := range resp {
-			if r.Address == nil {
+		for _, vpcip := range resp {
+			if vpcip.Address == nil {
 				continue
 			}
-			vpcNodes[r.LinodeID] = append(vpcNodes[r.LinodeID], *r.Address)
+			vpcNodes[vpcip.LinodeID] = append(vpcNodes[vpcip.LinodeID], *vpcip.Address)
 		}
 
 		resp, err = GetVPCIPv6Addresses(ctx, client, vpcName)
@@ -116,16 +116,16 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 			klog.Errorf("failed updating instances cache for VPC %s. Error: %s", vpcName, err.Error())
 			continue
 		}
-		for _, r := range resp {
-			if len(r.IPv6Addresses) == 0 {
+		for _, vpcip := range resp {
+			if len(vpcip.IPv6Addresses) == 0 {
 				continue
 			}
 			vpcIPv6AddrType := v1.NodeInternalIP
-			if r.IPv6IsPublic != nil && *r.IPv6IsPublic {
+			if vpcip.IPv6IsPublic != nil && *vpcip.IPv6IsPublic {
 				vpcIPv6AddrType = v1.NodeExternalIP
 			}
-			for _, ipv6 := range r.IPv6Addresses {
-				vpcNodes[r.LinodeID] = append(vpcNodes[r.LinodeID], ipv6.SLAACAddress)
+			for _, ipv6 := range vpcip.IPv6Addresses {
+				vpcNodes[vpcip.LinodeID] = append(vpcNodes[vpcip.LinodeID], ipv6.SLAACAddress)
 				vpcIPv6AddrTypes[ipv6.SLAACAddress] = vpcIPv6AddrType
 			}
 		}
