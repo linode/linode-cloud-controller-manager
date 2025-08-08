@@ -40,11 +40,11 @@ spec:
                 -H "Content-Type: application/json" \
                 -H "accept: application/json" \
                 "${LINODE_URL}/v4beta/networking/reserved/ips" \
-                --data "{\"region\": \"$REGION\"}" | jq .address)
+                --data "{\"region\": \"$LINODE_REGION\"}" | jq .address)
 
               reserved_ip=$(echo "$reserved_ip" | tr -d '"')
               LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
-              data=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN LABEL=$LABEL REGION=$REGION ../scripts/get-nb-create-data.sh svc-dummy)
+              data=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN LABEL=$LABEL REGION=$LINODE_REGION ../scripts/get-nb-create-data.sh svc-dummy)
               
               payload=$(echo "$data" | jq --arg key "ipv4" --arg value "$reserved_ip" '.[$key] = $value')
               

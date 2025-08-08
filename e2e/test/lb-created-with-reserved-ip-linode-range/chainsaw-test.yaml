@@ -9,7 +9,7 @@ metadata:
 spec:
   bindings:
     - name: fwname
-      value: (join('-', ['ccm-fwtest', env('CLUSTER_NAME')]))
+      value: (join('-', [ env('CLUSTER_NAME'), 'fwtest-li']))
   namespace: "lb-created-with-reserved-ip-linode-range"
   steps:
     - name: create reserved ip and nodebalancer resources
@@ -28,7 +28,7 @@ spec:
                 -H "Content-Type: application/json" \
                 -H "accept: application/json" \
                 "${LINODE_URL}/v4beta/networking/reserved/ips" \
-                --data "{\"region\": \"$REGION\"}" | jq .address)
+                --data "{\"region\": \"$LINODE_REGION\"}" | jq .address)
 
               reserved_ip=$(echo "$reserved_ip" | tr -d '"')
               
@@ -61,7 +61,7 @@ spec:
               }
               " | jq .id)
               
-              sleep 5
+              sleep 30
               if [ $fw_id == null ]; then
                 echo "failed to create firewall"
               fi
@@ -123,6 +123,7 @@ spec:
                 echo "IPs do not match"
               fi
 
+              sleep 30
               #Run a curl command to the service ip
               URL="http://$service_ip:80/"
               HTTP_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
@@ -171,7 +172,8 @@ spec:
               (contains($stdout, 'No service ip found for service svc-test')): false
               (contains($stdout, 'IPs do not match')): false
               (contains($stdout, 'No firewall id found in configmap')): false
-              (contains($stdout, 'Request failed with response code')): false
               (contains($stdout, 'Unable to delete firewall')): false
               (contains($stdout, 'Unable to delete the configmap')): false
               (contains($stdout, 'Unable to delete reserved ip')): false
+              (contains($stdout, 'Request failed with response code')): false
+              
