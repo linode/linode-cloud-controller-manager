@@ -9,7 +9,7 @@ metadata:
 spec:
   bindings:
     - name: fwname
-      value: (join('-', ['ccm-fwtest', env('CLUSTER_NAME')]))
+      value: (join('-', [env('CLUSTER_NAME'),'fwtest-nb']))
   namespace: "lb-created-with-reserved-ip-nb-range"
   steps:
     - name: Create nodebalancer and create resources
@@ -33,7 +33,7 @@ spec:
                 -H "Content-Type: application/json" \
                 -H "accept: application/json" \
                 "${LINODE_URL}/v4beta/nodebalancers" \
-                --data "{\"label\": \"$LABEL\", \"region\": \"$REGION\"}")
+                --data "{\"label\": \"$LABEL\", \"region\": \"$LINODE_REGION\"}")
               
               nbid=$(echo "$nbconf" | jq '.id')
               if ! [[ $nbid =~ $re ]]; then
@@ -93,7 +93,7 @@ spec:
               }
               " | jq .id)
               
-              sleep 5
+              sleep 30
               if [ $fw_id == null ]; then
                 echo "failed to create firewall"
               fi
@@ -155,6 +155,7 @@ spec:
                 echo "IPs do not match"
               fi
 
+              sleep 30
               #Run a curl command to the service ip
               URL="http://$service_ip:80/"
               HTTP_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$URL")

@@ -23,7 +23,7 @@ spec:
                 -H "Content-Type: application/json" \
                 -H "accept: application/json" \
                 "${LINODE_URL}/v4beta/networking/reserved/ips" \
-                --data "{\"region\": \"$REGION\"}" | jq .address)
+                --data "{\"region\": \"$LINODE_REGION\"}" | jq .address)
 
               reserved_ip=$(echo "$reserved_ip" | tr -d '"')
               
