@@ -200,6 +200,7 @@ func TestMetadataRetrieval(t *testing.T) {
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{instance}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), vpcIDs["test"], gomock.Any()).Return(routesInVPC, nil)
+		client.EXPECT().ListVPCIPv6Addresses(gomock.Any(), vpcIDs["test"], gomock.Any()).Return([]linodego.VPCIP{}, nil)
 
 		meta, err := instances.InstanceMetadata(ctx, node)
 		require.NoError(t, err)
