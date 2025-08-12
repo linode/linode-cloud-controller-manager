@@ -226,8 +226,9 @@ func TestNodeController_handleNode(t *testing.T) {
 	// Test: Successful metadata update
 	publicIP := net.ParseIP("172.234.31.123")
 	privateIP := net.ParseIP("192.168.159.135")
+	publicIPv6SLAAC := "2001:db::f03c:91ff:fe2b:1a2b"
 	client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
-		{ID: 123, Label: "test-node", IPv4: []*net.IP{&publicIP, &privateIP}, HostUUID: "123"},
+		{ID: 123, Label: "test-node", IPv4: []*net.IP{&publicIP, &privateIP}, IPv6: publicIPv6SLAAC, HostUUID: "123"},
 	}, nil)
 	err = nodeCtrl.handleNode(t.Context(), node)
 	require.NoError(t, err, "expected no error during handleNode")
@@ -241,6 +242,7 @@ func TestNodeController_handleNode(t *testing.T) {
 	// Annotations set, no update needed as ttl not reached
 	node.Labels[annotations.AnnLinodeHostUUID] = "123"
 	node.Annotations[annotations.AnnLinodeNodePrivateIP] = privateIP.String()
+	node.Annotations[annotations.AnnLinodeNodePublicIPv6] = publicIPv6SLAAC
 	err = nodeCtrl.handleNode(t.Context(), node)
 	require.NoError(t, err, "expected no error during handleNode")
 
@@ -257,7 +259,7 @@ func TestNodeController_handleNode(t *testing.T) {
 	nodeCtrl.instances = newInstances(client)
 	nodeCtrl.metadataLastUpdate["test-node"] = time.Now().Add(-2 * nodeCtrl.ttl)
 	client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
-		{ID: 123, Label: "test-node", IPv4: []*net.IP{&publicIP, &privateIP}, HostUUID: "123"},
+		{ID: 123, Label: "test-node", IPv4: []*net.IP{&publicIP, &privateIP}, IPv6: publicIPv6SLAAC, HostUUID: "123"},
 	}, nil)
 	err = nodeCtrl.handleNode(t.Context(), node)
 	assert.NoError(t, err, "expected no error during handleNode")
