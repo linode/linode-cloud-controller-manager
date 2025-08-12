@@ -371,6 +371,19 @@ func (_d ClientWithPrometheus) ListVPCIPAddresses(ctx context.Context, i1 int, l
 	return _d.base.ListVPCIPAddresses(ctx, i1, lp1)
 }
 
+// ListVPCIPv6Addresses implements Client
+func (_d ClientWithPrometheus) ListVPCIPv6Addresses(ctx context.Context, i1 int, lp1 *linodego.ListOptions) (va1 []linodego.VPCIP, err error) {
+	defer func() {
+		result := "ok"
+		if err != nil {
+			result = "error"
+		}
+
+		ClientMethodCounterVec.WithLabelValues("ListVPCIPv6Addresses", result).Inc()
+	}()
+	return _d.base.ListVPCIPv6Addresses(ctx, i1, lp1)
+}
+
 // ListVPCSubnets implements Client
 func (_d ClientWithPrometheus) ListVPCSubnets(ctx context.Context, i1 int, lp1 *linodego.ListOptions) (va1 []linodego.VPCSubnet, err error) {
 	defer func() {
