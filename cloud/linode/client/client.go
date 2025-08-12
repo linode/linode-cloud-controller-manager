@@ -20,6 +20,7 @@ import (
 const (
 	// DefaultClientTimeout is the default timeout for a client Linode API call
 	DefaultClientTimeout = 120 * time.Second
+	DefaultLinodeAPIURL  = "https://api.linode.com"
 )
 
 type Client interface {
@@ -72,6 +73,9 @@ var _ Client = (*linodego.Client)(nil)
 func New(token string, timeout time.Duration) (*linodego.Client, error) {
 	userAgent := fmt.Sprintf("linode-cloud-controller-manager %s", linodego.DefaultUserAgent)
 	apiURL := os.Getenv("LINODE_URL")
+	if apiURL == "" {
+		apiURL = DefaultLinodeAPIURL
+	}
 
 	linodeClient := linodego.NewClient(&http.Client{Timeout: timeout})
 	client, err := linodeClient.UseURL(apiURL)

@@ -20,7 +20,6 @@ func TestNewCloudRouteControllerDisabled(t *testing.T) {
 	t.Setenv("LINODE_API_TOKEN", "dummyapitoken")
 	t.Setenv("LINODE_REGION", "us-east")
 	t.Setenv("LINODE_REQUEST_TIMEOUT_SECONDS", "10")
-	t.Setenv("LINODE_URL", "https://api.linode.com/v4")
 	Options.NodeBalancerPrefix = "ccm"
 
 	t.Run("should not fail if vpc is empty and routecontroller is disabled", func(t *testing.T) {
