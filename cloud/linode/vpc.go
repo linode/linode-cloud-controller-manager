@@ -100,11 +100,11 @@ func GetSubnetID(ctx context.Context, client client.Client, vpcID int, subnetNam
 	return 0, subnetLookupError{subnetName}
 }
 
-// GetVPCIPAddresses returns vpc ip's for given VPC label
-func GetVPCIPAddresses(ctx context.Context, client client.Client, vpcName string) ([]linodego.VPCIP, error) {
+// getVPCIDAndFilter returns the VPC ID and a resultFilter for subnet names (if any)
+func getVPCIDAndFilter(ctx context.Context, client client.Client, vpcName string) (int, string, error) {
 	vpcID, err := GetVPCID(ctx, client, strings.TrimSpace(vpcName))
 	if err != nil {
-		return nil, err
+		return 0, "", err
 	}
 
 	resultFilter := ""
@@ -133,19 +133,48 @@ func GetVPCIPAddresses(ctx context.Context, client client.Client, vpcName string
 		filter, err = json.Marshal(subnetFilter{SubnetID: strings.Join(subnetIDList, ",")})
 		if err != nil {
 			klog.Error("could not create JSON filter for subnet_id")
+		} else {
+			resultFilter = string(filter)
 		}
-		resultFilter = string(filter)
+	}
+
+	return vpcID, resultFilter, nil
+}
+
+// handleNotFoundError checks if the error is a '404 Not Found error' and deletes the entry from the cache.
+func handleNotFoundError(err error, vpcName string) error {
+	if linodego.ErrHasStatus(err, http.StatusNotFound) {
+		Mu.Lock()
+		defer Mu.Unlock()
+		klog.Errorf("vpc %s not found. Deleting entry from cache", vpcName)
+		delete(vpcIDs, vpcName)
+	}
+	return err
+}
+
+// GetVPCIPAddresses returns vpc ip's for given VPC label
+func GetVPCIPAddresses(ctx context.Context, client client.Client, vpcName string) ([]linodego.VPCIP, error) {
+	vpcID, resultFilter, err := getVPCIDAndFilter(ctx, client, vpcName)
+	if err != nil {
+		return nil, err
 	}
 
 	resp, err := client.ListVPCIPAddresses(ctx, vpcID, linodego.NewListOptions(0, resultFilter))
 	if err != nil {
-		if linodego.ErrHasStatus(err, http.StatusNotFound) {
-			Mu.Lock()
-			defer Mu.Unlock()
-			klog.Errorf("vpc %s not found. Deleting entry from cache", vpcName)
-			delete(vpcIDs, vpcName)
-		}
+		return nil, handleNotFoundError(err, vpcName)
+	}
+	return resp, nil
+}
+
+func GetVPCIPv6Addresses(ctx context.Context, client client.Client, vpcName string) ([]linodego.VPCIP, error) {
+	vpcID, resultFilter, err := getVPCIDAndFilter(ctx, client, vpcName)
+	if err != nil {
 		return nil, err
+	}
+
+	resp, err := client.ListVPCIPv6Addresses(ctx, vpcID, linodego.NewListOptions(0, resultFilter))
+	if err != nil {
+		return nil, handleNotFoundError(err, vpcName)
 	}
 	return resp, nil
 }
