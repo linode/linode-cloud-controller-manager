@@ -270,10 +270,11 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 	lastUpdate := s.LastMetadataUpdate(node.Name)
 
 	uuid, foundLabel := node.Labels[annotations.AnnLinodeHostUUID]
-	configuredPrivateIP, foundAnnotation := node.Annotations[annotations.AnnLinodeNodePrivateIP]
+	configuredPrivateIP, foundPrivateIPAnnotation := node.Annotations[annotations.AnnLinodeNodePrivateIP]
+	configuredPublicIPv6, foundIPv6Annotation := node.Annotations[annotations.AnnLinodeNodePublicIPv6]
 
 	metaAge := time.Since(lastUpdate)
-	if foundLabel && foundAnnotation && metaAge < s.ttl {
+	if foundLabel && foundPrivateIPAnnotation && foundIPv6Annotation && metaAge < s.ttl {
 		klog.V(3).InfoS("Skipping refresh, ttl not reached",
 			"node", klog.KObj(node),
 			"ttl", s.ttl,
@@ -298,7 +299,8 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 		}
 	}
 
-	if uuid == linode.HostUUID && node.Spec.ProviderID != "" && configuredPrivateIP == expectedPrivateIP {
+	expectedPublicIPv6 := linode.IPv6
+	if uuid == linode.HostUUID && node.Spec.ProviderID != "" && configuredPrivateIP == expectedPrivateIP && configuredPublicIPv6 == expectedPublicIPv6 {
 		s.SetLastMetadataUpdate(node.Name)
 		return nil
 	}
@@ -324,6 +326,9 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 		// Try to update the expectedPrivateIP if its not set or doesn't match
 		if nodeResult.Annotations[annotations.AnnLinodeNodePrivateIP] != expectedPrivateIP && expectedPrivateIP != "" {
 			nodeResult.Annotations[annotations.AnnLinodeNodePrivateIP] = expectedPrivateIP
+		}
+		if nodeResult.Annotations[annotations.AnnLinodeNodePublicIPv6] != expectedPublicIPv6 && expectedPublicIPv6 != "" {
+			nodeResult.Annotations[annotations.AnnLinodeNodePublicIPv6] = expectedPublicIPv6
 		}
 		updatedNode, err = s.kubeclient.CoreV1().Nodes().Update(ctx, nodeResult, metav1.UpdateOptions{})
 		return err
