@@ -181,10 +181,10 @@ func Test_linodeCloud_LoadBalancer(t *testing.T) {
 			fields: fields{
 				client:        client,
 				instances:     newInstances(client),
-				loadbalancers: newLoadbalancers(client, "us-east"),
+				loadbalancers: NewLoadbalancers(client, "us-east"),
 				routes:        nil,
 			},
-			want:  newLoadbalancers(client, "us-east"),
+			want:  NewLoadbalancers(client, "us-east"),
 			want1: true,
 		},
 	}
@@ -228,7 +228,7 @@ func Test_linodeCloud_InstancesV2(t *testing.T) {
 			fields: fields{
 				client:        client,
 				instances:     newInstances(client),
-				loadbalancers: newLoadbalancers(client, "us-east"),
+				loadbalancers: NewLoadbalancers(client, "us-east"),
 				routes:        nil,
 			},
 			want:  newInstances(client),
@@ -275,7 +275,7 @@ func Test_linodeCloud_Instances(t *testing.T) {
 			fields: fields{
 				client:        client,
 				instances:     newInstances(client),
-				loadbalancers: newLoadbalancers(client, "us-east"),
+				loadbalancers: NewLoadbalancers(client, "us-east"),
 				routes:        nil,
 			},
 			want:  nil,
@@ -322,7 +322,7 @@ func Test_linodeCloud_Zones(t *testing.T) {
 			fields: fields{
 				client:        client,
 				instances:     newInstances(client),
-				loadbalancers: newLoadbalancers(client, "us-east"),
+				loadbalancers: NewLoadbalancers(client, "us-east"),
 				routes:        nil,
 			},
 			want:  nil,
@@ -369,7 +369,7 @@ func Test_linodeCloud_Clusters(t *testing.T) {
 			fields: fields{
 				client:        client,
 				instances:     newInstances(client),
-				loadbalancers: newLoadbalancers(client, "us-east"),
+				loadbalancers: NewLoadbalancers(client, "us-east"),
 				routes:        nil,
 			},
 			want:  nil,
@@ -418,7 +418,7 @@ func Test_linodeCloud_Routes(t *testing.T) {
 			fields: fields{
 				client:                client,
 				instances:             newInstances(client),
-				loadbalancers:         newLoadbalancers(client, "us-east"),
+				loadbalancers:         NewLoadbalancers(client, "us-east"),
 				routes:                r,
 				EnableRouteController: false,
 			},
@@ -430,7 +430,7 @@ func Test_linodeCloud_Routes(t *testing.T) {
 			fields: fields{
 				client:                client,
 				instances:             newInstances(client),
-				loadbalancers:         newLoadbalancers(client, "us-east"),
+				loadbalancers:         NewLoadbalancers(client, "us-east"),
 				routes:                r,
 				EnableRouteController: true,
 			},

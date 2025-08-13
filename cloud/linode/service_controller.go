@@ -19,13 +19,13 @@ import (
 var retryInterval = time.Minute * 1
 
 type serviceController struct {
-	loadbalancers *loadbalancers
+	loadbalancers *LoadBalancers
 	informer      v1informers.ServiceInformer
 
 	queue workqueue.TypedDelayingInterface[any]
 }
 
-func newServiceController(loadbalancers *loadbalancers, informer v1informers.ServiceInformer) *serviceController {
+func newServiceController(loadbalancers *LoadBalancers, informer v1informers.ServiceInformer) *serviceController {
 	return &serviceController{
 		loadbalancers: loadbalancers,
 		informer:      informer,
