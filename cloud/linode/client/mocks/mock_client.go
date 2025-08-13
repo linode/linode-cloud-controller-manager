@@ -359,6 +359,21 @@ func (mr *MockClientMockRecorder) ListInstances(arg0, arg1 interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListInstances", reflect.TypeOf((*MockClient)(nil).ListInstances), arg0, arg1)
 }
 
+// ListInterfaces mocks base method.
+func (m *MockClient) ListInterfaces(arg0 context.Context, arg1 int, arg2 *linodego.ListOptions) ([]linodego.LinodeInterface, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListInterfaces", arg0, arg1, arg2)
+	ret0, _ := ret[0].([]linodego.LinodeInterface)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListInterfaces indicates an expected call of ListInterfaces.
+func (mr *MockClientMockRecorder) ListInterfaces(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListInterfaces", reflect.TypeOf((*MockClient)(nil).ListInterfaces), arg0, arg1, arg2)
+}
+
 // ListNodeBalancerConfigs mocks base method.
 func (m *MockClient) ListNodeBalancerConfigs(arg0 context.Context, arg1 int, arg2 *linodego.ListOptions) ([]linodego.NodeBalancerConfig, error) {
 	m.ctrl.T.Helper()
@@ -551,6 +566,21 @@ func (m *MockClient) UpdateInstanceConfigInterface(arg0 context.Context, arg1, a
 func (mr *MockClientMockRecorder) UpdateInstanceConfigInterface(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateInstanceConfigInterface", reflect.TypeOf((*MockClient)(nil).UpdateInstanceConfigInterface), arg0, arg1, arg2, arg3, arg4)
+}
+
+// UpdateInterface mocks base method.
+func (m *MockClient) UpdateInterface(arg0 context.Context, arg1, arg2 int, arg3 linodego.LinodeInterfaceUpdateOptions) (*linodego.LinodeInterface, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateInterface", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(*linodego.LinodeInterface)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateInterface indicates an expected call of UpdateInterface.
+func (mr *MockClientMockRecorder) UpdateInterface(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateInterface", reflect.TypeOf((*MockClient)(nil).UpdateInterface), arg0, arg1, arg2, arg3)
 }
 
 // UpdateNodeBalancer mocks base method.
