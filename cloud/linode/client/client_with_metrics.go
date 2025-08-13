@@ -306,6 +306,19 @@ func (_d ClientWithPrometheus) ListInstances(ctx context.Context, lp1 *linodego.
 	return _d.base.ListInstances(ctx, lp1)
 }
 
+// ListInterfaces implements Client
+func (_d ClientWithPrometheus) ListInterfaces(ctx context.Context, linodeID int, opts *linodego.ListOptions) (la1 []linodego.LinodeInterface, err error) {
+	defer func() {
+		result := "ok"
+		if err != nil {
+			result = "error"
+		}
+
+		ClientMethodCounterVec.WithLabelValues("ListInterfaces", result).Inc()
+	}()
+	return _d.base.ListInterfaces(ctx, linodeID, opts)
+}
+
 // ListNodeBalancerConfigs implements Client
 func (_d ClientWithPrometheus) ListNodeBalancerConfigs(ctx context.Context, i1 int, lp1 *linodego.ListOptions) (na1 []linodego.NodeBalancerConfig, err error) {
 	defer func() {
@@ -460,6 +473,19 @@ func (_d ClientWithPrometheus) UpdateInstanceConfigInterface(ctx context.Context
 		ClientMethodCounterVec.WithLabelValues("UpdateInstanceConfigInterface", result).Inc()
 	}()
 	return _d.base.UpdateInstanceConfigInterface(ctx, i1, i2, i3, i4)
+}
+
+// UpdateInterface implements Client
+func (_d ClientWithPrometheus) UpdateInterface(ctx context.Context, linodeID int, interfaceID int, opts linodego.LinodeInterfaceUpdateOptions) (lp1 *linodego.LinodeInterface, err error) {
+	defer func() {
+		result := "ok"
+		if err != nil {
+			result = "error"
+		}
+
+		ClientMethodCounterVec.WithLabelValues("UpdateInterface", result).Inc()
+	}()
+	return _d.base.UpdateInterface(ctx, linodeID, interfaceID, opts)
 }
 
 // UpdateNodeBalancer implements Client
