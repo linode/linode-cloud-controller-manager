@@ -365,10 +365,10 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 func (l *loadbalancers) createIPChangeWarningEvent(ctx context.Context, service *v1.Service, nb *linodego.NodeBalancer, newIP string) {
 	if l.kubeClient == nil {
 		err := l.retrieveKubeClient()
-        if err != nil {
-			fmt.Errorf("%w: Error retrieving kube client", err)
-            return
-        }
+		if err != nil {
+			err = fmt.Errorf("%w: Error retrieving kube client", err)
+			return
+		}
 	}
 
 	l.kubeClient.CoreV1().Events(service.Namespace).Create(ctx, &v1.Event{
