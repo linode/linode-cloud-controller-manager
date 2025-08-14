@@ -27,7 +27,7 @@ const (
 
 	// AnnLinodeLoadBalancerIPv4 is the annotation used to specify a reserved IPv4 address
 	// for the NodeBalancer. If not specified, Linode will automatically assign an IPv4 address.
-	AnnLinodeLoadBalancerIPv4     = "service.beta.kubernetes.io/linode-loadbalancer-reserved-ipv4"
+	AnnLinodeLoadBalancerIPv4 = "service.beta.kubernetes.io/linode-loadbalancer-reserved-ipv4"
 
 	AnnLinodeLoadBalancerPreserve = "service.beta.kubernetes.io/linode-loadbalancer-preserve"
 	AnnLinodeNodeBalancerID       = "service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"
