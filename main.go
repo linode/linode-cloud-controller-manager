@@ -19,6 +19,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode"
+	ccmOptions "github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
 	"github.com/linode/linode-cloud-controller-manager/sentry"
 
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // for client metric registration
@@ -70,37 +71,37 @@ func main() {
 
 	ctx := sentry.SetHubOnContext(context.Background())
 
-	ccmOptions, err := options.NewCloudControllerManagerOptions()
+	opts, err := options.NewCloudControllerManagerOptions()
 	if err != nil {
 		klog.Fatalf("unable to initialize command options: %v", err)
 	}
 	fss := utilflag.NamedFlagSets{}
 	controllerAliases := names.CCMControllerAliases()
 	stopCh := make(chan struct{})
-	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, app.DefaultInitFuncConstructors, controllerAliases, fss, stopCh)
+	command := app.NewCloudControllerManagerCommand(opts, cloudInitializer, app.DefaultInitFuncConstructors, controllerAliases, fss, stopCh)
 
 	// Add Linode-specific flags
-	command.Flags().BoolVar(&linode.Options.LinodeGoDebug, "linodego-debug", false, "enables debug output for the LinodeAPI wrapper")
-	command.Flags().BoolVar(&linode.Options.EnableRouteController, "enable-route-controller", false, "enables route_controller for ccm")
-	command.Flags().BoolVar(&linode.Options.EnableTokenHealthChecker, "enable-token-health-checker", false, "enables Linode API token health checker")
-	command.Flags().StringSliceVar(&linode.Options.VPCNames, "vpc-names", nil, "comma separated vpc names whose routes will be managed by route-controller")
-	command.Flags().StringSliceVar(&linode.Options.SubnetNames, "subnet-names", []string{"default"}, "comma separated subnet names whose routes will be managed by route-controller (requires vpc-names flag to also be set)")
-	command.Flags().IntSliceVar(&linode.Options.VPCIDs, "vpc-ids", nil, "comma separated vpc ids whose routes will be managed by route-controller")
-	command.Flags().IntSliceVar(&linode.Options.SubnetIDs, "subnet-ids", nil, "comma separated subnet ids whose routes will be managed by route-controller (requires vpc-ids flag to also be set)")
-	command.Flags().StringVar(&linode.Options.LoadBalancerType, "load-balancer-type", "nodebalancer", "configures which type of load-balancing to use for LoadBalancer Services (options: nodebalancer, cilium-bgp)")
-	command.Flags().StringVar(&linode.Options.BGPNodeSelector, "bgp-node-selector", "", "node selector to use to perform shared IP fail-over with BGP (e.g. cilium-bgp-peering=true")
-	command.Flags().StringVar(&linode.Options.IpHolderSuffix, "ip-holder-suffix", "", "suffix to append to the ip holder name when using shared IP fail-over with BGP (e.g. ip-holder-suffix=my-cluster-name")
-	command.Flags().StringVar(&linode.Options.DefaultNBType, "default-nodebalancer-type", string(linodego.NBTypeCommon), "default type of NodeBalancer to create (options: common, premium)")
-	command.Flags().StringVar(&linode.Options.NodeBalancerBackendIPv4Subnet, "nodebalancer-backend-ipv4-subnet", "", "ipv4 subnet to use for NodeBalancer backends")
-	command.Flags().StringSliceVar(&linode.Options.NodeBalancerTags, "nodebalancer-tags", []string{}, "Linode tags to apply to all NodeBalancers")
-	command.Flags().BoolVar(&linode.Options.EnableIPv6ForLoadBalancers, "enable-ipv6-for-loadbalancers", false, "set both IPv4 and IPv6 addresses for all LoadBalancer services (when disabled, only IPv4 is used)")
-	command.Flags().IntVar(&linode.Options.NodeCIDRMaskSizeIPv4, "node-cidr-mask-size-ipv4", 0, "ipv4 cidr mask size for pod cidrs allocated to nodes")
-	command.Flags().IntVar(&linode.Options.NodeCIDRMaskSizeIPv6, "node-cidr-mask-size-ipv6", 0, "ipv6 cidr mask size for pod cidrs allocated to nodes")
-	command.Flags().IntVar(&linode.Options.NodeBalancerBackendIPv4SubnetID, "nodebalancer-backend-ipv4-subnet-id", 0, "ipv4 subnet id to use for NodeBalancer backends")
-	command.Flags().StringVar(&linode.Options.NodeBalancerBackendIPv4SubnetName, "nodebalancer-backend-ipv4-subnet-name", "", "ipv4 subnet name to use for NodeBalancer backends")
-	command.Flags().BoolVar(&linode.Options.DisableNodeBalancerVPCBackends, "disable-nodebalancer-vpc-backends", false, "disables nodebalancer backends in VPCs (when enabled, nodebalancers will only have private IPs as backends for backward compatibility)")
-	command.Flags().StringVar(&linode.Options.NodeBalancerPrefix, "nodebalancer-prefix", "ccm", fmt.Sprintf("Name prefix for NoadBalancers. (max. %v char.)", linode.NodeBalancerPrefixCharLimit))
-	command.Flags().BoolVar(&linode.Options.DisableIPv6NodeCIDRAllocation, "disable-ipv6-node-cidr-allocation", false, "disables IPv6 node cidr allocation by ipam controller (when enabled, IPv6 cidr ranges will be allocated to nodes)")
+	command.Flags().BoolVar(&ccmOptions.Options.LinodeGoDebug, "linodego-debug", false, "enables debug output for the LinodeAPI wrapper")
+	command.Flags().BoolVar(&ccmOptions.Options.EnableRouteController, "enable-route-controller", false, "enables route_controller for ccm")
+	command.Flags().BoolVar(&ccmOptions.Options.EnableTokenHealthChecker, "enable-token-health-checker", false, "enables Linode API token health checker")
+	command.Flags().StringSliceVar(&ccmOptions.Options.VPCNames, "vpc-names", nil, "comma separated vpc names whose routes will be managed by route-controller")
+	command.Flags().StringSliceVar(&ccmOptions.Options.SubnetNames, "subnet-names", []string{"default"}, "comma separated subnet names whose routes will be managed by route-controller (requires vpc-names flag to also be set)")
+	command.Flags().IntSliceVar(&ccmOptions.Options.VPCIDs, "vpc-ids", nil, "comma separated vpc ids whose routes will be managed by route-controller")
+	command.Flags().IntSliceVar(&ccmOptions.Options.SubnetIDs, "subnet-ids", nil, "comma separated subnet ids whose routes will be managed by route-controller (requires vpc-ids flag to also be set)")
+	command.Flags().StringVar(&ccmOptions.Options.LoadBalancerType, "load-balancer-type", "nodebalancer", "configures which type of load-balancing to use for LoadBalancer Services (options: nodebalancer, cilium-bgp)")
+	command.Flags().StringVar(&ccmOptions.Options.BGPNodeSelector, "bgp-node-selector", "", "node selector to use to perform shared IP fail-over with BGP (e.g. cilium-bgp-peering=true")
+	command.Flags().StringVar(&ccmOptions.Options.IpHolderSuffix, "ip-holder-suffix", "", "suffix to append to the ip holder name when using shared IP fail-over with BGP (e.g. ip-holder-suffix=my-cluster-name")
+	command.Flags().StringVar(&ccmOptions.Options.DefaultNBType, "default-nodebalancer-type", string(linodego.NBTypeCommon), "default type of NodeBalancer to create (options: common, premium)")
+	command.Flags().StringVar(&ccmOptions.Options.NodeBalancerBackendIPv4Subnet, "nodebalancer-backend-ipv4-subnet", "", "ipv4 subnet to use for NodeBalancer backends")
+	command.Flags().StringSliceVar(&ccmOptions.Options.NodeBalancerTags, "nodebalancer-tags", []string{}, "Linode tags to apply to all NodeBalancers")
+	command.Flags().BoolVar(&ccmOptions.Options.EnableIPv6ForLoadBalancers, "enable-ipv6-for-loadbalancers", false, "set both IPv4 and IPv6 addresses for all LoadBalancer services (when disabled, only IPv4 is used)")
+	command.Flags().IntVar(&ccmOptions.Options.NodeCIDRMaskSizeIPv4, "node-cidr-mask-size-ipv4", 0, "ipv4 cidr mask size for pod cidrs allocated to nodes")
+	command.Flags().IntVar(&ccmOptions.Options.NodeCIDRMaskSizeIPv6, "node-cidr-mask-size-ipv6", 0, "ipv6 cidr mask size for pod cidrs allocated to nodes")
+	command.Flags().IntVar(&ccmOptions.Options.NodeBalancerBackendIPv4SubnetID, "nodebalancer-backend-ipv4-subnet-id", 0, "ipv4 subnet id to use for NodeBalancer backends")
+	command.Flags().StringVar(&ccmOptions.Options.NodeBalancerBackendIPv4SubnetName, "nodebalancer-backend-ipv4-subnet-name", "", "ipv4 subnet name to use for NodeBalancer backends")
+	command.Flags().BoolVar(&ccmOptions.Options.DisableNodeBalancerVPCBackends, "disable-nodebalancer-vpc-backends", false, "disables nodebalancer backends in VPCs (when enabled, nodebalancers will only have private IPs as backends for backward compatibility)")
+	command.Flags().StringVar(&ccmOptions.Options.NodeBalancerPrefix, "nodebalancer-prefix", "ccm", fmt.Sprintf("Name prefix for NoadBalancers. (max. %v char.)", linode.NodeBalancerPrefixCharLimit))
+	command.Flags().BoolVar(&ccmOptions.Options.DisableIPv6NodeCIDRAllocation, "disable-ipv6-node-cidr-allocation", false, "disables IPv6 node cidr allocation by ipam controller (when enabled, IPv6 cidr ranges will be allocated to nodes)")
 
 	// Set static flags
 	command.Flags().VisitAll(func(fl *pflag.Flag) {
@@ -125,8 +126,8 @@ func main() {
 	})
 
 	// Make the Linode-specific CCM bits aware of the kubeconfig flag
-	linode.Options.KubeconfigFlag = command.Flags().Lookup("kubeconfig")
-	if linode.Options.KubeconfigFlag == nil {
+	ccmOptions.Options.KubeconfigFlag = command.Flags().Lookup("kubeconfig")
+	if ccmOptions.Options.KubeconfigFlag == nil {
 		msg := "kubeconfig missing from CCM flag set"
 		sentry.CaptureError(ctx, fmt.Errorf("%s", msg))
 		fmt.Fprintf(os.Stderr, "kubeconfig missing from CCM flag set"+"\n")
@@ -141,11 +142,11 @@ func main() {
 			fmt.Fprintf(os.Stderr, "%v\n", msg)
 			os.Exit(1)
 		}
-		linode.Options.LinodeExternalNetwork = network
+		ccmOptions.Options.LinodeExternalNetwork = network
 	}
 
 	// Provide stop channel for linode authenticated client healthchecker
-	linode.Options.GlobalStopChannel = stopCh
+	ccmOptions.Options.GlobalStopChannel = stopCh
 
 	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
@@ -163,12 +164,12 @@ func main() {
 func cloudInitializer(config *config.CompletedConfig) cloudprovider.Interface {
 	// initialize cloud provider with the cloud provider name and config file provided
 	if config.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs {
-		linode.Options.AllocateNodeCIDRs = true
+		ccmOptions.Options.AllocateNodeCIDRs = true
 		if config.ComponentConfig.KubeCloudShared.ClusterCIDR == "" {
 			fmt.Fprintf(os.Stderr, "--cluster-cidr is not set. This is required if --allocate-node-cidrs is set.\n")
 			os.Exit(1)
 		}
-		linode.Options.ClusterCIDRIPv4 = config.ComponentConfig.KubeCloudShared.ClusterCIDR
+		ccmOptions.Options.ClusterCIDRIPv4 = config.ComponentConfig.KubeCloudShared.ClusterCIDR
 	}
 	cloud, err := cloudprovider.InitCloudProvider(linode.ProviderName, "")
 	if err != nil {

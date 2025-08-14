@@ -15,6 +15,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
+	ccmUtils "github.com/linode/linode-cloud-controller-manager/cloud/linode/utils"
 )
 
 const (
@@ -32,7 +34,7 @@ var (
 				Labels: map[string]string{"cilium-bgp-peering": "true"},
 			},
 			Spec: v1.NodeSpec{
-				ProviderID: fmt.Sprintf("%s%d", providerIDPrefix, 11111),
+				ProviderID: fmt.Sprintf("%s%d", ccmUtils.ProviderIDPrefix, 11111),
 			},
 		},
 		{
@@ -41,7 +43,7 @@ var (
 				Labels: map[string]string{"cilium-bgp-peering": "true"},
 			},
 			Spec: v1.NodeSpec{
-				ProviderID: fmt.Sprintf("%s%d", providerIDPrefix, 22222),
+				ProviderID: fmt.Sprintf("%s%d", ccmUtils.ProviderIDPrefix, 22222),
 			},
 		},
 		{
@@ -49,7 +51,7 @@ var (
 				Name: "node-3",
 			},
 			Spec: v1.NodeSpec{
-				ProviderID: fmt.Sprintf("%s%d", providerIDPrefix, 33333),
+				ProviderID: fmt.Sprintf("%s%d", ccmUtils.ProviderIDPrefix, 33333),
 			},
 		},
 		{
@@ -60,7 +62,7 @@ var (
 				},
 			},
 			Spec: v1.NodeSpec{
-				ProviderID: fmt.Sprintf("%s%d", providerIDPrefix, 44444),
+				ProviderID: fmt.Sprintf("%s%d", ccmUtils.ProviderIDPrefix, 44444),
 			},
 		},
 	}
@@ -71,7 +73,7 @@ var (
 				Labels: map[string]string{"cilium-bgp-peering": "true"},
 			},
 			Spec: v1.NodeSpec{
-				ProviderID: fmt.Sprintf("%s%d", providerIDPrefix, 55555),
+				ProviderID: fmt.Sprintf("%s%d", ccmUtils.ProviderIDPrefix, 55555),
 			},
 		},
 	}
@@ -202,7 +204,7 @@ func addNodes(t *testing.T, kubeClient kubernetes.Interface, nodes []*v1.Node) {
 func createNewIpHolderInstance() linodego.Instance {
 	return linodego.Instance{
 		ID:     123456,
-		Label:  generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix),
+		Label:  generateClusterScopedIPHolderLinodeName(zone, options.Options.IpHolderSuffix),
 		Type:   "g6-standard-1",
 		Region: "us-west",
 		IPv4:   []*net.IP{&publicIPv4},
@@ -212,8 +214,8 @@ func createNewIpHolderInstance() linodego.Instance {
 func testNoBGPNodeLabel(t *testing.T, mc *mocks.MockClient) {
 	t.Helper()
 
-	Options.BGPNodeSelector = ""
-	Options.IpHolderSuffix = clusterName
+	options.Options.BGPNodeSelector = ""
+	options.Options.IpHolderSuffix = clusterName
 	t.Setenv("BGP_PEER_PREFIX", "2600:3cef")
 	svc := createTestService()
 	newIpHolderInstance = createNewIpHolderInstance()
@@ -231,7 +233,7 @@ func testNoBGPNodeLabel(t *testing.T, mc *mocks.MockClient) {
 	}
 
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
-	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix)}
+	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, options.Options.IpHolderSuffix)}
 	rawFilter, err = json.Marshal(filter)
 	if err != nil {
 		t.Errorf("json marshal error: %v", err)
@@ -271,7 +273,7 @@ func testNoBGPNodeLabel(t *testing.T, mc *mocks.MockClient) {
 func testUnsupportedRegion(t *testing.T, mc *mocks.MockClient) {
 	t.Helper()
 
-	Options.BGPNodeSelector = nodeSelector
+	options.Options.BGPNodeSelector = nodeSelector
 	svc := createTestService()
 
 	kubeClient, _ := k8sClient.NewFakeClientset()
@@ -302,7 +304,7 @@ func testUnsupportedRegion(t *testing.T, mc *mocks.MockClient) {
 func testCreateWithExistingIPHolderWithOldIpHolderNamingConvention(t *testing.T, mc *mocks.MockClient) {
 	t.Helper()
 
-	Options.BGPNodeSelector = nodeSelector
+	options.Options.BGPNodeSelector = nodeSelector
 	svc := createTestService()
 	newIpHolderInstance = createNewIpHolderInstance()
 
@@ -346,8 +348,8 @@ func testCreateWithExistingIPHolderWithOldIpHolderNamingConvention(t *testing.T,
 func testCreateWithExistingIPHolderWithNewIpHolderNamingConvention(t *testing.T, mc *mocks.MockClient) {
 	t.Helper()
 
-	Options.BGPNodeSelector = nodeSelector
-	Options.IpHolderSuffix = clusterName
+	options.Options.BGPNodeSelector = nodeSelector
+	options.Options.IpHolderSuffix = clusterName
 	svc := createTestService()
 	newIpHolderInstance = createNewIpHolderInstance()
 
@@ -391,8 +393,8 @@ func testCreateWithExistingIPHolderWithNewIpHolderNamingConvention(t *testing.T,
 func testCreateWithExistingIPHolderWithNewIpHolderNamingConventionUsingLongSuffix(t *testing.T, mc *mocks.MockClient) {
 	t.Helper()
 
-	Options.BGPNodeSelector = nodeSelector
-	Options.IpHolderSuffix = "OaTJrRuufacHVougjwkpBpmstiqvswvBNEMWXsRYfMBTCkKIUTXpbGIcIbDWSQp"
+	options.Options.BGPNodeSelector = nodeSelector
+	options.Options.IpHolderSuffix = "OaTJrRuufacHVougjwkpBpmstiqvswvBNEMWXsRYfMBTCkKIUTXpbGIcIbDWSQp"
 	svc := createTestService()
 	newIpHolderInstance = createNewIpHolderInstance()
 
@@ -436,8 +438,8 @@ func testCreateWithExistingIPHolderWithNewIpHolderNamingConventionUsingLongSuffi
 func testCreateWithNoExistingIPHolderUsingNoSuffix(t *testing.T, mc *mocks.MockClient) {
 	t.Helper()
 
-	Options.BGPNodeSelector = nodeSelector
-	Options.IpHolderSuffix = ""
+	options.Options.BGPNodeSelector = nodeSelector
+	options.Options.IpHolderSuffix = ""
 	svc := createTestService()
 	newIpHolderInstance = createNewIpHolderInstance()
 
@@ -453,7 +455,7 @@ func testCreateWithNoExistingIPHolderUsingNoSuffix(t *testing.T, mc *mocks.MockC
 		t.Errorf("json marshal error: %v", err)
 	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
-	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix)}
+	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, options.Options.IpHolderSuffix)}
 	rawFilter, err = json.Marshal(filter)
 	if err != nil {
 		t.Errorf("json marshal error: %v", err)
@@ -488,8 +490,8 @@ func testCreateWithNoExistingIPHolderUsingNoSuffix(t *testing.T, mc *mocks.MockC
 func testCreateWithNoExistingIPHolderUsingShortSuffix(t *testing.T, mc *mocks.MockClient) {
 	t.Helper()
 
-	Options.BGPNodeSelector = nodeSelector
-	Options.IpHolderSuffix = clusterName
+	options.Options.BGPNodeSelector = nodeSelector
+	options.Options.IpHolderSuffix = clusterName
 	svc := createTestService()
 	newIpHolderInstance = createNewIpHolderInstance()
 
@@ -505,7 +507,7 @@ func testCreateWithNoExistingIPHolderUsingShortSuffix(t *testing.T, mc *mocks.Mo
 		t.Errorf("json marshal error: %v", err)
 	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
-	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix)}
+	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, options.Options.IpHolderSuffix)}
 	rawFilter, err = json.Marshal(filter)
 	if err != nil {
 		t.Errorf("json marshal error: %v", err)
@@ -540,8 +542,8 @@ func testCreateWithNoExistingIPHolderUsingShortSuffix(t *testing.T, mc *mocks.Mo
 func testCreateWithNoExistingIPHolderUsingLongSuffix(t *testing.T, mc *mocks.MockClient) {
 	t.Helper()
 
-	Options.BGPNodeSelector = nodeSelector
-	Options.IpHolderSuffix = "OaTJrRuufacHVougjwkpBpmstiqvswvBNEMWXsRYfMBTCkKIUTXpbGIcIbDWSQp"
+	options.Options.BGPNodeSelector = nodeSelector
+	options.Options.IpHolderSuffix = "OaTJrRuufacHVougjwkpBpmstiqvswvBNEMWXsRYfMBTCkKIUTXpbGIcIbDWSQp"
 	svc := createTestService()
 	newIpHolderInstance = createNewIpHolderInstance()
 
@@ -557,7 +559,7 @@ func testCreateWithNoExistingIPHolderUsingLongSuffix(t *testing.T, mc *mocks.Moc
 		t.Errorf("json marshal error: %v", err)
 	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
-	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix)}
+	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, options.Options.IpHolderSuffix)}
 	rawFilter, err = json.Marshal(filter)
 	if err != nil {
 		t.Errorf("json marshal error: %v", err)
@@ -592,7 +594,7 @@ func testCreateWithNoExistingIPHolderUsingLongSuffix(t *testing.T, mc *mocks.Moc
 func testEnsureCiliumLoadBalancerDeletedWithOldIpHolderNamingConvention(t *testing.T, mc *mocks.MockClient) {
 	t.Helper()
 
-	Options.BGPNodeSelector = nodeSelector
+	options.Options.BGPNodeSelector = nodeSelector
 	svc := createTestService()
 
 	kubeClient, _ := k8sClient.NewFakeClientset()
@@ -623,8 +625,8 @@ func testEnsureCiliumLoadBalancerDeletedWithOldIpHolderNamingConvention(t *testi
 func testEnsureCiliumLoadBalancerDeletedWithNewIpHolderNamingConvention(t *testing.T, mc *mocks.MockClient) {
 	t.Helper()
 
-	Options.BGPNodeSelector = nodeSelector
-	Options.IpHolderSuffix = clusterName
+	options.Options.BGPNodeSelector = nodeSelector
+	options.Options.IpHolderSuffix = clusterName
 	svc := createTestService()
 	newIpHolderInstance = createNewIpHolderInstance()
 
@@ -643,7 +645,7 @@ func testEnsureCiliumLoadBalancerDeletedWithNewIpHolderNamingConvention(t *testi
 		t.Errorf("json marshal error: %v", err)
 	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
-	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix)}
+	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, options.Options.IpHolderSuffix)}
 	rawFilter, err = json.Marshal(filter)
 	if err != nil {
 		t.Errorf("json marshal error: %v", err)
@@ -662,7 +664,7 @@ func testEnsureCiliumLoadBalancerDeletedWithNewIpHolderNamingConvention(t *testi
 func testCiliumUpdateLoadBalancerAddNodeWithOldIpHolderNamingConvention(t *testing.T, mc *mocks.MockClient) {
 	t.Helper()
 
-	Options.BGPNodeSelector = nodeSelector
+	options.Options.BGPNodeSelector = nodeSelector
 	svc := createTestService()
 
 	kubeClient, _ := k8sClient.NewFakeClientset()
@@ -723,8 +725,8 @@ func testCiliumUpdateLoadBalancerAddNodeWithOldIpHolderNamingConvention(t *testi
 func testCiliumUpdateLoadBalancerAddNodeWithNewIpHolderNamingConvention(t *testing.T, mc *mocks.MockClient) {
 	t.Helper()
 
-	Options.BGPNodeSelector = nodeSelector
-	Options.IpHolderSuffix = clusterName
+	options.Options.BGPNodeSelector = nodeSelector
+	options.Options.IpHolderSuffix = clusterName
 	svc := createTestService()
 	newIpHolderInstance = createNewIpHolderInstance()
 
@@ -740,7 +742,7 @@ func testCiliumUpdateLoadBalancerAddNodeWithNewIpHolderNamingConvention(t *testi
 		t.Errorf("json marshal error: %v", err)
 	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
-	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix)}
+	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, options.Options.IpHolderSuffix)}
 	rawFilter, err = json.Marshal(filter)
 	if err != nil {
 		t.Errorf("json marshal error: %v", err)
@@ -777,7 +779,7 @@ func testCiliumUpdateLoadBalancerAddNodeWithNewIpHolderNamingConvention(t *testi
 		t.Errorf("json marshal error: %v", err)
 	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{}, nil)
-	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, Options.IpHolderSuffix)}
+	filter = map[string]string{"label": generateClusterScopedIPHolderLinodeName(zone, options.Options.IpHolderSuffix)}
 	rawFilter, err = json.Marshal(filter)
 	if err != nil {
 		t.Errorf("json marshal error: %v", err)

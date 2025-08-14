@@ -15,16 +15,19 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/utils/ptr"
 
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/cache"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
+	ccmUtils "github.com/linode/linode-cloud-controller-manager/cloud/linode/utils"
 )
 
 func TestListRoutes(t *testing.T) {
-	Options.VPCNames = []string{"test", "abc"}
-	vpcIDs["test"] = 1
-	vpcIDs["abc"] = 2
-	Options.SubnetNames = []string{"default"}
-	subnetIDs["default"] = 1
-	Options.EnableRouteController = true
+	options.Options.VPCNames = []string{"test", "abc"}
+	cache.VpcIDs["test"] = 1
+	cache.VpcIDs["abc"] = 2
+	options.Options.SubnetNames = []string{"default"}
+	cache.SubnetIDs["default"] = 1
+	options.Options.EnableRouteController = true
 
 	nodeID := 123
 	name := "mock-instance"
@@ -34,7 +37,7 @@ func TestListRoutes(t *testing.T) {
 			Labels:      map[string]string{},
 			Annotations: map[string]string{},
 		},
-		Spec: v1.NodeSpec{ProviderID: providerIDPrefix + strconv.Itoa(nodeID)},
+		Spec: v1.NodeSpec{ProviderID: ccmUtils.ProviderIDPrefix + strconv.Itoa(nodeID)},
 	}
 	publicIPv4 := net.ParseIP("45.76.101.25")
 	privateIPv4 := net.ParseIP("192.168.133.65")
@@ -46,7 +49,7 @@ func TestListRoutes(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		instanceCache := newInstances(client)
+		instanceCache := cache.NewInstances(client)
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
@@ -71,7 +74,7 @@ func TestListRoutes(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		instanceCache := newInstances(client)
+		instanceCache := cache.NewInstances(client)
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
@@ -88,7 +91,7 @@ func TestListRoutes(t *testing.T) {
 		{
 			Address:      &vpcIP,
 			AddressRange: nil,
-			VPCID:        vpcIDs["test"],
+			VPCID:        cache.VpcIDs["test"],
 			NAT1To1:      nil,
 			LinodeID:     nodeID,
 		},
@@ -99,7 +102,7 @@ func TestListRoutes(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		instanceCache := newInstances(client)
+		instanceCache := cache.NewInstances(client)
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
@@ -117,21 +120,21 @@ func TestListRoutes(t *testing.T) {
 		{
 			Address:      &vpcIP,
 			AddressRange: nil,
-			VPCID:        vpcIDs["test"],
+			VPCID:        cache.VpcIDs["test"],
 			NAT1To1:      nil,
 			LinodeID:     nodeID,
 		},
 		{
 			Address:      nil,
 			AddressRange: &addressRange1,
-			VPCID:        vpcIDs["test"],
+			VPCID:        cache.VpcIDs["test"],
 			NAT1To1:      nil,
 			LinodeID:     nodeID,
 		},
 		{
 			Address:      nil,
 			AddressRange: &addressRange2,
-			VPCID:        vpcIDs["test"],
+			VPCID:        cache.VpcIDs["test"],
 			NAT1To1:      nil,
 			LinodeID:     nodeID,
 		},
@@ -142,7 +145,7 @@ func TestListRoutes(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		instanceCache := newInstances(client)
+		instanceCache := cache.NewInstances(client)
 		existingK8sCache := registeredK8sNodeCache
 		defer func() {
 			registeredK8sNodeCache = existingK8sCache
@@ -191,7 +194,7 @@ func TestListRoutes(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		instanceCache := newInstances(client)
+		instanceCache := cache.NewInstances(client)
 		existingK8sCache := registeredK8sNodeCache
 		defer func() {
 			registeredK8sNodeCache = existingK8sCache
@@ -214,7 +217,7 @@ func TestListRoutes(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		instanceCache := newInstances(client)
+		instanceCache := cache.NewInstances(client)
 		existingK8sCache := registeredK8sNodeCache
 		defer func() {
 			registeredK8sNodeCache = existingK8sCache
@@ -252,35 +255,35 @@ func TestListRoutes(t *testing.T) {
 			{
 				Address:      &vpcIP2,
 				AddressRange: nil,
-				VPCID:        vpcIDs["abc"],
+				VPCID:        cache.VpcIDs["abc"],
 				NAT1To1:      nil,
 				LinodeID:     instance2ID,
 			},
 			{
 				Address:      nil,
 				AddressRange: &addressRange3,
-				VPCID:        vpcIDs["abc"],
+				VPCID:        cache.VpcIDs["abc"],
 				NAT1To1:      nil,
 				LinodeID:     instance2ID,
 			},
 			{
 				Address:      nil,
 				AddressRange: &addressRange4,
-				VPCID:        vpcIDs["abc"],
+				VPCID:        cache.VpcIDs["abc"],
 				NAT1To1:      nil,
 				LinodeID:     instance2ID,
 			},
 			{
 				Address:      &vpcIP2,
 				AddressRange: nil,
-				VPCID:        vpcIDs["abc"],
+				VPCID:        cache.VpcIDs["abc"],
 				NAT1To1:      nil,
 				LinodeID:     instance3ID,
 			},
 			{
 				Address:      nil,
 				AddressRange: &addressRange5,
-				VPCID:        vpcIDs["abc"],
+				VPCID:        cache.VpcIDs["abc"],
 				NAT1To1:      nil,
 				LinodeID:     instance3ID,
 			},
@@ -292,7 +295,7 @@ func TestListRoutes(t *testing.T) {
 				Labels:      map[string]string{},
 				Annotations: map[string]string{},
 			},
-			Spec: v1.NodeSpec{ProviderID: providerIDPrefix + strconv.Itoa(instance2ID)},
+			Spec: v1.NodeSpec{ProviderID: ccmUtils.ProviderIDPrefix + strconv.Itoa(instance2ID)},
 		}
 
 		registeredK8sNodeCache.addNodeToCache(node2)
@@ -320,9 +323,9 @@ func TestListRoutes(t *testing.T) {
 
 func TestCreateRoute(t *testing.T) {
 	ctx := t.Context()
-	Options.VPCNames = []string{"dummy"}
-	vpcIDs["dummy"] = 1
-	Options.EnableRouteController = true
+	options.Options.VPCNames = []string{"dummy"}
+	cache.VpcIDs["dummy"] = 1
+	options.Options.EnableRouteController = true
 
 	nodeID := 123
 	name := "mock-instance"
@@ -336,7 +339,7 @@ func TestCreateRoute(t *testing.T) {
 			Labels:      map[string]string{},
 			Annotations: map[string]string{},
 		},
-		Spec: v1.NodeSpec{ProviderID: providerIDPrefix + strconv.Itoa(nodeID)},
+		Spec: v1.NodeSpec{ProviderID: ccmUtils.ProviderIDPrefix + strconv.Itoa(nodeID)},
 	}
 	validInstance := linodego.Instance{
 		ID:     nodeID,
@@ -351,14 +354,14 @@ func TestCreateRoute(t *testing.T) {
 		{
 			Address:      &vpcIP,
 			AddressRange: nil,
-			VPCID:        vpcIDs["dummy"],
+			VPCID:        cache.VpcIDs["dummy"],
 			NAT1To1:      nil,
 			LinodeID:     nodeID,
 		},
 	}
 
 	instanceConfigIntfWithVPCAndRoute := linodego.InstanceConfigInterface{
-		VPCID:    ptr.To(vpcIDs["dummy"]),
+		VPCID:    ptr.To(cache.VpcIDs["dummy"]),
 		IPv4:     &linodego.VPCIPv4{VPC: vpcIP},
 		IPRanges: []string{"10.10.10.0/24"},
 	}
@@ -372,7 +375,7 @@ func TestCreateRoute(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		instanceCache := newInstances(client)
+		instanceCache := cache.NewInstances(client)
 		existingK8sCache := registeredK8sNodeCache
 		defer func() {
 			registeredK8sNodeCache = existingK8sCache
@@ -399,7 +402,7 @@ func TestCreateRoute(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		instanceCache := newInstances(client)
+		instanceCache := cache.NewInstances(client)
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
@@ -416,7 +419,7 @@ func TestCreateRoute(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		instanceCache := newInstances(client)
+		instanceCache := cache.NewInstances(client)
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
@@ -429,14 +432,14 @@ func TestCreateRoute(t *testing.T) {
 		{
 			Address:      &vpcIP,
 			AddressRange: nil,
-			VPCID:        vpcIDs["dummy"],
+			VPCID:        cache.VpcIDs["dummy"],
 			NAT1To1:      nil,
 			LinodeID:     nodeID,
 		},
 		{
 			Address:      nil,
 			AddressRange: &addressRange1,
-			VPCID:        vpcIDs["dummy"],
+			VPCID:        cache.VpcIDs["dummy"],
 			NAT1To1:      nil,
 			LinodeID:     nodeID,
 		},
@@ -446,7 +449,7 @@ func TestCreateRoute(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		instanceCache := newInstances(client)
+		instanceCache := cache.NewInstances(client)
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
@@ -461,7 +464,7 @@ func TestCreateRoute(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		instanceCache := newInstances(client)
+		instanceCache := cache.NewInstances(client)
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
@@ -474,9 +477,9 @@ func TestCreateRoute(t *testing.T) {
 }
 
 func TestDeleteRoute(t *testing.T) {
-	Options.VPCNames = []string{"dummy"}
-	vpcIDs["dummy"] = 1
-	Options.EnableRouteController = true
+	options.Options.VPCNames = []string{"dummy"}
+	cache.VpcIDs["dummy"] = 1
+	options.Options.EnableRouteController = true
 
 	ctx := t.Context()
 
@@ -505,7 +508,7 @@ func TestDeleteRoute(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		instanceCache := newInstances(client)
+		instanceCache := cache.NewInstances(client)
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
@@ -521,14 +524,14 @@ func TestDeleteRoute(t *testing.T) {
 		{
 			Address:      &vpcIP,
 			AddressRange: nil,
-			VPCID:        vpcIDs["dummy"],
+			VPCID:        cache.VpcIDs["dummy"],
 			NAT1To1:      nil,
 			LinodeID:     nodeID,
 		},
 	}
 
 	instanceConfigIntfWithVPCAndNoRoute := linodego.InstanceConfigInterface{
-		VPCID:    ptr.To(vpcIDs["dummy"]),
+		VPCID:    ptr.To(cache.VpcIDs["dummy"]),
 		IPv4:     &linodego.VPCIPv4{VPC: vpcIP},
 		IPRanges: []string{},
 	}
@@ -537,7 +540,7 @@ func TestDeleteRoute(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		instanceCache := newInstances(client)
+		instanceCache := cache.NewInstances(client)
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
@@ -553,14 +556,14 @@ func TestDeleteRoute(t *testing.T) {
 		{
 			Address:      &vpcIP,
 			AddressRange: nil,
-			VPCID:        vpcIDs["dummy"],
+			VPCID:        cache.VpcIDs["dummy"],
 			NAT1To1:      nil,
 			LinodeID:     nodeID,
 		},
 		{
 			Address:      nil,
 			AddressRange: &addressRange1,
-			VPCID:        vpcIDs["dummy"],
+			VPCID:        cache.VpcIDs["dummy"],
 			NAT1To1:      nil,
 			LinodeID:     nodeID,
 		},
@@ -570,7 +573,7 @@ func TestDeleteRoute(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		instanceCache := newInstances(client)
+		instanceCache := cache.NewInstances(client)
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 

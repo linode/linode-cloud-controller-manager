@@ -31,6 +31,7 @@ import (
 	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/firewall"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
 )
 
 const testCert string = `-----BEGIN CERTIFICATE-----
@@ -601,11 +602,11 @@ func testCreateNodeBalancerWithInvalidFirewall(t *testing.T, client *linodego.Cl
 func testCreateNodeBalancerWithGlobalTags(t *testing.T, client *linodego.Client, f *fakeAPI) {
 	t.Helper()
 
-	original := Options.NodeBalancerTags
+	original := options.Options.NodeBalancerTags
 	defer func() {
-		Options.NodeBalancerTags = original
+		options.Options.NodeBalancerTags = original
 	}()
-	Options.NodeBalancerTags = []string{"foobar"}
+	options.Options.NodeBalancerTags = []string{"foobar"}
 	expectedTags := []string{"linodelb", "foobar", "fake", "test", "yolo"}
 	err := testCreateNodeBalancer(t, client, f, nil, expectedTags)
 	if err != nil {
@@ -621,14 +622,14 @@ func testCreateNodeBalancerWithVPCBackend(t *testing.T, client *linodego.Client,
 		annotations.NodeBalancerBackendIPv4Range: "10.100.0.0/30",
 	}
 
-	vpcNames := Options.VPCNames
-	subnetNames := Options.SubnetNames
+	vpcNames := options.Options.VPCNames
+	subnetNames := options.Options.SubnetNames
 	defer func() {
-		Options.VPCNames = vpcNames
-		Options.SubnetNames = subnetNames
+		options.Options.VPCNames = vpcNames
+		options.Options.SubnetNames = subnetNames
 	}()
-	Options.VPCNames = []string{"test1"}
-	Options.SubnetNames = []string{defaultSubnet}
+	options.Options.VPCNames = []string{"test1"}
+	options.Options.SubnetNames = []string{defaultSubnet}
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
 		Label:       "test1",
 		Description: "",
@@ -649,11 +650,11 @@ func testCreateNodeBalancerWithVPCBackend(t *testing.T, client *linodego.Client,
 	f.ResetRequests()
 
 	// test with IPv4Range outside of defined NodeBalancer subnet
-	nodebalancerBackendIPv4Subnet := Options.NodeBalancerBackendIPv4Subnet
+	nodebalancerBackendIPv4Subnet := options.Options.NodeBalancerBackendIPv4Subnet
 	defer func() {
-		Options.NodeBalancerBackendIPv4Subnet = nodebalancerBackendIPv4Subnet
+		options.Options.NodeBalancerBackendIPv4Subnet = nodebalancerBackendIPv4Subnet
 	}()
-	Options.NodeBalancerBackendIPv4Subnet = "10.99.0.0/24"
+	options.Options.NodeBalancerBackendIPv4Subnet = "10.99.0.0/24"
 	if err := testCreateNodeBalancer(t, client, f, ann, nil); err == nil {
 		t.Fatalf("expected nodebalancer creation to fail")
 	}
@@ -663,14 +664,14 @@ func testUpdateNodeBalancerWithVPCBackend(t *testing.T, client *linodego.Client,
 	t.Helper()
 
 	// provision vpc and test
-	vpcNames := Options.VPCNames
-	subnetNames := Options.SubnetNames
+	vpcNames := options.Options.VPCNames
+	subnetNames := options.Options.SubnetNames
 	defer func() {
-		Options.VPCNames = vpcNames
-		Options.SubnetNames = subnetNames
+		options.Options.VPCNames = vpcNames
+		options.Options.SubnetNames = subnetNames
 	}()
-	Options.VPCNames = []string{"test1"}
-	Options.SubnetNames = []string{defaultSubnet}
+	options.Options.VPCNames = []string{"test1"}
+	options.Options.SubnetNames = []string{defaultSubnet}
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
 		Label:       "test1",
 		Description: "",
@@ -749,17 +750,17 @@ func testCreateNodeBalancerWithVPCOnlySubnetFlag(t *testing.T, client *linodego.
 	t.Helper()
 
 	// provision vpc and test
-	vpcNames := Options.VPCNames
-	subnetNames := Options.SubnetNames
-	nbBackendSubnet := Options.NodeBalancerBackendIPv4Subnet
+	vpcNames := options.Options.VPCNames
+	subnetNames := options.Options.SubnetNames
+	nbBackendSubnet := options.Options.NodeBalancerBackendIPv4Subnet
 	defer func() {
-		Options.VPCNames = vpcNames
-		Options.SubnetNames = subnetNames
-		Options.NodeBalancerBackendIPv4Subnet = nbBackendSubnet
+		options.Options.VPCNames = vpcNames
+		options.Options.SubnetNames = subnetNames
+		options.Options.NodeBalancerBackendIPv4Subnet = nbBackendSubnet
 	}()
-	Options.VPCNames = []string{"test-subflag"}
-	Options.SubnetNames = []string{defaultSubnet}
-	Options.NodeBalancerBackendIPv4Subnet = "10.254.0.0/24"
+	options.Options.VPCNames = []string{"test-subflag"}
+	options.Options.SubnetNames = []string{defaultSubnet}
+	options.Options.NodeBalancerBackendIPv4Subnet = "10.254.0.0/24"
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
 		Label:       "test-subflag",
 		Description: "",
@@ -845,14 +846,14 @@ func testCreateNodeBalancerWithVPCNoFlagOrAnnotation(t *testing.T, client *linod
 	t.Helper()
 
 	// provision vpc and test
-	vpcNames := Options.VPCNames
-	subnetNames := Options.SubnetNames
+	vpcNames := options.Options.VPCNames
+	subnetNames := options.Options.SubnetNames
 	defer func() {
-		Options.VPCNames = vpcNames
-		Options.SubnetNames = subnetNames
+		options.Options.VPCNames = vpcNames
+		options.Options.SubnetNames = subnetNames
 	}()
-	Options.VPCNames = []string{"test-noflags"}
-	Options.SubnetNames = []string{defaultSubnet}
+	options.Options.VPCNames = []string{"test-noflags"}
+	options.Options.SubnetNames = []string{defaultSubnet}
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
 		Label:       "test-noflags",
 		Description: "",
@@ -928,14 +929,14 @@ func testCreateNodeBalancerWithVPCAnnotationOnly(t *testing.T, client *linodego.
 	t.Helper()
 
 	// provision vpc and test
-	vpcNames := Options.VPCNames
-	subnetNames := Options.SubnetNames
+	vpcNames := options.Options.VPCNames
+	subnetNames := options.Options.SubnetNames
 	defer func() {
-		Options.VPCNames = vpcNames
-		Options.SubnetNames = subnetNames
+		options.Options.VPCNames = vpcNames
+		options.Options.SubnetNames = subnetNames
 	}()
-	Options.VPCNames = []string{"test-onlyannotation"}
-	Options.SubnetNames = []string{defaultSubnet}
+	options.Options.VPCNames = []string{"test-onlyannotation"}
+	options.Options.SubnetNames = []string{defaultSubnet}
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
 		Label:       "test-onlyannotation",
 		Description: "",
@@ -1016,17 +1017,17 @@ func testCreateNodeBalancerWithVPCOnlySubnetIDFlag(t *testing.T, client *linodeg
 	t.Helper()
 
 	// provision vpc and test
-	vpcNames := Options.VPCNames
-	subnetNames := Options.SubnetNames
-	nbBackendSubnetID := Options.NodeBalancerBackendIPv4SubnetID
+	vpcNames := options.Options.VPCNames
+	subnetNames := options.Options.SubnetNames
+	nbBackendSubnetID := options.Options.NodeBalancerBackendIPv4SubnetID
 	defer func() {
-		Options.VPCNames = vpcNames
-		Options.SubnetNames = subnetNames
-		Options.NodeBalancerBackendIPv4SubnetID = nbBackendSubnetID
+		options.Options.VPCNames = vpcNames
+		options.Options.SubnetNames = subnetNames
+		options.Options.NodeBalancerBackendIPv4SubnetID = nbBackendSubnetID
 	}()
-	Options.VPCNames = []string{"test1"}
-	Options.SubnetNames = []string{defaultSubnet}
-	Options.NodeBalancerBackendIPv4SubnetID = 1111
+	options.Options.VPCNames = []string{"test1"}
+	options.Options.SubnetNames = []string{defaultSubnet}
+	options.Options.NodeBalancerBackendIPv4SubnetID = 1111
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
 		Label:       "test-subid-flag",
 		Description: "",
@@ -1104,17 +1105,17 @@ func testCreateNodeBalancerWithVPCAnnotationOverwrite(t *testing.T, client *lino
 	t.Helper()
 
 	// provision multiple vpcs
-	vpcNames := Options.VPCNames
-	subnetNames := Options.SubnetNames
-	nodebalancerBackendIPv4Subnet := Options.NodeBalancerBackendIPv4Subnet
+	vpcNames := options.Options.VPCNames
+	subnetNames := options.Options.SubnetNames
+	nodebalancerBackendIPv4Subnet := options.Options.NodeBalancerBackendIPv4Subnet
 	defer func() {
-		Options.VPCNames = vpcNames
-		Options.SubnetNames = subnetNames
-		Options.NodeBalancerBackendIPv4Subnet = nodebalancerBackendIPv4Subnet
+		options.Options.VPCNames = vpcNames
+		options.Options.SubnetNames = subnetNames
+		options.Options.NodeBalancerBackendIPv4Subnet = nodebalancerBackendIPv4Subnet
 	}()
-	Options.VPCNames = []string{"test1"}
-	Options.SubnetNames = []string{defaultSubnet}
-	Options.NodeBalancerBackendIPv4Subnet = "10.100.0.0/24"
+	options.Options.VPCNames = []string{"test1"}
+	options.Options.SubnetNames = []string{defaultSubnet}
+	options.Options.NodeBalancerBackendIPv4Subnet = "10.100.0.0/24"
 
 	_, _ = client.CreateVPC(t.Context(), linodego.VPCCreateOptions{
 		Label:       "test1",
@@ -4369,7 +4370,7 @@ func testMakeLoadBalancerStatusWithIPv6(t *testing.T, client *linodego.Client, _
 	}
 
 	// Test with EnableIPv6ForLoadBalancers = false (default)
-	Options.EnableIPv6ForLoadBalancers = false
+	options.Options.EnableIPv6ForLoadBalancers = false
 	expectedStatus := &v1.LoadBalancerStatus{
 		Ingress: []v1.LoadBalancerIngress{{
 			Hostname: hostname,
@@ -4382,7 +4383,7 @@ func testMakeLoadBalancerStatusWithIPv6(t *testing.T, client *linodego.Client, _
 	}
 
 	// Test with EnableIPv6ForLoadBalancers = true
-	Options.EnableIPv6ForLoadBalancers = true
+	options.Options.EnableIPv6ForLoadBalancers = true
 	expectedStatus = &v1.LoadBalancerStatus{
 		Ingress: []v1.LoadBalancerIngress{
 			{
@@ -4402,7 +4403,7 @@ func testMakeLoadBalancerStatusWithIPv6(t *testing.T, client *linodego.Client, _
 
 	// Test with per-service annotation
 	// Reset the global flag to false and set the annotation
-	Options.EnableIPv6ForLoadBalancers = false
+	options.Options.EnableIPv6ForLoadBalancers = false
 	svc.Annotations[annotations.AnnLinodeEnableIPv6Ingress] = "true"
 
 	// Expect the same result as when the global flag is enabled
@@ -4413,7 +4414,7 @@ func testMakeLoadBalancerStatusWithIPv6(t *testing.T, client *linodego.Client, _
 	}
 
 	// Reset the flag to its default value
-	Options.EnableIPv6ForLoadBalancers = false
+	options.Options.EnableIPv6ForLoadBalancers = false
 }
 
 func testMakeLoadBalancerStatusEnvVar(t *testing.T, client *linodego.Client, _ *fakeAPI) {
@@ -5499,7 +5500,7 @@ func Test_loadbalancers_GetLinodeNBType(t *testing.T) {
 				ciliumClient:     tt.fields.ciliumClient,
 				loadBalancerType: tt.fields.loadBalancerType,
 			}
-			Options.DefaultNBType = string(tt.defaultNB)
+			options.Options.DefaultNBType = string(tt.defaultNB)
 			if got := l.GetLinodeNBType(tt.args.service); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("loadbalancers.GetLinodeNBType() = %v, want %v", got, tt.want)
 			}
@@ -5528,11 +5529,11 @@ func Test_validateNodeBalancerBackendIPv4Range(t *testing.T) {
 		},
 	}
 
-	nbBackendSubnet := Options.NodeBalancerBackendIPv4Subnet
+	nbBackendSubnet := options.Options.NodeBalancerBackendIPv4Subnet
 	defer func() {
-		Options.NodeBalancerBackendIPv4Subnet = nbBackendSubnet
+		options.Options.NodeBalancerBackendIPv4Subnet = nbBackendSubnet
 	}()
-	Options.NodeBalancerBackendIPv4Subnet = "10.100.0.0/24"
+	options.Options.NodeBalancerBackendIPv4Subnet = "10.100.0.0/24"
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

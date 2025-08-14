@@ -1,4 +1,4 @@
-package linode
+package cache
 
 import (
 	"fmt"
@@ -17,6 +17,8 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
+	ccmUtils "github.com/linode/linode-cloud-controller-manager/cloud/linode/utils"
 )
 
 const (
@@ -43,8 +45,8 @@ func TestInstanceExists(t *testing.T) {
 	client := mocks.NewMockClient(ctrl)
 
 	t.Run("should return false if linode does not exist (by providerID)", func(t *testing.T) {
-		instances := newInstances(client)
-		node := nodeWithProviderID(providerIDPrefix + "123")
+		instances := NewInstances(client)
+		node := nodeWithProviderID(ccmUtils.ProviderIDPrefix + "123")
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
 
 		exists, err := instances.InstanceExists(ctx, node)
@@ -53,8 +55,8 @@ func TestInstanceExists(t *testing.T) {
 	})
 
 	t.Run("should return true if linode exists (by provider)", func(t *testing.T) {
-		instances := newInstances(client)
-		node := nodeWithProviderID(providerIDPrefix + "123")
+		instances := NewInstances(client)
+		node := nodeWithProviderID(ccmUtils.ProviderIDPrefix + "123")
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
 			{
 				ID:     123,
@@ -70,7 +72,7 @@ func TestInstanceExists(t *testing.T) {
 	})
 
 	t.Run("should return true if linode exists (by name)", func(t *testing.T) {
-		instances := newInstances(client)
+		instances := NewInstances(client)
 		name := "some-name"
 		node := nodeWithName(name)
 
@@ -92,7 +94,7 @@ func TestMetadataRetrieval(t *testing.T) {
 	client := mocks.NewMockClient(ctrl)
 
 	t.Run("uses name over IP for finding linode", func(t *testing.T) {
-		instances := newInstances(client)
+		instances := NewInstances(client)
 		publicIP := net.ParseIP("172.234.31.123")
 		privateIP := net.ParseIP("192.168.159.135")
 		expectedInstance := linodego.Instance{Label: "expected-instance", ID: 12345, IPv4: []*net.IP{&publicIP, &privateIP}}
@@ -102,13 +104,13 @@ func TestMetadataRetrieval(t *testing.T) {
 
 		meta, err := instances.InstanceMetadata(ctx, node)
 		require.NoError(t, err)
-		assert.Equal(t, providerIDPrefix+strconv.Itoa(expectedInstance.ID), meta.ProviderID)
+		assert.Equal(t, ccmUtils.ProviderIDPrefix+strconv.Itoa(expectedInstance.ID), meta.ProviderID)
 	})
 
 	t.Run("fails when linode does not exist (by provider)", func(t *testing.T) {
-		instances := newInstances(client)
+		instances := NewInstances(client)
 		id := 456302
-		providerID := providerIDPrefix + strconv.Itoa(id)
+		providerID := ccmUtils.ProviderIDPrefix + strconv.Itoa(id)
 		node := nodeWithProviderID(providerID)
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
 		meta, err := instances.InstanceMetadata(ctx, node)
@@ -118,7 +120,7 @@ func TestMetadataRetrieval(t *testing.T) {
 	})
 
 	t.Run("should return data when linode is found (by name)", func(t *testing.T) {
-		instances := newInstances(client)
+		instances := NewInstances(client)
 		id := 123
 		node := nodeWithName(instanceName)
 		publicIPv4 := net.ParseIP("45.76.101.25")
@@ -131,7 +133,7 @@ func TestMetadataRetrieval(t *testing.T) {
 
 		meta, err := instances.InstanceMetadata(ctx, node)
 		require.NoError(t, err)
-		assert.Equal(t, providerIDPrefix+strconv.Itoa(id), meta.ProviderID)
+		assert.Equal(t, ccmUtils.ProviderIDPrefix+strconv.Itoa(id), meta.ProviderID)
 		assert.Equal(t, region, meta.Region)
 		assert.Equal(t, linodeType, meta.InstanceType)
 		assert.Equal(t, []v1.NodeAddress{
@@ -151,7 +153,7 @@ func TestMetadataRetrieval(t *testing.T) {
 	})
 
 	t.Run("should return data when linode is found (by name) and addresses must be in order", func(t *testing.T) {
-		instances := newInstances(client)
+		instances := NewInstances(client)
 		id := 123
 		node := nodeWithName(instanceName)
 		publicIPv4 := net.ParseIP("45.76.101.25")
@@ -159,9 +161,9 @@ func TestMetadataRetrieval(t *testing.T) {
 		ipv6Addr := "2001::8a2e:370:7348"
 		linodeType := typeG6
 
-		Options.VPCNames = []string{"test"}
-		vpcIDs["test"] = 1
-		Options.EnableRouteController = true
+		options.Options.VPCNames = []string{"test"}
+		VpcIDs["test"] = 1
+		options.Options.EnableRouteController = true
 
 		instance := linodego.Instance{
 			ID:     id,
@@ -178,33 +180,33 @@ func TestMetadataRetrieval(t *testing.T) {
 			{
 				Address:      &vpcIP,
 				AddressRange: nil,
-				VPCID:        vpcIDs["test"],
+				VPCID:        VpcIDs["test"],
 				NAT1To1:      nil,
 				LinodeID:     id,
 			},
 			{
 				Address:      nil,
 				AddressRange: &addressRange1,
-				VPCID:        vpcIDs["test"],
+				VPCID:        VpcIDs["test"],
 				NAT1To1:      nil,
 				LinodeID:     id,
 			},
 			{
 				Address:      nil,
 				AddressRange: &addressRange2,
-				VPCID:        vpcIDs["test"],
+				VPCID:        VpcIDs["test"],
 				NAT1To1:      nil,
 				LinodeID:     id,
 			},
 		}
 
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{instance}, nil)
-		client.EXPECT().ListVPCIPAddresses(gomock.Any(), vpcIDs["test"], gomock.Any()).Return(routesInVPC, nil)
-		client.EXPECT().ListVPCIPv6Addresses(gomock.Any(), vpcIDs["test"], gomock.Any()).Return([]linodego.VPCIP{}, nil)
+		client.EXPECT().ListVPCIPAddresses(gomock.Any(), VpcIDs["test"], gomock.Any()).Return(routesInVPC, nil)
+		client.EXPECT().ListVPCIPv6Addresses(gomock.Any(), VpcIDs["test"], gomock.Any()).Return([]linodego.VPCIP{}, nil)
 
 		meta, err := instances.InstanceMetadata(ctx, node)
 		require.NoError(t, err)
-		assert.Equal(t, providerIDPrefix+strconv.Itoa(id), meta.ProviderID)
+		assert.Equal(t, ccmUtils.ProviderIDPrefix+strconv.Itoa(id), meta.ProviderID)
 		assert.Equal(t, usEast, meta.Region)
 		assert.Equal(t, linodeType, meta.InstanceType)
 		assert.Equal(t, []v1.NodeAddress{
@@ -230,7 +232,7 @@ func TestMetadataRetrieval(t *testing.T) {
 			},
 		}, meta.NodeAddresses)
 
-		Options.VPCNames = []string{}
+		options.Options.VPCNames = []string{}
 	})
 
 	ipTests := []struct {
@@ -327,15 +329,15 @@ func TestMetadataRetrieval(t *testing.T) {
 
 	for _, test := range ipTests {
 		t.Run(fmt.Sprintf("addresses are retrieved - %s", test.name), func(t *testing.T) {
-			instances := newInstances(client)
+			instances := NewInstances(client)
 			id := 192910
 			name := "my-instance"
-			providerID := providerIDPrefix + strconv.Itoa(id)
+			providerID := ccmUtils.ProviderIDPrefix + strconv.Itoa(id)
 			node := nodeWithProviderID(providerID)
 			if test.externalNetwork == "" {
-				Options.LinodeExternalNetwork = nil
+				options.Options.LinodeExternalNetwork = nil
 			} else {
-				_, Options.LinodeExternalNetwork, _ = net.ParseCIDR(test.externalNetwork)
+				_, options.Options.LinodeExternalNetwork, _ = net.ParseCIDR(test.externalNetwork)
 			}
 			if test.existingAddresses != nil {
 				node.Status.Addresses = append(node.Status.Addresses, test.existingAddresses...)
@@ -419,7 +421,7 @@ func TestMetadataRetrieval(t *testing.T) {
 
 		for _, test := range getByIPTests {
 			t.Run(fmt.Sprintf("gets linode by IP - %s", test.name), func(t *testing.T) {
-				instances := newInstances(client)
+				instances := NewInstances(client)
 				client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{{ID: 3456, IPv4: []*net.IP{&wrongIP}}, expectedInstance}, nil)
 				node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node-1"}, Status: v1.NodeStatus{Addresses: test.nodeAddresses}}
 				meta, err := instances.InstanceMetadata(ctx, &node)
@@ -428,7 +430,7 @@ func TestMetadataRetrieval(t *testing.T) {
 					assert.Equal(t, test.expectedErr, err)
 				} else {
 					require.NoError(t, err)
-					assert.Equal(t, providerIDPrefix+strconv.Itoa(expectedInstance.ID), meta.ProviderID)
+					assert.Equal(t, ccmUtils.ProviderIDPrefix+strconv.Itoa(expectedInstance.ID), meta.ProviderID)
 				}
 			})
 		}
@@ -443,13 +445,13 @@ func TestMalformedProviders(t *testing.T) {
 	client := mocks.NewMockClient(ctrl)
 
 	t.Run("fails on non-numeric providerID", func(t *testing.T) {
-		instances := newInstances(client)
-		providerID := providerIDPrefix + "abc"
+		instances := NewInstances(client)
+		providerID := ccmUtils.ProviderIDPrefix + "abc"
 		node := nodeWithProviderID(providerID)
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
 		meta, err := instances.InstanceMetadata(ctx, node)
 
-		require.ErrorIs(t, err, invalidProviderIDError{providerID})
+		require.ErrorIs(t, err, ccmUtils.InvalidProviderIDError{Value: providerID})
 		assert.Nil(t, meta)
 	})
 }
@@ -462,9 +464,9 @@ func TestInstanceShutdown(t *testing.T) {
 	client := mocks.NewMockClient(ctrl)
 
 	t.Run("fails when instance not found (by provider)", func(t *testing.T) {
-		instances := newInstances(client)
+		instances := NewInstances(client)
 		id := 12345
-		node := nodeWithProviderID(providerIDPrefix + strconv.Itoa(id))
+		node := nodeWithProviderID(ccmUtils.ProviderIDPrefix + strconv.Itoa(id))
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
 		shutdown, err := instances.InstanceShutdown(ctx, node)
 
@@ -473,7 +475,7 @@ func TestInstanceShutdown(t *testing.T) {
 	})
 
 	t.Run("fails when instance not found (by name)", func(t *testing.T) {
-		instances := newInstances(client)
+		instances := NewInstances(client)
 		name := "some-name"
 		node := nodeWithName(name)
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
@@ -484,9 +486,9 @@ func TestInstanceShutdown(t *testing.T) {
 	})
 
 	t.Run("returns true when instance is shut down", func(t *testing.T) {
-		instances := newInstances(client)
+		instances := NewInstances(client)
 		id := 12345
-		node := nodeWithProviderID(providerIDPrefix + strconv.Itoa(id))
+		node := nodeWithProviderID(ccmUtils.ProviderIDPrefix + strconv.Itoa(id))
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
 			{ID: id, Label: "offline-linode", Status: linodego.InstanceOffline},
 		}, nil)
@@ -497,9 +499,9 @@ func TestInstanceShutdown(t *testing.T) {
 	})
 
 	t.Run("returns true when instance is shutting down", func(t *testing.T) {
-		instances := newInstances(client)
+		instances := NewInstances(client)
 		id := 12345
-		node := nodeWithProviderID(providerIDPrefix + strconv.Itoa(id))
+		node := nodeWithProviderID(ccmUtils.ProviderIDPrefix + strconv.Itoa(id))
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
 			{ID: id, Label: "shutting-down-linode", Status: linodego.InstanceShuttingDown},
 		}, nil)
@@ -510,9 +512,9 @@ func TestInstanceShutdown(t *testing.T) {
 	})
 
 	t.Run("returns false when instance is running", func(t *testing.T) {
-		instances := newInstances(client)
+		instances := NewInstances(client)
 		id := 12345
-		node := nodeWithProviderID(providerIDPrefix + strconv.Itoa(id))
+		node := nodeWithProviderID(ccmUtils.ProviderIDPrefix + strconv.Itoa(id))
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
 			{ID: id, Label: "running-linode", Status: linodego.InstanceRunning},
 		}, nil)

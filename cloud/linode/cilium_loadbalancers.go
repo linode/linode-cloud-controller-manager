@@ -24,6 +24,8 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
+	ccmUtils "github.com/linode/linode-cloud-controller-manager/cloud/linode/utils"
 )
 
 const (
@@ -111,7 +113,7 @@ func (l *loadbalancers) getExistingSharedIPs(ctx context.Context, ipHolder *lino
 
 // shareIPs shares the given list of IP addresses on the given Node
 func (l *loadbalancers) shareIPs(ctx context.Context, addrs []string, node *v1.Node) error {
-	nodeLinodeID, err := parseProviderID(node.Spec.ProviderID)
+	nodeLinodeID, err := ccmUtils.ParseProviderID(node.Spec.ProviderID)
 	if err != nil {
 		return err
 	}
@@ -159,8 +161,8 @@ func (l *loadbalancers) handleIPSharing(ctx context.Context, node *v1.Node, ipHo
 	}
 	// If performing Service load-balancing via IP sharing + BGP, check for a special annotation
 	// added by the CCM gets set when load-balancer IPs have been successfully shared on the node
-	if Options.BGPNodeSelector != "" {
-		kv := strings.Split(Options.BGPNodeSelector, "=")
+	if options.Options.BGPNodeSelector != "" {
+		kv := strings.Split(options.Options.BGPNodeSelector, "=")
 		// Check if node should be participating in IP sharing via the given selector
 		if val, ok := node.Labels[kv[0]]; !ok || len(kv) != 2 || val != kv[1] {
 			// not a selected Node
@@ -243,7 +245,7 @@ func (l *loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node, ip
 	}
 
 	// share the IPs with nodes participating in Cilium BGP peering
-	if Options.BGPNodeSelector == "" {
+	if options.Options.BGPNodeSelector == "" {
 		for _, node := range nodes {
 			if _, ok := node.Labels[commonControlPlaneLabel]; !ok {
 				if err = l.shareIPs(ctx, addrs, node); err != nil {
@@ -252,7 +254,7 @@ func (l *loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node, ip
 			}
 		}
 	} else {
-		kv := strings.Split(Options.BGPNodeSelector, "=")
+		kv := strings.Split(options.Options.BGPNodeSelector, "=")
 		for _, node := range nodes {
 			if val, ok := node.Labels[kv[0]]; ok && len(kv) == 2 && val == kv[1] {
 				if err = l.shareIPs(ctx, addrs, node); err != nil {
@@ -273,7 +275,7 @@ func (l *loadbalancers) deleteSharedIP(ctx context.Context, service *v1.Service)
 		return err
 	}
 	nodeList, err := l.kubeClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{
-		LabelSelector: Options.BGPNodeSelector,
+		LabelSelector: options.Options.BGPNodeSelector,
 	})
 	if err != nil {
 		return err
@@ -282,8 +284,8 @@ func (l *loadbalancers) deleteSharedIP(ctx context.Context, service *v1.Service)
 
 	serviceNn := getServiceNn(service)
 	var ipHolderSuffix string
-	if Options.IpHolderSuffix != "" {
-		ipHolderSuffix = Options.IpHolderSuffix
+	if options.Options.IpHolderSuffix != "" {
+		ipHolderSuffix = options.Options.IpHolderSuffix
 		klog.V(3).Infof("using parameter-based IP Holder suffix %s for Service %s", ipHolderSuffix, serviceNn)
 	}
 
@@ -291,7 +293,7 @@ func (l *loadbalancers) deleteSharedIP(ctx context.Context, service *v1.Service)
 	if err != nil {
 		// return error or nil if not found since no IP holder means there
 		// is no IP to reclaim
-		return IgnoreLinodeAPIError(err, http.StatusNotFound)
+		return ccmUtils.IgnoreLinodeAPIError(err, http.StatusNotFound)
 	}
 	svcIngress := service.Status.LoadBalancer.Ingress
 	if len(svcIngress) > 0 && ipHolder != nil {
@@ -300,19 +302,19 @@ func (l *loadbalancers) deleteSharedIP(ctx context.Context, service *v1.Service)
 		for _, ingress := range svcIngress {
 			// delete the shared IP on the Linodes it's shared on
 			for _, node := range bgpNodes {
-				nodeLinodeID, err = parseProviderID(node.Spec.ProviderID)
+				nodeLinodeID, err = ccmUtils.ParseProviderID(node.Spec.ProviderID)
 				if err != nil {
 					return err
 				}
 				err = l.client.DeleteInstanceIPAddress(ctx, nodeLinodeID, ingress.IP)
-				if IgnoreLinodeAPIError(err, http.StatusNotFound) != nil {
+				if ccmUtils.IgnoreLinodeAPIError(err, http.StatusNotFound) != nil {
 					return err
 				}
 			}
 
 			// finally delete the shared IP on the ip-holder
 			err = l.client.DeleteInstanceIPAddress(ctx, ipHolder.ID, ingress.IP)
-			if IgnoreLinodeAPIError(err, http.StatusNotFound) != nil {
+			if ccmUtils.IgnoreLinodeAPIError(err, http.StatusNotFound) != nil {
 				return err
 			}
 		}
@@ -415,7 +417,7 @@ func (l *loadbalancers) retrieveCiliumClientset() error {
 		kubeConfig *rest.Config
 		err        error
 	)
-	kubeconfigFlag := Options.KubeconfigFlag
+	kubeconfigFlag := options.Options.KubeconfigFlag
 	if kubeconfigFlag == nil || kubeconfigFlag.Value.String() == "" {
 		kubeConfig, err = rest.InClusterConfig()
 	} else {
@@ -513,7 +515,7 @@ func (l *loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error 
 	// otherwise create it
 	var nodeSelector slimv1.LabelSelector
 	// If no BGPNodeSelector is specified, select all worker nodes.
-	if Options.BGPNodeSelector == "" {
+	if options.Options.BGPNodeSelector == "" {
 		nodeSelector = slimv1.LabelSelector{
 			MatchExpressions: []slimv1.LabelSelectorRequirement{
 				{
@@ -523,9 +525,9 @@ func (l *loadbalancers) ensureCiliumBGPPeeringPolicy(ctx context.Context) error 
 			},
 		}
 	} else {
-		kv := strings.Split(Options.BGPNodeSelector, "=")
+		kv := strings.Split(options.Options.BGPNodeSelector, "=")
 		if len(kv) != BGPNodeSelectorFlagInputLen {
-			return fmt.Errorf("invalid node selector %s", Options.BGPNodeSelector)
+			return fmt.Errorf("invalid node selector %s", options.Options.BGPNodeSelector)
 		}
 
 		nodeSelector = slimv1.LabelSelector{MatchLabels: map[string]string{kv[0]: kv[1]}}

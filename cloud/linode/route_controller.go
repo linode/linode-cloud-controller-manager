@@ -17,7 +17,10 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/cache"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
+	ccmUtils "github.com/linode/linode-cloud-controller-manager/cloud/linode/utils"
 )
 
 var ipv6ConfiguredRoutes []*cloudprovider.Route
@@ -39,12 +42,12 @@ func (rc *routeCache) refreshRoutes(ctx context.Context, client client.Client) {
 	}
 
 	vpcNodes := map[int][]linodego.VPCIP{}
-	for _, v := range Options.VPCNames {
+	for _, v := range options.Options.VPCNames {
 		vpcName := strings.TrimSpace(v)
 		if vpcName == "" {
 			continue
 		}
-		resp, err := GetVPCIPAddresses(ctx, client, vpcName)
+		resp, err := cache.GetVPCIPAddresses(ctx, client, vpcName)
 		if err != nil {
 			klog.Errorf("failed updating cache for VPC %s. Error: %s", vpcName, err.Error())
 			continue
@@ -60,11 +63,11 @@ func (rc *routeCache) refreshRoutes(ctx context.Context, client client.Client) {
 
 type routes struct {
 	client     client.Client
-	instances  *instances
+	instances  *cache.Instances
 	routeCache *routeCache
 }
 
-func newRoutes(client client.Client, instanceCache *instances) (cloudprovider.Routes, error) {
+func newRoutes(client client.Client, instanceCache *cache.Instances) (cloudprovider.Routes, error) {
 	timeout := 60
 	if raw, ok := os.LookupEnv("LINODE_ROUTES_CACHE_TTL_SECONDS"); ok {
 		if t, err := strconv.Atoi(raw); t > 0 && err == nil {
@@ -73,7 +76,7 @@ func newRoutes(client client.Client, instanceCache *instances) (cloudprovider.Ro
 	}
 	klog.V(3).Infof("TTL for routeCache set to %d seconds", timeout)
 
-	if Options.EnableRouteController && len(Options.VPCNames) == 0 {
+	if options.Options.EnableRouteController && len(options.Options.VPCNames) == 0 {
 		return nil, fmt.Errorf("cannot enable route controller as vpc-names is empty")
 	}
 
@@ -120,7 +123,7 @@ func (r *routes) getInstanceFromName(ctx context.Context, name string) (*linodeg
 	}
 
 	// fetch instance with specified node name
-	instance, err := r.instances.lookupLinode(ctx, node)
+	instance, err := r.instances.LookupLinode(ctx, node)
 	if err != nil {
 		klog.Errorf("failed getting linode %s", name)
 		return nil, err
@@ -156,7 +159,7 @@ func (r *routes) CreateRoute(ctx context.Context, clusterName string, nameHint s
 	intfRoutes := []string{}
 	intfVPCIP := linodego.VPCIP{}
 
-	for _, vpcid := range GetAllVPCIDs() {
+	for _, vpcid := range cache.GetAllVPCIDs() {
 		for _, ir := range instanceRoutes {
 			if ir.VPCID != vpcid {
 				continue
@@ -209,7 +212,7 @@ func (r *routes) DeleteRoute(ctx context.Context, clusterName string, route *clo
 	intfRoutes := []string{}
 	intfVPCIP := linodego.VPCIP{}
 
-	for _, vpcid := range GetAllVPCIDs() {
+	for _, vpcid := range cache.GetAllVPCIDs() {
 		for _, ir := range instanceRoutes {
 			if ir.VPCID != vpcid {
 				continue
@@ -246,14 +249,14 @@ func (r *routes) DeleteRoute(ctx context.Context, clusterName string, route *clo
 // ListRoutes fetches routes configured on all instances which have VPC interfaces
 func (r *routes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudprovider.Route, error) {
 	klog.V(4).Infof("Fetching routes configured on the cluster")
-	instances, err := r.instances.listAllInstances(ctx)
+	instances, err := r.instances.ListAllInstances(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	var configuredRoutes []*cloudprovider.Route
 	for _, instance := range instances {
-		providerID := providerIDPrefix + strconv.Itoa(instance.ID)
+		providerID := ccmUtils.ProviderIDPrefix + strconv.Itoa(instance.ID)
 		label, found := registeredK8sNodeCache.getNodeLabel(providerID, instance.Label)
 		if !found {
 			klog.V(4).Infof("Node %s not found in k8s node cache, skipping listing its routes", instance.Label)
@@ -269,7 +272,7 @@ func (r *routes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpr
 		}
 
 		// check for configured routes
-		for _, vpcid := range GetAllVPCIDs() {
+		for _, vpcid := range cache.GetAllVPCIDs() {
 			for _, ir := range instanceRoutes {
 				if ir.Address != nil || ir.VPCID != vpcid {
 					continue

@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/cache"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 )
 
@@ -30,7 +31,7 @@ func TestNodeController_Run(t *testing.T) {
 	informer := informers.NewSharedInformerFactory(kubeClient, 0).Core().V1().Nodes()
 	mockQueue := workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[nodeRequest]{Name: "test"})
 
-	nodeCtrl := newNodeController(kubeClient, client, informer, newInstances(client))
+	nodeCtrl := newNodeController(kubeClient, client, informer, cache.NewInstances(client))
 	nodeCtrl.queue = mockQueue
 	nodeCtrl.ttl = 1 * time.Second
 
@@ -83,7 +84,7 @@ func TestNodeController_processNext(t *testing.T) {
 
 	controller := &nodeController{
 		kubeclient:         kubeClient,
-		instances:          newInstances(client),
+		instances:          cache.NewInstances(client),
 		queue:              queue,
 		metadataLastUpdate: make(map[string]time.Time),
 		ttl:                defaultMetadataTTL,
@@ -137,7 +138,7 @@ func TestNodeController_processNext(t *testing.T) {
 		defer func() {
 			controller.instances = currInstances
 		}()
-		controller.instances = newInstances(client)
+		controller.instances = cache.NewInstances(client)
 		registeredK8sNodeCache.lastUpdate = time.Now().Add(-15 * time.Minute)
 		controller.addNodeToQueue(node2)
 		publicIP := net.ParseIP("172.234.31.123")
@@ -168,7 +169,7 @@ func TestNodeController_processNext(t *testing.T) {
 		controller.queue = queue
 		controller.addNodeToQueue(node)
 		client := mocks.NewMockClient(ctrl)
-		controller.instances = newInstances(client)
+		controller.instances = cache.NewInstances(client)
 		retryInterval = 1 * time.Nanosecond
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, &linodego.Error{Code: http.StatusTooManyRequests, Message: "Too many requests"})
 		result := controller.processNext()
@@ -184,7 +185,7 @@ func TestNodeController_processNext(t *testing.T) {
 		controller.queue = queue
 		controller.addNodeToQueue(node)
 		client := mocks.NewMockClient(ctrl)
-		controller.instances = newInstances(client)
+		controller.instances = cache.NewInstances(client)
 		retryInterval = 1 * time.Nanosecond
 		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, &linodego.Error{Code: http.StatusInternalServerError, Message: "Too many requests"})
 		result := controller.processNext()
@@ -213,7 +214,7 @@ func TestNodeController_handleNode(t *testing.T) {
 	_, err := kubeClient.CoreV1().Nodes().Create(t.Context(), node, metav1.CreateOptions{})
 	require.NoError(t, err, "expected no error during node creation")
 
-	instCache := newInstances(client)
+	instCache := cache.NewInstances(client)
 
 	t.Setenv("LINODE_METADATA_TTL", "30")
 	nodeCtrl := newNodeController(kubeClient, client, nil, instCache)
@@ -248,7 +249,7 @@ func TestNodeController_handleNode(t *testing.T) {
 
 	// Lookup failure for linode instance
 	client = mocks.NewMockClient(ctrl)
-	nodeCtrl.instances = newInstances(client)
+	nodeCtrl.instances = cache.NewInstances(client)
 	nodeCtrl.metadataLastUpdate["test-node"] = time.Now().Add(-2 * nodeCtrl.ttl)
 	client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, errors.New("lookup failed"))
 	err = nodeCtrl.handleNode(t.Context(), node)
@@ -256,7 +257,7 @@ func TestNodeController_handleNode(t *testing.T) {
 
 	// All fields already set
 	client = mocks.NewMockClient(ctrl)
-	nodeCtrl.instances = newInstances(client)
+	nodeCtrl.instances = cache.NewInstances(client)
 	nodeCtrl.metadataLastUpdate["test-node"] = time.Now().Add(-2 * nodeCtrl.ttl)
 	client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
 		{ID: 123, Label: "test-node", IPv4: []*net.IP{&publicIP, &privateIP}, IPv6: publicIPv6SLAAC, HostUUID: "123"},
