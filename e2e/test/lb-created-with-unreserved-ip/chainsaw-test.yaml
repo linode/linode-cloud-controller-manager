@@ -1,0 +1,94 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: lb-created-with-unreserved-ip
+  labels:
+    all:
+    lke:
+spec:
+  namespace: "lb-created-with-unreserved-ip"
+  steps:
+    - name: create reserved ip and nodebalancer resources
+      try:
+        - script:
+            content: |
+              set -e
+
+              unreserved_ip="100.10.10.10"
+
+              create_cm=$(kubectl -n $NAMESPACE create configmap unreserved-ip-config --from-literal=UnReservedIP=$unreserved_ip -o yaml --dry-run=client | kubectl apply -f -)
+              if [[ "$create_cm" != "configmap/unreserved-ip-config created" ]]; then
+                echo "Unable to create configmap. Error: $create_cm"
+                exit 1
+              fi
+
+              echo "{\"unreserved_ip\": \"$unreserved_ip\"}"
+            check:
+              ($error == null): true
+              (contains($stdout, 'Unable to create configmap')): false
+            outputs:
+              - name: ip
+                value: (json_parse($stdout))
+        - apply:
+            file: create-pods-services.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that loadbalancer ip is not assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test
+            status:
+              (loadBalancer.ingress[0].ip == null): true
+    - name: get service ip and compare with unreserved ip
+      try:
+        - script: 
+            content: |
+              set -e
+
+              unreserved_ip=$(kubectl get configmap unreserved-ip-config -o=jsonpath='{.data.UnReservedIP}' -n $NAMESPACE)
+              if [[ -z "$unreserved_ip" ]]; then
+                  echo "Error: No un reserved ip found in configmap"
+              fi
+
+              events=$(kubectl get events -n $NAMESPACE --field-selector reason=SyncLoadBalancerFailed --sort-by='.lastTimestamp' -o json)
+              message=$(echo $events | jq .items[0].message)
+              echo $message
+
+              if [[ "$message" =~ ^\"Error\ syncing\ load\ balancer:\ failed\ to\ ensure\ load\ balancer:\ \[400\]\ IPv4\ address\ is\ not\ reserved\"$ ]]; then
+                echo "Warning event found"
+              else
+                echo "Warning event not found"
+              fi
+              
+              service_ip=$(kubectl get svc svc-test -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+              if [[ "$service_ip" != "" ]]; then
+                  echo "Error: service ip found for service svc-test"
+              fi
+              echo "{\"service_ip\": $service_ip}"
+              echo "{\"unreserved_ip\": $unreserved_ip}"
+              if [[ "$service_ip" == "$unreserved_ip" ]]; then
+                echo "Expected service ip to be null got the unreserved ip: $unreserved_ip"
+              fi
+
+              delete_cm=$(kubectl delete configmap unreserved-ip-config -n $NAMESPACE)
+              if [[ "$delete_cm" == "configmap \"unreserved-ip-config\" deleted" ]]; then
+                echo "Configmap deleted successfully"
+              else
+                echo "Unable to delete the configmap: $delete_cm. Error: $delete_cm"
+              fi
+            check:
+              ($error == null): true
+              (contains($stdout, 'Warning event not found')): false
+              (contains($stdout, 'No un reserved ip found in configmap')): false
+              (contains($stdout, 'Unable to delete the configmap')): false
+              (contains($stdout, 'Expected service ip to be null got the unreserved ip')): false
