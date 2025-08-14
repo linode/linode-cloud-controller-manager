@@ -202,6 +202,8 @@ github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0
 github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de h1:9TO3cAIGXtEhnIaL+V+BEER86oLrvS+kWobKpbJuye0=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de/go.mod h1:zAbeS9B/r2mtpb6U+EI2rYA5OAXxsYw6wTamcNW+zcE=
+github.com/linode/linodego v1.54.1-0.20250812173013-ca1c9b03408c h1:EnDv76oCGlC3YGbmtdLJD67GGCkbKT5rQf+bJSQ5X9A=
+github.com/linode/linodego v1.54.1-0.20250812173013-ca1c9b03408c/go.mod h1:VHlFAbhj18634Cd7B7L5D723kFKFQMOxzIutSMcWsB4=
 github.com/linode/linodego v1.55.0 h1:ZMTRtTP4/4zwYdOKThge04JJIih03DXPDyVlHEmI/AY=
 github.com/linode/linodego v1.55.0/go.mod h1:LoQZ8hW8ZcXh/DJdYADwPCtVP8duyckLRGXwwwh55SU=
 github.com/mackerelio/go-osstat v0.2.5 h1:+MqTbZUhoIt4m8qzkVoXUJg1EuifwlAJSk4Yl2GXh+o=
