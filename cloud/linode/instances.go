@@ -39,12 +39,22 @@ type nodeCache struct {
 }
 
 // getInstanceAddresses returns all addresses configured on a linode.
-func (nc *nodeCache) getInstanceAddresses(instance linodego.Instance, vpcips []string) []nodeIP {
+func (nc *nodeCache) getInstanceAddresses(instance linodego.Instance, vpcips []string, vpcIPv6AddrTypes map[string]v1.NodeAddressType) []nodeIP {
 	ips := []nodeIP{}
+
+	// We store vpc IPv6 addrs separately so that we can list them after IPv4 addresses.
+	// Ordering matters in k8s, first address marked as externalIP will be used as external IP for node.
+	// We prefer to use IPv4 address as external IP if possible, so we list them first.
+	vpcIPv6Addrs := []nodeIP{}
 
 	// If vpc ips are present, list them first
 	for _, ip := range vpcips {
 		ipType := v1.NodeInternalIP
+		if _, ok := vpcIPv6AddrTypes[ip]; ok {
+			ipType = vpcIPv6AddrTypes[ip]
+			vpcIPv6Addrs = append(vpcIPv6Addrs, nodeIP{ip: ip, ipType: ipType})
+			continue
+		}
 		ips = append(ips, nodeIP{ip: ip, ipType: ipType})
 	}
 
@@ -55,6 +65,9 @@ func (nc *nodeCache) getInstanceAddresses(instance linodego.Instance, vpcips []s
 		}
 		ips = append(ips, nodeIP{ip: ip.String(), ipType: ipType})
 	}
+
+	// Add vpc IPv6 addresses after IPv4 addresses
+	ips = append(ips, vpcIPv6Addrs...)
 
 	if instance.IPv6 != "" {
 		ips = append(ips, nodeIP{ip: strings.TrimSuffix(instance.IPv6, "/128"), ipType: v1.NodeExternalIP})
@@ -80,9 +93,9 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 
 	// If running within VPC, find instances and store their ips
 	vpcNodes := map[int][]string{}
-	vpcNames := strings.Split(Options.VPCNames, ",")
-	for _, v := range vpcNames {
-		vpcName := strings.TrimSpace(v)
+	vpcIPv6AddrTypes := map[string]v1.NodeAddressType{}
+	for _, name := range Options.VPCNames {
+		vpcName := strings.TrimSpace(name)
 		if vpcName == "" {
 			continue
 		}
@@ -91,23 +104,42 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 			klog.Errorf("failed updating instances cache for VPC %s. Error: %s", vpcName, err.Error())
 			continue
 		}
-		for _, r := range resp {
-			if r.Address == nil {
+		for _, vpcip := range resp {
+			if vpcip.Address == nil {
 				continue
 			}
-			vpcNodes[r.LinodeID] = append(vpcNodes[r.LinodeID], *r.Address)
+			vpcNodes[vpcip.LinodeID] = append(vpcNodes[vpcip.LinodeID], *vpcip.Address)
+		}
+
+		resp, err = GetVPCIPv6Addresses(ctx, client, vpcName)
+		if err != nil {
+			klog.Errorf("failed updating instances cache for VPC %s. Error: %s", vpcName, err.Error())
+			continue
+		}
+		for _, vpcip := range resp {
+			if len(vpcip.IPv6Addresses) == 0 {
+				continue
+			}
+			vpcIPv6AddrType := v1.NodeInternalIP
+			if vpcip.IPv6IsPublic != nil && *vpcip.IPv6IsPublic {
+				vpcIPv6AddrType = v1.NodeExternalIP
+			}
+			for _, ipv6 := range vpcip.IPv6Addresses {
+				vpcNodes[vpcip.LinodeID] = append(vpcNodes[vpcip.LinodeID], ipv6.SLAACAddress)
+				vpcIPv6AddrTypes[ipv6.SLAACAddress] = vpcIPv6AddrType
+			}
 		}
 	}
 
 	newNodes := make(map[int]linodeInstance, len(instances))
 	for index, instance := range instances {
 		// if running within VPC, only store instances in cache which are part of VPC
-		if Options.VPCNames != "" && len(vpcNodes[instance.ID]) == 0 {
+		if len(Options.VPCNames) > 0 && len(vpcNodes[instance.ID]) == 0 {
 			continue
 		}
 		node := linodeInstance{
 			instance: &instances[index],
-			ips:      nc.getInstanceAddresses(instance, vpcNodes[instance.ID]),
+			ips:      nc.getInstanceAddresses(instance, vpcNodes[instance.ID], vpcIPv6AddrTypes),
 		}
 		newNodes[instance.ID] = node
 	}

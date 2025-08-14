@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -34,14 +35,14 @@ var supportedLoadBalancerTypes = []string{ciliumLBType, nodeBalancerLBType}
 // We expect it to be initialized with flags external to this package, likely in
 // main.go
 var Options struct {
-	KubeconfigFlag           *pflag.Flag
-	LinodeGoDebug            bool
-	EnableRouteController    bool
-	EnableTokenHealthChecker bool
-	// Deprecated: use VPCNames instead
-	VPCName                           string
-	VPCNames                          string
-	SubnetNames                       string
+	KubeconfigFlag                    *pflag.Flag
+	LinodeGoDebug                     bool
+	EnableRouteController             bool
+	EnableTokenHealthChecker          bool
+	VPCNames                          []string
+	VPCIDs                            []int
+	SubnetNames                       []string
+	SubnetIDs                         []int
 	LoadBalancerType                  string
 	BGPNodeSelector                   string
 	IpHolderSuffix                    string
@@ -55,9 +56,11 @@ var Options struct {
 	GlobalStopChannel                 chan<- struct{}
 	EnableIPv6ForLoadBalancers        bool
 	AllocateNodeCIDRs                 bool
+	DisableIPv6NodeCIDRAllocation     bool
 	ClusterCIDRIPv4                   string
 	NodeCIDRMaskSizeIPv4              int
 	NodeCIDRMaskSizeIPv6              int
+	NodeBalancerPrefix                string
 }
 
 type linodeCloud struct {
@@ -69,8 +72,9 @@ type linodeCloud struct {
 }
 
 var (
-	instanceCache     *instances
-	ipHolderCharLimit int = 23
+	instanceCache               *instances
+	ipHolderCharLimit           int = 23
+	NodeBalancerPrefixCharLimit int = 19
 )
 
 func init() {
@@ -138,19 +142,9 @@ func newCloud() (cloudprovider.Interface, error) {
 		healthChecker = newHealthChecker(linodeClient, tokenHealthCheckPeriod, Options.GlobalStopChannel)
 	}
 
-	if Options.VPCName != "" && Options.VPCNames != "" {
-		return nil, fmt.Errorf("cannot have both vpc-name and vpc-names set")
-	}
-
-	if Options.VPCName != "" {
-		klog.Warningf("vpc-name flag is deprecated. Use vpc-names instead")
-		Options.VPCNames = Options.VPCName
-	}
-
-	// SubnetNames can't be used without VPCNames also being set
-	if Options.SubnetNames != "" && Options.VPCNames == "" {
-		klog.Warningf("failed to set flag subnet-names: vpc-names must be set to a non-empty value")
-		Options.SubnetNames = ""
+	err = validateAndSetVPCSubnetFlags(linodeClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate VPC and subnet flags: %w", err)
 	}
 
 	if Options.NodeBalancerBackendIPv4SubnetID != 0 && Options.NodeBalancerBackendIPv4SubnetName != "" {
@@ -189,6 +183,19 @@ func newCloud() (cloudprovider.Interface, error) {
 
 	if len(Options.IpHolderSuffix) > ipHolderCharLimit {
 		msg := fmt.Sprintf("ip-holder-suffix must be %d characters or less: %s is %d characters\n", ipHolderCharLimit, Options.IpHolderSuffix, len(Options.IpHolderSuffix))
+		klog.Error(msg)
+		return nil, fmt.Errorf("%s", msg)
+	}
+
+	if len(Options.NodeBalancerPrefix) > NodeBalancerPrefixCharLimit {
+		msg := fmt.Sprintf("nodebalancer-prefix must be %d characters or less: %s is %d characters\n", NodeBalancerPrefixCharLimit, Options.NodeBalancerPrefix, len(Options.NodeBalancerPrefix))
+		klog.Error(msg)
+		return nil, fmt.Errorf("%s", msg)
+	}
+
+	validPrefix := regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+	if !validPrefix.MatchString(Options.NodeBalancerPrefix) {
+		msg := fmt.Sprintf("nodebalancer-prefix must be no empty and use only letters, numbers, underscores, and dashes: %s\n", Options.NodeBalancerPrefix)
 		klog.Error(msg)
 		return nil, fmt.Errorf("%s", msg)
 	}

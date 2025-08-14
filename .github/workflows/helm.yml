@@ -80,3 +80,4 @@ jobs:
         with:
           charts_dir: deploy
           skip_existing: true
+          mark_as_latest: false

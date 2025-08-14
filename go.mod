@@ -6,29 +6,32 @@ toolchain go1.24.1
 
 require (
 	github.com/appscode/go v0.0.0-20201105063637-5613f3b8169f
-	github.com/cilium/cilium v1.17.4
-	github.com/getsentry/sentry-go v0.33.0
+	github.com/cilium/cilium v1.17.6
+	github.com/getsentry/sentry-go v0.35.0
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
 	github.com/hexdigest/gowrap v1.4.2
 	github.com/linode/linodego v1.55.0
-	github.com/prometheus/client_golang v1.22.0
-	github.com/spf13/pflag v1.0.6
+	github.com/prometheus/client_golang v1.23.0
+	github.com/spf13/pflag v1.0.7
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/exp v0.0.0-20241215155358-4a5509556b9e
-	k8s.io/api v0.33.2
-	k8s.io/apimachinery v0.33.2
-	k8s.io/client-go v0.33.2
-	k8s.io/cloud-provider v0.33.2
-	k8s.io/component-base v0.33.2
+	k8s.io/api v0.33.3
+	k8s.io/apimachinery v0.33.3
+	k8s.io/client-go v0.33.3
+	k8s.io/cloud-provider v0.33.3
+	k8s.io/component-base v0.33.3
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20250502105355-0f33e8f1c979
 )
 
-require sigs.k8s.io/randfill v1.0.0 // indirect
+require (
+	github.com/onsi/gomega v1.35.1 // indirect
+	sigs.k8s.io/randfill v1.0.0 // indirect
+)
 
 require (
-	cel.dev/expr v0.19.1 // indirect
+	cel.dev/expr v0.20.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.2.1 // indirect
@@ -41,9 +44,9 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cilium/ebpf v0.17.1 // indirect
-	github.com/cilium/hive v0.0.0-20250121145729-e67f66eb0375 // indirect
-	github.com/cilium/proxy v0.0.0-20250408103314-d3be7c547203 // indirect
-	github.com/cilium/statedb v0.3.6 // indirect
+	github.com/cilium/hive v0.0.0-20250522145610-0734675df148 // indirect
+	github.com/cilium/proxy v0.0.0-20250526114940-b80199397e8a // indirect
+	github.com/cilium/statedb v0.4.0 // indirect
 	github.com/cilium/stream v0.0.0-20241203114243-53c3e5d79744 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
@@ -102,9 +105,9 @@ require (
 	github.com/petermattis/goid v0.0.0-20241211131331-93ee7e083c43 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_model v0.6.1 // indirect
-	github.com/prometheus/common v0.62.0 // indirect
-	github.com/prometheus/procfs v0.15.1 // indirect
+	github.com/prometheus/client_model v0.6.2 // indirect
+	github.com/prometheus/common v0.65.0 // indirect
+	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/sagikazarmark/locafero v0.6.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/sasha-s/go-deadlock v0.3.5 // indirect
@@ -150,7 +153,7 @@ require (
 	golang.org/x/tools v0.35.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250407143221-ac9807e6c755 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250407143221-ac9807e6c755 // indirect
-	google.golang.org/grpc v1.71.1 // indirect
+	google.golang.org/grpc v1.72.1 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
@@ -158,13 +161,13 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.33.0 // indirect
-	k8s.io/apiserver v0.33.2 // indirect
-	k8s.io/component-helpers v0.33.2 // indirect
-	k8s.io/controller-manager v0.33.2 // indirect
-	k8s.io/kms v0.33.2 // indirect
+	k8s.io/apiserver v0.33.3 // indirect
+	k8s.io/component-helpers v0.33.3
+	k8s.io/controller-manager v0.33.3 // indirect
+	k8s.io/kms v0.33.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff // indirect
 	k8s.io/kubelet v0.33.0 // indirect
-	k8s.io/kubernetes v1.33.2
+	k8s.io/kubernetes v1.33.3
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.32.0 // indirect
 	sigs.k8s.io/gateway-api v1.3.0 // indirect
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
@@ -182,6 +185,7 @@ replace (
 	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.33.0
 	k8s.io/externaljwt => k8s.io/externaljwt v0.33.0
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.33.0
+	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.33.0
 	k8s.io/kube-proxy => k8s.io/kube-proxy v0.33.0
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.33.0
 	k8s.io/kubelet => k8s.io/kubelet v0.33.0

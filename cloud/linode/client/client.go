@@ -20,12 +20,14 @@ import (
 const (
 	// DefaultClientTimeout is the default timeout for a client Linode API call
 	DefaultClientTimeout = 120 * time.Second
+	DefaultLinodeAPIURL  = "https://api.linode.com"
 )
 
 type Client interface {
 	GetInstance(context.Context, int) (*linodego.Instance, error)
 	ListInstances(context.Context, *linodego.ListOptions) ([]linodego.Instance, error)
 	CreateInstance(ctx context.Context, opts linodego.InstanceCreateOptions) (*linodego.Instance, error)
+	ListInstanceConfigs(ctx context.Context, linodeID int, opts *linodego.ListOptions) ([]linodego.InstanceConfig, error)
 
 	GetInstanceIPAddresses(context.Context, int) (*linodego.InstanceIPAddressResponse, error)
 	AddInstanceIPAddress(ctx context.Context, linodeID int, public bool) (*linodego.InstanceIP, error)
@@ -34,8 +36,11 @@ type Client interface {
 
 	UpdateInstanceConfigInterface(context.Context, int, int, int, linodego.InstanceConfigInterfaceUpdateOptions) (*linodego.InstanceConfigInterface, error)
 
+	GetVPC(context.Context, int) (*linodego.VPC, error)
+	GetVPCSubnet(context.Context, int, int) (*linodego.VPCSubnet, error)
 	ListVPCs(context.Context, *linodego.ListOptions) ([]linodego.VPC, error)
 	ListVPCIPAddresses(context.Context, int, *linodego.ListOptions) ([]linodego.VPCIP, error)
+	ListVPCIPv6Addresses(context.Context, int, *linodego.ListOptions) ([]linodego.VPCIP, error)
 	ListVPCSubnets(context.Context, int, *linodego.ListOptions) ([]linodego.VPCSubnet, error)
 
 	CreateNodeBalancer(context.Context, linodego.NodeBalancerCreateOptions) (*linodego.NodeBalancer, error)
@@ -68,6 +73,9 @@ var _ Client = (*linodego.Client)(nil)
 func New(token string, timeout time.Duration) (*linodego.Client, error) {
 	userAgent := fmt.Sprintf("linode-cloud-controller-manager %s", linodego.DefaultUserAgent)
 	apiURL := os.Getenv("LINODE_URL")
+	if apiURL == "" {
+		apiURL = DefaultLinodeAPIURL
+	}
 
 	linodeClient := linodego.NewClient(&http.Client{Timeout: timeout})
 	client, err := linodeClient.UseURL(apiURL)

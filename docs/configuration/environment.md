@@ -34,25 +34,29 @@ The CCM can be configured using environment variables and flags. Environment var
 
 The CCM supports the following flags:
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--linodego-debug` | `false` | Enables debug output for the LinodeAPI wrapper |
-| `--enable-route-controller` | `false` | Enables route_controller for CCM |
-| `--enable-token-health-checker` | `false` | Enables Linode API token health checker |
-| `--vpc-names` | `""` | Comma separated VPC names whose routes will be managed by route-controller |
-| `--subnet-names` | `""` | Comma separated subnet names whose routes will be managed by route-controller (requires vpc-names flag) |
-| `--load-balancer-type` | `nodebalancer` | Configures which type of load-balancing to use (options: nodebalancer, cilium-bgp) |
-| `--bgp-node-selector` | `""` | Node selector to use to perform shared IP fail-over with BGP |
-| `--ip-holder-suffix` | `""` | Suffix to append to the IP holder name when using shared IP fail-over with BGP |
-| `--default-nodebalancer-type` | `common` | Default type of NodeBalancer to create (options: common, premium) |
-| `--nodebalancer-tags` | `[]` | Linode tags to apply to all NodeBalancers |
-| `--nodebalancer-backend-ipv4-subnet` | `""` | ipv4 subnet to use for NodeBalancer backends |
-| `--nodebalancer-backend-ipv4-subnet-id` | `""` | ipv4 subnet id to use for NodeBalancer backends |
-| `--nodebalancer-backend-ipv4-subnet-name` | `""` | ipv4 subnet name to use for NodeBalancer backends |
-| `--disable-nodebalancer-vpc-backends` | `false` | don't use VPC specific ip-addresses for nodebalancer backend ips when running in VPC (set to `true` for backward compatibility if needed) |
-| `--enable-ipv6-for-loadbalancers` | `false` | Set both IPv4 and IPv6 addresses for all LoadBalancer services (when disabled, only IPv4 is used). This can also be configured per-service using the `service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-ingress` annotation. |
-| `--node-cidr-mask-size-ipv4` | `24` | ipv4 cidr mask size for pod cidrs allocated to nodes |
-| `--node-cidr-mask-size-ipv6` | `64` | ipv6 cidr mask size for pod cidrs allocated to nodes |
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--linodego-debug` | Boolean | `false` | Enables debug output for the LinodeAPI wrapper |
+| `--enable-route-controller` | Boolean | `false` | Enables route_controller for CCM |
+| `--enable-token-health-checker` | Boolean | `false` | Enables Linode API token health checker |
+| `--vpc-names` | String (comma separated) |  | Comma separated VPC names whose routes will be managed by route-controller |
+| `--subnet-names` | String (comma separated) | `"default"` | Comma separated subnet names whose routes will be managed by route-controller (requires vpc-names flag) |
+| `--vpc-ids` | Int (comma separated) |  | Comma separated VPC ids whose routes will be managed by route-controller |
+| `--subnet-ids` | Int (comma separated) |  | Comma separated subnet ids whose routes will be managed by route-controller (requires vpc-ids flag) |
+| `--load-balancer-type` | String | `nodebalancer` | Configures which type of load-balancing to use (options: nodebalancer, cilium-bgp) |
+| `--bgp-node-selector` | String | `""` | Node selector to use to perform shared IP fail-over with BGP |
+| `--ip-holder-suffix` | String | `""` | Suffix to append to the IP holder name when using shared IP fail-over with BGP |
+| `--default-nodebalancer-type` | String | `common` | Default type of NodeBalancer to create (options: common, premium) |
+| `--nodebalancer-tags` | String (comma separated) |  | Linode tags to apply to all NodeBalancers |
+| `--nodebalancer-backend-ipv4-subnet` | String | `""` | ipv4 subnet to use for NodeBalancer backends |
+| `--nodebalancer-backend-ipv4-subnet-id` | Int | `""` | ipv4 subnet id to use for NodeBalancer backends |
+| `--nodebalancer-backend-ipv4-subnet-name` | String | `""` | ipv4 subnet name to use for NodeBalancer backends |
+| `--disable-nodebalancer-vpc-backends` | Boolean | `false` | don't use VPC specific ip-addresses for nodebalancer backend ips when running in VPC (set to `true` for backward compatibility if needed) |
+| `--enable-ipv6-for-loadbalancers` | Boolean | `false` | Set both IPv4 and IPv6 addresses for all LoadBalancer services (when disabled, only IPv4 is used). This can also be configured per-service using the `service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-ingress` annotation. |
+| `--node-cidr-mask-size-ipv4` | Int | `24` | ipv4 cidr mask size for pod cidrs allocated to nodes |
+| `--node-cidr-mask-size-ipv6` | Int | `64` | ipv6 cidr mask size for pod cidrs allocated to nodes |
+| `--nodebalancer-prefix` | String | `ccm` | Name prefix for NoadBalancers. |
+| `--disable-ipv6-node-cidr-allocation` | Boolean | `false` | disables allocating IPv6 CIDR ranges to nodes when using CCM for node IPAM (set to `true` if IPv6 ranges are not configured on Linode interfaces) |
 
 ## Configuration Methods
 

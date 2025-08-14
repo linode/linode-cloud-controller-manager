@@ -270,6 +270,36 @@ func (mr *MockClientMockRecorder) GetProfile(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProfile", reflect.TypeOf((*MockClient)(nil).GetProfile), arg0)
 }
 
+// GetVPC mocks base method.
+func (m *MockClient) GetVPC(arg0 context.Context, arg1 int) (*linodego.VPC, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetVPC", arg0, arg1)
+	ret0, _ := ret[0].(*linodego.VPC)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetVPC indicates an expected call of GetVPC.
+func (mr *MockClientMockRecorder) GetVPC(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVPC", reflect.TypeOf((*MockClient)(nil).GetVPC), arg0, arg1)
+}
+
+// GetVPCSubnet mocks base method.
+func (m *MockClient) GetVPCSubnet(arg0 context.Context, arg1, arg2 int) (*linodego.VPCSubnet, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetVPCSubnet", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*linodego.VPCSubnet)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetVPCSubnet indicates an expected call of GetVPCSubnet.
+func (mr *MockClientMockRecorder) GetVPCSubnet(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVPCSubnet", reflect.TypeOf((*MockClient)(nil).GetVPCSubnet), arg0, arg1, arg2)
+}
+
 // ListFirewallDevices mocks base method.
 func (m *MockClient) ListFirewallDevices(arg0 context.Context, arg1 int, arg2 *linodego.ListOptions) ([]linodego.FirewallDevice, error) {
 	m.ctrl.T.Helper()
@@ -283,6 +313,21 @@ func (m *MockClient) ListFirewallDevices(arg0 context.Context, arg1 int, arg2 *l
 func (mr *MockClientMockRecorder) ListFirewallDevices(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListFirewallDevices", reflect.TypeOf((*MockClient)(nil).ListFirewallDevices), arg0, arg1, arg2)
+}
+
+// ListInstanceConfigs mocks base method.
+func (m *MockClient) ListInstanceConfigs(arg0 context.Context, arg1 int, arg2 *linodego.ListOptions) ([]linodego.InstanceConfig, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListInstanceConfigs", arg0, arg1, arg2)
+	ret0, _ := ret[0].([]linodego.InstanceConfig)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListInstanceConfigs indicates an expected call of ListInstanceConfigs.
+func (mr *MockClientMockRecorder) ListInstanceConfigs(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListInstanceConfigs", reflect.TypeOf((*MockClient)(nil).ListInstanceConfigs), arg0, arg1, arg2)
 }
 
 // ListInstances mocks base method.
@@ -373,6 +418,21 @@ func (m *MockClient) ListVPCIPAddresses(arg0 context.Context, arg1 int, arg2 *li
 func (mr *MockClientMockRecorder) ListVPCIPAddresses(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListVPCIPAddresses", reflect.TypeOf((*MockClient)(nil).ListVPCIPAddresses), arg0, arg1, arg2)
+}
+
+// ListVPCIPv6Addresses mocks base method.
+func (m *MockClient) ListVPCIPv6Addresses(arg0 context.Context, arg1 int, arg2 *linodego.ListOptions) ([]linodego.VPCIP, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListVPCIPv6Addresses", arg0, arg1, arg2)
+	ret0, _ := ret[0].([]linodego.VPCIP)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListVPCIPv6Addresses indicates an expected call of ListVPCIPv6Addresses.
+func (mr *MockClientMockRecorder) ListVPCIPv6Addresses(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListVPCIPv6Addresses", reflect.TypeOf((*MockClient)(nil).ListVPCIPv6Addresses), arg0, arg1, arg2)
 }
 
 // ListVPCSubnets mocks base method.

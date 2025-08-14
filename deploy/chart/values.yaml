@@ -75,9 +75,11 @@ tolerations:
 
 # This section adds ability to enable route-controller for ccm
 # routeController:
-#   vpcName: <name of VPC> [Deprecated: use vpcNames instead]
+#   Use one of the two: either [vpcNames and subnetNames] or [vpcIDs and subnetIDs]
 #   vpcNames: <comma separated list of vpc names>
 #   subnetNames: <comma separated list of subnet names>
+#   vpcIDs: <comma separated list of vpc ids>
+#   subnetIDs: <comma separated list of subnet ids>
 #   clusterCIDR: 10.192.0.0/10
 #   configureCloudRoutes: true
 
@@ -86,11 +88,14 @@ tolerations:
 # clusterCIDR: 10.192.0.0/10
 # nodeCIDRMaskSizeIPv4: 24
 # nodeCIDRMaskSizeIPv6: 64
+# disableIPv6NodeCIDRAllocation: false
 
 # vpcs and subnets that node internal IPs will be assigned from (not required if already specified in routeController)
-# vpcName: <name of VPC> [Deprecated: use vpcNames instead]
+# Use one of the two: either [vpcNames and subnetNames] or [vpcIDs and subnetIDs]
 # vpcNames: <comma separated list of vpc names>
 # subnetNames: <comma separated list of subnet names>
+# vpcIDs: <comma separated list of vpc ids>
+# subnetIDs: <comma separated list of subnet ids>
 
 # Enable Linode token health checker
 # tokenHealthChecker: true
@@ -115,6 +120,9 @@ tolerations:
 
 # nodeBalancerBackendIPv4SubnetName is the subnet name to use for the backend ips of the NodeBalancer
 # nodeBalancerBackendIPv4SubnetName: ""
+
+# nodeBalancerPrefix is used to add prefix for nodeBalancer name. Default is "ccm"
+# nodeBalancerPrefix: ""
 
 # This section adds the ability to pass environment variables to adjust CCM defaults
 # https://github.com/linode/linode-cloud-controller-manager/blob/master/cloud/linode/loadbalancers.go

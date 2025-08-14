@@ -83,9 +83,10 @@ func main() {
 	command.Flags().BoolVar(&linode.Options.LinodeGoDebug, "linodego-debug", false, "enables debug output for the LinodeAPI wrapper")
 	command.Flags().BoolVar(&linode.Options.EnableRouteController, "enable-route-controller", false, "enables route_controller for ccm")
 	command.Flags().BoolVar(&linode.Options.EnableTokenHealthChecker, "enable-token-health-checker", false, "enables Linode API token health checker")
-	command.Flags().StringVar(&linode.Options.VPCName, "vpc-name", "", "[deprecated: use vpc-names instead] vpc name whose routes will be managed by route-controller")
-	command.Flags().StringVar(&linode.Options.VPCNames, "vpc-names", "", "comma separated vpc names whose routes will be managed by route-controller")
-	command.Flags().StringVar(&linode.Options.SubnetNames, "subnet-names", "default", "comma separated subnet names whose routes will be managed by route-controller (requires vpc-names flag to also be set)")
+	command.Flags().StringSliceVar(&linode.Options.VPCNames, "vpc-names", nil, "comma separated vpc names whose routes will be managed by route-controller")
+	command.Flags().StringSliceVar(&linode.Options.SubnetNames, "subnet-names", []string{"default"}, "comma separated subnet names whose routes will be managed by route-controller (requires vpc-names flag to also be set)")
+	command.Flags().IntSliceVar(&linode.Options.VPCIDs, "vpc-ids", nil, "comma separated vpc ids whose routes will be managed by route-controller")
+	command.Flags().IntSliceVar(&linode.Options.SubnetIDs, "subnet-ids", nil, "comma separated subnet ids whose routes will be managed by route-controller (requires vpc-ids flag to also be set)")
 	command.Flags().StringVar(&linode.Options.LoadBalancerType, "load-balancer-type", "nodebalancer", "configures which type of load-balancing to use for LoadBalancer Services (options: nodebalancer, cilium-bgp)")
 	command.Flags().StringVar(&linode.Options.BGPNodeSelector, "bgp-node-selector", "", "node selector to use to perform shared IP fail-over with BGP (e.g. cilium-bgp-peering=true")
 	command.Flags().StringVar(&linode.Options.IpHolderSuffix, "ip-holder-suffix", "", "suffix to append to the ip holder name when using shared IP fail-over with BGP (e.g. ip-holder-suffix=my-cluster-name")
@@ -98,6 +99,8 @@ func main() {
 	command.Flags().IntVar(&linode.Options.NodeBalancerBackendIPv4SubnetID, "nodebalancer-backend-ipv4-subnet-id", 0, "ipv4 subnet id to use for NodeBalancer backends")
 	command.Flags().StringVar(&linode.Options.NodeBalancerBackendIPv4SubnetName, "nodebalancer-backend-ipv4-subnet-name", "", "ipv4 subnet name to use for NodeBalancer backends")
 	command.Flags().BoolVar(&linode.Options.DisableNodeBalancerVPCBackends, "disable-nodebalancer-vpc-backends", false, "disables nodebalancer backends in VPCs (when enabled, nodebalancers will only have private IPs as backends for backward compatibility)")
+	command.Flags().StringVar(&linode.Options.NodeBalancerPrefix, "nodebalancer-prefix", "ccm", fmt.Sprintf("Name prefix for NoadBalancers. (max. %v char.)", linode.NodeBalancerPrefixCharLimit))
+	command.Flags().BoolVar(&linode.Options.DisableIPv6NodeCIDRAllocation, "disable-ipv6-node-cidr-allocation", false, "disables IPv6 node cidr allocation by ipam controller (when enabled, IPv6 cidr ranges will be allocated to nodes)")
 
 	// Set static flags
 	command.Flags().VisitAll(func(fl *pflag.Flag) {
