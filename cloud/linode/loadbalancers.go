@@ -363,15 +363,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 }
 
 func (l *loadbalancers) createIPChangeWarningEvent(ctx context.Context, service *v1.Service, nb *linodego.NodeBalancer, newIP string) {
-	if l.kubeClient == nil {
-		err := l.retrieveKubeClient()
-		if err != nil {
-			err = fmt.Errorf("%w: Error retrieving kube client", err)
-			return
-		}
-	}
-
-	l.kubeClient.CoreV1().Events(service.Namespace).Create(ctx, &v1.Event{
+	_, err := l.kubeClient.CoreV1().Events(service.Namespace).Create(ctx, &v1.Event{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("nodebalancer-ipv4-change-ignored-%d", time.Now().Unix()),
 			Namespace: service.Namespace,
@@ -389,6 +381,9 @@ func (l *loadbalancers) createIPChangeWarningEvent(ctx context.Context, service 
 			Component: "linode-cloud-controller-manager",
 		},
 	}, metav1.CreateOptions{})
+	if err != nil {
+		klog.Errorf("failed to create NodeBalancerIPChangeIgnored event for service %s: %s", getServiceNn(service), err)
+	}
 }
 
 func (l *loadbalancers) updateNodeBalancer(
@@ -881,7 +876,7 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 	// Check for static IPv4 address annotation
 	if ipv4, ok := service.GetAnnotations()[annotations.AnnLinodeLoadBalancerIPv4]; ok {
 		if err := isValidPublicIPv4(ipv4); err != nil {
-			return nil, fmt.Errorf("invalid IPv4 address in annotation %s: %v", annotations.AnnLinodeLoadBalancerIPv4, err)
+			return nil, fmt.Errorf("invalid IPv4 address in annotation %s: %w", annotations.AnnLinodeLoadBalancerIPv4, err)
 		}
 		createOpts.IPv4 = &ipv4
 	}
