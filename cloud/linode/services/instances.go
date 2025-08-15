@@ -1,4 +1,4 @@
-package linode
+package services
 
 import (
 	"context"
@@ -18,6 +18,8 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
+	ccmUtils "github.com/linode/linode-cloud-controller-manager/cloud/linode/utils"
 	"github.com/linode/linode-cloud-controller-manager/sentry"
 )
 
@@ -60,7 +62,7 @@ func (nc *nodeCache) getInstanceAddresses(instance linodego.Instance, vpcips []s
 
 	for _, ip := range instance.IPv4 {
 		ipType := v1.NodeExternalIP
-		if isPrivate(ip) {
+		if ccmUtils.IsPrivate(ip, options.Options.LinodeExternalNetwork) {
 			ipType = v1.NodeInternalIP
 		}
 		ips = append(ips, nodeIP{ip: ip.String(), ipType: ipType})
@@ -94,7 +96,7 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 	// If running within VPC, find instances and store their ips
 	vpcNodes := map[int][]string{}
 	vpcIPv6AddrTypes := map[string]v1.NodeAddressType{}
-	for _, name := range Options.VPCNames {
+	for _, name := range options.Options.VPCNames {
 		vpcName := strings.TrimSpace(name)
 		if vpcName == "" {
 			continue
@@ -134,7 +136,7 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 	newNodes := make(map[int]linodeInstance, len(instances))
 	for index, instance := range instances {
 		// if running within VPC, only store instances in cache which are part of VPC
-		if len(Options.VPCNames) > 0 && len(vpcNodes[instance.ID]) == 0 {
+		if len(options.Options.VPCNames) > 0 && len(vpcNodes[instance.ID]) == 0 {
 			continue
 		}
 		node := linodeInstance{
@@ -149,13 +151,14 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 	return nil
 }
 
-type instances struct {
+type Instances struct {
 	client client.Client
 
 	nodeCache *nodeCache
 }
 
-func newInstances(client client.Client) *instances {
+// NewInstances creates a new Instances cache with a specified TTL for the nodeCache.
+func NewInstances(client client.Client) *Instances {
 	timeout := 15
 	if raw, ok := os.LookupEnv("LINODE_INSTANCE_CACHE_TTL"); ok {
 		if t, err := strconv.Atoi(raw); t > 0 && err == nil {
@@ -164,7 +167,7 @@ func newInstances(client client.Client) *instances {
 	}
 	klog.V(3).Infof("TTL for nodeCache set to %d", timeout)
 
-	return &instances{client, &nodeCache{
+	return &Instances{client, &nodeCache{
 		nodes: make(map[int]linodeInstance, 0),
 		ttl:   time.Duration(timeout) * time.Second,
 	}}
@@ -178,7 +181,7 @@ func (e instanceNoIPAddressesError) Error() string {
 	return fmt.Sprintf("instance %d has no IP addresses", e.id)
 }
 
-func (i *instances) linodeByIP(kNode *v1.Node) (*linodego.Instance, error) {
+func (i *Instances) linodeByIP(kNode *v1.Node) (*linodego.Instance, error) {
 	i.nodeCache.RLock()
 	defer i.nodeCache.RUnlock()
 	var kNodeAddresses []string
@@ -192,7 +195,7 @@ func (i *instances) linodeByIP(kNode *v1.Node) (*linodego.Instance, error) {
 	}
 	for _, node := range i.nodeCache.nodes {
 		for _, nodeIP := range node.instance.IPv4 {
-			if !isPrivate(nodeIP) && slices.Contains(kNodeAddresses, nodeIP.String()) {
+			if !ccmUtils.IsPrivate(nodeIP, options.Options.LinodeExternalNetwork) && slices.Contains(kNodeAddresses, nodeIP.String()) {
 				return node.instance, nil
 			}
 		}
@@ -201,7 +204,7 @@ func (i *instances) linodeByIP(kNode *v1.Node) (*linodego.Instance, error) {
 	return nil, cloudprovider.InstanceNotFound
 }
 
-func (i *instances) linodeByName(nodeName types.NodeName) *linodego.Instance {
+func (i *Instances) linodeByName(nodeName types.NodeName) *linodego.Instance {
 	i.nodeCache.RLock()
 	defer i.nodeCache.RUnlock()
 	for _, node := range i.nodeCache.nodes {
@@ -213,7 +216,7 @@ func (i *instances) linodeByName(nodeName types.NodeName) *linodego.Instance {
 	return nil
 }
 
-func (i *instances) linodeByID(id int) (*linodego.Instance, error) {
+func (i *Instances) linodeByID(id int) (*linodego.Instance, error) {
 	i.nodeCache.RLock()
 	defer i.nodeCache.RUnlock()
 	linodeInstance, ok := i.nodeCache.nodes[id]
@@ -223,8 +226,8 @@ func (i *instances) linodeByID(id int) (*linodego.Instance, error) {
 	return linodeInstance.instance, nil
 }
 
-// listAllInstances returns all instances in nodeCache
-func (i *instances) listAllInstances(ctx context.Context) ([]linodego.Instance, error) {
+// ListAllInstances returns all instances in nodeCache
+func (i *Instances) ListAllInstances(ctx context.Context) ([]linodego.Instance, error) {
 	if err := i.nodeCache.refreshInstances(ctx, i.client); err != nil {
 		return nil, err
 	}
@@ -236,7 +239,8 @@ func (i *instances) listAllInstances(ctx context.Context) ([]linodego.Instance, 
 	return instances, nil
 }
 
-func (i *instances) lookupLinode(ctx context.Context, node *v1.Node) (*linodego.Instance, error) {
+// LookupLinode looks up a Linode instance by its ProviderID or NodeName.
+func (i *Instances) LookupLinode(ctx context.Context, node *v1.Node) (*linodego.Instance, error) {
 	if err := i.nodeCache.refreshInstances(ctx, i.client); err != nil {
 		return nil, err
 	}
@@ -247,8 +251,8 @@ func (i *instances) lookupLinode(ctx context.Context, node *v1.Node) (*linodego.
 	sentry.SetTag(ctx, "provider_id", providerID)
 	sentry.SetTag(ctx, "node_name", node.Name)
 
-	if providerID != "" && isLinodeProviderID(providerID) {
-		id, err := parseProviderID(providerID)
+	if providerID != "" && ccmUtils.IsLinodeProviderID(providerID) {
+		id, err := ccmUtils.ParseProviderID(providerID)
 		if err != nil {
 			sentry.CaptureError(ctx, err)
 			return nil, err
@@ -265,9 +269,9 @@ func (i *instances) lookupLinode(ctx context.Context, node *v1.Node) (*linodego.
 	return i.linodeByIP(node)
 }
 
-func (i *instances) InstanceExists(ctx context.Context, node *v1.Node) (bool, error) {
+func (i *Instances) InstanceExists(ctx context.Context, node *v1.Node) (bool, error) {
 	ctx = sentry.SetHubOnContext(ctx)
-	if _, err := i.lookupLinode(ctx, node); err != nil {
+	if _, err := i.LookupLinode(ctx, node); err != nil {
 		if errors.Is(err, cloudprovider.InstanceNotFound) {
 			return false, nil
 		}
@@ -278,9 +282,9 @@ func (i *instances) InstanceExists(ctx context.Context, node *v1.Node) (bool, er
 	return true, nil
 }
 
-func (i *instances) InstanceShutdown(ctx context.Context, node *v1.Node) (bool, error) {
+func (i *Instances) InstanceShutdown(ctx context.Context, node *v1.Node) (bool, error) {
 	ctx = sentry.SetHubOnContext(ctx)
-	instance, err := i.lookupLinode(ctx, node)
+	instance, err := i.LookupLinode(ctx, node)
 	if err != nil {
 		sentry.CaptureError(ctx, err)
 		return false, err
@@ -296,9 +300,9 @@ func (i *instances) InstanceShutdown(ctx context.Context, node *v1.Node) (bool, 
 	return false, nil
 }
 
-func (i *instances) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
+func (i *Instances) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
 	ctx = sentry.SetHubOnContext(ctx)
-	linode, err := i.lookupLinode(ctx, node)
+	linode, err := i.LookupLinode(ctx, node)
 	if err != nil {
 		sentry.CaptureError(ctx, err)
 		return nil, err
@@ -344,7 +348,7 @@ func (i *instances) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloud
 	klog.Infof("Instance %s, assembled IP addresses: %v", node.Name, addresses)
 	// note that Zone is omitted as it's not a thing in Linode
 	meta := &cloudprovider.InstanceMetadata{
-		ProviderID:    fmt.Sprintf("%v%v", providerIDPrefix, linode.ID),
+		ProviderID:    fmt.Sprintf("%v%v", ccmUtils.ProviderIDPrefix, linode.ID),
 		NodeAddresses: addresses,
 		InstanceType:  linode.Type,
 		Region:        linode.Region,
@@ -353,9 +357,9 @@ func (i *instances) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloud
 	return meta, nil
 }
 
-func (i *instances) getLinodeAddresses(ctx context.Context, node *v1.Node) ([]nodeIP, error) {
+func (i *Instances) getLinodeAddresses(ctx context.Context, node *v1.Node) ([]nodeIP, error) {
 	ctx = sentry.SetHubOnContext(ctx)
-	instance, err := i.lookupLinode(ctx, node)
+	instance, err := i.LookupLinode(ctx, node)
 	if err != nil {
 		sentry.CaptureError(ctx, err)
 		return nil, err

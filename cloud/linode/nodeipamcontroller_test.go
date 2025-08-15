@@ -28,6 +28,8 @@ import (
 	v1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
 )
 
 func Test_setNodeCIDRMaskSizes(t *testing.T) {
@@ -56,17 +58,17 @@ func Test_setNodeCIDRMaskSizes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			oldCIDRMaskSizeIPv4 := Options.NodeCIDRMaskSizeIPv4
-			oldCIDRMaskSizeIPv6 := Options.NodeCIDRMaskSizeIPv6
+			oldCIDRMaskSizeIPv4 := options.Options.NodeCIDRMaskSizeIPv4
+			oldCIDRMaskSizeIPv6 := options.Options.NodeCIDRMaskSizeIPv6
 			defer func() {
-				Options.NodeCIDRMaskSizeIPv4 = oldCIDRMaskSizeIPv4
-				Options.NodeCIDRMaskSizeIPv6 = oldCIDRMaskSizeIPv6
+				options.Options.NodeCIDRMaskSizeIPv4 = oldCIDRMaskSizeIPv4
+				options.Options.NodeCIDRMaskSizeIPv6 = oldCIDRMaskSizeIPv6
 			}()
 			if tt.args.ipv4NetMask != 0 {
-				Options.NodeCIDRMaskSizeIPv4 = tt.args.ipv4NetMask
+				options.Options.NodeCIDRMaskSizeIPv4 = tt.args.ipv4NetMask
 			}
 			if tt.args.ipv6NetMask != 0 {
-				Options.NodeCIDRMaskSizeIPv6 = tt.args.ipv6NetMask
+				options.Options.NodeCIDRMaskSizeIPv6 = tt.args.ipv6NetMask
 			}
 			got := setNodeCIDRMaskSizes()
 			if !reflect.DeepEqual(got, tt.want) {
@@ -212,14 +214,14 @@ func Test_startNodeIpamController(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		currAllocateNodeCIDRs := Options.AllocateNodeCIDRs
-		currClusterCIDR := Options.ClusterCIDRIPv4
+		currAllocateNodeCIDRs := options.Options.AllocateNodeCIDRs
+		currClusterCIDR := options.Options.ClusterCIDRIPv4
 		defer func() {
-			Options.AllocateNodeCIDRs = currAllocateNodeCIDRs
-			Options.ClusterCIDRIPv4 = currClusterCIDR
+			options.Options.AllocateNodeCIDRs = currAllocateNodeCIDRs
+			options.Options.ClusterCIDRIPv4 = currClusterCIDR
 		}()
-		Options.AllocateNodeCIDRs = tt.args.allocateNodeCIDRs
-		Options.ClusterCIDRIPv4 = tt.args.clusterCIDR
+		options.Options.AllocateNodeCIDRs = tt.args.allocateNodeCIDRs
+		options.Options.ClusterCIDRIPv4 = tt.args.clusterCIDR
 		t.Run(tt.name, func(t *testing.T) {
 			if err := startNodeIpamController(tt.args.stopCh, &tt.args.cloud, tt.args.nodeInformer, tt.args.kubeclient); (err != nil) != tt.wantErr {
 				t.Errorf("startNodeIpamController() error = %v, wantErr %v", err, tt.wantErr)
