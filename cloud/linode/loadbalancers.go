@@ -27,10 +27,9 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/cache"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/firewall"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
 	"github.com/linode/linode-cloud-controller-manager/sentry"
 )
 
@@ -396,7 +395,7 @@ func (l *loadbalancers) updateNodeBalancer(
 		}
 	}
 
-	fwClient := firewall.LinodeClient{Client: l.client}
+	fwClient := services.LinodeClient{Client: l.client}
 	err = fwClient.UpdateNodeBalancerFirewall(ctx, l.GetLoadBalancerName(ctx, clusterName, service), tags, service, nb)
 	if err != nil {
 		return err
@@ -652,7 +651,7 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 		return nil
 	}
 
-	fwClient := firewall.LinodeClient{Client: l.client}
+	fwClient := services.LinodeClient{Client: l.client}
 	if err = fwClient.DeleteNodeBalancerFirewall(ctx, service, nb); err != nil {
 		return err
 	}
@@ -851,7 +850,7 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 		// There's no firewallID already set, see if we need to create a new fw, look for the acl annotation.
 		_, ok := service.GetAnnotations()[annotations.AnnLinodeCloudFirewallACL]
 		if ok {
-			fwcreateOpts, err := firewall.CreateFirewallOptsForSvc(label, tags, service)
+			fwcreateOpts, err := services.CreateFirewallOptsForSvc(label, tags, service)
 			if err != nil {
 				return nil, err
 			}
@@ -998,7 +997,7 @@ func (l *loadbalancers) getSubnetIDForSVC(ctx context.Context, service *v1.Servi
 	if vpcOk {
 		vpcName = specifiedVPCName
 	}
-	vpcID, err := cache.GetVPCID(ctx, l.client, vpcName)
+	vpcID, err := services.GetVPCID(ctx, l.client, vpcName)
 	if err != nil {
 		return 0, err
 	}
@@ -1009,7 +1008,7 @@ func (l *loadbalancers) getSubnetIDForSVC(ctx context.Context, service *v1.Servi
 	}
 
 	// Use the VPC ID and Subnet Name to get the subnet ID
-	return cache.GetSubnetID(ctx, l.client, vpcID, subnetName)
+	return services.GetSubnetID(ctx, l.client, vpcID, subnetName)
 }
 
 // buildLoadBalancerRequest returns a linodego.NodeBalancer

@@ -17,9 +17,9 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/cache"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
 	ccmUtils "github.com/linode/linode-cloud-controller-manager/cloud/linode/utils"
 )
 
@@ -47,7 +47,7 @@ func (rc *routeCache) refreshRoutes(ctx context.Context, client client.Client) {
 		if vpcName == "" {
 			continue
 		}
-		resp, err := cache.GetVPCIPAddresses(ctx, client, vpcName)
+		resp, err := services.GetVPCIPAddresses(ctx, client, vpcName)
 		if err != nil {
 			klog.Errorf("failed updating cache for VPC %s. Error: %s", vpcName, err.Error())
 			continue
@@ -63,11 +63,11 @@ func (rc *routeCache) refreshRoutes(ctx context.Context, client client.Client) {
 
 type routes struct {
 	client     client.Client
-	instances  *cache.Instances
+	instances  *services.Instances
 	routeCache *routeCache
 }
 
-func newRoutes(client client.Client, instanceCache *cache.Instances) (cloudprovider.Routes, error) {
+func newRoutes(client client.Client, instanceCache *services.Instances) (cloudprovider.Routes, error) {
 	timeout := 60
 	if raw, ok := os.LookupEnv("LINODE_ROUTES_CACHE_TTL_SECONDS"); ok {
 		if t, err := strconv.Atoi(raw); t > 0 && err == nil {
@@ -159,7 +159,7 @@ func (r *routes) CreateRoute(ctx context.Context, clusterName string, nameHint s
 	intfRoutes := []string{}
 	intfVPCIP := linodego.VPCIP{}
 
-	for _, vpcid := range cache.GetAllVPCIDs() {
+	for _, vpcid := range services.GetAllVPCIDs() {
 		for _, ir := range instanceRoutes {
 			if ir.VPCID != vpcid {
 				continue
@@ -212,7 +212,7 @@ func (r *routes) DeleteRoute(ctx context.Context, clusterName string, route *clo
 	intfRoutes := []string{}
 	intfVPCIP := linodego.VPCIP{}
 
-	for _, vpcid := range cache.GetAllVPCIDs() {
+	for _, vpcid := range services.GetAllVPCIDs() {
 		for _, ir := range instanceRoutes {
 			if ir.VPCID != vpcid {
 				continue
@@ -272,7 +272,7 @@ func (r *routes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpr
 		}
 
 		// check for configured routes
-		for _, vpcid := range cache.GetAllVPCIDs() {
+		for _, vpcid := range services.GetAllVPCIDs() {
 			for _, ir := range instanceRoutes {
 				if ir.Address != nil || ir.VPCID != vpcid {
 					continue

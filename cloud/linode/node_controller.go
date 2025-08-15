@@ -21,9 +21,9 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
-	ccmCache "github.com/linode/linode-cloud-controller-manager/cloud/linode/cache"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
 	ccmUtils "github.com/linode/linode-cloud-controller-manager/cloud/linode/utils"
 )
 
@@ -45,7 +45,7 @@ type nodeController struct {
 	sync.RWMutex
 
 	client     client.Client
-	instances  *ccmCache.Instances
+	instances  *services.Instances
 	kubeclient kubernetes.Interface
 	informer   v1informers.NodeInformer
 
@@ -157,7 +157,7 @@ func newK8sNodeCache() *k8sNodeCache {
 	}
 }
 
-func newNodeController(kubeclient kubernetes.Interface, client client.Client, informer v1informers.NodeInformer, instanceCache *ccmCache.Instances) *nodeController {
+func newNodeController(kubeclient kubernetes.Interface, client client.Client, informer v1informers.NodeInformer, instanceCache *services.Instances) *nodeController {
 	timeout := defaultMetadataTTL
 	if raw, ok := os.LookupEnv("LINODE_METADATA_TTL"); ok {
 		if t, err := strconv.Atoi(raw); t > 0 && err == nil {

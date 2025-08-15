@@ -30,8 +30,8 @@ import (
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/firewall"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
 )
 
 const testCert string = `-----BEGIN CERTIFICATE-----
@@ -511,8 +511,8 @@ func testCreateNodeBalanceWithNoAllowOrDenyList(t *testing.T, client *linodego.C
 	}
 
 	err := testCreateNodeBalancer(t, client, f, annotations, nil)
-	if err == nil || !stderrors.Is(err, firewall.ErrInvalidFWConfig) {
-		t.Fatalf("expected a %v error, got %v", firewall.ErrInvalidFWConfig, err)
+	if err == nil || !stderrors.Is(err, services.ErrInvalidFWConfig) {
+		t.Fatalf("expected a %v error, got %v", services.ErrInvalidFWConfig, err)
 	}
 }
 
@@ -533,8 +533,8 @@ func testCreateNodeBalanceWithBothAllowOrDenyList(t *testing.T, client *linodego
 	}
 
 	err := testCreateNodeBalancer(t, client, f, annotations, nil)
-	if err == nil || !stderrors.Is(err, firewall.ErrInvalidFWConfig) {
-		t.Fatalf("expected a %v error, got %v", firewall.ErrInvalidFWConfig, err)
+	if err == nil || !stderrors.Is(err, services.ErrInvalidFWConfig) {
+		t.Fatalf("expected a %v error, got %v", services.ErrInvalidFWConfig, err)
 	}
 }
 
@@ -1950,7 +1950,7 @@ func testUpdateLoadBalancerAddNewFirewall(t *testing.T, client *linodego.Client,
 	}
 	svc.Status.LoadBalancer = *lbStatus
 	stubServiceUpdate(fakeClientset, svc)
-	fwClient := firewall.LinodeClient{Client: client}
+	fwClient := services.LinodeClient{Client: client}
 	fw, err := fwClient.CreateFirewall(t.Context(), linodego.FirewallCreateOptions{
 		Label: "test",
 		Rules: linodego.FirewallRuleSet{Inbound: []linodego.FirewallRule{{
@@ -2313,7 +2313,7 @@ func testUpdateLoadBalancerUpdateFirewallRemoveACLaddID(t *testing.T, client *li
 		t.Errorf("expected IP, got %v", fwIPs)
 	}
 
-	fwClient := firewall.LinodeClient{Client: client}
+	fwClient := services.LinodeClient{Client: client}
 	fw, err := fwClient.CreateFirewall(t.Context(), linodego.FirewallCreateOptions{
 		Label: "test",
 		Rules: linodego.FirewallRuleSet{Inbound: []linodego.FirewallRule{{
@@ -2411,7 +2411,7 @@ func testUpdateLoadBalancerUpdateFirewallRemoveIDaddACL(t *testing.T, client *li
 	fakeClientset := fake.NewSimpleClientset()
 	lb.kubeClient = fakeClientset
 
-	fwClient := firewall.LinodeClient{Client: client}
+	fwClient := services.LinodeClient{Client: client}
 	fw, err := fwClient.CreateFirewall(t.Context(), linodego.FirewallCreateOptions{
 		Label: "test",
 		Rules: linodego.FirewallRuleSet{Inbound: []linodego.FirewallRule{{
@@ -2798,7 +2798,7 @@ func testUpdateLoadBalancerUpdateFirewall(t *testing.T, client *linodego.Client,
 		_ = lb.EnsureLoadBalancerDeleted(t.Context(), "linodelb", svc)
 	}()
 
-	fwClient := firewall.LinodeClient{Client: client}
+	fwClient := services.LinodeClient{Client: client}
 	fw, err := fwClient.CreateFirewall(t.Context(), firewallCreateOpts)
 	if err != nil {
 		t.Errorf("Error creating firewall %s", err)
@@ -2931,7 +2931,7 @@ func testUpdateLoadBalancerDeleteFirewallRemoveID(t *testing.T, client *linodego
 		_ = lb.EnsureLoadBalancerDeleted(t.Context(), "linodelb", svc)
 	}()
 
-	fwClient := firewall.LinodeClient{Client: client}
+	fwClient := services.LinodeClient{Client: client}
 	fw, err := fwClient.CreateFirewall(t.Context(), firewallCreateOpts)
 	if err != nil {
 		t.Errorf("Error in creating firewall %s", err)
