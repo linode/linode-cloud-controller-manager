@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
 )
 
 func Test_serviceController_Run(t *testing.T) {
@@ -70,7 +71,7 @@ func Test_serviceController_processNextDeletion(t *testing.T) {
 				loadbalancers: nil,
 			},
 			Setup: func(f *fields) {
-				f.loadbalancers = &loadbalancers{client: f.Client, zone: "test", loadBalancerType: Options.LoadBalancerType}
+				f.loadbalancers = &loadbalancers{client: f.Client, zone: "test", loadBalancerType: options.Options.LoadBalancerType}
 				f.queue = workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[any]{Name: "testQueue"})
 				f.queue.Add("test")
 			},
@@ -83,7 +84,7 @@ func Test_serviceController_processNextDeletion(t *testing.T) {
 				loadbalancers: nil,
 			},
 			Setup: func(f *fields) {
-				f.loadbalancers = &loadbalancers{client: f.Client, zone: "test", loadBalancerType: Options.LoadBalancerType}
+				f.loadbalancers = &loadbalancers{client: f.Client, zone: "test", loadBalancerType: options.Options.LoadBalancerType}
 				f.queue = workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[any]{Name: "testQueue"})
 				svc := createTestService()
 				f.queue.Add(svc)

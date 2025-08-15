@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	netutils "k8s.io/utils/net"
 
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
 	nodeipamcontroller "github.com/linode/linode-cloud-controller-manager/cloud/nodeipam"
 	"github.com/linode/linode-cloud-controller-manager/cloud/nodeipam/ipam"
 )
@@ -49,12 +50,12 @@ func startNodeIpamController(stopCh <-chan struct{}, cloud *linodeCloud, nodeInf
 	var secondaryServiceCIDR *net.IPNet
 
 	// should we start nodeIPAM
-	if !Options.AllocateNodeCIDRs {
+	if !options.Options.AllocateNodeCIDRs {
 		return nil
 	}
 
 	// failure: bad cidrs in config
-	clusterCIDRs, err := processCIDRs(Options.ClusterCIDRIPv4)
+	clusterCIDRs, err := processCIDRs(options.Options.ClusterCIDRIPv4)
 	if err != nil {
 		return fmt.Errorf("processCIDRs failed: %w", err)
 	}
@@ -86,7 +87,7 @@ func startNodeIpamController(stopCh <-chan struct{}, cloud *linodeCloud, nodeInf
 		secondaryServiceCIDR,
 		nodeCIDRMaskSizes,
 		ipam.CloudAllocatorType,
-		Options.DisableIPv6NodeCIDRAllocation,
+		options.Options.DisableIPv6NodeCIDRAllocation,
 	)
 	if err != nil {
 		return err
@@ -110,11 +111,11 @@ func processCIDRs(cidrsList string) ([]*net.IPNet, error) {
 }
 
 func setNodeCIDRMaskSizes() []int {
-	if Options.NodeCIDRMaskSizeIPv4 != 0 {
-		defaultNodeMaskCIDRIPv4 = Options.NodeCIDRMaskSizeIPv4
+	if options.Options.NodeCIDRMaskSizeIPv4 != 0 {
+		defaultNodeMaskCIDRIPv4 = options.Options.NodeCIDRMaskSizeIPv4
 	}
-	if Options.NodeCIDRMaskSizeIPv6 != 0 {
-		defaultNodeMaskCIDRIPv6 = Options.NodeCIDRMaskSizeIPv6
+	if options.Options.NodeCIDRMaskSizeIPv6 != 0 {
+		defaultNodeMaskCIDRIPv6 = options.Options.NodeCIDRMaskSizeIPv6
 	}
 	return []int{defaultNodeMaskCIDRIPv4, defaultNodeMaskCIDRIPv6}
 }

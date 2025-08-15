@@ -11,6 +11,8 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
 )
 
 func TestNewCloudRouteControllerDisabled(t *testing.T) {
@@ -20,18 +22,18 @@ func TestNewCloudRouteControllerDisabled(t *testing.T) {
 	t.Setenv("LINODE_API_TOKEN", "dummyapitoken")
 	t.Setenv("LINODE_REGION", "us-east")
 	t.Setenv("LINODE_REQUEST_TIMEOUT_SECONDS", "10")
-	Options.NodeBalancerPrefix = "ccm"
+	options.Options.NodeBalancerPrefix = "ccm"
 
 	t.Run("should not fail if vpc is empty and routecontroller is disabled", func(t *testing.T) {
-		Options.VPCNames = []string{}
-		Options.EnableRouteController = false
+		options.Options.VPCNames = []string{}
+		options.Options.EnableRouteController = false
 		_, err := newCloud()
 		assert.NoError(t, err)
 	})
 
 	t.Run("fail if vpcname is empty and routecontroller is enabled", func(t *testing.T) {
-		Options.VPCNames = []string{}
-		Options.EnableRouteController = true
+		options.Options.VPCNames = []string{}
+		options.Options.EnableRouteController = true
 		_, err := newCloud()
 		assert.Error(t, err)
 	})
@@ -46,8 +48,8 @@ func TestNewCloud(t *testing.T) {
 	t.Setenv("LINODE_REQUEST_TIMEOUT_SECONDS", "10")
 	t.Setenv("LINODE_ROUTES_CACHE_TTL_SECONDS", "60")
 	t.Setenv("LINODE_URL", "https://api.linode.com/v4")
-	Options.LinodeGoDebug = true
-	Options.NodeBalancerPrefix = "ccm"
+	options.Options.LinodeGoDebug = true
+	options.Options.NodeBalancerPrefix = "ccm"
 
 	t.Run("should fail if api token is empty", func(t *testing.T) {
 		t.Setenv("LINODE_API_TOKEN", "")
@@ -62,62 +64,62 @@ func TestNewCloud(t *testing.T) {
 	})
 
 	t.Run("should fail if both nodeBalancerBackendIPv4SubnetID and nodeBalancerBackendIPv4SubnetName are set", func(t *testing.T) {
-		Options.VPCNames = []string{"tt"}
-		Options.NodeBalancerBackendIPv4SubnetID = 12345
-		Options.NodeBalancerBackendIPv4SubnetName = "test-subnet"
+		options.Options.VPCNames = []string{"tt"}
+		options.Options.NodeBalancerBackendIPv4SubnetID = 12345
+		options.Options.NodeBalancerBackendIPv4SubnetName = "test-subnet"
 		defer func() {
-			Options.VPCNames = []string{}
-			Options.NodeBalancerBackendIPv4SubnetID = 0
-			Options.NodeBalancerBackendIPv4SubnetName = ""
+			options.Options.VPCNames = []string{}
+			options.Options.NodeBalancerBackendIPv4SubnetID = 0
+			options.Options.NodeBalancerBackendIPv4SubnetName = ""
 		}()
 		_, err := newCloud()
 		assert.Error(t, err, "expected error when both nodeBalancerBackendIPv4SubnetID and nodeBalancerBackendIPv4SubnetName are set")
 	})
 
 	t.Run("should fail if incorrect loadbalancertype is set", func(t *testing.T) {
-		rtEnabled := Options.EnableRouteController
-		Options.EnableRouteController = false
-		Options.LoadBalancerType = "test"
-		Options.VPCNames = []string{"vpc-test1", "vpc-test2"}
-		Options.NodeBalancerBackendIPv4SubnetName = "t1"
-		vpcIDs = map[string]int{"vpc-test1": 1, "vpc-test2": 2, "vpc-test3": 3}
-		subnetIDs = map[string]int{"t1": 1, "t2": 2, "t3": 3}
+		rtEnabled := options.Options.EnableRouteController
+		options.Options.EnableRouteController = false
+		options.Options.LoadBalancerType = "test"
+		options.Options.VPCNames = []string{"vpc-test1", "vpc-test2"}
+		options.Options.NodeBalancerBackendIPv4SubnetName = "t1"
+		services.VpcIDs = map[string]int{"vpc-test1": 1, "vpc-test2": 2, "vpc-test3": 3}
+		services.SubnetIDs = map[string]int{"t1": 1, "t2": 2, "t3": 3}
 		defer func() {
-			Options.LoadBalancerType = ""
-			Options.EnableRouteController = rtEnabled
-			Options.VPCNames = []string{}
-			Options.NodeBalancerBackendIPv4SubnetID = 0
-			Options.NodeBalancerBackendIPv4SubnetName = ""
-			vpcIDs = map[string]int{}
-			subnetIDs = map[string]int{}
+			options.Options.LoadBalancerType = ""
+			options.Options.EnableRouteController = rtEnabled
+			options.Options.VPCNames = []string{}
+			options.Options.NodeBalancerBackendIPv4SubnetID = 0
+			options.Options.NodeBalancerBackendIPv4SubnetName = ""
+			services.VpcIDs = map[string]int{}
+			services.SubnetIDs = map[string]int{}
 		}()
 		_, err := newCloud()
 		assert.Error(t, err, "expected error if incorrect loadbalancertype is set")
 	})
 
 	t.Run("should fail if ipholdersuffix is longer than 23 chars", func(t *testing.T) {
-		suffix := Options.IpHolderSuffix
-		Options.IpHolderSuffix = strings.Repeat("a", 24)
-		rtEnabled := Options.EnableRouteController
-		Options.EnableRouteController = false
+		suffix := options.Options.IpHolderSuffix
+		options.Options.IpHolderSuffix = strings.Repeat("a", 24)
+		rtEnabled := options.Options.EnableRouteController
+		options.Options.EnableRouteController = false
 		defer func() {
-			Options.IpHolderSuffix = suffix
-			Options.EnableRouteController = rtEnabled
+			options.Options.IpHolderSuffix = suffix
+			options.Options.EnableRouteController = rtEnabled
 		}()
 		_, err := newCloud()
 		assert.Error(t, err, "expected error if ipholdersuffix is longer than 23 chars")
 	})
 
 	t.Run("should fail if nodebalancer-prefix is longer than 19 chars", func(t *testing.T) {
-		prefix := Options.NodeBalancerPrefix
-		rtEnabled := Options.EnableRouteController
-		Options.EnableRouteController = false
-		Options.LoadBalancerType = "nodebalancer"
-		Options.NodeBalancerPrefix = strings.Repeat("a", 21)
+		prefix := options.Options.NodeBalancerPrefix
+		rtEnabled := options.Options.EnableRouteController
+		options.Options.EnableRouteController = false
+		options.Options.LoadBalancerType = "nodebalancer"
+		options.Options.NodeBalancerPrefix = strings.Repeat("a", 21)
 		defer func() {
-			Options.NodeBalancerPrefix = prefix
-			Options.LoadBalancerType = ""
-			Options.EnableRouteController = rtEnabled
+			options.Options.NodeBalancerPrefix = prefix
+			options.Options.LoadBalancerType = ""
+			options.Options.EnableRouteController = rtEnabled
 		}()
 		_, err := newCloud()
 		t.Log(err)
@@ -126,15 +128,15 @@ func TestNewCloud(t *testing.T) {
 	})
 
 	t.Run("should fail if nodebalancer-prefix is empty", func(t *testing.T) {
-		prefix := Options.NodeBalancerPrefix
-		rtEnabled := Options.EnableRouteController
-		Options.EnableRouteController = false
-		Options.LoadBalancerType = "nodebalancer"
-		Options.NodeBalancerPrefix = ""
+		prefix := options.Options.NodeBalancerPrefix
+		rtEnabled := options.Options.EnableRouteController
+		options.Options.EnableRouteController = false
+		options.Options.LoadBalancerType = "nodebalancer"
+		options.Options.NodeBalancerPrefix = ""
 		defer func() {
-			Options.NodeBalancerPrefix = prefix
-			Options.LoadBalancerType = ""
-			Options.EnableRouteController = rtEnabled
+			options.Options.NodeBalancerPrefix = prefix
+			options.Options.LoadBalancerType = ""
+			options.Options.EnableRouteController = rtEnabled
 		}()
 		_, err := newCloud()
 		t.Log(err)
@@ -143,15 +145,15 @@ func TestNewCloud(t *testing.T) {
 	})
 
 	t.Run("should fail if not validated nodebalancer-prefix", func(t *testing.T) {
-		prefix := Options.NodeBalancerPrefix
-		rtEnabled := Options.EnableRouteController
-		Options.EnableRouteController = false
-		Options.LoadBalancerType = "nodebalancer"
-		Options.NodeBalancerPrefix = "\\+x"
+		prefix := options.Options.NodeBalancerPrefix
+		rtEnabled := options.Options.EnableRouteController
+		options.Options.EnableRouteController = false
+		options.Options.LoadBalancerType = "nodebalancer"
+		options.Options.NodeBalancerPrefix = "\\+x"
 		defer func() {
-			Options.NodeBalancerPrefix = prefix
-			Options.LoadBalancerType = ""
-			Options.EnableRouteController = rtEnabled
+			options.Options.NodeBalancerPrefix = prefix
+			options.Options.LoadBalancerType = ""
+			options.Options.EnableRouteController = rtEnabled
 		}()
 		_, err := newCloud()
 		t.Log(err)
@@ -180,7 +182,7 @@ func Test_linodeCloud_LoadBalancer(t *testing.T) {
 			name: "should return loadbalancer interface",
 			fields: fields{
 				client:        client,
-				instances:     newInstances(client),
+				instances:     services.NewInstances(client),
 				loadbalancers: newLoadbalancers(client, "us-east"),
 				routes:        nil,
 			},
@@ -227,11 +229,11 @@ func Test_linodeCloud_InstancesV2(t *testing.T) {
 			name: "should return instances interface",
 			fields: fields{
 				client:        client,
-				instances:     newInstances(client),
+				instances:     services.NewInstances(client),
 				loadbalancers: newLoadbalancers(client, "us-east"),
 				routes:        nil,
 			},
-			want:  newInstances(client),
+			want:  services.NewInstances(client),
 			want1: true,
 		},
 	}
@@ -274,7 +276,7 @@ func Test_linodeCloud_Instances(t *testing.T) {
 			name: "should return nil",
 			fields: fields{
 				client:        client,
-				instances:     newInstances(client),
+				instances:     services.NewInstances(client),
 				loadbalancers: newLoadbalancers(client, "us-east"),
 				routes:        nil,
 			},
@@ -321,7 +323,7 @@ func Test_linodeCloud_Zones(t *testing.T) {
 			name: "should return nil",
 			fields: fields{
 				client:        client,
-				instances:     newInstances(client),
+				instances:     services.NewInstances(client),
 				loadbalancers: newLoadbalancers(client, "us-east"),
 				routes:        nil,
 			},
@@ -368,7 +370,7 @@ func Test_linodeCloud_Clusters(t *testing.T) {
 			name: "should return nil",
 			fields: fields{
 				client:        client,
-				instances:     newInstances(client),
+				instances:     services.NewInstances(client),
 				loadbalancers: newLoadbalancers(client, "us-east"),
 				routes:        nil,
 			},
@@ -417,7 +419,7 @@ func Test_linodeCloud_Routes(t *testing.T) {
 			name: "should return nil",
 			fields: fields{
 				client:                client,
-				instances:             newInstances(client),
+				instances:             services.NewInstances(client),
 				loadbalancers:         newLoadbalancers(client, "us-east"),
 				routes:                r,
 				EnableRouteController: false,
@@ -429,7 +431,7 @@ func Test_linodeCloud_Routes(t *testing.T) {
 			name: "should return routes interface",
 			fields: fields{
 				client:                client,
-				instances:             newInstances(client),
+				instances:             services.NewInstances(client),
 				loadbalancers:         newLoadbalancers(client, "us-east"),
 				routes:                r,
 				EnableRouteController: true,
@@ -446,9 +448,9 @@ func Test_linodeCloud_Routes(t *testing.T) {
 				loadbalancers: tt.fields.loadbalancers,
 				routes:        tt.fields.routes,
 			}
-			rt := Options.EnableRouteController
-			defer func() { Options.EnableRouteController = rt }()
-			Options.EnableRouteController = tt.fields.EnableRouteController
+			rt := options.Options.EnableRouteController
+			defer func() { options.Options.EnableRouteController = rt }()
+			options.Options.EnableRouteController = tt.fields.EnableRouteController
 			got, got1 := c.Routes()
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("linodeCloud.Routes() got = %v, want %v", got, tt.want)

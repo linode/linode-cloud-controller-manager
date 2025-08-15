@@ -22,6 +22,9 @@ import (
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
+	ccmUtils "github.com/linode/linode-cloud-controller-manager/cloud/linode/utils"
 )
 
 const (
@@ -42,7 +45,7 @@ type nodeController struct {
 	sync.RWMutex
 
 	client     client.Client
-	instances  *instances
+	instances  *services.Instances
 	kubeclient kubernetes.Interface
 	informer   v1informers.NodeInformer
 
@@ -154,7 +157,7 @@ func newK8sNodeCache() *k8sNodeCache {
 	}
 }
 
-func newNodeController(kubeclient kubernetes.Interface, client client.Client, informer v1informers.NodeInformer, instanceCache *instances) *nodeController {
+func newNodeController(kubeclient kubernetes.Interface, client client.Client, informer v1informers.NodeInformer, instanceCache *services.Instances) *nodeController {
 	timeout := defaultMetadataTTL
 	if raw, ok := os.LookupEnv("LINODE_METADATA_TTL"); ok {
 		if t, err := strconv.Atoi(raw); t > 0 && err == nil {
@@ -283,7 +286,7 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 		return nil
 	}
 
-	linode, err := s.instances.lookupLinode(ctx, node)
+	linode, err := s.instances.LookupLinode(ctx, node)
 	if err != nil {
 		klog.V(1).ErrorS(err, "Instance lookup error")
 		return err
@@ -293,7 +296,7 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 	// linode API response for linode will contain only one private ip
 	// if any private ip is configured.
 	for _, addr := range linode.IPv4 {
-		if isPrivate(addr) {
+		if ccmUtils.IsPrivate(addr, options.Options.LinodeExternalNetwork) {
 			expectedPrivateIP = addr.String()
 			break
 		}
@@ -320,7 +323,7 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 
 		// Try to update the node ProviderID if it has not been set
 		if nodeResult.Spec.ProviderID == "" {
-			nodeResult.Spec.ProviderID = providerIDPrefix + strconv.Itoa(linode.ID)
+			nodeResult.Spec.ProviderID = ccmUtils.ProviderIDPrefix + strconv.Itoa(linode.ID)
 		}
 
 		// Try to update the expectedPrivateIP if its not set or doesn't match

@@ -1,4 +1,4 @@
-package linode
+package utils
 
 import (
 	"errors"
@@ -36,7 +36,7 @@ func TestParseProviderID(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			id, err := parseProviderID(tc.providerID)
+			id, err := ParseProviderID(tc.providerID)
 			if err != nil {
 				if !tc.errExpected {
 					t.Errorf("unexpected error: %v", err)

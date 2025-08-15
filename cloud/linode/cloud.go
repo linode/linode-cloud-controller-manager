@@ -4,19 +4,19 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"regexp"
 	"strconv"
 	"time"
 
-	"github.com/spf13/pflag"
 	"golang.org/x/exp/slices"
 	"k8s.io/client-go/informers"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
 )
 
 const (
@@ -31,38 +31,6 @@ const (
 
 var supportedLoadBalancerTypes = []string{ciliumLBType, nodeBalancerLBType}
 
-// Options is a configuration object for this cloudprovider implementation.
-// We expect it to be initialized with flags external to this package, likely in
-// main.go
-var Options struct {
-	KubeconfigFlag                    *pflag.Flag
-	LinodeGoDebug                     bool
-	EnableRouteController             bool
-	EnableTokenHealthChecker          bool
-	VPCNames                          []string
-	VPCIDs                            []int
-	SubnetNames                       []string
-	SubnetIDs                         []int
-	LoadBalancerType                  string
-	BGPNodeSelector                   string
-	IpHolderSuffix                    string
-	LinodeExternalNetwork             *net.IPNet
-	NodeBalancerTags                  []string
-	DefaultNBType                     string
-	NodeBalancerBackendIPv4Subnet     string
-	NodeBalancerBackendIPv4SubnetID   int
-	NodeBalancerBackendIPv4SubnetName string
-	DisableNodeBalancerVPCBackends    bool
-	GlobalStopChannel                 chan<- struct{}
-	EnableIPv6ForLoadBalancers        bool
-	AllocateNodeCIDRs                 bool
-	DisableIPv6NodeCIDRAllocation     bool
-	ClusterCIDRIPv4                   string
-	NodeCIDRMaskSizeIPv4              int
-	NodeCIDRMaskSizeIPv6              int
-	NodeBalancerPrefix                string
-}
-
 type linodeCloud struct {
 	client                   client.Client
 	instances                cloudprovider.InstancesV2
@@ -72,7 +40,7 @@ type linodeCloud struct {
 }
 
 var (
-	instanceCache               *instances
+	instanceCache               *services.Instances
 	ipHolderCharLimit           int = 23
 	NodeBalancerPrefixCharLimit int = 19
 )
@@ -94,7 +62,7 @@ func newLinodeClientWithPrometheus(apiToken string, timeout time.Duration) (clie
 		return nil, fmt.Errorf("client was not created successfully: %w", err)
 	}
 
-	if Options.LinodeGoDebug {
+	if options.Options.LinodeGoDebug {
 		linodeClient.SetDebug(true)
 	}
 
@@ -128,7 +96,7 @@ func newCloud() (cloudprovider.Interface, error) {
 
 	var healthChecker *healthChecker
 
-	if Options.EnableTokenHealthChecker {
+	if options.Options.EnableTokenHealthChecker {
 		var authenticated bool
 		authenticated, err = client.CheckClientAuthenticated(context.TODO(), linodeClient)
 		if err != nil {
@@ -139,63 +107,63 @@ func newCloud() (cloudprovider.Interface, error) {
 			return nil, fmt.Errorf("linode api token %q is invalid", accessTokenEnv)
 		}
 
-		healthChecker = newHealthChecker(linodeClient, tokenHealthCheckPeriod, Options.GlobalStopChannel)
+		healthChecker = newHealthChecker(linodeClient, tokenHealthCheckPeriod, options.Options.GlobalStopChannel)
 	}
 
-	err = validateAndSetVPCSubnetFlags(linodeClient)
+	err = services.ValidateAndSetVPCSubnetFlags(linodeClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate VPC and subnet flags: %w", err)
 	}
 
-	if Options.NodeBalancerBackendIPv4SubnetID != 0 && Options.NodeBalancerBackendIPv4SubnetName != "" {
+	if options.Options.NodeBalancerBackendIPv4SubnetID != 0 && options.Options.NodeBalancerBackendIPv4SubnetName != "" {
 		return nil, fmt.Errorf("cannot have both --nodebalancer-backend-ipv4-subnet-id and --nodebalancer-backend-ipv4-subnet-name set")
 	}
 
-	if Options.DisableNodeBalancerVPCBackends {
+	if options.Options.DisableNodeBalancerVPCBackends {
 		klog.Infof("NodeBalancer VPC backends are disabled, no VPC backends will be created for NodeBalancers")
-		Options.NodeBalancerBackendIPv4SubnetID = 0
-		Options.NodeBalancerBackendIPv4SubnetName = ""
-	} else if Options.NodeBalancerBackendIPv4SubnetName != "" {
-		Options.NodeBalancerBackendIPv4SubnetID, err = getNodeBalancerBackendIPv4SubnetID(linodeClient)
+		options.Options.NodeBalancerBackendIPv4SubnetID = 0
+		options.Options.NodeBalancerBackendIPv4SubnetName = ""
+	} else if options.Options.NodeBalancerBackendIPv4SubnetName != "" {
+		options.Options.NodeBalancerBackendIPv4SubnetID, err = services.GetNodeBalancerBackendIPv4SubnetID(linodeClient)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get backend IPv4 subnet ID for subnet name %s: %w", Options.NodeBalancerBackendIPv4SubnetName, err)
+			return nil, fmt.Errorf("failed to get backend IPv4 subnet ID for subnet name %s: %w", options.Options.NodeBalancerBackendIPv4SubnetName, err)
 		}
-		klog.Infof("Using NodeBalancer backend IPv4 subnet ID %d for subnet name %s", Options.NodeBalancerBackendIPv4SubnetID, Options.NodeBalancerBackendIPv4SubnetName)
+		klog.Infof("Using NodeBalancer backend IPv4 subnet ID %d for subnet name %s", options.Options.NodeBalancerBackendIPv4SubnetID, options.Options.NodeBalancerBackendIPv4SubnetName)
 	}
 
-	instanceCache = newInstances(linodeClient)
+	instanceCache = services.NewInstances(linodeClient)
 	routes, err := newRoutes(linodeClient, instanceCache)
 	if err != nil {
 		return nil, fmt.Errorf("routes client was not created successfully: %w", err)
 	}
 
-	if Options.LoadBalancerType != "" && !slices.Contains(supportedLoadBalancerTypes, Options.LoadBalancerType) {
+	if options.Options.LoadBalancerType != "" && !slices.Contains(supportedLoadBalancerTypes, options.Options.LoadBalancerType) {
 		return nil, fmt.Errorf(
-			"unsupported default load-balancer type %s. Options are %v",
-			Options.LoadBalancerType,
+			"unsupported default load-balancer type %s. options.Options are %v",
+			options.Options.LoadBalancerType,
 			supportedLoadBalancerTypes,
 		)
 	}
 
-	if Options.IpHolderSuffix != "" {
-		klog.Infof("Using IP holder suffix '%s'\n", Options.IpHolderSuffix)
+	if options.Options.IpHolderSuffix != "" {
+		klog.Infof("Using IP holder suffix '%s'\n", options.Options.IpHolderSuffix)
 	}
 
-	if len(Options.IpHolderSuffix) > ipHolderCharLimit {
-		msg := fmt.Sprintf("ip-holder-suffix must be %d characters or less: %s is %d characters\n", ipHolderCharLimit, Options.IpHolderSuffix, len(Options.IpHolderSuffix))
+	if len(options.Options.IpHolderSuffix) > ipHolderCharLimit {
+		msg := fmt.Sprintf("ip-holder-suffix must be %d characters or less: %s is %d characters\n", ipHolderCharLimit, options.Options.IpHolderSuffix, len(options.Options.IpHolderSuffix))
 		klog.Error(msg)
 		return nil, fmt.Errorf("%s", msg)
 	}
 
-	if len(Options.NodeBalancerPrefix) > NodeBalancerPrefixCharLimit {
-		msg := fmt.Sprintf("nodebalancer-prefix must be %d characters or less: %s is %d characters\n", NodeBalancerPrefixCharLimit, Options.NodeBalancerPrefix, len(Options.NodeBalancerPrefix))
+	if len(options.Options.NodeBalancerPrefix) > NodeBalancerPrefixCharLimit {
+		msg := fmt.Sprintf("nodebalancer-prefix must be %d characters or less: %s is %d characters\n", NodeBalancerPrefixCharLimit, options.Options.NodeBalancerPrefix, len(options.Options.NodeBalancerPrefix))
 		klog.Error(msg)
 		return nil, fmt.Errorf("%s", msg)
 	}
 
 	validPrefix := regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
-	if !validPrefix.MatchString(Options.NodeBalancerPrefix) {
-		msg := fmt.Sprintf("nodebalancer-prefix must be no empty and use only letters, numbers, underscores, and dashes: %s\n", Options.NodeBalancerPrefix)
+	if !validPrefix.MatchString(options.Options.NodeBalancerPrefix) {
+		msg := fmt.Sprintf("nodebalancer-prefix must be no empty and use only letters, numbers, underscores, and dashes: %s\n", options.Options.NodeBalancerPrefix)
 		klog.Error(msg)
 		return nil, fmt.Errorf("%s", msg)
 	}
@@ -258,7 +226,7 @@ func (c *linodeCloud) Clusters() (cloudprovider.Clusters, bool) {
 }
 
 func (c *linodeCloud) Routes() (cloudprovider.Routes, bool) {
-	if Options.EnableRouteController {
+	if options.Options.EnableRouteController {
 		return c.routes, true
 	}
 	return nil, false
