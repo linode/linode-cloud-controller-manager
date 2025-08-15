@@ -394,7 +394,7 @@ func TestCreateRoute(t *testing.T) {
 	})
 
 	interfaceWithVPCAndRoute := linodego.LinodeInterface{
-		ID: vpcIDs["dummy"],
+		ID: services.VpcIDs["dummy"],
 		VPC: &linodego.VPCInterface{
 			IPv4: linodego.VPCInterfaceIPv4{
 				Ranges: []linodego.VPCInterfaceIPv4Range{{Range: "10.10.10.0/24"}},
@@ -406,7 +406,7 @@ func TestCreateRoute(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		instanceCache := newInstances(client)
+		instanceCache := services.NewInstances(client)
 		existingK8sCache := registeredK8sNodeCache
 		defer func() {
 			registeredK8sNodeCache = existingK8sCache
@@ -585,7 +585,7 @@ func TestDeleteRoute(t *testing.T) {
 	})
 
 	interfaceWitVPCAndNoRoute := linodego.LinodeInterface{
-		ID:  vpcIDs["dummy"],
+		ID:  services.VpcIDs["dummy"],
 		VPC: &linodego.VPCInterface{IPv4: linodego.VPCInterfaceIPv4{Ranges: nil}},
 	}
 
@@ -594,7 +594,7 @@ func TestDeleteRoute(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		instanceCache := newInstances(client)
+		instanceCache := services.NewInstances(client)
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
@@ -645,7 +645,7 @@ func TestDeleteRoute(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		instanceCache := newInstances(client)
+		instanceCache := services.NewInstances(client)
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
