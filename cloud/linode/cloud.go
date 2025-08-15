@@ -14,9 +14,9 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/cache"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
 )
 
 const (
@@ -40,7 +40,7 @@ type linodeCloud struct {
 }
 
 var (
-	instanceCache               *cache.Instances
+	instanceCache               *services.Instances
 	ipHolderCharLimit           int = 23
 	NodeBalancerPrefixCharLimit int = 19
 )
@@ -110,7 +110,7 @@ func newCloud() (cloudprovider.Interface, error) {
 		healthChecker = newHealthChecker(linodeClient, tokenHealthCheckPeriod, options.Options.GlobalStopChannel)
 	}
 
-	err = cache.ValidateAndSetVPCSubnetFlags(linodeClient)
+	err = services.ValidateAndSetVPCSubnetFlags(linodeClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate VPC and subnet flags: %w", err)
 	}
@@ -124,14 +124,14 @@ func newCloud() (cloudprovider.Interface, error) {
 		options.Options.NodeBalancerBackendIPv4SubnetID = 0
 		options.Options.NodeBalancerBackendIPv4SubnetName = ""
 	} else if options.Options.NodeBalancerBackendIPv4SubnetName != "" {
-		options.Options.NodeBalancerBackendIPv4SubnetID, err = cache.GetNodeBalancerBackendIPv4SubnetID(linodeClient)
+		options.Options.NodeBalancerBackendIPv4SubnetID, err = services.GetNodeBalancerBackendIPv4SubnetID(linodeClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get backend IPv4 subnet ID for subnet name %s: %w", options.Options.NodeBalancerBackendIPv4SubnetName, err)
 		}
 		klog.Infof("Using NodeBalancer backend IPv4 subnet ID %d for subnet name %s", options.Options.NodeBalancerBackendIPv4SubnetID, options.Options.NodeBalancerBackendIPv4SubnetName)
 	}
 
-	instanceCache = cache.NewInstances(linodeClient)
+	instanceCache = services.NewInstances(linodeClient)
 	routes, err := newRoutes(linodeClient, instanceCache)
 	if err != nil {
 		return nil, fmt.Errorf("routes client was not created successfully: %w", err)

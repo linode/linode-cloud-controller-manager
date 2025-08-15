@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 	cloudprovider "k8s.io/cloud-provider"
 
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/cache"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
 )
 
 func TestNewCloudRouteControllerDisabled(t *testing.T) {
@@ -82,16 +82,16 @@ func TestNewCloud(t *testing.T) {
 		options.Options.LoadBalancerType = "test"
 		options.Options.VPCNames = []string{"vpc-test1", "vpc-test2"}
 		options.Options.NodeBalancerBackendIPv4SubnetName = "t1"
-		cache.VpcIDs = map[string]int{"vpc-test1": 1, "vpc-test2": 2, "vpc-test3": 3}
-		cache.SubnetIDs = map[string]int{"t1": 1, "t2": 2, "t3": 3}
+		services.VpcIDs = map[string]int{"vpc-test1": 1, "vpc-test2": 2, "vpc-test3": 3}
+		services.SubnetIDs = map[string]int{"t1": 1, "t2": 2, "t3": 3}
 		defer func() {
 			options.Options.LoadBalancerType = ""
 			options.Options.EnableRouteController = rtEnabled
 			options.Options.VPCNames = []string{}
 			options.Options.NodeBalancerBackendIPv4SubnetID = 0
 			options.Options.NodeBalancerBackendIPv4SubnetName = ""
-			cache.VpcIDs = map[string]int{}
-			cache.SubnetIDs = map[string]int{}
+			services.VpcIDs = map[string]int{}
+			services.SubnetIDs = map[string]int{}
 		}()
 		_, err := newCloud()
 		assert.Error(t, err, "expected error if incorrect loadbalancertype is set")
@@ -182,7 +182,7 @@ func Test_linodeCloud_LoadBalancer(t *testing.T) {
 			name: "should return loadbalancer interface",
 			fields: fields{
 				client:        client,
-				instances:     cache.NewInstances(client),
+				instances:     services.NewInstances(client),
 				loadbalancers: newLoadbalancers(client, "us-east"),
 				routes:        nil,
 			},
@@ -229,11 +229,11 @@ func Test_linodeCloud_InstancesV2(t *testing.T) {
 			name: "should return instances interface",
 			fields: fields{
 				client:        client,
-				instances:     cache.NewInstances(client),
+				instances:     services.NewInstances(client),
 				loadbalancers: newLoadbalancers(client, "us-east"),
 				routes:        nil,
 			},
-			want:  cache.NewInstances(client),
+			want:  services.NewInstances(client),
 			want1: true,
 		},
 	}
@@ -276,7 +276,7 @@ func Test_linodeCloud_Instances(t *testing.T) {
 			name: "should return nil",
 			fields: fields{
 				client:        client,
-				instances:     cache.NewInstances(client),
+				instances:     services.NewInstances(client),
 				loadbalancers: newLoadbalancers(client, "us-east"),
 				routes:        nil,
 			},
@@ -323,7 +323,7 @@ func Test_linodeCloud_Zones(t *testing.T) {
 			name: "should return nil",
 			fields: fields{
 				client:        client,
-				instances:     cache.NewInstances(client),
+				instances:     services.NewInstances(client),
 				loadbalancers: newLoadbalancers(client, "us-east"),
 				routes:        nil,
 			},
@@ -370,7 +370,7 @@ func Test_linodeCloud_Clusters(t *testing.T) {
 			name: "should return nil",
 			fields: fields{
 				client:        client,
-				instances:     cache.NewInstances(client),
+				instances:     services.NewInstances(client),
 				loadbalancers: newLoadbalancers(client, "us-east"),
 				routes:        nil,
 			},
@@ -419,7 +419,7 @@ func Test_linodeCloud_Routes(t *testing.T) {
 			name: "should return nil",
 			fields: fields{
 				client:                client,
-				instances:             cache.NewInstances(client),
+				instances:             services.NewInstances(client),
 				loadbalancers:         newLoadbalancers(client, "us-east"),
 				routes:                r,
 				EnableRouteController: false,
@@ -431,7 +431,7 @@ func Test_linodeCloud_Routes(t *testing.T) {
 			name: "should return routes interface",
 			fields: fields{
 				client:                client,
-				instances:             cache.NewInstances(client),
+				instances:             services.NewInstances(client),
 				loadbalancers:         newLoadbalancers(client, "us-east"),
 				routes:                r,
 				EnableRouteController: true,
