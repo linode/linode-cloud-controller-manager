@@ -157,6 +157,7 @@ func (r *routes) CreateRoute(ctx context.Context, clusterName string, nameHint s
 
 	// check already configured routes
 	intfRoutes := []string{}
+	linodeInterfaceRoutes := []linodego.VPCInterfaceIPv4RangeCreateOptions{}
 	intfVPCIP := linodego.VPCIP{}
 
 	for _, vpcid := range services.GetAllVPCIDs() {
@@ -176,6 +177,9 @@ func (r *routes) CreateRoute(ctx context.Context, clusterName string, nameHint s
 			}
 
 			intfRoutes = append(intfRoutes, *ir.AddressRange)
+			linodeInterfaceRoutes = append(linodeInterfaceRoutes, linodego.VPCInterfaceIPv4RangeCreateOptions{
+				Range: *ir.AddressRange,
+			})
 		}
 	}
 
@@ -184,16 +188,11 @@ func (r *routes) CreateRoute(ctx context.Context, clusterName string, nameHint s
 	}
 
 	intfRoutes = append(intfRoutes, route.DestinationCIDR)
-	interfaceUpdateOptions := linodego.InstanceConfigInterfaceUpdateOptions{
-		IPRanges: &intfRoutes,
-	}
+	linodeInterfaceRoutes = append(linodeInterfaceRoutes, linodego.VPCInterfaceIPv4RangeCreateOptions{
+		Range: route.DestinationCIDR,
+	})
 
-	resp, err := r.client.UpdateInstanceConfigInterface(ctx, instance.ID, intfVPCIP.ConfigID, intfVPCIP.InterfaceID, interfaceUpdateOptions)
-	if err != nil {
-		return err
-	}
-	klog.V(4).Infof("Added routes for node %s. Current routes: %v", route.TargetNode, resp.IPRanges)
-	return nil
+	return r.handleInterfaces(ctx, intfRoutes, linodeInterfaceRoutes, instance, intfVPCIP, route)
 }
 
 // DeleteRoute removes route's subnet from ip_ranges of target node's VPC interface
@@ -210,6 +209,7 @@ func (r *routes) DeleteRoute(ctx context.Context, clusterName string, route *clo
 
 	// check already configured routes
 	intfRoutes := []string{}
+	linodeInterfaceRoutes := []linodego.VPCInterfaceIPv4RangeCreateOptions{}
 	intfVPCIP := linodego.VPCIP{}
 
 	for _, vpcid := range services.GetAllVPCIDs() {
@@ -228,6 +228,9 @@ func (r *routes) DeleteRoute(ctx context.Context, clusterName string, route *clo
 			}
 
 			intfRoutes = append(intfRoutes, *ir.AddressRange)
+			linodeInterfaceRoutes = append(linodeInterfaceRoutes, linodego.VPCInterfaceIPv4RangeCreateOptions{
+				Range: *ir.AddressRange,
+			})
 		}
 	}
 
@@ -235,14 +238,33 @@ func (r *routes) DeleteRoute(ctx context.Context, clusterName string, route *clo
 		return fmt.Errorf("unable to remove route %s for node %s. no valid interface found", route.DestinationCIDR, route.TargetNode)
 	}
 
-	interfaceUpdateOptions := linodego.InstanceConfigInterfaceUpdateOptions{
-		IPRanges: &intfRoutes,
+	return r.handleInterfaces(ctx, intfRoutes, linodeInterfaceRoutes, instance, intfVPCIP, route)
+}
+
+// handleInterfaces updates the VPC interface with adding or deleting routes
+func (r *routes) handleInterfaces(ctx context.Context, intfRoutes []string, linodeInterfaceRoutes []linodego.VPCInterfaceIPv4RangeCreateOptions, instance *linodego.Instance, intfVPCIP linodego.VPCIP, route *cloudprovider.Route) error {
+	if instance.InterfaceGeneration == linodego.GenerationLinode {
+		interfaceUpdateOptions := linodego.LinodeInterfaceUpdateOptions{
+			VPC: &linodego.VPCInterfaceCreateOptions{
+				IPv4: &linodego.VPCInterfaceIPv4CreateOptions{Ranges: linodeInterfaceRoutes},
+			},
+		}
+		resp, err := r.client.UpdateInterface(ctx, instance.ID, intfVPCIP.InterfaceID, interfaceUpdateOptions)
+		if err != nil {
+			return err
+		}
+		klog.V(4).Infof("Updated routes for node %s. Current routes: %v", route.TargetNode, resp.VPC.IPv4.Ranges)
+	} else {
+		interfaceUpdateOptions := linodego.InstanceConfigInterfaceUpdateOptions{
+			IPRanges: &intfRoutes,
+		}
+		resp, err := r.client.UpdateInstanceConfigInterface(ctx, instance.ID, intfVPCIP.ConfigID, intfVPCIP.InterfaceID, interfaceUpdateOptions)
+		if err != nil {
+			return err
+		}
+		klog.V(4).Infof("Updated routes for node %s. Current routes: %v", route.TargetNode, resp.IPRanges)
 	}
-	resp, err := r.client.UpdateInstanceConfigInterface(ctx, instance.ID, intfVPCIP.ConfigID, intfVPCIP.InterfaceID, interfaceUpdateOptions)
-	if err != nil {
-		return err
-	}
-	klog.V(4).Infof("Deleted route for node %s. Current routes: %v", route.TargetNode, resp.IPRanges)
+
 	return nil
 }
 

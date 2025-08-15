@@ -337,6 +337,16 @@ func getIPv6RangeFromInterface(iface linodego.InstanceConfigInterface) string {
 	return ""
 }
 
+func getIPv6RangeFromLinodeInterface(iface linodego.LinodeInterface) string {
+	if len(iface.VPC.IPv6.SLAAC) > 0 {
+		return iface.VPC.IPv6.SLAAC[0].Range
+	}
+	if len(iface.VPC.IPv6.Ranges) > 0 {
+		return iface.VPC.IPv6.Ranges[0].Range
+	}
+	return ""
+}
+
 // allocateIPv6CIDR allocates an IPv6 CIDR for the given node.
 // It retrieves the instance configuration for the node and extracts the IPv6 range.
 // It then creates a new net.IPNet with the IPv6 address and mask size defined
@@ -355,24 +365,49 @@ func (c *cloudAllocator) allocateIPv6CIDR(ctx context.Context, node *v1.Node) (*
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse Linode ID from ProviderID %s: %w", node.Spec.ProviderID, err)
 	}
-	// Retrieve the instance configuration for the Linode ID
-	configs, err := c.linodeClient.ListInstanceConfigs(ctx, id, &linodego.ListOptions{})
-	if err != nil || len(configs) == 0 {
-		return nil, fmt.Errorf("failed to list instance configs: %w", err)
-	}
 
+	// fetch the instance so we can determine which interface generation to use
+	instance, err := c.linodeClient.GetInstance(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed get linode with id %d: %w", id, err)
+	}
 	ipv6Range := ""
-	for _, iface := range configs[0].Interfaces {
-		if iface.Purpose == linodego.InterfacePurposeVPC {
-			ipv6Range = getIPv6RangeFromInterface(iface)
-			if ipv6Range != "" {
-				break
+	if instance.InterfaceGeneration == linodego.GenerationLinode {
+		ifaces, listErr := c.linodeClient.ListInterfaces(ctx, id, &linodego.ListOptions{})
+		if listErr != nil || len(ifaces) == 0 {
+			return nil, fmt.Errorf("failed to list interfaces: %w", listErr)
+		}
+		for _, iface := range ifaces {
+			if iface.VPC != nil {
+				ipv6Range = getIPv6RangeFromLinodeInterface(iface)
+				if ipv6Range != "" {
+					break
+				}
 			}
 		}
-	}
 
-	if ipv6Range == "" {
-		return nil, fmt.Errorf("failed to find ipv6 range in instance config: %v", configs[0])
+		if ipv6Range == "" {
+			return nil, fmt.Errorf("failed to find ipv6 range in Linode interfaces: %v", ifaces)
+		}
+	} else {
+		// Retrieve the instance configuration for the Linode ID
+		configs, listErr := c.linodeClient.ListInstanceConfigs(ctx, id, &linodego.ListOptions{})
+		if listErr != nil || len(configs) == 0 {
+			return nil, fmt.Errorf("failed to list instance configs: %w", listErr)
+		}
+
+		for _, iface := range configs[0].Interfaces {
+			if iface.Purpose == linodego.InterfacePurposeVPC {
+				ipv6Range = getIPv6RangeFromInterface(iface)
+				if ipv6Range != "" {
+					break
+				}
+			}
+		}
+
+		if ipv6Range == "" {
+			return nil, fmt.Errorf("failed to find ipv6 range in instance config: %v", configs[0])
+		}
 	}
 
 	ip, _, err := net.ParseCIDR(ipv6Range)
