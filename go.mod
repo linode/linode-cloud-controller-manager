@@ -178,7 +178,7 @@ require (
 
 // Fixes for `unknown revision v0.0.0` reported by `go list -modfile=go.mod -m -json -mod=mod all`
 replace (
-	github.com/linode/linodego => github.com/komer3/linodego v0.0.0-20250815220120-72ddfca407ca
+	github.com/linode/linodego => github.com/komer3/linodego v0.0.0-20250815223828-0e5518dcb256
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.33.0
 	k8s.io/cri-api => k8s.io/cri-api v0.33.0
 	k8s.io/cri-client => k8s.io/cri-client v0.33.0
