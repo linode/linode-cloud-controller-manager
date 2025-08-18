@@ -9,7 +9,7 @@ metadata:
 spec:
   bindings:
     - name: fwname
-      value: (join('-', [ env('CLUSTER_NAME'), 'fwtest-li']))
+      value: (join('-', [ 'fwtest-linode', env($RANDOM)]))
   namespace: "lb-created-with-reserved-ip-linode-range"
   steps:
     - name: create reserved ip and nodebalancer resources
