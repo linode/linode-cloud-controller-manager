@@ -246,11 +246,13 @@ func (r *routes) handleInterfaces(ctx context.Context, intfRoutes []string, lino
 	if instance.InterfaceGeneration == linodego.GenerationLinode {
 		interfaceUpdateOptions := linodego.LinodeInterfaceUpdateOptions{
 			VPC: &linodego.VPCInterfaceCreateOptions{
-				IPv4: &linodego.VPCInterfaceIPv4CreateOptions{Ranges: linodeInterfaceRoutes},
+				SubnetID: intfVPCIP.SubnetID,
+				IPv4:     &linodego.VPCInterfaceIPv4CreateOptions{Ranges: linodeInterfaceRoutes},
 			},
 		}
 		resp, err := r.client.UpdateInterface(ctx, instance.ID, intfVPCIP.InterfaceID, interfaceUpdateOptions)
 		if err != nil {
+			klog.V(4).Infof("Unable to update legacy interface %d for node %s", intfVPCIP.InterfaceID, route.TargetNode)
 			return err
 		}
 		klog.V(4).Infof("Updated routes for node %s. Current routes: %v", route.TargetNode, resp.VPC.IPv4.Ranges)
@@ -260,6 +262,7 @@ func (r *routes) handleInterfaces(ctx context.Context, intfRoutes []string, lino
 		}
 		resp, err := r.client.UpdateInstanceConfigInterface(ctx, instance.ID, intfVPCIP.ConfigID, intfVPCIP.InterfaceID, interfaceUpdateOptions)
 		if err != nil {
+			klog.V(4).Infof("Unable to update linode interface %d for node %s", intfVPCIP.InterfaceID, route.TargetNode)
 			return err
 		}
 		klog.V(4).Infof("Updated routes for node %s. Current routes: %v", route.TargetNode, resp.IPRanges)
