@@ -50,6 +50,40 @@ type testCase struct {
 	instance       *linodego.Instance
 }
 
+func TestGetIPv6RangeFromLinodeInterface(t *testing.T) {
+	for _, tc := range []struct {
+		iface         linodego.LinodeInterface
+		expectedRange string
+	}{
+		{linodego.LinodeInterface{
+			ID: 123,
+			VPC: &linodego.VPCInterface{
+				IPv6: linodego.VPCInterfaceIPv6{},
+			},
+		}, ""},
+		{linodego.LinodeInterface{
+			ID: 123,
+			VPC: &linodego.VPCInterface{
+				IPv6: linodego.VPCInterfaceIPv6{
+					Ranges: []linodego.VPCInterfaceIPv6Range{{Range: "2001:db8::/64"}, {Range: "2001:db9::/64"}},
+				},
+			},
+		}, "2001:db8::/64"},
+		{linodego.LinodeInterface{
+			ID: 123,
+			VPC: &linodego.VPCInterface{
+				IPv6: linodego.VPCInterfaceIPv6{
+					SLAAC: []linodego.VPCInterfaceIPv6SLAAC{{Range: "2001:db8::/64"}, {Range: "2001:db9::/64"}},
+				},
+			},
+		}, "2001:db8::/64"},
+	} {
+		if getIPv6RangeFromLinodeInterface(tc.iface) != tc.expectedRange {
+			t.Errorf("getIPv6RangeFromLinodeInterface(%+v) = %s, want %s", tc.iface, getIPv6RangeFromLinodeInterface(tc.iface), tc.expectedRange)
+		}
+	}
+}
+
 func TestOccupyPreExistingCIDR(t *testing.T) {
 	// all tests operate on a single node
 	ctrl := gomock.NewController(t)
