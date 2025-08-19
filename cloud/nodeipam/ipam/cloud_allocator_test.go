@@ -47,6 +47,41 @@ type testCase struct {
 	allocatedCIDRs        map[int][]string
 	// should controller creation fail?
 	ctrlCreateFail bool
+	instance       *linodego.Instance
+}
+
+func TestGetIPv6RangeFromLinodeInterface(t *testing.T) {
+	for _, tc := range []struct {
+		iface         linodego.LinodeInterface
+		expectedRange string
+	}{
+		{linodego.LinodeInterface{
+			ID: 123,
+			VPC: &linodego.VPCInterface{
+				IPv6: linodego.VPCInterfaceIPv6{},
+			},
+		}, ""},
+		{linodego.LinodeInterface{
+			ID: 123,
+			VPC: &linodego.VPCInterface{
+				IPv6: linodego.VPCInterfaceIPv6{
+					Ranges: []linodego.VPCInterfaceIPv6Range{{Range: "2001:db8::/64"}, {Range: "2001:db9::/64"}},
+				},
+			},
+		}, "2001:db8::/64"},
+		{linodego.LinodeInterface{
+			ID: 123,
+			VPC: &linodego.VPCInterface{
+				IPv6: linodego.VPCInterfaceIPv6{
+					SLAAC: []linodego.VPCInterfaceIPv6SLAAC{{Range: "2001:db8::/64"}, {Range: "2001:db9::/64"}},
+				},
+			},
+		}, "2001:db8::/64"},
+	} {
+		if getIPv6RangeFromLinodeInterface(tc.iface) != tc.expectedRange {
+			t.Errorf("getIPv6RangeFromLinodeInterface(%+v) = %s, want %s", tc.iface, getIPv6RangeFromLinodeInterface(tc.iface), tc.expectedRange)
+		}
+	}
 }
 
 func TestOccupyPreExistingCIDR(t *testing.T) {
@@ -181,6 +216,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 		{
 			description:  "When there's no ServiceCIDR return first CIDR in range",
 			linodeClient: client,
+			instance:     &linodego.Instance{ID: 12345},
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -219,6 +255,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 		{
 			description:  "Correctly filter out ServiceCIDR",
 			linodeClient: client,
+			instance:     &linodego.Instance{ID: 12345},
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -261,6 +298,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 		{
 			description:  "Correctly ignore already allocated CIDRs",
 			linodeClient: client,
+			instance:     &linodego.Instance{ID: 12345},
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -305,6 +343,207 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 		{
 			description:  "no double counting",
 			linodeClient: client,
+			instance:     &linodego.Instance{ID: 12345},
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node0",
+						},
+						Spec: v1.NodeSpec{
+							PodCIDRs:   []string{"10.10.0.0/24"},
+							ProviderID: fmt.Sprintf("%s12345", providerIDPrefix),
+						},
+						Status: v1.NodeStatus{
+							Addresses: []v1.NodeAddress{
+								{
+									Type:    v1.NodeExternalIP,
+									Address: "172.234.236.202",
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node1",
+						},
+						Spec: v1.NodeSpec{
+							PodCIDRs:   []string{"10.10.2.0/24"},
+							ProviderID: fmt.Sprintf("%s22345", providerIDPrefix),
+						},
+						Status: v1.NodeStatus{
+							Addresses: []v1.NodeAddress{
+								{
+									Type:    v1.NodeExternalIP,
+									Address: "172.234.236.201",
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node2",
+						},
+						Spec: v1.NodeSpec{
+							ProviderID: fmt.Sprintf("%s32345", providerIDPrefix),
+						},
+						Status: v1.NodeStatus{
+							Addresses: []v1.NodeAddress{
+								{
+									Type:    v1.NodeExternalIP,
+									Address: "172.234.236.211",
+								},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(),
+			},
+			allocatorParams: CIDRAllocatorParams{
+				ClusterCIDRs: func() []*net.IPNet {
+					_, clusterCIDR, _ := netutils.ParseCIDRSloppy("10.10.0.0/22")
+					return []*net.IPNet{clusterCIDR}
+				}(),
+				ServiceCIDR:          nil,
+				SecondaryServiceCIDR: nil,
+				NodeCIDRMaskSizes:    []int{24, 112},
+			},
+			expectedAllocatedCIDR: map[int]string{
+				0: "10.10.1.0/24",
+				1: "2300:5800:2:1::/112",
+			},
+		},
+		{
+			description:  "When there's no ServiceCIDR return first CIDR in range with linode interfaces",
+			linodeClient: client,
+			instance:     &linodego.Instance{ID: 12345, InterfaceGeneration: linodego.GenerationLinode},
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node0",
+						},
+						Spec: v1.NodeSpec{
+							ProviderID: fmt.Sprintf("%s12345", providerIDPrefix),
+						},
+						Status: v1.NodeStatus{
+							Addresses: []v1.NodeAddress{
+								{
+									Type:    v1.NodeExternalIP,
+									Address: "172.234.236.211",
+								},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(),
+			},
+			allocatorParams: CIDRAllocatorParams{
+				ClusterCIDRs: func() []*net.IPNet {
+					_, clusterCIDR, _ := netutils.ParseCIDRSloppy("127.123.234.0/24")
+					return []*net.IPNet{clusterCIDR}
+				}(),
+				ServiceCIDR:          nil,
+				SecondaryServiceCIDR: nil,
+				NodeCIDRMaskSizes:    []int{30, 112},
+			},
+			expectedAllocatedCIDR: map[int]string{
+				0: "127.123.234.0/30",
+				1: "2300:5800:2:1::/112",
+			},
+		},
+		{
+			description:  "Correctly filter out ServiceCIDR with linode interfaces",
+			linodeClient: client,
+			instance:     &linodego.Instance{ID: 12345, InterfaceGeneration: linodego.GenerationLinode},
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node0",
+						},
+						Spec: v1.NodeSpec{
+							ProviderID: fmt.Sprintf("%s12345", providerIDPrefix),
+						},
+						Status: v1.NodeStatus{
+							Addresses: []v1.NodeAddress{
+								{
+									Type:    v1.NodeExternalIP,
+									Address: "172.234.236.211",
+								},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(),
+			},
+			allocatorParams: CIDRAllocatorParams{
+				ClusterCIDRs: func() []*net.IPNet {
+					_, clusterCIDR, _ := netutils.ParseCIDRSloppy("127.123.234.0/24")
+					return []*net.IPNet{clusterCIDR}
+				}(),
+				ServiceCIDR: func() *net.IPNet {
+					_, serviceCIDR, _ := netutils.ParseCIDRSloppy("127.123.234.0/26")
+					return serviceCIDR
+				}(),
+				SecondaryServiceCIDR: nil,
+				NodeCIDRMaskSizes:    []int{30, 112},
+			},
+			// it should return first /30 CIDR after service range
+			expectedAllocatedCIDR: map[int]string{
+				0: "127.123.234.64/30",
+				1: "2300:5800:2:1::/112",
+			},
+		},
+		{
+			description:  "Correctly ignore already allocated CIDRs with linode interfaces",
+			linodeClient: client,
+			instance:     &linodego.Instance{ID: 12345, InterfaceGeneration: linodego.GenerationLinode},
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node0",
+						},
+						Spec: v1.NodeSpec{
+							ProviderID: fmt.Sprintf("%s12345", providerIDPrefix),
+						},
+						Status: v1.NodeStatus{
+							Addresses: []v1.NodeAddress{
+								{
+									Type:    v1.NodeExternalIP,
+									Address: "172.234.236.211",
+								},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(),
+			},
+			allocatorParams: CIDRAllocatorParams{
+				ClusterCIDRs: func() []*net.IPNet {
+					_, clusterCIDR, _ := netutils.ParseCIDRSloppy("127.123.234.0/24")
+					return []*net.IPNet{clusterCIDR}
+				}(),
+				ServiceCIDR: func() *net.IPNet {
+					_, serviceCIDR, _ := netutils.ParseCIDRSloppy("127.123.234.0/26")
+					return serviceCIDR
+				}(),
+				SecondaryServiceCIDR: nil,
+				NodeCIDRMaskSizes:    []int{30, 112},
+			},
+			allocatedCIDRs: map[int][]string{
+				0: {"127.123.234.64/30", "127.123.234.68/30", "127.123.234.72/30", "127.123.234.80/30"},
+			},
+			expectedAllocatedCIDR: map[int]string{
+				0: "127.123.234.76/30",
+				1: "2300:5800:2:1::/112",
+			},
+		},
+		{
+			description:  "no double counting with linode interfaces",
+			linodeClient: client,
+			instance:     &linodego.Instance{ID: 12345, InterfaceGeneration: linodego.GenerationLinode},
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -381,23 +620,37 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 	testFunc := func(tc testCase) {
 		fakeNodeInformer := test.FakeNodeInformer(tc.fakeNodeHandler)
 		nodeList, _ := tc.fakeNodeHandler.List(tCtx, metav1.ListOptions{})
-		tc.linodeClient.EXPECT().ListInstanceConfigs(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.InstanceConfig{
-			{
-				Interfaces: []linodego.InstanceConfigInterface{
-					{
-						VPCID:   ptr.To(12345),
-						Purpose: linodego.InterfacePurposeVPC,
-						IPv6: &linodego.InstanceConfigInterfaceIPv6{
-							Ranges: []linodego.InstanceConfigInterfaceIPv6Range{
-								{
-									Range: "2300:5800:2:1::/64",
+		tc.linodeClient.EXPECT().GetInstance(gomock.Any(), gomock.Any()).AnyTimes().Return(tc.instance, nil)
+		if tc.instance.InterfaceGeneration == linodego.GenerationLinode {
+			tc.linodeClient.EXPECT().ListInterfaces(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.LinodeInterface{
+				{
+					ID: 12345,
+					VPC: &linodego.VPCInterface{
+						IPv6: linodego.VPCInterfaceIPv6{
+							Ranges: []linodego.VPCInterfaceIPv6Range{{Range: "2300:5800:2:1::/64"}},
+						},
+					},
+				},
+			}, nil)
+		} else {
+			tc.linodeClient.EXPECT().ListInstanceConfigs(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.InstanceConfig{
+				{
+					Interfaces: []linodego.InstanceConfigInterface{
+						{
+							VPCID:   ptr.To(12345),
+							Purpose: linodego.InterfacePurposeVPC,
+							IPv6: &linodego.InstanceConfigInterfaceIPv6{
+								Ranges: []linodego.InstanceConfigInterfaceIPv6Range{
+									{
+										Range: "2300:5800:2:1::/64",
+									},
 								},
 							},
 						},
 					},
 				},
-			},
-		}, nil)
+			}, nil)
+		}
 		allocator, err := NewLinodeCIDRAllocator(tCtx, tc.linodeClient, tc.fakeNodeHandler, fakeNodeInformer, tc.allocatorParams, nodeList)
 		if err != nil {
 			t.Errorf("%v: failed to create CIDRRangeAllocator with error %v", tc.description, err)
@@ -566,6 +819,7 @@ type releaseTestCase struct {
 	expectedAllocatedCIDRSecondRound map[int]string
 	allocatedCIDRs                   map[int][]string
 	cidrsToRelease                   [][]string
+	instance                         *linodego.Instance
 }
 
 func TestReleaseCIDRSuccess(t *testing.T) {
@@ -583,6 +837,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 		{
 			description:  "Correctly release preallocated CIDR",
 			linodeClient: client,
+			instance:     &linodego.Instance{ID: 12345},
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
@@ -626,6 +881,99 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 		},
 		{
 			description:  "Correctly recycle CIDR",
+			linodeClient: client,
+			instance:     &linodego.Instance{ID: 12345},
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node0",
+						},
+						Spec: v1.NodeSpec{
+							ProviderID: fmt.Sprintf("%s12345", providerIDPrefix),
+						},
+						Status: v1.NodeStatus{
+							Addresses: []v1.NodeAddress{
+								{
+									Type:    v1.NodeExternalIP,
+									Address: "172.234.236.211",
+								},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(),
+			},
+			allocatorParams: CIDRAllocatorParams{
+				ClusterCIDRs: func() []*net.IPNet {
+					_, clusterCIDR, _ := netutils.ParseCIDRSloppy("127.123.234.0/28")
+					return []*net.IPNet{clusterCIDR}
+				}(),
+				ServiceCIDR:          nil,
+				SecondaryServiceCIDR: nil,
+				NodeCIDRMaskSizes:    []int{30, 112},
+			},
+			allocatedCIDRs: map[int][]string{
+				0: {"127.123.234.4/30", "127.123.234.8/30", "127.123.234.12/30"},
+			},
+			expectedAllocatedCIDRFirstRound: map[int]string{
+				0: "127.123.234.0/30",
+			},
+			cidrsToRelease: [][]string{
+				{"127.123.234.0/30"},
+			},
+			expectedAllocatedCIDRSecondRound: map[int]string{
+				0: "127.123.234.0/30",
+			},
+		},
+		{
+			description:  "Correctly release preallocated CIDR with linode interfaces",
+			instance:     &linodego.Instance{ID: 12345, InterfaceGeneration: linodego.GenerationLinode},
+			linodeClient: client,
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node0",
+						},
+						Spec: v1.NodeSpec{
+							ProviderID: fmt.Sprintf("%s12345", providerIDPrefix),
+						},
+						Status: v1.NodeStatus{
+							Addresses: []v1.NodeAddress{
+								{
+									Type:    v1.NodeExternalIP,
+									Address: "172.234.236.211",
+								},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(),
+			},
+			allocatorParams: CIDRAllocatorParams{
+				ClusterCIDRs: func() []*net.IPNet {
+					_, clusterCIDR, _ := netutils.ParseCIDRSloppy("127.123.234.0/28")
+					return []*net.IPNet{clusterCIDR}
+				}(),
+				ServiceCIDR:          nil,
+				SecondaryServiceCIDR: nil,
+				NodeCIDRMaskSizes:    []int{30, 112},
+			},
+			allocatedCIDRs: map[int][]string{
+				0: {"127.123.234.0/30", "127.123.234.4/30", "127.123.234.8/30", "127.123.234.12/30"},
+			},
+			expectedAllocatedCIDRFirstRound: nil,
+			cidrsToRelease: [][]string{
+				{"127.123.234.4/30"},
+			},
+			expectedAllocatedCIDRSecondRound: map[int]string{
+				0: "127.123.234.4/30",
+			},
+		},
+		{
+			description:  "Correctly recycle CIDR with linode interfaces",
+			instance:     &linodego.Instance{ID: 12345, InterfaceGeneration: linodego.GenerationLinode},
 			linodeClient: client,
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
@@ -673,23 +1021,37 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 	}
 	logger, tCtx := ktesting.NewTestContext(t)
 	testFunc := func(tc releaseTestCase) {
-		tc.linodeClient.EXPECT().ListInstanceConfigs(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.InstanceConfig{
-			{
-				Interfaces: []linodego.InstanceConfigInterface{
-					{
-						VPCID:   ptr.To(12345),
-						Purpose: linodego.InterfacePurposeVPC,
-						IPv6: &linodego.InstanceConfigInterfaceIPv6{
-							Ranges: []linodego.InstanceConfigInterfaceIPv6Range{
-								{
-									Range: "2300:5800:2:1::/64",
+		tc.linodeClient.EXPECT().GetInstance(gomock.Any(), gomock.Any()).AnyTimes().Return(tc.instance, nil)
+		if tc.instance.InterfaceGeneration == linodego.GenerationLinode {
+			tc.linodeClient.EXPECT().ListInterfaces(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.LinodeInterface{
+				{
+					ID: 12345,
+					VPC: &linodego.VPCInterface{
+						IPv6: linodego.VPCInterfaceIPv6{
+							Ranges: []linodego.VPCInterfaceIPv6Range{{Range: "2300:5800:2:1::/64"}},
+						},
+					},
+				},
+			}, nil)
+		} else {
+			tc.linodeClient.EXPECT().ListInstanceConfigs(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.InstanceConfig{
+				{
+					Interfaces: []linodego.InstanceConfigInterface{
+						{
+							VPCID:   ptr.To(12345),
+							Purpose: linodego.InterfacePurposeVPC,
+							IPv6: &linodego.InstanceConfigInterfaceIPv6{
+								Ranges: []linodego.InstanceConfigInterfaceIPv6Range{
+									{
+										Range: "2300:5800:2:1::/64",
+									},
 								},
 							},
 						},
 					},
 				},
-			},
-		}, nil)
+			}, nil)
+		}
 		allocator, _ := NewLinodeCIDRAllocator(tCtx, tc.linodeClient, tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil)
 		rangeAllocator, ok := allocator.(*cloudAllocator)
 		if !ok {
