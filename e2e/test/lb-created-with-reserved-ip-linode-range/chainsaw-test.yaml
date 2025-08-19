@@ -7,17 +7,11 @@ metadata:
     all:
     lke:
 spec:
-  bindings:
-    - name: fwname
-      value: (join('-', [ 'fwtest-linode', env($RANDOM)]))
   namespace: "lb-created-with-reserved-ip-linode-range"
   steps:
     - name: create reserved ip and nodebalancer resources
       try:
         - script:
-            env:
-              - name: FWLABEL
-                value: ($fwname)
             content: |
               set -e
 
@@ -35,7 +29,9 @@ spec:
               if ! [[ $reserved_ip =~ $re ]]; then
                   echo "Reserved ip [$reserved_ip] is incorrect, failed to create a reserved ip"
               fi
-
+              
+              fw_label="ccm-fwtest-$RANDOM"
+              
               fw_id=$(curl -s --request POST \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 -H "Content-Type: application/json" \
@@ -43,7 +39,7 @@ spec:
                 "$LINODE_URL/v4/networking/firewalls" \
                 --data "
               {
-                \"label\": \"$FWLABEL\",
+                \"label\": \"$fw_label\",
                 \"rules\": {
                   \"inbound\": [{
                     \"action\": \"ACCEPT\",
@@ -63,7 +59,7 @@ spec:
               
               sleep 30
               if [ $fw_id == null ]; then
-                echo "failed to create firewall"
+                echo "failed to create firewall : $fw_id"
               fi
 
               echo "{\"reserved_ip\": \"$reserved_ip\",
