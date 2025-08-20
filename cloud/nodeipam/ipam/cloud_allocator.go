@@ -72,7 +72,11 @@ type cloudAllocator struct {
 	disableIPv6NodeCIDRAllocation bool
 }
 
-const providerIDPrefix = "linode://"
+const (
+	providerIDPrefix = "linode://"
+	ipv6BitLen       = 128
+	ipv6PrefixLen64  = 64
+)
 
 var _ CIDRAllocator = &cloudAllocator{}
 
@@ -350,9 +354,9 @@ func getIPv6RangeFromLinodeInterface(iface linodego.LinodeInterface) string {
 // computeStableIPv6PodCIDR attempts to compute a stable IPv6 /112 PodCIDR
 // within the provided base IPv6 range using the mnemonic subprefix :0:c::/112.
 //
-// This prefix is degiefined here:
 // The mnemonic subprefix :0:c::/112 is constructed by setting hextets 5..7 to 0, c, 0
 // (i.e., bytes 8-13 set to 00 00 00 0c 00 00) within the /64 base, as implemented below.
+//
 // Rules:
 //   - For a /64 base, return {base64}:0:c::/112
 //   - Only applies when desiredMask is /112 and the result is fully contained
@@ -363,7 +367,7 @@ func computeStableIPv6PodCIDR(base *net.IPNet, desiredMask int) (*net.IPNet, boo
 	}
 
 	ones, bits := base.Mask.Size()
-	if bits != 128 {
+	if bits != ipv6BitLen {
 		return nil, false
 	}
 
@@ -373,7 +377,7 @@ func computeStableIPv6PodCIDR(base *net.IPNet, desiredMask int) (*net.IPNet, boo
 	}
 
 	// Safety: only handle /64 base ranges
-	if ones != 64 {
+	if ones != ipv6PrefixLen64 {
 		return nil, false
 	}
 
@@ -389,7 +393,7 @@ func computeStableIPv6PodCIDR(base *net.IPNet, desiredMask int) (*net.IPNet, boo
 	out[12], out[13] = 0x00, 0x00 // :0
 	// last hextet (bytes 14..15) will be zeroed by mask below
 
-	mask := net.CIDRMask(desiredMask, 128)
+	mask := net.CIDRMask(desiredMask, ipv6BitLen)
 	// Ensure the address is the network address for the desired mask
 	out = out.Mask(mask)
 	pod := &net.IPNet{IP: out, Mask: mask}
