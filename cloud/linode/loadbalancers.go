@@ -34,8 +34,9 @@ import (
 )
 
 var (
-	errNoNodesAvailable          = errors.New("no nodes available for nodebalancer")
-	maxConnThrottleStringLen int = 20
+	errNoNodesAvailable             = errors.New("no nodes available for nodebalancer")
+	maxConnThrottleStringLen    int = 20
+	eventIPChangeIgnoredWarning     = "nodebalancer-ipv4-change-ignored"
 
 	// validProtocols is a map of valid protocols
 	validProtocols = map[string]bool{
@@ -365,7 +366,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 func (l *loadbalancers) createIPChangeWarningEvent(ctx context.Context, service *v1.Service, nb *linodego.NodeBalancer, newIP string) {
 	_, err := l.kubeClient.CoreV1().Events(service.Namespace).Create(ctx, &v1.Event{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("nodebalancer-ipv4-change-ignored-%d", time.Now().Unix()),
+			Name:      eventIPChangeIgnoredWarning,
 			Namespace: service.Namespace,
 		},
 		InvolvedObject: v1.ObjectReference{
