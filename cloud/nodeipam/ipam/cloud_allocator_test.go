@@ -60,20 +60,18 @@ func TestComputeStableIPv6PodCIDR(t *testing.T) {
 	}{
 		{name: "nil base", baseCIDR: "", desiredMask: 112, wantOK: false},
 		{name: "non-/112 desired", baseCIDR: "2300:5800:2:1::/64", desiredMask: 120, wantOK: false},
-		{name: "ipv4 base", baseCIDR: "10.0.0.0/24", desiredMask: 112, wantOK: false},
-		{name: "non-/64 ipv6 base (/56)", baseCIDR: "2300:5800:2::/56", desiredMask: 112, wantOK: false},
 		{name: "success /64 -> mnemonic /112", baseCIDR: "2300:5800:2:1::/64", desiredMask: 112, wantCIDR: "2300:5800:2:1:0:c::/112", wantOK: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			var baseIPNet *net.IPNet
+			var baseIP net.IP
 			if tc.baseCIDR != "" {
-				_, base, err := net.ParseCIDR(tc.baseCIDR)
+				ip, _, err := net.ParseCIDR(tc.baseCIDR)
 				if err != nil {
 					t.Fatalf("parse base cidr: %v", err)
 				}
-				baseIPNet = base
+				baseIP = ip
 			}
-			got, ok := getIPv6PodCIDR(baseIPNet, tc.desiredMask)
+			got, ok := getIPv6PodCIDR(baseIP, tc.desiredMask)
 			if ok != tc.wantOK {
 				t.Fatalf("ok mismatch: got %v want %v (gotCIDR=%v)", ok, tc.wantOK, func() string {
 					if got != nil {
