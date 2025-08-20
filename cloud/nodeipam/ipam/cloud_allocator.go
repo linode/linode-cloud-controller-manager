@@ -351,7 +351,8 @@ func getIPv6RangeFromLinodeInterface(iface linodego.LinodeInterface) string {
 // within the provided base IPv6 range using the mnemonic subprefix :0:c::/112.
 //
 // This prefix is degiefined here:
-//
+// The mnemonic subprefix :0:c::/112 is constructed by setting hextets 5..7 to 0, c, 0
+// (i.e., bytes 8-13 set to 00 00 00 0c 00 00) within the /64 base, as implemented below.
 // Rules:
 //   - For a /64 base, return {base64}:0:c::/112
 //   - Only applies when desiredMask is /112 and the result is fully contained
