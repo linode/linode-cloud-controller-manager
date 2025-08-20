@@ -249,7 +249,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			expectedAllocatedCIDR: map[int]string{
 				0: "127.123.234.0/30",
-				1: "2300:5800:2:1::/112",
+				1: "2300:5800:2:1:0:c::/112",
 			},
 		},
 		{
@@ -292,7 +292,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			// it should return first /30 CIDR after service range
 			expectedAllocatedCIDR: map[int]string{
 				0: "127.123.234.64/30",
-				1: "2300:5800:2:1::/112",
+				1: "2300:5800:2:1:0:c::/112",
 			},
 		},
 		{
@@ -337,7 +337,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			expectedAllocatedCIDR: map[int]string{
 				0: "127.123.234.76/30",
-				1: "2300:5800:2:1::/112",
+				1: "2300:5800:2:1:0:c::/112",
 			},
 		},
 		{
@@ -410,7 +410,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			expectedAllocatedCIDR: map[int]string{
 				0: "10.10.1.0/24",
-				1: "2300:5800:2:1::/112",
+				1: "2300:5800:2:1:0:c::/112",
 			},
 		},
 		{
@@ -449,7 +449,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			expectedAllocatedCIDR: map[int]string{
 				0: "127.123.234.0/30",
-				1: "2300:5800:2:1::/112",
+				1: "2300:5800:2:1:0:c::/112",
 			},
 		},
 		{
@@ -492,7 +492,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			// it should return first /30 CIDR after service range
 			expectedAllocatedCIDR: map[int]string{
 				0: "127.123.234.64/30",
-				1: "2300:5800:2:1::/112",
+				1: "2300:5800:2:1:0:c::/112",
 			},
 		},
 		{
@@ -537,7 +537,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			expectedAllocatedCIDR: map[int]string{
 				0: "127.123.234.76/30",
-				1: "2300:5800:2:1::/112",
+				1: "2300:5800:2:1:0:c::/112",
 			},
 		},
 		{
@@ -610,7 +610,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			expectedAllocatedCIDR: map[int]string{
 				0: "10.10.1.0/24",
-				1: "2300:5800:2:1::/112",
+				1: "2300:5800:2:1:0:c::/112",
 			},
 		},
 	}
