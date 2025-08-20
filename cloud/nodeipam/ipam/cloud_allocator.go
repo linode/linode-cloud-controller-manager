@@ -361,19 +361,11 @@ func getIPv6RangeFromLinodeInterface(iface linodego.LinodeInterface) string {
 //   - For a /64 base, return {base64}:0:c::/112
 //   - Only applies when desiredMask is /112 and the result is fully contained
 //     in the base range. Otherwise, returns (nil, false) to signal fallback.
-func getIPv6PodCIDR(base *net.IPNet, desiredMask int) (*net.IPNet, bool) {
+func getIPv6PodCIDR(ip net.IP, desiredMask int) (*net.IPNet, bool) {
 	// Some validation checks
-	if base == nil || desiredMask != 112 {
+	if ip == nil || desiredMask != 112 {
 		return nil, false
 	}
-	prefixLen, addrBits := base.Mask.Size()
-	if addrBits != ipv6BitLen || prefixLen != ipv6PrefixLen64 { // must be a /64
-		return nil, false
-	}
-
-	// create a copy to avoid modifying the original
-	ip := make(net.IP, len(base.IP))
-	copy(ip, base.IP)
 
 	// Keep first 64 bits (bytes 0..7) and set hextets 5..7 to 0, c, 0 respectively
 	// Hextet index to byte mapping: h5->[8,9], h6->[10,11], h7->[12,13]
@@ -386,10 +378,6 @@ func getIPv6PodCIDR(base *net.IPNet, desiredMask int) (*net.IPNet, bool) {
 	// Ensure the address is the network address for the desired mask
 	ip = ip.Mask(podMask)
 	podCIDR := &net.IPNet{IP: ip, Mask: podMask}
-
-	if !base.Contains(ip) {
-		return nil, false
-	}
 
 	return podCIDR, true
 }
@@ -464,16 +452,19 @@ func (c *cloudAllocator) allocateIPv6CIDR(ctx context.Context, node *v1.Node) (*
 		return nil, fmt.Errorf("failed parsing ipv6 range %s: %w", ipv6Range, err)
 	}
 
-	// Try stable subprefix selection first.
-	if podCIDR, ok := getIPv6PodCIDR(base, c.nodeCIDRMaskSizeIPv6); ok {
-		logger.V(4).Info("Using stable IPv6 PodCIDR subprefix :0:c::/112", "base", base, "podCIDR", podCIDR)
+	// get pod cidr using stable mnemonic subprefix :0:c::/112
+	if podCIDR, ok := getIPv6PodCIDR(ip, c.nodeCIDRMaskSizeIPv6); ok {
+		logger.V(4).Info("Using stable IPv6 PodCIDR subprefix :0:c::/112", "ip", ip, "podCIDR", podCIDR)
+		if !base.Contains(podCIDR.IP) {
+			return nil, fmt.Errorf("stable IPv6 PodCIDR %s is not contained in base range %s", podCIDR, base)
+		}
 		return podCIDR, nil
 	}
 
 	// Fallback to the original behavior: mask base IP directly to desired size
 	podMask := net.CIDRMask(c.nodeCIDRMaskSizeIPv6, 128)
 	fallbackPodCIDR := &net.IPNet{IP: ip.Mask(podMask), Mask: podMask}
-	logger.V(4).Info("Falling back to start-of-range IPv6 PodCIDR", "base", base, "podCIDR", fallbackPodCIDR)
+	logger.V(4).Info("Falling back to start-of-range IPv6 PodCIDR", "ip", ip, "podCIDR", fallbackPodCIDR)
 	return fallbackPodCIDR, nil
 }
 
