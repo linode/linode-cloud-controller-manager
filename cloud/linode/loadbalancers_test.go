@@ -3009,6 +3009,8 @@ func testUpdateLoadBalancerDeleteFirewallRemoveID(t *testing.T, client *linodego
 
 func testUpdateLoadBalancerAddReservedIP(t *testing.T, client *linodego.Client, fakeAPI *fakeAPI) {
 	t.Helper()
+	clusterName := "linodelb"
+	region := "us-west"
 
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3041,12 +3043,12 @@ func testUpdateLoadBalancerAddReservedIP(t *testing.T, client *linodego.Client, 
 		},
 	}
 
-	lb, assertion := newLoadbalancers(client, "us-west").(*loadbalancers)
+	lb, assertion := newLoadbalancers(client, region).(*loadbalancers)
 	if !assertion {
 		t.Error("type assertion failed")
 	}
 	defer func() {
-		_ = lb.EnsureLoadBalancerDeleted(t.Context(), "linodelb", svc)
+		_ = lb.EnsureLoadBalancerDeleted(t.Context(), clusterName, svc)
 	}()
 
 	fakeClientset := fake.NewSimpleClientset()
@@ -3059,6 +3061,7 @@ func testUpdateLoadBalancerAddReservedIP(t *testing.T, client *linodego.Client, 
 		t.Fatalf("failed to create NodeBalancer: %s", err)
 	}
 
+	initialIP := string(*nodeBalancer.IPv4)
 	svc.Status.LoadBalancer = *makeLoadBalancerStatus(svc, nodeBalancer)
 
 	ipaddr, err := client.ReserveIPAddress(context.TODO(), linodego.ReserveIPOptions{
@@ -3073,9 +3076,21 @@ func testUpdateLoadBalancerAddReservedIP(t *testing.T, client *linodego.Client, 
 		annotations.AnnLinodeLoadBalancerIPv4: ipaddr.Address,
 	})
 
-	err = lb.UpdateLoadBalancer(t.Context(), "linodelb", svc, nodes)
+	err = lb.UpdateLoadBalancer(t.Context(), "", svc, nodes)
 	if err != nil {
 		t.Errorf("UpdateLoadBalancer returned an error while updated annotations: %s", err)
+	}
+
+	status, _, err := lb.GetLoadBalancer(t.Context(), clusterName, svc)
+	if status.Ingress[0].IP != initialIP {
+		t.Fatalf("IP should not have changed in service status: %s", err)
+	}
+
+	event, _ := fakeClientset.CoreV1().Events("").Get(t.Context(),
+		eventIPChangeIgnoredWarning,
+		metav1.GetOptions{})
+	if event == nil {
+		t.Fatalf("failed to generate %s event: %s", eventIPChangeIgnoredWarning, err)
 	}
 }
 
