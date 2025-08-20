@@ -65,15 +65,15 @@ func TestComputeStableIPv6PodCIDR(t *testing.T) {
 		{name: "success /64 -> mnemonic /112", baseCIDR: "2300:5800:2:1::/64", desiredMask: 112, wantCIDR: "2300:5800:2:1:0:c::/112", wantOK: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			var baseNet *net.IPNet
+			var baseIPNet *net.IPNet
 			if tc.baseCIDR != "" {
-				_, parsed, err := net.ParseCIDR(tc.baseCIDR)
+				_, base, err := net.ParseCIDR(tc.baseCIDR)
 				if err != nil {
 					t.Fatalf("parse base cidr: %v", err)
 				}
-				baseNet = parsed
+				baseIPNet = base
 			}
-			got, ok := getIPv6PodCIDR(baseNet, tc.desiredMask)
+			got, ok := getIPv6PodCIDR(baseIPNet, tc.desiredMask)
 			if ok != tc.wantOK {
 				t.Fatalf("ok mismatch: got %v want %v (gotCIDR=%v)", ok, tc.wantOK, func() string {
 					if got != nil {
