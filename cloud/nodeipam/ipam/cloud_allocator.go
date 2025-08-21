@@ -75,7 +75,7 @@ type cloudAllocator struct {
 const (
 	providerIDPrefix = "linode://"
 	ipv6BitLen       = 128
-	ipv6PrefixLen64  = 64
+	ipv6PodCIDRMaskSize  = 112
 )
 
 var _ CIDRAllocator = &cloudAllocator{}
@@ -363,7 +363,7 @@ func getIPv6RangeFromLinodeInterface(iface linodego.LinodeInterface) string {
 //     in the base range. Otherwise, returns (nil, false) to signal fallback.
 func getIPv6PodCIDR(ip net.IP, desiredMask int) (*net.IPNet, bool) {
 	// Some validation checks
-	if ip == nil || desiredMask != 112 {
+	if ip == nil || desiredMask != ipv6PodCIDRMaskSize {
 		return nil, false
 	}
 
