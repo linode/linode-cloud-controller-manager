@@ -50,6 +50,52 @@ type testCase struct {
 	instance       *linodego.Instance
 }
 
+func TestComputeStableIPv6PodCIDR(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		baseCIDR    string
+		desiredMask int
+		wantCIDR    string
+		wantOK      bool
+	}{
+		{name: "nil base", baseCIDR: "", desiredMask: 112, wantOK: false},
+		{name: "non-/112 desired", baseCIDR: "2300:5800:2:1::/64", desiredMask: 120, wantOK: false},
+		{name: "success /64 -> mnemonic /112", baseCIDR: "2300:5800:2:1::/64", desiredMask: 112, wantCIDR: "2300:5800:2:1:0:c::/112", wantOK: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var baseIP net.IP
+			if tc.baseCIDR != "" {
+				ip, _, err := net.ParseCIDR(tc.baseCIDR)
+				if err != nil {
+					t.Fatalf("parse base cidr: %v", err)
+				}
+				baseIP = ip
+			}
+			got, ok := getIPv6PodCIDR(baseIP, tc.desiredMask)
+			if ok != tc.wantOK {
+				t.Fatalf("ok mismatch: got %v want %v (gotCIDR=%v)", ok, tc.wantOK, func() string {
+					if got != nil {
+						return got.String()
+					}
+					return ""
+				}())
+			}
+			if !tc.wantOK {
+				if got != nil {
+					t.Fatalf("expected nil cidr on failure, got %v", got.String())
+				}
+				return
+			}
+			if got == nil {
+				t.Fatalf("expected non-nil cidr")
+			}
+			if got.String() != tc.wantCIDR {
+				t.Fatalf("cidr mismatch: got %s want %s", got.String(), tc.wantCIDR)
+			}
+		})
+	}
+}
+
 func TestGetIPv6RangeFromLinodeInterface(t *testing.T) {
 	for _, tc := range []struct {
 		iface         linodego.LinodeInterface
@@ -249,7 +295,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			expectedAllocatedCIDR: map[int]string{
 				0: "127.123.234.0/30",
-				1: "2300:5800:2:1::/112",
+				1: "2300:5800:2:1:0:c::/112",
 			},
 		},
 		{
@@ -292,7 +338,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			// it should return first /30 CIDR after service range
 			expectedAllocatedCIDR: map[int]string{
 				0: "127.123.234.64/30",
-				1: "2300:5800:2:1::/112",
+				1: "2300:5800:2:1:0:c::/112",
 			},
 		},
 		{
@@ -337,7 +383,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			expectedAllocatedCIDR: map[int]string{
 				0: "127.123.234.76/30",
-				1: "2300:5800:2:1::/112",
+				1: "2300:5800:2:1:0:c::/112",
 			},
 		},
 		{
@@ -410,7 +456,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			expectedAllocatedCIDR: map[int]string{
 				0: "10.10.1.0/24",
-				1: "2300:5800:2:1::/112",
+				1: "2300:5800:2:1:0:c::/112",
 			},
 		},
 		{
@@ -449,7 +495,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			expectedAllocatedCIDR: map[int]string{
 				0: "127.123.234.0/30",
-				1: "2300:5800:2:1::/112",
+				1: "2300:5800:2:1:0:c::/112",
 			},
 		},
 		{
@@ -492,7 +538,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			// it should return first /30 CIDR after service range
 			expectedAllocatedCIDR: map[int]string{
 				0: "127.123.234.64/30",
-				1: "2300:5800:2:1::/112",
+				1: "2300:5800:2:1:0:c::/112",
 			},
 		},
 		{
@@ -537,7 +583,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			expectedAllocatedCIDR: map[int]string{
 				0: "127.123.234.76/30",
-				1: "2300:5800:2:1::/112",
+				1: "2300:5800:2:1:0:c::/112",
 			},
 		},
 		{
@@ -610,7 +656,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			expectedAllocatedCIDR: map[int]string{
 				0: "10.10.1.0/24",
-				1: "2300:5800:2:1::/112",
+				1: "2300:5800:2:1:0:c::/112",
 			},
 		},
 	}
