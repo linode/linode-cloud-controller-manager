@@ -72,7 +72,11 @@ type cloudAllocator struct {
 	disableIPv6NodeCIDRAllocation bool
 }
 
-const providerIDPrefix = "linode://"
+const (
+	providerIDPrefix = "linode://"
+	ipv6BitLen       = 128
+	ipv6PodCIDRMaskSize  = 112
+)
 
 var _ CIDRAllocator = &cloudAllocator{}
 
@@ -347,12 +351,49 @@ func getIPv6RangeFromLinodeInterface(iface linodego.LinodeInterface) string {
 	return ""
 }
 
+// getIPv6PodCIDR attempts to compute a stable IPv6 /112 PodCIDR
+// within the provided base IPv6 range using the mnemonic subprefix :0:c::/112.
+//
+// The mnemonic subprefix :0:c::/112 is constructed by setting hextets 5..7 to 0, c, 0
+// (i.e., bytes 8-13 set to 00 00 00 0c 00 00) within the /64 base, as implemented below.
+//
+// Rules:
+//   - For a /64 base, return {base64}:0:c::/112
+//   - Only applies when desiredMask is /112 and the result is fully contained
+//     in the base range. Otherwise, returns (nil, false) to signal fallback.
+func getIPv6PodCIDR(ip net.IP, desiredMask int) (*net.IPNet, bool) {
+	// Some validation checks
+	if ip == nil || desiredMask != ipv6PodCIDRMaskSize {
+		return nil, false
+	}
+
+	// We need to make a copy so we don't mutate caller's backing array (net.IP is a slice)
+	ipCopy := make(net.IP, len(ip))
+	copy(ipCopy, ip)
+
+	// Keep first 64 bits (bytes 0..7) and set hextets 5..7 to 0, c, 0 respectively
+	// Hextet index to byte mapping: h5->[8,9], h6->[10,11], h7->[12,13]
+	ipCopy[8], ipCopy[9] = 0x00, 0x00   // :0
+	ipCopy[10], ipCopy[11] = 0x00, 0x0c // :c
+	ipCopy[12], ipCopy[13] = 0x00, 0x00 // :0
+	// last hextet (bytes 14..15) will be zeroed by mask below
+
+	podMask := net.CIDRMask(desiredMask, ipv6BitLen)
+	// Ensure the address is the network address for the desired mask
+	ipCopy = ipCopy.Mask(podMask)
+	podCIDR := &net.IPNet{IP: ipCopy, Mask: podMask}
+
+	return podCIDR, true
+}
+
 // allocateIPv6CIDR allocates an IPv6 CIDR for the given node.
 // It retrieves the instance configuration for the node and extracts the IPv6 range.
 // It then creates a new net.IPNet with the IPv6 address and mask size defined
 // by nodeCIDRMaskSizeIPv6. The function returns an error if it fails to retrieve
 // the instance configuration or parse the IPv6 range.
 func (c *cloudAllocator) allocateIPv6CIDR(ctx context.Context, node *v1.Node) (*net.IPNet, error) {
+	logger := klog.FromContext(ctx)
+
 	if node.Spec.ProviderID == "" {
 		return nil, fmt.Errorf("node %s has no ProviderID set, cannot calculate ipv6 range for it", node.Name)
 	}
@@ -410,18 +451,26 @@ func (c *cloudAllocator) allocateIPv6CIDR(ctx context.Context, node *v1.Node) (*
 		}
 	}
 
-	ip, _, err := net.ParseCIDR(ipv6Range)
+	ip, base, err := net.ParseCIDR(ipv6Range)
 	if err != nil {
 		return nil, fmt.Errorf("failed parsing ipv6 range %s: %w", ipv6Range, err)
 	}
 
-	mask := net.CIDRMask(c.nodeCIDRMaskSizeIPv6, 128)
-	ipv6Embedded := &net.IPNet{
-		IP:   ip.Mask(mask),
-		Mask: mask,
+	// get pod cidr using stable mnemonic subprefix :0:c::/112
+	if podCIDR, ok := getIPv6PodCIDR(ip, c.nodeCIDRMaskSizeIPv6); ok {
+		logger.V(4).Info("Using stable IPv6 PodCIDR subprefix :0:c::/112", "ip", ip, "podCIDR", podCIDR)
+		// Verify the /112 PodCIDR is fully contained within the base /64 range
+		if !base.Contains(podCIDR.IP) {
+			return nil, fmt.Errorf("stable IPv6 PodCIDR %s is not contained in base range %s", podCIDR, base)
+		}
+		return podCIDR, nil
 	}
 
-	return ipv6Embedded, nil
+	// Fallback to the original behavior: mask base IP directly to desired size
+	podMask := net.CIDRMask(c.nodeCIDRMaskSizeIPv6, 128)
+	fallbackPodCIDR := &net.IPNet{IP: ip.Mask(podMask), Mask: podMask}
+	logger.V(4).Info("Falling back to start-of-range IPv6 PodCIDR", "ip", ip, "podCIDR", fallbackPodCIDR)
+	return fallbackPodCIDR, nil
 }
 
 // WARNING: If you're adding any return calls or defer any more work from this
