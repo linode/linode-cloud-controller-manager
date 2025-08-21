@@ -68,6 +68,54 @@ spec:
         - describe:
             apiVersion: v1
             kind: Service
+      cleanup:
+        - script:
+            content: |
+              set -e 
+
+              reserved_ip=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.ReservedIP}' -n $NAMESPACE)
+              if [ -z "$reserved_ip" ]; then
+                  echo "Error: No reserved ip found in configmap"
+              fi
+
+              reserved_ip2=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.ReservedIP2}' -n $NAMESPACE)
+              if [ -z "$reserved_ip2" ]; then
+                  echo "Error: No reserved ip found in configmap"
+              fi
+
+              delete_rip=$(curl -s --request DELETE \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                "${LINODE_URL}/v4beta/networking/reserved/ips/$reserved_ip" )
+
+              if [[ "$delete_rip" == "{}" ]]; then
+                echo "Reserved IP $reserved_ip deleted successfully"
+              else
+                echo "Unable to delete reserved ip: $reserved_ip. Error: $delete_rip"
+              fi
+
+              delete_rip2=$(curl -s --request DELETE \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                "${LINODE_URL}/v4beta/networking/reserved/ips/$reserved_ip2" )
+
+              if [[ "$delete_rip2" == "{}" ]]; then
+                echo "Reserved IP $reserved_ip2 deleted successfully"
+              else
+                echo "Unable to delete reserved ip: $reserved_ip. Error: $delete_rip2"
+              fi
+
+              delete_cm=$(kubectl delete configmap reserved-ip-config -n $NAMESPACE)
+              if [[ "$delete_cm" == "configmap \"reserved-ip-config\" deleted" ]]; then
+                echo "Configmap deleted successfully"
+              else
+                echo "Unable to delete the configmap: $delete_cm. Error: $delete_cm"
+              fi
+            check:
+              ($error == null): true
+              (contains($stdout, 'No reserved ip found in configmap')): false
+              (contains($stdout, 'Unable to delete the configmap')): false
+              (contains($stdout, 'Unable to delete reserved ip')): false
     - name: Check that loadbalancer ip is assigned
       try:
       - assert:
@@ -175,40 +223,9 @@ spec:
                 echo "IPs Match"
               else
                 echo "IPs do not match"
-              fi
-
-              delete_rip=$(curl -s --request DELETE \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
-                "${LINODE_URL}/v4beta/networking/reserved/ips/$reserved_ip" )
-
-              if [[ "$delete_rip" == "{}" ]]; then
-                echo "Reserved IP $reserved_ip deleted successfully"
-              else
-                echo "Unable to delete reserved ip: $reserved_ip. Error: $delete_rip"
-              fi
-
-              delete_rip2=$(curl -s --request DELETE \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
-                "${LINODE_URL}/v4beta/networking/reserved/ips/$reserved_ip2" )
-
-              if [[ "$delete_rip2" == "{}" ]]; then
-                echo "Reserved IP $reserved_ip2 deleted successfully"
-              else
-                echo "Unable to delete reserved ip: $reserved_ip. Error: $delete_rip2"
-              fi
-
-              delete_cm=$(kubectl delete configmap reserved-ip-config -n $NAMESPACE)
-              if [[ "$delete_cm" == "configmap \"reserved-ip-config\" deleted" ]]; then
-                echo "Configmap deleted successfully"
-              else
-                echo "Unable to delete the configmap: $delete_cm. Error: $delete_cm"
-              fi
+              fi              
             check:
               ($error == null): true
               (contains($stdout, 'No reserved ip found in configmap')): false
               (contains($stdout, 'No service ip found for service svc-test')): false
               (contains($stdout, 'IPs do not match')): false
-              (contains($stdout, 'Unable to delete the configmap')): false
-              (contains($stdout, 'Unable to delete reserved ip')): false

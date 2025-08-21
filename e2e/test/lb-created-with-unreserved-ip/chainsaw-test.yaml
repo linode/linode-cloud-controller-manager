@@ -39,6 +39,20 @@ spec:
         - describe:
             apiVersion: v1
             kind: Service
+      cleanup: 
+        - script:
+            content: |
+              set -e 
+
+              delete_cm=$(kubectl delete configmap unreserved-ip-config -n $NAMESPACE)
+              if [[ "$delete_cm" == "configmap \"unreserved-ip-config\" deleted" ]]; then
+                echo "Configmap deleted successfully"
+              else
+                echo "Unable to delete the configmap: $delete_cm. Error: $delete_cm"
+              fi
+            check:
+              ($error == null): true
+              (contains($stdout, 'Unable to delete the configmap')): false
     - name: Check that loadbalancer ip is not assigned
       try:
       - assert:
@@ -79,16 +93,8 @@ spec:
               if [[ "$service_ip" == "$unreserved_ip" ]]; then
                 echo "Expected service ip to be null got the unreserved ip: $unreserved_ip"
               fi
-
-              delete_cm=$(kubectl delete configmap unreserved-ip-config -n $NAMESPACE)
-              if [[ "$delete_cm" == "configmap \"unreserved-ip-config\" deleted" ]]; then
-                echo "Configmap deleted successfully"
-              else
-                echo "Unable to delete the configmap: $delete_cm. Error: $delete_cm"
-              fi
             check:
               ($error == null): true
               (contains($stdout, 'Warning event not found')): false
               (contains($stdout, 'No un reserved ip found in configmap')): false
-              (contains($stdout, 'Unable to delete the configmap')): false
               (contains($stdout, 'Expected service ip to be null got the unreserved ip')): false

@@ -86,6 +86,55 @@ spec:
         - describe:
             apiVersion: v1
             kind: Service
+      cleanup:
+        - script:
+            content: |
+              set -e 
+             
+              reserved_ip=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.ReservedIP}' -n $NAMESPACE)
+              if [ -z "$reserved_ip" ]; then
+                  echo "Error: No reserved ip found in configmap"
+              fi
+
+              fw_id=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.FW_ID}' -n $NAMESPACE)
+              if [ -z "$fw_id" ]; then
+                  echo "Error: No firewall id found in configmap"
+              fi
+
+              delete_fw=$(curl -s -X DELETE \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                "$LINODE_URL/v4/networking/firewalls/$fw_id")
+
+              if [[ "$delete_fw" == "{}" ]]; then
+                echo "Firewall $fw_id deleted successfully"
+              else
+                echo "Unable to delete firewall: $fw_id. Error: $delete_fw"
+              fi
+
+              delete_rip=$(curl -s --request DELETE \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                "${LINODE_URL}/v4beta/networking/reserved/ips/$reserved_ip" )
+
+              if [[ "$delete_rip" == "{}" ]]; then
+                echo "Reserved IP $reserved_ip deleted successfully"
+              else
+                echo "Unable to delete reserved ip: $reserved_ip. Error: $delete_rip"
+              fi
+
+              delete_cm=$(kubectl delete configmap reserved-ip-config -n $NAMESPACE)
+              if [[ "$delete_cm" == "configmap \"reserved-ip-config\" deleted" ]]; then
+                echo "Configmap deleted successfully"
+              else
+                echo "Unable to delete the configmap: $delete_cm. Error: $delete_cm"
+              fi
+            check:
+              ($error == null): true
+              (contains($stdout, 'No firewall id found in configmap')): false
+              (contains($stdout, 'Unable to delete firewall')): false
+              (contains($stdout, 'Unable to delete the configmap')): false
+              (contains($stdout, 'Unable to delete reserved ip')): false
     - name: Check that loadbalancer ip is assigned
       try:
       - assert:
@@ -128,48 +177,10 @@ spec:
               else
                  echo "Request failed with response code: $HTTP_RESPONSE"
               fi
-
-              fw_id=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.FW_ID}' -n $NAMESPACE)
-              if [ -z "$fw_id" ]; then
-                  echo "Error: No firewall id found in configmap"
-              fi
-
-              delete_fw=$(curl -s -X DELETE \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
-                "$LINODE_URL/v4/networking/firewalls/$fw_id")
-
-              if [[ "$delete_fw" == "{}" ]]; then
-                echo "Firewall $fw_id deleted successfully"
-              else
-                echo "Unable to delete firewall: $fw_id. Error: $delete_fw"
-              fi
-
-              delete_rip=$(curl -s --request DELETE \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
-                "${LINODE_URL}/v4beta/networking/reserved/ips/$reserved_ip" )
-
-              if [[ "$delete_rip" == "{}" ]]; then
-                echo "Reserved IP $reserved_ip deleted successfully"
-              else
-                echo "Unable to delete reserved ip: $reserved_ip. Error: $delete_rip"
-              fi
-
-              delete_cm=$(kubectl delete configmap reserved-ip-config -n $NAMESPACE)
-              if [[ "$delete_cm" == "configmap \"reserved-ip-config\" deleted" ]]; then
-                echo "Configmap deleted successfully"
-              else
-                echo "Unable to delete the configmap: $delete_cm. Error: $delete_cm"
-              fi
             check:
               ($error == null): true
               (contains($stdout, 'No reserved ip found in configmap')): false
               (contains($stdout, 'No service ip found for service svc-test')): false
               (contains($stdout, 'IPs do not match')): false
-              (contains($stdout, 'No firewall id found in configmap')): false
-              (contains($stdout, 'Unable to delete firewall')): false
-              (contains($stdout, 'Unable to delete the configmap')): false
-              (contains($stdout, 'Unable to delete reserved ip')): false
               (contains($stdout, 'Request failed with response code')): false
-              
+     
