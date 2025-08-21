@@ -875,9 +875,6 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 
 	// Check for static IPv4 address annotation
 	if ipv4, ok := service.GetAnnotations()[annotations.AnnLinodeLoadBalancerIPv4]; ok {
-		if err := isValidPublicIPv4(ipv4); err != nil {
-			return nil, fmt.Errorf("invalid IPv4 address in annotation %s: %w", annotations.AnnLinodeLoadBalancerIPv4, err)
-		}
 		createOpts.IPv4 = &ipv4
 	}
 
@@ -907,31 +904,6 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 	}
 
 	return l.client.CreateNodeBalancer(ctx, createOpts)
-}
-
-// isValidPublicIPv4 checks if the given string is a valid public IPv4 address
-func isValidPublicIPv4(ipStr string) error {
-	ip := net.ParseIP(ipStr)
-	if ip == nil {
-		return fmt.Errorf("invalid IP address format: %s", ipStr)
-	}
-
-	ipv4 := ip.To4()
-	if ipv4 == nil {
-		return fmt.Errorf("not an IPv4 address: %s", ipStr)
-	}
-
-	// Check if it's a public IP (not private, not multicast, not experimental)
-	if ipv4[0] == 10 || // 10.0.0.0/8
-		(ipv4[0] == 172 && ipv4[1] >= 16 && ipv4[1] <= 31) || // 172.16.0.0/12
-		(ipv4[0] == 192 && ipv4[1] == 168) || // 192.168.0.0/16
-		ipv4[0] >= 224 || // Class D & E
-		ipv4[0] == 0 || // 0.0.0.0/8
-		ipv4[0] == 127 { // 127.0.0.0/8
-		return fmt.Errorf("not a public IPv4 address: %s", ipStr)
-	}
-
-	return nil
 }
 
 func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1.Service, port v1.ServicePort) (linodego.NodeBalancerConfig, error) {
