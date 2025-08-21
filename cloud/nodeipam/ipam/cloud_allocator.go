@@ -367,17 +367,21 @@ func getIPv6PodCIDR(ip net.IP, desiredMask int) (*net.IPNet, bool) {
 		return nil, false
 	}
 
+	// We need to make a copy so we don't mutate caller's backing array (net.IP is a slice)
+	ipCopy := make(net.IP, len(ip))
+	copy(ipCopy, ip)
+
 	// Keep first 64 bits (bytes 0..7) and set hextets 5..7 to 0, c, 0 respectively
 	// Hextet index to byte mapping: h5->[8,9], h6->[10,11], h7->[12,13]
-	ip[8], ip[9] = 0x00, 0x00   // :0
-	ip[10], ip[11] = 0x00, 0x0c // :c
-	ip[12], ip[13] = 0x00, 0x00 // :0
+	ipCopy[8], ipCopy[9] = 0x00, 0x00   // :0
+	ipCopy[10], ipCopy[11] = 0x00, 0x0c // :c
+	ipCopy[12], ipCopy[13] = 0x00, 0x00 // :0
 	// last hextet (bytes 14..15) will be zeroed by mask below
 
 	podMask := net.CIDRMask(desiredMask, ipv6BitLen)
 	// Ensure the address is the network address for the desired mask
-	ip = ip.Mask(podMask)
-	podCIDR := &net.IPNet{IP: ip, Mask: podMask}
+	ipCopy = ipCopy.Mask(podMask)
+	podCIDR := &net.IPNet{IP: ipCopy, Mask: podMask}
 
 	return podCIDR, true
 }
@@ -455,6 +459,7 @@ func (c *cloudAllocator) allocateIPv6CIDR(ctx context.Context, node *v1.Node) (*
 	// get pod cidr using stable mnemonic subprefix :0:c::/112
 	if podCIDR, ok := getIPv6PodCIDR(ip, c.nodeCIDRMaskSizeIPv6); ok {
 		logger.V(4).Info("Using stable IPv6 PodCIDR subprefix :0:c::/112", "ip", ip, "podCIDR", podCIDR)
+		// Verify the /112 PodCIDR is fully contained within the base /64 range
 		if !base.Contains(podCIDR.IP) {
 			return nil, fmt.Errorf("stable IPv6 PodCIDR %s is not contained in base range %s", podCIDR, base)
 		}
