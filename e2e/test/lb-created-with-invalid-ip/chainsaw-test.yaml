@@ -67,7 +67,7 @@ spec:
         - script: 
             content: |
               set -e
-              
+              sleep 30
               invalid_ip=$(kubectl get configmap invalid-ip-config -o=jsonpath='{.data.InvalidIP}' -n $NAMESPACE)
               if [[ -z "$invalid_ip" ]]; then
                   echo "Error: No invalid ip found in configmap"
@@ -77,23 +77,24 @@ spec:
               events=$(kubectl get events -n $NAMESPACE --field-selector reason=SyncLoadBalancerFailed --sort-by='.lastTimestamp' -o json)
               message=$(echo $events | jq .items[0].message)
 
-              if [[ "$message" =~ ^\"Error\ syncing\ load\ balancer:\ failed\ to\ ensure\ load\ balancer:\ invalid\ IPv4\ address\ in\ annotation\ $annotation:\ invalid\ IP\ address\ format:\ $invalid_ip\"$ ]]; then
+              if [[ "$message" == *"Error syncing load balancer: failed to ensure load balancer: [400] Invalid IPv4 address"* ]]; then
                 echo "Warning event found"
               else
                 echo "Warning event not found"
               fi
-
+              
               service_ip=$(kubectl get svc svc-test -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
               if [[ "$service_ip" != "" ]]; then
                   echo "Error: service ip found for service svc-test"
               fi
-              echo "{\"service_ip\": $service_ip}"
-              echo "{\"invalid_ip\": $invalid_ip}"
               if [[ "$service_ip" == "$invalid_ip" ]]; then
                 echo "Expected service ip to be null got the invalid ip: $invalid_ip"
               fi
+              echo "{\"service_ip\": $service_ip}"
+              echo "{\"invalid_ip\": $invalid_ip}"
             check:
               ($error == null): true
               (contains($stdout, 'Warning event not found')): false
               (contains($stdout, 'No invalid ip found in configmap')): false
               (contains($stdout, 'Expected service ip to be null got the invalid ip')): false
+              

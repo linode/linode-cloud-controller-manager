@@ -159,8 +159,6 @@ spec:
 
               message=$(echo $events | jq .items[0].message)
 
-              echo $message
-
               if [[ "$message" =~ ^\"IPv4\ annotation\ changed\ to\ $reserved_ip2,\ but\ NodeBalancer\ \([0-9]+\)\ IP\ cannot\ be\ updated\ after\ creation.\ It\ will\ remain\ $reserved_ip\"$ ]]; then
                 echo "Warning event found"
               else
