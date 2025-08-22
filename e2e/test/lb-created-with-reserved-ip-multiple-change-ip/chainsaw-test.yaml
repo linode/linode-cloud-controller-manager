@@ -2,7 +2,7 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  name: lb-created-with-reserved-ip-multiple-change-ip
+  name: c
   labels:
     all:
     lke:
@@ -143,8 +143,6 @@ spec:
                   echo "Error: No reserved ip found in configmap"
               fi
               
-              echo $NAMESPACE
-              echo $reserved_ip2
               patch=$(kubectl patch service svc-test -n $NAMESPACE --patch "{
                 \"metadata\": {
                   \"annotations\": {
@@ -153,7 +151,7 @@ spec:
                 }
               }")
 
-              sleep 10
+              sleep 30
 
               patch2=$(kubectl patch service svc-test -n $NAMESPACE --patch "{
                 \"metadata\": {
@@ -163,6 +161,7 @@ spec:
                 }
               }")
 
+              sleep 30
               if [[ "$patch" != "service/svc-test patched" ]]; then
                 echo "Unable to update annotation"
               fi
@@ -170,23 +169,17 @@ spec:
                 echo "Unable to update annotation"
               fi
               
-              sleep 10
-
               events=$(kubectl get events -n $NAMESPACE --field-selector reason=NodeBalancerIPChangeIgnored --sort-by='.lastTimestamp' -o json)
 
               message=$(echo $events | jq .items[0].message)
               message2=$(echo $events | jq .items[1].message)
-
-              echo $events
-              echo $message
-              echo $message2
 
               if [[ "$message" =~ ^\"IPv4\ annotation\ changed\ to\ $reserved_ip2,\ but\ NodeBalancer\ \([0-9]+\)\ IP\ cannot\ be\ updated\ after\ creation.\ It\ will\ remain\ $reserved_ip\"$ ]]; then
                 echo "Warning event found"
               else
                 echo "Warning event not found"
               fi
-
+              
               if [[ "$message2" =~ ^\"IPv4\ annotation\ changed\ to\ 100.10.10.10,\ but\ NodeBalancer\ \([0-9]+\)\ IP\ cannot\ be\ updated\ after\ creation.\ It\ will\ remain\ $reserved_ip\"$ ]]; then
                 echo "Warning event found"
               else
