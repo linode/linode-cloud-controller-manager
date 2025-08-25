@@ -3061,10 +3061,10 @@ func testUpdateLoadBalancerAddReservedIP(t *testing.T, client *linodego.Client, 
 		t.Fatalf("failed to create NodeBalancer: %s", err)
 	}
 
-	initialIP := string(*nodeBalancer.IPv4)
+	initialIP := *nodeBalancer.IPv4
 	svc.Status.LoadBalancer = *makeLoadBalancerStatus(svc, nodeBalancer)
 
-	ipaddr, err := client.ReserveIPAddress(context.TODO(), linodego.ReserveIPOptions{
+	ipaddr, err := client.ReserveIPAddress(t.Context(), linodego.ReserveIPOptions{
 		Region: lb.zone,
 	})
 	if err != nil {
