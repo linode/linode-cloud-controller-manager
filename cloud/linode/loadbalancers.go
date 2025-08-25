@@ -366,7 +366,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 func (l *loadbalancers) createIPChangeWarningEvent(ctx context.Context, service *v1.Service, nb *linodego.NodeBalancer, newIP string) {
 	_, err := l.kubeClient.CoreV1().Events(service.Namespace).Create(ctx, &v1.Event{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      eventIPChangeIgnoredWarning,
+			Name:      fmt.Sprintf("%s-%d", eventIPChangeIgnoredWarning, time.Now().Unix()),
 			Namespace: service.Namespace,
 		},
 		InvolvedObject: v1.ObjectReference{
