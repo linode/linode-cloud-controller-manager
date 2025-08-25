@@ -66,6 +66,9 @@ type Client interface {
 	GetFirewall(context.Context, int) (*linodego.Firewall, error)
 	UpdateFirewallRules(context.Context, int, linodego.FirewallRuleSet) (*linodego.FirewallRuleSet, error)
 
+	ReserveIPAddress(ctx context.Context, opts linodego.ReserveIPOptions) (*linodego.InstanceIP, error)
+	DeleteReservedIPAddress(ctx context.Context, ipAddress string) error
+
 	GetProfile(ctx context.Context) (*linodego.Profile, error)
 }
 
