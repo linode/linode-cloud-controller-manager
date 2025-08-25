@@ -14,7 +14,7 @@ require (
 	github.com/linode/linodego v1.54.1-0.20250812173013-ca1c9b03408c
 	github.com/prometheus/client_golang v1.23.0
 	github.com/spf13/pflag v1.0.7
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.0
 	golang.org/x/exp v0.0.0-20241215155358-4a5509556b9e
 	k8s.io/api v0.33.3
 	k8s.io/apimachinery v0.33.3
