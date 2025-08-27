@@ -17,6 +17,7 @@ spec:
         - describe:
             apiVersion: v1
             kind: Service
+    
     - name: Check that loadbalancer ip is assigned
       try:
       - assert:
@@ -95,6 +96,11 @@ spec:
                   echo "Error: No reserved ip found in configmap"
               fi
 
+              nb_id=$(kubectl get configmap nb-config -o=jsonpath='{.data.NB_ID}' -n $NAMESPACE)
+              if [ -z "$nb_id" ]; then
+                  echo "Error: No nb id found in configmap"
+              fi
+
               delete_rip=$(curl -s --request DELETE \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 -H "Content-Type: application/json" \
@@ -104,6 +110,17 @@ spec:
                 echo "Reserved IP $reserved_ip deleted successfully"
               else
                 echo "Unable to delete reserved ip: $reserved_ip. Error: $delete_rip"
+              fi
+
+               del_nb=$(curl -s --request DELETE \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" \
+                "${LINODE_URL}/v4beta/nodebalancers/$nb_id" )
+
+              if [[ "$del_nb" == "{}" ]]; then
+                echo "NB $nb_id deleted successfully"
+              else
+                echo "Unable to delete NB: $nb_id. Error: $del_nb"
               fi
 
               delete_cm=$(kubectl delete configmap nb-config -n $NAMESPACE)
@@ -117,6 +134,8 @@ spec:
               (contains($stdout, 'No reserved ip found in configmap')): false
               (contains($stdout, 'Unable to delete the configmap')): false
               (contains($stdout, 'Unable to delete reserved ip')): false
+              (contains($stdout, 'No nb id found in configmap')): false
+              (contains($stdout, 'Unable to delete NB')): false
     - name: Check that loadbalancer ip is assigned
       try:
       - assert:
