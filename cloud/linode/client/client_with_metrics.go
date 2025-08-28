@@ -176,6 +176,19 @@ func (_d ClientWithPrometheus) DeleteNodeBalancerConfig(ctx context.Context, i1 
 	return _d.base.DeleteNodeBalancerConfig(ctx, i1, i2)
 }
 
+// DeleteReservedIPAddress implements Client
+func (_d ClientWithPrometheus) DeleteReservedIPAddress(ctx context.Context, ipAddress string) (err error) {
+	defer func() {
+		result := "ok"
+		if err != nil {
+			result = "error"
+		}
+
+		ClientMethodCounterVec.WithLabelValues("DeleteReservedIPAddress", result).Inc()
+	}()
+	return _d.base.DeleteReservedIPAddress(ctx, ipAddress)
+}
+
 // GetFirewall implements Client
 func (_d ClientWithPrometheus) GetFirewall(ctx context.Context, i1 int) (fp1 *linodego.Firewall, err error) {
 	defer func() {
@@ -434,6 +447,19 @@ func (_d ClientWithPrometheus) RebuildNodeBalancerConfig(ctx context.Context, i1
 		ClientMethodCounterVec.WithLabelValues("RebuildNodeBalancerConfig", result).Inc()
 	}()
 	return _d.base.RebuildNodeBalancerConfig(ctx, i1, i2, n1)
+}
+
+// ReserveIPAddress implements Client
+func (_d ClientWithPrometheus) ReserveIPAddress(ctx context.Context, opts linodego.ReserveIPOptions) (ip1 *linodego.InstanceIP, err error) {
+	defer func() {
+		result := "ok"
+		if err != nil {
+			result = "error"
+		}
+
+		ClientMethodCounterVec.WithLabelValues("ReserveIPAddress", result).Inc()
+	}()
+	return _d.base.ReserveIPAddress(ctx, opts)
 }
 
 // ShareIPAddresses implements Client
