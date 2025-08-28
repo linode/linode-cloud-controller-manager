@@ -7,14 +7,14 @@ toolchain go1.24.1
 require (
 	github.com/appscode/go v0.0.0-20201105063637-5613f3b8169f
 	github.com/cilium/cilium v1.17.6
-	github.com/getsentry/sentry-go v0.35.0
+	github.com/getsentry/sentry-go v0.35.1
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
 	github.com/hexdigest/gowrap v1.4.2
-	github.com/linode/linodego v1.54.1-0.20250812173013-ca1c9b03408c
+	github.com/linode/linodego v1.56.0
 	github.com/prometheus/client_golang v1.23.0
 	github.com/spf13/pflag v1.0.7
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.0
 	golang.org/x/exp v0.0.0-20241215155358-4a5509556b9e
 	k8s.io/api v0.33.3
 	k8s.io/apimachinery v0.33.3
