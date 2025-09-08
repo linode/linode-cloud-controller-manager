@@ -73,9 +73,9 @@ type cloudAllocator struct {
 }
 
 const (
-	providerIDPrefix = "linode://"
-	ipv6BitLen       = 128
-	ipv6PodCIDRMaskSize  = 112
+	providerIDPrefix    = "linode://"
+	ipv6BitLen          = 128
+	ipv6PodCIDRMaskSize = 112
 )
 
 var _ CIDRAllocator = &cloudAllocator{}

@@ -459,7 +459,7 @@ func testCreateNodeBalancerWithReservedIP(t *testing.T, client *linodego.Client,
 	t.Helper()
 
 	annMap := map[string]string{
-		annotations.AnnLinodeLoadBalancerIPv4: "156.1.1.101",
+		annotations.AnnLinodeLoadBalancerReservedIPv4: "156.1.1.101",
 	}
 	err := testCreateNodeBalancer(t, client, f, annMap, nil)
 	if err != nil {
@@ -3073,7 +3073,7 @@ func testUpdateLoadBalancerAddReservedIP(t *testing.T, client *linodego.Client, 
 
 	stubService(fakeClientset, svc)
 	svc.SetAnnotations(map[string]string{
-		annotations.AnnLinodeLoadBalancerIPv4: ipaddr.Address,
+		annotations.AnnLinodeLoadBalancerReservedIPv4: ipaddr.Address,
 	})
 
 	err = lb.UpdateLoadBalancer(t.Context(), "", svc, nodes)
