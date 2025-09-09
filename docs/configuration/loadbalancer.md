@@ -211,7 +211,7 @@ metadata:
     service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id: "12345"
 ```
 
-### Using Reserved IPv4 addresses
+### Reserved IPv4 addresses
 
 Create an new NodeBalancer with an existing Reserved IPv4 Address:
 ```
