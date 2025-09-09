@@ -1,0 +1,49 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: created-with-reserved-ip-change-ip
+  name: test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: created-with-reserved-ip-change-ip
+  template:
+    metadata:
+      labels:
+        app: created-with-reserved-ip-change-ip
+    spec:
+      containers:
+      - image: appscode/test-server:2.3
+        name: test
+        ports:
+        - name: http-1
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-test
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-reserved-ipv4: ($ip.reserved_ip)
+  labels:
+    app: created-with-reserved-ip-change-ip
+spec:
+  type: LoadBalancer
+  selector:
+    app: created-with-reserved-ip-change-ip
+  ports:
+    - name: http-1
+      protocol: TCP
+      port: 80
+      targetPort: 8080
+  sessionAffinity: None

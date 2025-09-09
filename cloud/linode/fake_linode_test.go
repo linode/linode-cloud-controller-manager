@@ -305,6 +305,34 @@ func (f *fakeAPI) setupRoutes() {
 		_, _ = w.Write(rr)
 	})
 
+	f.mux.HandleFunc("POST /v4/networking/reserved/ips", func(w http.ResponseWriter, r *http.Request) {
+		rico := linodego.ReserveIPOptions{}
+		if err := json.NewDecoder(r.Body).Decode(&rico); err != nil {
+			f.t.Fatal(err)
+		}
+
+		ip := net.IPv4(byte(rand.Intn(100)), byte(rand.Intn(100)), byte(rand.Intn(100)), byte(rand.Intn(100))).String()
+
+		rip := linodego.InstanceIP{
+			Address:    ip,
+			SubnetMask: "32",
+			Prefix:     0,
+			Type:       linodego.IPTypeIPv4,
+			Public:     true,
+			RDNS:       "",
+			LinodeID:   0,
+			Region:     rico.Region,
+			VPCNAT1To1: nil,
+			Reserved:   true,
+		}
+
+		resp, err := json.Marshal(rip)
+		if err != nil {
+			f.t.Fatal(err)
+		}
+		_, _ = w.Write(resp)
+	})
+
 	f.mux.HandleFunc("POST /v4/nodebalancers", func(w http.ResponseWriter, r *http.Request) {
 		nbco := linodego.NodeBalancerCreateOptions{}
 		if err := json.NewDecoder(r.Body).Decode(&nbco); err != nil {

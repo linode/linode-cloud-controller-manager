@@ -34,8 +34,9 @@ import (
 )
 
 var (
-	errNoNodesAvailable          = errors.New("no nodes available for nodebalancer")
-	maxConnThrottleStringLen int = 20
+	errNoNodesAvailable             = errors.New("no nodes available for nodebalancer")
+	maxConnThrottleStringLen    int = 20
+	eventIPChangeIgnoredWarning     = "nodebalancer-ipv4-change-ignored"
 
 	// validProtocols is a map of valid protocols
 	validProtocols = map[string]bool{
@@ -362,6 +363,30 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	return lbStatus, nil
 }
 
+func (l *loadbalancers) createIPChangeWarningEvent(ctx context.Context, service *v1.Service, nb *linodego.NodeBalancer, newIP string) {
+	_, err := l.kubeClient.CoreV1().Events(service.Namespace).Create(ctx, &v1.Event{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-%d", eventIPChangeIgnoredWarning, time.Now().Unix()),
+			Namespace: service.Namespace,
+		},
+		InvolvedObject: v1.ObjectReference{
+			Kind:      "Service",
+			Namespace: service.Namespace,
+			Name:      service.Name,
+			UID:       service.UID,
+		},
+		Type:    "Warning",
+		Reason:  "NodeBalancerIPChangeIgnored",
+		Message: fmt.Sprintf("IPv4 annotation changed to %s, but NodeBalancer (%d) IP cannot be updated after creation. It will remain %s", newIP, nb.ID, *nb.IPv4),
+		Source: v1.EventSource{
+			Component: "linode-cloud-controller-manager",
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		klog.Errorf("failed to create NodeBalancerIPChangeIgnored event for service %s: %s", getServiceNn(service), err)
+	}
+}
+
 func (l *loadbalancers) updateNodeBalancer(
 	ctx context.Context,
 	clusterName string,
@@ -371,6 +396,16 @@ func (l *loadbalancers) updateNodeBalancer(
 ) (err error) {
 	if len(nodes) == 0 {
 		return fmt.Errorf("%w: service %s", errNoNodesAvailable, getServiceNn(service))
+	}
+
+	// Check for IPv4 annotation change
+	if ipv4, ok := service.GetAnnotations()[annotations.AnnLinodeLoadBalancerReservedIPv4]; ok && ipv4 != *nb.IPv4 {
+		// Log the error in the CCM's logfile
+		klog.Warningf("IPv4 annotation has changed for service (%s) from %s to %s, but NodeBalancer (%d) IP cannot be updated after creation",
+			getServiceNn(service), *nb.IPv4, ipv4, nb.ID)
+
+		// Issue a k8s cluster event warning
+		l.createIPChangeWarningEvent(ctx, service, nb, ipv4)
 	}
 
 	connThrottle := getConnectionThrottle(service)
@@ -837,6 +872,11 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	// Check for static IPv4 address annotation
+	if ipv4, ok := service.GetAnnotations()[annotations.AnnLinodeLoadBalancerReservedIPv4]; ok {
+		createOpts.IPv4 = &ipv4
 	}
 
 	fwid, ok := service.GetAnnotations()[annotations.AnnLinodeCloudFirewallID]
