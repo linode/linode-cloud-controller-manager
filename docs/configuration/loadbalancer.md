@@ -211,6 +211,17 @@ metadata:
     service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id: "12345"
 ```
 
+### Using Reserved IPv4 addresses
+
+Create an new NodeBalancer with an existing Reserved IPv4 Address:
+```
+metadata:
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-reserved-ipv4: "100.100.100.100"
+```
+The annotation must be present when the Service is created in order to take effect.
+
+
 ### NodeBalancer Preservation
 
 Prevent NodeBalancer deletion when service is deleted:
