@@ -110,7 +110,7 @@ make mockgen
 
 ## Common Gotchas
 - NodeBalancer backends require VPC configuration when `Options.VPCNames` is set
-- Node exclusion annotation: `node.k8s.linode.com/exclude-from-nb`
+- Node exclusion label: `node.kubernetes.io/exclude-from-external-load-balancers=true`
 - Port configurations must be valid JSON in annotations
 - Health check types depend on protocol (UDP vs TCP/HTTP)
 - Instance cache is global and shared across controllers
