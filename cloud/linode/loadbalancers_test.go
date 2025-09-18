@@ -4711,8 +4711,8 @@ func testUpdateLoadBalancerNodeExcludedByAnnotation(t *testing.T, client *linode
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "node-2",
-				Annotations: map[string]string{
-					annotations.AnnExcludeNodeFromNb: "true",
+				Labels: map[string]string{
+					v1.LabelNodeExcludeBalancers: "true",
 				},
 			},
 			Status: v1.NodeStatus{
@@ -4764,8 +4764,8 @@ func testUpdateLoadBalancerNodeExcludedByAnnotation(t *testing.T, client *linode
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "node-1",
-				Annotations: map[string]string{
-					annotations.AnnExcludeNodeFromNb: "true", // Now exclude node-1
+				Labels: map[string]string{
+					v1.LabelNodeExcludeBalancers: "true",
 				},
 			},
 			Status: v1.NodeStatus{
@@ -4780,8 +4780,8 @@ func testUpdateLoadBalancerNodeExcludedByAnnotation(t *testing.T, client *linode
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "node-2",
-				Annotations: map[string]string{
-					annotations.AnnExcludeNodeFromNb: "true", // Still excluded
+				Labels: map[string]string{
+					v1.LabelNodeExcludeBalancers: "true",
 				},
 			},
 			Status: v1.NodeStatus{
@@ -4833,8 +4833,8 @@ func testUpdateLoadBalancerNodeExcludedByAnnotation(t *testing.T, client *linode
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "node-1",
-				Annotations: map[string]string{
-					annotations.AnnExcludeNodeFromNb: "true",
+				Labels: map[string]string{
+					v1.LabelNodeExcludeBalancers: "true",
 				},
 			},
 			Status: v1.NodeStatus{
@@ -4849,8 +4849,8 @@ func testUpdateLoadBalancerNodeExcludedByAnnotation(t *testing.T, client *linode
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "node-2",
-				Annotations: map[string]string{
-					annotations.AnnExcludeNodeFromNb: "true",
+				Labels: map[string]string{
+					v1.LabelNodeExcludeBalancers: "true",
 				},
 			},
 			Status: v1.NodeStatus{
@@ -4865,8 +4865,8 @@ func testUpdateLoadBalancerNodeExcludedByAnnotation(t *testing.T, client *linode
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "node-3",
-				Annotations: map[string]string{
-					annotations.AnnExcludeNodeFromNb: "true",
+				Labels: map[string]string{
+					v1.LabelNodeExcludeBalancers: "true",
 				},
 			},
 			Status: v1.NodeStatus{
