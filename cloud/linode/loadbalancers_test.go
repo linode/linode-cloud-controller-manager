@@ -13,7 +13,6 @@ import (
 	"os"
 	"reflect"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -4569,28 +4568,6 @@ func testMakeLoadBalancerStatusEnvVar(t *testing.T, client *linodego.Client, _ *
 		t.Errorf("expected status for %q annotated service to be %#v; got %#v", annotations.AnnLinodeHostnameOnlyIngress, expectedStatus, status)
 	}
 	os.Unsetenv("LINODE_HOSTNAME_ONLY_INGRESS")
-}
-
-func getLatestNbNodesForService(t *testing.T, client *linodego.Client, svc *v1.Service, lb *loadbalancers) []linodego.NodeBalancerNode {
-	t.Helper()
-	nb, err := lb.getNodeBalancerByStatus(t.Context(), svc)
-	if err != nil {
-		t.Fatalf("expected no error got %v", err)
-	}
-	cfgs, errConfigs := client.ListNodeBalancerConfigs(t.Context(), nb.ID, nil)
-	if errConfigs != nil {
-		t.Fatalf("expected no error getting configs, got %v", errConfigs)
-	}
-	slices.SortFunc(cfgs, func(a, b linodego.NodeBalancerConfig) int {
-		return a.ID - b.ID
-	})
-
-	// Verify nodes were created correctly (only non-excluded nodes)
-	nodeBalancerNodes, err := client.ListNodeBalancerNodes(t.Context(), nb.ID, cfgs[0].ID, nil)
-	if err != nil {
-		t.Fatalf("expected no error got %v", err)
-	}
-	return nodeBalancerNodes
 }
 
 func testCleanupDoesntCall(t *testing.T, client *linodego.Client, fakeAPI *fakeAPI) {
