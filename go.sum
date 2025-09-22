@@ -505,8 +505,8 @@ k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b h1:MloQ9/bdJyIu9lb1PzujOP
 k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b/go.mod h1:UZ2yyWbFTpuhSbFhv24aGNOdoRdJZgsIObGBUaYVsts=
 k8s.io/kubelet v0.33.0 h1:4pJA2Ge6Rp0kDNV76KH7pTBiaV2T1a1874QHMcubuSU=
 k8s.io/kubelet v0.33.0/go.mod h1:iDnxbJQMy9DUNaML5L/WUlt3uJtNLWh7ZAe0JSp4Yi0=
-k8s.io/kubernetes v1.34.1 h1:F3p8dtpv+i8zQoebZeK5zBqM1g9x1aIdnA5vthvcuUk=
-k8s.io/kubernetes v1.34.1/go.mod h1:iu+FhII+Oc/1gGWLJcer6wpyih441aNFHl7Pvm8yPto=
+k8s.io/kubernetes v1.33.4 h1:T1d5FLUYm3/KyUeV7YJhKTR980zHCHb7K2xhCSo3lE8=
+k8s.io/kubernetes v1.33.4/go.mod h1:nrt8sldmckKz2fCZhgRX3SKfS2e+CzXATPv6ITNkU00=
 k8s.io/utils v0.0.0-20250604170112-4c0f3b243397 h1:hwvWFiBzdWw1FhfY1FooPn3kzWuJ8tmbZBHi4zVsl1Y=
 k8s.io/utils v0.0.0-20250604170112-4c0f3b243397/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.32.0 h1:XotDXzqvJ8Nx5eiZZueLpTuafJz8SiodgOemI+w87QU=
