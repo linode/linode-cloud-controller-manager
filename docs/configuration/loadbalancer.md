@@ -255,7 +255,7 @@ metadata:
 ```
 
 ### Excluding nodes from nodebalancer
-Add the a label to the node object to exclude
+Add a label to the node object to exclude
 
 ```yaml
 apiVersion: v1
