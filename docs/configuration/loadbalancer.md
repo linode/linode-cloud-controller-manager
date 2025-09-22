@@ -255,15 +255,15 @@ metadata:
 ```
 
 ### Excluding nodes from nodebalancer
-Add the an annotation to the node object to exclude
+Add a label to the node object to exclude
 
 ```yaml
 apiVersion: v1
 kind: Node
 metadata:
   name: node-to-exclude
-  annotations:
-    node.k8s.linode.com/exclude-from-nb: "true"
+  labels:
+    node.kubernetes.io/exclude-from-external-load-balancers: "true"
 ```
 
 ## Related Documentation

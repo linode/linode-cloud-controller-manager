@@ -506,10 +506,6 @@ func (l *loadbalancers) updateNodeBalancer(
 			subnetID = id
 		}
 		for _, node := range nodes {
-			if _, ok := node.Annotations[annotations.AnnExcludeNodeFromNb]; ok {
-				klog.Infof("Node %s is excluded from NodeBalancer by annotation, skipping", node.Name)
-				continue
-			}
 			var newNodeOpts *linodego.NodeBalancerConfigRebuildNodeOptions
 			newNodeOpts, err = l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort, subnetID, newNBCfg.Protocol)
 			if err != nil {
@@ -1087,10 +1083,6 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 		createOpt := config.GetCreateOptions()
 
 		for _, node := range nodes {
-			if _, ok := node.Annotations[annotations.AnnExcludeNodeFromNb]; ok {
-				klog.Infof("Node %s is excluded from NodeBalancer by annotation, skipping", node.Name)
-				continue
-			}
 			newNodeOpts, err := l.buildNodeBalancerNodeConfigRebuildOptions(node, port.NodePort, subnetID, config.Protocol)
 			if err != nil {
 				sentry.CaptureError(ctx, err)
