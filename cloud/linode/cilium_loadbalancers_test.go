@@ -6,13 +6,14 @@ import (
 	"net"
 	"testing"
 
-	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
+	ciliumfake "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/fake"
 	fakev2alpha1 "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/typed/cilium.io/v2alpha1/fake"
 	"github.com/golang/mock/gomock"
 	"github.com/linode/linodego"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	k8sfake "k8s.io/client-go/kubernetes/fake"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
@@ -220,8 +221,9 @@ func testNoBGPNodeLabel(t *testing.T, mc *mocks.MockClient) {
 	svc := createTestService()
 	newIpHolderInstance = createNewIpHolderInstance()
 
-	kubeClient, _ := k8sClient.NewFakeClientset()
-	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
+	kubeClient := k8sfake.NewClientset()
+	ciliumClientset := ciliumfake.NewSimpleClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &ciliumClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
@@ -276,8 +278,9 @@ func testUnsupportedRegion(t *testing.T, mc *mocks.MockClient) {
 	options.Options.BGPNodeSelector = nodeSelector
 	svc := createTestService()
 
-	kubeClient, _ := k8sClient.NewFakeClientset()
-	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
+	kubeClient := k8sfake.NewClientset()
+	ciliumClientset := ciliumfake.NewSimpleClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &ciliumClientset.Fake}
 	addService(t, kubeClient, svc)
 	lb := &loadbalancers{mc, "us-foobar", kubeClient, ciliumClient, ciliumLBType}
 
@@ -308,8 +311,9 @@ func testCreateWithExistingIPHolderWithOldIpHolderNamingConvention(t *testing.T,
 	svc := createTestService()
 	newIpHolderInstance = createNewIpHolderInstance()
 
-	kubeClient, _ := k8sClient.NewFakeClientset()
-	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
+	kubeClient := k8sfake.NewClientset()
+	ciliumClientset := ciliumfake.NewSimpleClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &ciliumClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
@@ -353,8 +357,9 @@ func testCreateWithExistingIPHolderWithNewIpHolderNamingConvention(t *testing.T,
 	svc := createTestService()
 	newIpHolderInstance = createNewIpHolderInstance()
 
-	kubeClient, _ := k8sClient.NewFakeClientset()
-	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
+	kubeClient := k8sfake.NewClientset()
+	ciliumClientset := ciliumfake.NewSimpleClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &ciliumClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
@@ -398,8 +403,9 @@ func testCreateWithExistingIPHolderWithNewIpHolderNamingConventionUsingLongSuffi
 	svc := createTestService()
 	newIpHolderInstance = createNewIpHolderInstance()
 
-	kubeClient, _ := k8sClient.NewFakeClientset()
-	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
+	kubeClient := k8sfake.NewClientset()
+	ciliumClientset := ciliumfake.NewSimpleClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &ciliumClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
@@ -443,8 +449,9 @@ func testCreateWithNoExistingIPHolderUsingNoSuffix(t *testing.T, mc *mocks.MockC
 	svc := createTestService()
 	newIpHolderInstance = createNewIpHolderInstance()
 
-	kubeClient, _ := k8sClient.NewFakeClientset()
-	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
+	kubeClient := k8sfake.NewClientset()
+	ciliumClientset := ciliumfake.NewSimpleClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &ciliumClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
@@ -495,8 +502,9 @@ func testCreateWithNoExistingIPHolderUsingShortSuffix(t *testing.T, mc *mocks.Mo
 	svc := createTestService()
 	newIpHolderInstance = createNewIpHolderInstance()
 
-	kubeClient, _ := k8sClient.NewFakeClientset()
-	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
+	kubeClient := k8sfake.NewClientset()
+	ciliumClientset := ciliumfake.NewSimpleClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &ciliumClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
@@ -547,8 +555,9 @@ func testCreateWithNoExistingIPHolderUsingLongSuffix(t *testing.T, mc *mocks.Moc
 	svc := createTestService()
 	newIpHolderInstance = createNewIpHolderInstance()
 
-	kubeClient, _ := k8sClient.NewFakeClientset()
-	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
+	kubeClient := k8sfake.NewClientset()
+	ciliumClientset := ciliumfake.NewSimpleClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &ciliumClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
@@ -597,8 +606,9 @@ func testEnsureCiliumLoadBalancerDeletedWithOldIpHolderNamingConvention(t *testi
 	options.Options.BGPNodeSelector = nodeSelector
 	svc := createTestService()
 
-	kubeClient, _ := k8sClient.NewFakeClientset()
-	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
+	kubeClient := k8sfake.NewClientset()
+	ciliumClientset := ciliumfake.NewSimpleClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &ciliumClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
@@ -630,8 +640,9 @@ func testEnsureCiliumLoadBalancerDeletedWithNewIpHolderNamingConvention(t *testi
 	svc := createTestService()
 	newIpHolderInstance = createNewIpHolderInstance()
 
-	kubeClient, _ := k8sClient.NewFakeClientset()
-	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
+	kubeClient := k8sfake.NewClientset()
+	ciliumClientset := ciliumfake.NewSimpleClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &ciliumClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
@@ -667,8 +678,9 @@ func testCiliumUpdateLoadBalancerAddNodeWithOldIpHolderNamingConvention(t *testi
 	options.Options.BGPNodeSelector = nodeSelector
 	svc := createTestService()
 
-	kubeClient, _ := k8sClient.NewFakeClientset()
-	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
+	kubeClient := k8sfake.NewClientset()
+	ciliumClientset := ciliumfake.NewSimpleClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &ciliumClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
@@ -730,8 +742,9 @@ func testCiliumUpdateLoadBalancerAddNodeWithNewIpHolderNamingConvention(t *testi
 	svc := createTestService()
 	newIpHolderInstance = createNewIpHolderInstance()
 
-	kubeClient, _ := k8sClient.NewFakeClientset()
-	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &kubeClient.CiliumFakeClientset.Fake}
+	kubeClient := k8sfake.NewClientset()
+	ciliumClientset := ciliumfake.NewSimpleClientset()
+	ciliumClient := &fakev2alpha1.FakeCiliumV2alpha1{Fake: &ciliumClientset.Fake}
 	addService(t, kubeClient, svc)
 	addNodes(t, kubeClient, nodes)
 	lb := &loadbalancers{mc, zone, kubeClient, ciliumClient, ciliumLBType}
