@@ -16,7 +16,7 @@ jobs:
         env:
           IMAGE_VERSION: ${{ github.ref_name }}
       - name: Upload Release Artifacts
-        uses: softprops/action-gh-release@v2.3.3
+        uses: softprops/action-gh-release@v2.3.4
         with:
           files: |
             ./release/helm-chart-${{ github.ref_name }}.tgz
