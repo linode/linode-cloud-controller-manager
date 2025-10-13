@@ -101,7 +101,7 @@ codegen:
 
 .PHONY: test
 # we say code is not worth testing unless it's formatted
-test: fmt codegen
+test: fmt codegen vet
 	go test -v -coverpkg=./sentry,./cloud/linode/client,./cloud/linode,./cloud/linode/utils,./cloud/linode/services,./cloud/nodeipam,./cloud/nodeipam/ipam -coverprofile ./coverage.out -cover ./sentry/... ./cloud/... $(TEST_ARGS)
 
 ## --------------------------------------
@@ -109,14 +109,14 @@ test: fmt codegen
 ## --------------------------------------
 
 .PHONY: build-linux
-build-linux: codegen
+build-linux: codegen fmt vet
 	echo "cross compiling linode-cloud-controller-manager for linux/amd64" && \
 		GOOS=linux GOARCH=amd64 \
 		CGO_ENABLED=0 \
 		go build -o dist/linode-cloud-controller-manager-linux-amd64 .
 
 .PHONY: build
-build: codegen
+build: codegen fmt vet
 	echo "compiling linode-cloud-controller-manager" && \
 		CGO_ENABLED=0 \
 		go build -o dist/linode-cloud-controller-manager .

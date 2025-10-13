@@ -60,10 +60,13 @@ jobs:
             cli.codecov.io:443
             api.codecov.io:443
             ingest.codecov.io:443
+            dl.k8s.io:443
+            cdn.dl.k8s.io:443
 
       - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
