@@ -13,7 +13,7 @@
   },
   "shell": {
     "init_hook": [
-      "export \"GOROOT=$(go env GOROOT)\""
+      "export \"GOROOT=$(go env GOROOT)\"; export GOTOOLCHAIN=auto"
     ],
     "scripts": {
       "mgmt-and-capl-cluster": "make mgmt-and-capl-cluster",
