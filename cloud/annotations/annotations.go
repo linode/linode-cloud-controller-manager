@@ -17,7 +17,7 @@ const (
 	AnnLinodeHealthCheckTimeout  = "service.beta.kubernetes.io/linode-loadbalancer-check-timeout"
 	AnnLinodeHealthCheckAttempts = "service.beta.kubernetes.io/linode-loadbalancer-check-attempts"
 	//gosec:disable G101 -- This is a false positive
-	AnnLinodeHealthCheckPassive  = "service.beta.kubernetes.io/linode-loadbalancer-check-passive"
+	AnnLinodeHealthCheckPassive = "service.beta.kubernetes.io/linode-loadbalancer-check-passive"
 
 	AnnLinodeUDPCheckPort = "service.beta.kubernetes.io/linode-loadbalancer-udp-check-port"
 
