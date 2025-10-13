@@ -37,7 +37,7 @@ jobs:
           base: ${{ github.ref }}
           filters: .github/filters.yml
 
-  build-test:
+  build:
     runs-on: ubuntu-latest
     needs: changes
     if: ${{ contains(fromJSON(needs.changes.outputs.paths), 'src') }}
@@ -83,6 +83,8 @@ jobs:
 
   docker-build:
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ contains(fromJSON(needs.changes.outputs.paths), 'src') }}
     steps:
       - uses: actions/checkout@v5
         with:
