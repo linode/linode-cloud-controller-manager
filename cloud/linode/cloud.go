@@ -22,6 +22,7 @@ import (
 const (
 	// The name of this cloudprovider
 	ProviderName           = "linode"
+	//gosec:disable G101 -- This is a false positive
 	accessTokenEnv         = "LINODE_API_TOKEN"
 	regionEnv              = "LINODE_REGION"
 	ciliumLBType           = "cilium-bgp"

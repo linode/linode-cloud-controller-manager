@@ -1,18 +1,12 @@
 {
   "packages": [
-    "ctlptl@latest",
-    "clusterctl@latest",
-    "docker@latest",
-    "envsubst@latest",
-    "go@1.24.1",
-    "golangci-lint@latest",
-    "jq@latest",
-    "kind@latest",
-    "kubectl@latest",
-    "kustomize@latest",
-    "kyverno-chainsaw@latest",
-    "mockgen@latest",
-    "yq-go@latest"
+    "apple-sdk_15@15.2",
+    "clusterctl@1.11.1",
+    "docker@28.3.3",
+    "go@1.25",
+    "jq@1.8.1",
+    "kubectl@1.33.4",
+    "yq-go@4.47.2"
   ],
   "shell": {
     "init_hook": [
