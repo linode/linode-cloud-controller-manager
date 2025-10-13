@@ -1,23 +1,26 @@
 {
-  "packages": [
-    "apple-sdk_15@15.2",
-    "clusterctl@1.11.1",
-    "docker@28.3.3",
-    "go@1.25",
-    "jq@1.8.1",
-    "kubectl@1.33.4",
-    "yq-go@4.47.2"
-  ],
+  "packages": {
+    "apple-sdk_15": {
+      "version":            "15.2",
+      "excluded_platforms": ["x86_64-linux"]
+    },
+    "clusterctl": "1.11.1",
+    "docker":     "28.3.3",
+    "go":         "1.25",
+    "jq":         "1.8.1",
+    "kubectl":    "1.33.4",
+    "yq-go":      "4.47.2"
+  },
   "shell": {
     "init_hook": [
       "export \"GOROOT=$(go env GOROOT)\""
     ],
     "scripts": {
       "mgmt-and-capl-cluster": "make mgmt-and-capl-cluster",
-      "e2e-test": "make e2e-test",
-      "e2e-test-bgp": "make e2e-test-bgp",
-      "e2e-test-subnet": "make e2e-test-subnet",
-      "cleanup-cluster": "make cleanup-cluster"
+      "e2e-test":              "make e2e-test",
+      "e2e-test-bgp":          "make e2e-test-bgp",
+      "e2e-test-subnet":       "make e2e-test-subnet",
+      "cleanup-cluster":       "make cleanup-cluster"
     }
   },
   "env": {
