@@ -16,10 +16,6 @@ SUBNET_CLUSTER_NAME     ?= subnet-testing-$(shell git rev-parse --short HEAD)
 VPC_NAME                ?= $(CLUSTER_NAME)
 MANIFEST_NAME           ?= capl-cluster-manifests
 SUBNET_MANIFEST_NAME    ?= subnet-testing-manifests
-K8S_VERSION             ?= "v1.31.2"
-CAPI_VERSION            ?= "v1.8.5"
-CAAPH_VERSION           ?= "v0.2.1"
-CAPL_VERSION            ?= "v0.8.5"
 CONTROLPLANE_NODES      ?= 1
 WORKER_NODES            ?= 1
 LINODE_FIREWALL_ENABLED ?= true
@@ -181,7 +177,7 @@ capl-cluster: tools generate-capl-cluster-manifests create-capl-cluster patch-li
 generate-capl-cluster-manifests: tools
 	# Create the CAPL cluster manifests without any CSI driver stuff
 	LINODE_FIREWALL_ENABLED=$(LINODE_FIREWALL_ENABLED) LINODE_OS=$(LINODE_OS) VPC_NAME=$(VPC_NAME) clusterctl generate cluster $(CLUSTER_NAME) \
-		--kubernetes-version $(K8S_VERSION) --infrastructure linode-linode:$(CAPL_VERSION) \
+		--infrastructure linode-linode \
 		--control-plane-machine-count $(CONTROLPLANE_NODES) --worker-machine-count $(WORKER_NODES) > $(MANIFEST_NAME).yaml
 	yq -i e 'select(.kind == "LinodeVPC").spec.subnets = [{"ipv4": "10.0.0.0/8", "label": "default"}, {"ipv4": "172.16.0.0/16", "label": "testing"}]' $(MANIFEST_NAME).yaml
 
@@ -210,11 +206,8 @@ mgmt-cluster: tools
 	clusterctl init \
 		--wait-providers \
 		--wait-provider-timeout 600 \
-		--core cluster-api:$(CAPI_VERSION) \
-		--bootstrap kubeadm:$(CAPI_VERSION) \
-		--control-plane kubeadm:$(CAPI_VERSION) \
-		--addon helm:$(CAAPH_VERSION) \
-		--infrastructure linode-linode:$(CAPL_VERSION)
+		--addon helm \
+		--infrastructure linode-linode
 	kind get kubeconfig --name=caplccm > $(MGMT_KUBECONFIG_PATH)
 
 .PHONY: cleanup-cluster
