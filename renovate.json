@@ -1,0 +1,56 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "labels": ["dependencies"],
+  "postUpdateOptions": ["gomodTidy"],
+  "vulnerabilityAlerts": {
+    "enabled": true
+  },
+  "osvVulnerabilityAlerts": true,
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)Makefile$/",
+        "/(^|/)makefile$/",
+        "/(^|/)GNUMakefile$/",
+        "/\\.mk$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-zA-Z0-9-._]+?) depName=(?<depName>[^\\s]+?)(?: (?:packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?(?: registryUrl=(?<registryUrl>[^\\s]+?))?\\s+[A-Za-z0-9_]+?_VERSION\\s*:*\\??=\\s*[\"']?(?<currentValue>.+?)[\"']?\\s"
+      ]
+    }
+  ],
+  "packageRules": [
+    {
+      "groupName": "kubernetes",
+      "groupSlug": "kubernetes-go",
+      "matchDatasources": [
+        "go"
+      ],
+      "matchPackageNames": [
+        "k8s.io/**",
+        "sigs.k8s.io/**"
+      ]
+    },
+    {
+      "groupName": "otel",
+      "groupSlug": "otel-go",
+      "matchDatasources": [
+        "go"
+      ],
+      "matchPackageNames": [
+        "go.opentelemetry.io/**"
+      ]
+    },
+    {
+      "groupName": "devbox",
+      "groupSlug": "devbox",
+      "matchDatasources": [
+        "devbox"
+      ]
+    }
+  ]
+}
