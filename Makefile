@@ -31,7 +31,7 @@ LINODE_URL              ?= https://api.linode.com
 KUBECONFIG_PATH         ?= $(CURDIR)/test-cluster-kubeconfig.yaml
 SUBNET_KUBECONFIG_PATH	?= $(CURDIR)/subnet-testing-kubeconfig.yaml
 MGMT_KUBECONFIG_PATH    ?= $(CURDIR)/mgmt-cluster-kubeconfig.yaml
-GOLANGCI_LINT_VERSION   ?= v2.1.5
+GOLANGCI_LINT_VERSION   ?= v2.5.0
 
 # if the $DEVBOX_PACKAGES_DIR env variable exists that means we are within a devbox shell and can safely
 # use devbox's bin for our tools

@@ -74,8 +74,6 @@ jobs:
 
       - name: lint
         uses: golangci/golangci-lint-action@v8
-        with:
-          version: v2.1.5
 
       - name: Helm Lint
         run: make helm-lint
