@@ -1,18 +1,18 @@
 {
   "packages": [
-    "ctlptl@latest",
-    "clusterctl@latest",
-    "docker@latest",
-    "envsubst@latest",
+    "ctlptl@0.8.43",
+    "clusterctl@1.11.2",
+    "docker@20.10.26",
+    "envsubst@1.4.3",
     "go@1.25.1",
-    "golangci-lint@2.4.0",
-    "jq@latest",
-    "kind@latest",
-    "kubectl@latest",
-    "kustomize@latest",
-    "kyverno-chainsaw@latest",
-    "mockgen@latest",
-    "yq-go@latest"
+    "golangci-lint@2.5.0",
+    "jq@1.8.1",
+    "kind@0.30.0",
+    "kubectl@1.34.1",
+    "kustomize@3.10.0",
+    "kyverno-chainsaw@0.2.13",
+    "mockgen@0.6.0",
+    "yq-go@3.4.1"
   ],
   "shell": {
     "init_hook": [
