@@ -5,7 +5,7 @@
     "docker@latest",
     "envsubst@latest",
     "go@1.25.1",
-    "golangci-lint@latest",
+    "golangci-lint@2.4.0",
     "jq@latest",
     "kind@latest",
     "kubectl@latest",
