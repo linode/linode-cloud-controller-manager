@@ -9,6 +9,9 @@ LOCALBIN                ?= $(CACHE_BIN)
 DEVBOX_BIN              ?= $(DEVBOX_PACKAGES_DIR)/bin
 HELM                    ?= $(LOCALBIN)/helm
 HELM_VERSION            ?= v3.16.3
+GOLANGCI_LINT           ?= $(LOCALBIN)/golangci-lint
+GOLANGCI_LINT_VERSION   ?= v2.5.0
+GOLANGCI_LINT_NILAWAY   ?= $(CACHE_BIN)/golangci-lint-nilaway
 
 #####################################################################
 # Dev Setup
@@ -31,7 +34,6 @@ LINODE_URL              ?= https://api.linode.com
 KUBECONFIG_PATH         ?= $(CURDIR)/test-cluster-kubeconfig.yaml
 SUBNET_KUBECONFIG_PATH	?= $(CURDIR)/subnet-testing-kubeconfig.yaml
 MGMT_KUBECONFIG_PATH    ?= $(CURDIR)/mgmt-cluster-kubeconfig.yaml
-GOLANGCI_LINT_VERSION   ?= v2.5.0
 
 # if the $DEVBOX_PACKAGES_DIR env variable exists that means we are within a devbox shell and can safely
 # use devbox's bin for our tools
@@ -66,7 +68,11 @@ vet: fmt
 
 .PHONY: lint
 lint:
-	docker run --rm -w /workdir -v $(PWD):/workdir golangci/golangci-lint:$(GOLANGCI_LINT_VERSION) golangci-lint run -c .golangci.yml --fix
+	$(GOLANGCI_LINT) run -c .golangci.yml --fix
+
+.PHONY: lint
+nilcheck: golangci-lint-nilaway ## Run nilaway against code.
+	$(GOLANGCI_LINT_NILAWAY) run -c .golangci-nilaway.yml
 
 .PHONY: gosec
 gosec: ## Run gosec against code.
@@ -273,3 +279,25 @@ helm-template: helm
 #Verify template works when region and apiToken are passed, and when it is passed as reference.
 	@$(HELM) template foo deploy/chart --set apiToken="apiToken",region="us-east" > /dev/null
 	@$(HELM) template foo deploy/chart --set secretRef.apiTokenRef="apiToken",secretRef.name="api",secretRef.regionRef="us-east" > /dev/null
+
+.PHONY: kubectl
+kubectl: $(KUBECTL) ## Download kubectl locally if necessary.
+$(KUBECTL): $(LOCALBIN)
+	curl -fsSL https://dl.k8s.io/release/$(KUBECTL_VERSION)/bin/$(OS)/$(ARCH_SHORT)/kubectl -o $(KUBECTL)
+	chmod +x $(KUBECTL)
+
+.PHONY: clusterctl
+clusterctl: $(CLUSTERCTL) ## Download clusterctl locally if necessary.
+$(CLUSTERCTL): $(LOCALBIN)
+	curl -fsSL https://github.com/kubernetes-sigs/cluster-api/releases/download/$(CLUSTERCTL_VERSION)/clusterctl-$(OS)-$(ARCH_SHORT) -o $(CLUSTERCTL)
+	chmod +x $(CLUSTERCTL)
+
+.phony: golangci-lint-nilaway
+golangci-lint-nilaway: $(GOLANGCI_LINT_NILAWAY)
+$(GOLANGCI_LINT_NILAWAY): $(GOLANGCI_LINT) # Build golangci-lint-nilaway from custom configuration.
+	$(GOLANGCI_LINT) custom
+
+.phony: golangci-lint
+golangci-lint: $(GOLANGCI_LINT)
+$(GOLANGCI_LINT): # Build golangci-lint from tools folder.
+	GOBIN=$(LOCALBIN)  go install  github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
