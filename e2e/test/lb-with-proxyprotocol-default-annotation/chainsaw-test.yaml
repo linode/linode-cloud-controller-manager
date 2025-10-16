@@ -47,19 +47,23 @@ spec:
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
-              nbconfig=$(curl -s \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
-                "$LINODE_URL/v4/nodebalancers/$nbid/configs")
+              for i in {1..20}; do
+                nbconfig=$(curl -s \
+                  -H "Authorization: Bearer $LINODE_TOKEN" \
+                  -H "Content-Type: application/json" \
+                  "$LINODE_URL/v4/nodebalancers/$nbid/configs")
 
-              port_80_v2=$(echo $nbconfig | jq -r '.data[] | select(.port == 80) | .proxy_protocol == "v2"')
-              port_8080_v2=$(echo $nbconfig | jq -r '.data[] | select(.port == 8080) | .proxy_protocol == "v2"')
+                port_80_v2=$(echo $nbconfig | jq -r '.data[] | select(.port == 80) | .proxy_protocol == "v2"')
+                port_8080_v2=$(echo $nbconfig | jq -r '.data[] | select(.port == 8080) | .proxy_protocol == "v2"')
 
-              if [[ $port_80_v2 == "true" && $port_8080_v2 == "true" ]]; then
-                  echo "Conditions met"
-              else
-                  echo "Conditions not met"
-              fi
+                if [[ $port_80_v2 == "true" && $port_8080_v2 == "true" ]]; then
+                    echo "Conditions met"
+                    break
+                else
+                    echo "Conditions not met"
+                    sleep 10
+                fi
+              done
             check:
               ($error): ~
               (contains($stdout, 'Conditions met')): true
