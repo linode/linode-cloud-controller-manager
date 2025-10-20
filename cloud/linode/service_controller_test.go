@@ -21,7 +21,7 @@ func Test_serviceController_Run(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	client := mocks.NewMockClient(ctrl)
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	informer := informers.NewSharedInformerFactory(kubeClient, 0).Core().V1().Services()
 	mockQueue := workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[any]{Name: "test"})
 
