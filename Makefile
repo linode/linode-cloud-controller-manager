@@ -67,7 +67,7 @@ vet: fmt
 	go vet ./...
 
 .PHONY: lint
-lint:
+lint: golangci-lint
 	$(GOLANGCI_LINT) run -c .golangci.yml --fix
 
 .PHONY: lint

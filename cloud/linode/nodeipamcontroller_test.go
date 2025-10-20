@@ -104,8 +104,8 @@ func Test_processCIDRs(t *testing.T) {
 			},
 			want: []*net.IPNet{
 				{
-					IP:   ipv4Net.IP,
-					Mask: ipv4Net.Mask,
+					IP:   ipv4Net.IP,   //nolint:nilaway // ipv4Net should not be nil
+					Mask: ipv4Net.Mask, //nolint:nilaway // ipv4Net should not be nil
 				},
 			},
 			wantErr: false,
