@@ -27,7 +27,7 @@ func TestNodeController_Run(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	client := mocks.NewMockClient(ctrl)
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	informer := informers.NewSharedInformerFactory(kubeClient, 0).Core().V1().Nodes()
 	mockQueue := workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[nodeRequest]{Name: "test"})
 
@@ -68,7 +68,7 @@ func TestNodeController_processNext(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	client := mocks.NewMockClient(ctrl)
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	queue := workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[nodeRequest]{Name: "testQueue"})
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -155,7 +155,7 @@ func TestNodeController_processNext(t *testing.T) {
 
 	t.Run("should return no error if node in k8s doesn't exist", func(t *testing.T) {
 		controller.addNodeToQueue(node)
-		controller.kubeclient = fake.NewSimpleClientset()
+		controller.kubeclient = fake.NewClientset()
 		defer func() { controller.kubeclient = kubeClient }()
 		result := controller.processNext()
 		assert.True(t, result, "processNext should return true")
@@ -202,7 +202,7 @@ func TestNodeController_handleNode(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	client := mocks.NewMockClient(ctrl)
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "test-node",

@@ -85,7 +85,7 @@ spec:
 
               podnames=()
 
-              for i in {1..10}; do
+              for i in {1..20}; do
                   if [[ ${#podnames[@]} -lt 2 ]]; then
                       output=$(curl -s $IP:8080 | jq -e .podName || true)
 

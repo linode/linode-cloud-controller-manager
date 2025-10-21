@@ -150,7 +150,7 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(),
+				Clientset: fake.NewClientset(),
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
@@ -180,7 +180,7 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(),
+				Clientset: fake.NewClientset(),
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
@@ -211,7 +211,7 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(),
+				Clientset: fake.NewClientset(),
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
@@ -282,7 +282,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(),
+				Clientset: fake.NewClientset(),
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
@@ -321,7 +321,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(),
+				Clientset: fake.NewClientset(),
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
@@ -364,7 +364,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(),
+				Clientset: fake.NewClientset(),
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
@@ -443,7 +443,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(),
+				Clientset: fake.NewClientset(),
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
@@ -482,7 +482,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(),
+				Clientset: fake.NewClientset(),
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
@@ -521,7 +521,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(),
+				Clientset: fake.NewClientset(),
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
@@ -564,7 +564,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(),
+				Clientset: fake.NewClientset(),
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
@@ -643,7 +643,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(),
+				Clientset: fake.NewClientset(),
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
@@ -781,7 +781,7 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(),
+				Clientset: fake.NewClientset(),
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
@@ -903,7 +903,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(),
+				Clientset: fake.NewClientset(),
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
@@ -948,7 +948,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(),
+				Clientset: fake.NewClientset(),
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
@@ -995,7 +995,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(),
+				Clientset: fake.NewClientset(),
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
@@ -1040,7 +1040,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(),
+				Clientset: fake.NewClientset(),
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
@@ -1251,7 +1251,7 @@ func TestNodeDeletionReleaseCIDR(t *testing.T) {
 
 			fakeNodeHandler := &testutil.FakeNodeHandler{
 				Existing:  tc.existingNodes,
-				Clientset: fake.NewSimpleClientset(),
+				Clientset: fake.NewClientset(),
 			}
 			_, tCtx := ktesting.NewTestContext(t)
 

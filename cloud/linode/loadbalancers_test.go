@@ -504,7 +504,7 @@ func testCreateNodeBalancerWithNodeNoAddresses(t *testing.T, client *linodego.Cl
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	defer func() {
@@ -609,7 +609,7 @@ func testCreateNodeBalancerWithInvalidFirewall(t *testing.T, client *linodego.Cl
 	}
 	expectedError := "strconv.Atoi: parsing \"qwerty\": invalid syntax"
 	err := testCreateNodeBalancer(t, client, f, annotations, nil)
-	if err.Error() != expectedError {
+	if err != nil && err.Error() != expectedError {
 		t.Fatalf("expected a %s error, got %v", expectedError, err)
 	}
 }
@@ -736,7 +736,7 @@ func testUpdateNodeBalancerWithVPCBackend(t *testing.T, client *linodego.Client,
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	defer func() {
@@ -748,7 +748,9 @@ func testUpdateNodeBalancerWithVPCBackend(t *testing.T, client *linodego.Client,
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
-	svc.Status.LoadBalancer = *lbStatus
+	if lbStatus != nil {
+		svc.Status.LoadBalancer = *lbStatus
+	}
 
 	stubServiceUpdate(fakeClientset, svc)
 	svc.SetAnnotations(map[string]string{
@@ -823,7 +825,7 @@ func testCreateNodeBalancerWithVPCOnlySubnetFlag(t *testing.T, client *linodego.
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	defer func() {
@@ -834,7 +836,9 @@ func testCreateNodeBalancerWithVPCOnlySubnetFlag(t *testing.T, client *linodego.
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
-	svc.Status.LoadBalancer = *lbStatus
+	if lbStatus != nil {
+		svc.Status.LoadBalancer = *lbStatus
+	}
 
 	stubService(fakeClientset, svc)
 	svc.SetAnnotations(map[string]string{
@@ -916,7 +920,7 @@ func testCreateNodeBalancerWithVPCNoFlagOrAnnotation(t *testing.T, client *linod
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	defer func() {
@@ -927,7 +931,9 @@ func testCreateNodeBalancerWithVPCNoFlagOrAnnotation(t *testing.T, client *linod
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
-	svc.Status.LoadBalancer = *lbStatus
+	if lbStatus != nil {
+		svc.Status.LoadBalancer = *lbStatus
+	}
 
 	stubService(fakeClientset, svc)
 	svc.SetAnnotations(map[string]string{
@@ -1005,7 +1011,7 @@ func testCreateNodeBalancerWithVPCAnnotationOnly(t *testing.T, client *linodego.
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	defer func() {
@@ -1017,7 +1023,9 @@ func testCreateNodeBalancerWithVPCAnnotationOnly(t *testing.T, client *linodego.
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
-	svc.Status.LoadBalancer = *lbStatus
+	if lbStatus != nil {
+		svc.Status.LoadBalancer = *lbStatus
+	}
 
 	stubServiceUpdate(fakeClientset, svc)
 	svc.SetAnnotations(map[string]string{})
@@ -1090,7 +1098,7 @@ func testCreateNodeBalancerWithVPCOnlySubnetIDFlag(t *testing.T, client *linodeg
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	defer func() {
@@ -1101,7 +1109,9 @@ func testCreateNodeBalancerWithVPCOnlySubnetIDFlag(t *testing.T, client *linodeg
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
-	svc.Status.LoadBalancer = *lbStatus
+	if lbStatus != nil {
+		svc.Status.LoadBalancer = *lbStatus
+	}
 
 	stubService(fakeClientset, svc)
 
@@ -1236,7 +1246,7 @@ func testUpdateLoadBalancerAddNode(t *testing.T, client *linodego.Client, f *fak
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	defer func() {
@@ -1247,7 +1257,9 @@ func testUpdateLoadBalancerAddNode(t *testing.T, client *linodego.Client, f *fak
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error %s", err)
 	}
-	svc.Status.LoadBalancer = *lbStatus
+	if lbStatus != nil {
+		svc.Status.LoadBalancer = *lbStatus
+	}
 
 	stubService(fakeClientset, svc)
 
@@ -1401,7 +1413,7 @@ func testUpdateLoadBalancerAddAnnotation(t *testing.T, client *linodego.Client, 
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	defer func() {
@@ -1412,7 +1424,9 @@ func testUpdateLoadBalancerAddAnnotation(t *testing.T, client *linodego.Client, 
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
-	svc.Status.LoadBalancer = *lbStatus
+	if lbStatus != nil {
+		svc.Status.LoadBalancer = *lbStatus
+	}
 
 	stubService(fakeClientset, svc)
 	svc.SetAnnotations(map[string]string{
@@ -1476,7 +1490,7 @@ func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Clie
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	defer func() {
@@ -1488,7 +1502,9 @@ func testUpdateLoadBalancerAddPortAnnotation(t *testing.T, client *linodego.Clie
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
-	svc.Status.LoadBalancer = *lbStatus
+	if lbStatus != nil {
+		svc.Status.LoadBalancer = *lbStatus
+	}
 	stubServiceUpdate(fakeClientset, svc)
 
 	svc.SetAnnotations(map[string]string{
@@ -1589,7 +1605,7 @@ func testVeryLongServiceName(t *testing.T, client *linodego.Client, _ *fakeAPI) 
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	defer func() {
@@ -1601,7 +1617,9 @@ func testVeryLongServiceName(t *testing.T, client *linodego.Client, _ *fakeAPI) 
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
-	svc.Status.LoadBalancer = *lbStatus
+	if lbStatus != nil {
+		svc.Status.LoadBalancer = *lbStatus
+	}
 	stubServiceUpdate(fakeClientset, svc)
 
 	svc.SetAnnotations(map[string]string{
@@ -1657,7 +1675,7 @@ func testUpdateLoadBalancerAddTags(t *testing.T, client *linodego.Client, _ *fak
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 	clusterName := "linodelb"
 
@@ -1669,7 +1687,9 @@ func testUpdateLoadBalancerAddTags(t *testing.T, client *linodego.Client, _ *fak
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
-	svc.Status.LoadBalancer = *lbStatus
+	if lbStatus != nil {
+		svc.Status.LoadBalancer = *lbStatus
+	}
 	stubService(fakeClientset, svc)
 
 	testTags := "test,new,tags"
@@ -1747,7 +1767,7 @@ func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *
 		_ = lb.EnsureLoadBalancerDeleted(t.Context(), "linodelb", svc)
 	}()
 
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 	addTLSSecret(t, lb.kubeClient)
 
@@ -1756,7 +1776,9 @@ func testUpdateLoadBalancerAddTLSPort(t *testing.T, client *linodego.Client, _ *
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
-	svc.Status.LoadBalancer = *lbStatus
+	if lbStatus != nil {
+		svc.Status.LoadBalancer = *lbStatus
+	}
 
 	stubServiceUpdate(fakeClientset, svc)
 	svc.Spec.Ports = append(svc.Spec.Ports, extraPort)
@@ -1823,7 +1845,7 @@ func testUpdateLoadBalancerAddProxyProtocol(t *testing.T, client *linodego.Clien
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	for _, tc := range []struct {
@@ -1951,7 +1973,7 @@ func testUpdateLoadBalancerAddNewFirewall(t *testing.T, client *linodego.Client,
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	defer func() {
@@ -1963,7 +1985,9 @@ func testUpdateLoadBalancerAddNewFirewall(t *testing.T, client *linodego.Client,
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
-	svc.Status.LoadBalancer = *lbStatus
+	if lbStatus != nil {
+		svc.Status.LoadBalancer = *lbStatus
+	}
 	stubServiceUpdate(fakeClientset, svc)
 	fwClient := services.LinodeClient{Client: client}
 	fw, err := fwClient.CreateFirewall(t.Context(), linodego.FirewallCreateOptions{
@@ -1987,7 +2011,7 @@ func testUpdateLoadBalancerAddNewFirewall(t *testing.T, client *linodego.Client,
 	}()
 
 	svc.SetAnnotations(map[string]string{
-		annotations.AnnLinodeCloudFirewallID: strconv.Itoa(fw.ID),
+		annotations.AnnLinodeCloudFirewallID: strconv.Itoa(fw.ID), //nolint:nilaway // fw should not be nil if no err
 	})
 
 	err = lb.UpdateLoadBalancer(t.Context(), "linodelb", svc, nodes)
@@ -2052,7 +2076,7 @@ func testUpdateLoadBalancerAddNewFirewallACL(t *testing.T, client *linodego.Clie
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	defer func() {
@@ -2063,7 +2087,9 @@ func testUpdateLoadBalancerAddNewFirewallACL(t *testing.T, client *linodego.Clie
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
-	svc.Status.LoadBalancer = *lbStatus
+	if lbStatus != nil {
+		svc.Status.LoadBalancer = *lbStatus
+	}
 	stubService(fakeClientset, svc)
 
 	nb, err := lb.getNodeBalancerByStatus(t.Context(), svc)
@@ -2184,7 +2210,7 @@ func testUpdateLoadBalancerDeleteFirewallRemoveACL(t *testing.T, client *linodeg
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	svc.SetAnnotations(map[string]string{
@@ -2203,7 +2229,9 @@ func testUpdateLoadBalancerDeleteFirewallRemoveACL(t *testing.T, client *linodeg
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
-	svc.Status.LoadBalancer = *lbStatus
+	if lbStatus != nil {
+		svc.Status.LoadBalancer = *lbStatus
+	}
 	stubService(fakeClientset, svc)
 
 	nb, err := lb.getNodeBalancerByStatus(t.Context(), svc)
@@ -2283,7 +2311,7 @@ func testUpdateLoadBalancerUpdateFirewallRemoveACLaddID(t *testing.T, client *li
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	svc.SetAnnotations(map[string]string{
@@ -2302,7 +2330,9 @@ func testUpdateLoadBalancerUpdateFirewallRemoveACLaddID(t *testing.T, client *li
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
-	svc.Status.LoadBalancer = *lbStatus
+	if lbStatus != nil {
+		svc.Status.LoadBalancer = *lbStatus
+	}
 	stubService(fakeClientset, svc)
 
 	nb, err := lb.getNodeBalancerByStatus(t.Context(), svc)
@@ -2350,7 +2380,7 @@ func testUpdateLoadBalancerUpdateFirewallRemoveACLaddID(t *testing.T, client *li
 	}()
 
 	svc.SetAnnotations(map[string]string{
-		annotations.AnnLinodeCloudFirewallID: strconv.Itoa(fw.ID),
+		annotations.AnnLinodeCloudFirewallID: strconv.Itoa(fw.ID), //nolint:nilaway // fw should not be nil if no err
 	})
 
 	err = lb.UpdateLoadBalancer(t.Context(), "linodelb", svc, nodes)
@@ -2423,7 +2453,7 @@ func testUpdateLoadBalancerUpdateFirewallRemoveIDaddACL(t *testing.T, client *li
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	fwClient := services.LinodeClient{Client: client}
@@ -2448,7 +2478,7 @@ func testUpdateLoadBalancerUpdateFirewallRemoveIDaddACL(t *testing.T, client *li
 	}()
 
 	svc.SetAnnotations(map[string]string{
-		annotations.AnnLinodeCloudFirewallID: strconv.Itoa(fw.ID),
+		annotations.AnnLinodeCloudFirewallID: strconv.Itoa(fw.ID), //nolint:nilaway // fw should not be nil if no err
 	})
 
 	defer func() {
@@ -2460,7 +2490,9 @@ func testUpdateLoadBalancerUpdateFirewallRemoveIDaddACL(t *testing.T, client *li
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
-	svc.Status.LoadBalancer = *lbStatus
+	if lbStatus != nil {
+		svc.Status.LoadBalancer = *lbStatus
+	}
 	stubServiceUpdate(fakeClientset, svc)
 
 	nb, err := lb.getNodeBalancerByStatus(t.Context(), svc)
@@ -2570,7 +2602,7 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	defer func() {
@@ -2581,7 +2613,9 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
-	svc.Status.LoadBalancer = *lbStatus
+	if lbStatus != nil {
+		svc.Status.LoadBalancer = *lbStatus
+	}
 	stubService(fakeClientset, svc)
 
 	nb, err := lb.getNodeBalancerByStatus(t.Context(), svc)
@@ -2806,7 +2840,7 @@ func testUpdateLoadBalancerUpdateFirewall(t *testing.T, client *linodego.Client,
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	defer func() {
@@ -2823,14 +2857,16 @@ func testUpdateLoadBalancerUpdateFirewall(t *testing.T, client *linodego.Client,
 	}()
 
 	svc.SetAnnotations(map[string]string{
-		annotations.AnnLinodeCloudFirewallID: strconv.Itoa(fw.ID),
+		annotations.AnnLinodeCloudFirewallID: strconv.Itoa(fw.ID), //nolint:nilaway // fw should not be nil if no err
 	})
 
 	lbStatus, err := lb.EnsureLoadBalancer(t.Context(), "linodelb", svc, nodes)
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
-	svc.Status.LoadBalancer = *lbStatus
+	if lbStatus != nil {
+		svc.Status.LoadBalancer = *lbStatus
+	}
 	stubService(fakeClientset, svc)
 
 	nb, err := lb.getNodeBalancerByStatus(t.Context(), svc)
@@ -2939,7 +2975,7 @@ func testUpdateLoadBalancerDeleteFirewallRemoveID(t *testing.T, client *linodego
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	defer func() {
@@ -2956,7 +2992,7 @@ func testUpdateLoadBalancerDeleteFirewallRemoveID(t *testing.T, client *linodego
 	}()
 
 	svc.SetAnnotations(map[string]string{
-		annotations.AnnLinodeCloudFirewallID: strconv.Itoa(fw.ID),
+		annotations.AnnLinodeCloudFirewallID: strconv.Itoa(fw.ID), //nolint:nilaway // fw should not be nil if no err
 	})
 
 	stubService(fakeClientset, svc)
@@ -2964,7 +3000,9 @@ func testUpdateLoadBalancerDeleteFirewallRemoveID(t *testing.T, client *linodego
 	if err != nil {
 		t.Errorf("EnsureLoadBalancer returned an error: %s", err)
 	}
-	svc.Status.LoadBalancer = *lbStatus
+	if lbStatus != nil {
+		svc.Status.LoadBalancer = *lbStatus
+	}
 	stubServiceUpdate(fakeClientset, svc)
 
 	nb, err := lb.getNodeBalancerByStatus(t.Context(), svc)
@@ -3046,7 +3084,7 @@ func testUpdateLoadBalancerAddReservedIP(t *testing.T, client *linodego.Client, 
 		_ = lb.EnsureLoadBalancerDeleted(t.Context(), clusterName, svc)
 	}()
 
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	nodeBalancer, err := client.CreateNodeBalancer(t.Context(), linodego.NodeBalancerCreateOptions{
@@ -3077,6 +3115,12 @@ func testUpdateLoadBalancerAddReservedIP(t *testing.T, client *linodego.Client, 
 	}
 
 	status, _, err := lb.GetLoadBalancer(t.Context(), clusterName, svc)
+	if err != nil {
+		t.Fatalf("failed to get loadbalancer status: %s", err)
+	}
+	if status == nil {
+		t.Fatalf("no loadbalancer status returned")
+	}
 	if status.Ingress[0].IP != initialIP {
 		t.Fatalf("IP should not have changed in service status: %s", err)
 	}
@@ -3131,7 +3175,7 @@ func testUpdateLoadBalancerAddNodeBalancerID(t *testing.T, client *linodego.Clie
 		_ = lb.EnsureLoadBalancerDeleted(t.Context(), "linodelb", svc)
 	}()
 
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	nodeBalancer, err := client.CreateNodeBalancer(t.Context(), linodego.NodeBalancerCreateOptions{
@@ -4319,7 +4363,7 @@ func testEnsureExistingLoadBalancer(t *testing.T, client *linodego.Client, _ *fa
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	lb.kubeClient = fake.NewSimpleClientset()
+	lb.kubeClient = fake.NewClientset()
 	addTLSSecret(t, lb.kubeClient)
 
 	configs := []*linodego.NodeBalancerConfigCreateOptions{}
@@ -4333,6 +4377,9 @@ func testEnsureExistingLoadBalancer(t *testing.T, client *linodego.Client, _ *fa
 	getLBStatus, exists, err := lb.GetLoadBalancer(t.Context(), "linodelb", svc)
 	if err != nil {
 		t.Fatalf("failed to create nodebalancer: %s", err)
+	}
+	if getLBStatus == nil {
+		t.Fatalf("failed to get nodebalancer")
 	}
 	if !exists {
 		t.Fatal("Node balancer not found")
@@ -4652,7 +4699,7 @@ func testUpdateLoadBalancerNoNodes(t *testing.T, client *linodego.Client, _ *fak
 		_ = lb.EnsureLoadBalancerDeleted(t.Context(), "linodelb", svc)
 	}()
 
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	nodeBalancer, err := client.CreateNodeBalancer(t.Context(), linodego.NodeBalancerCreateOptions{
@@ -4686,7 +4733,7 @@ func testGetNodeBalancerByStatus(t *testing.T, client *linodego.Client, _ *fakeA
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	for _, test := range []struct {
@@ -4894,7 +4941,7 @@ func testEnsureNewLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	lb.kubeClient = fake.NewSimpleClientset()
+	lb.kubeClient = fake.NewClientset()
 	addTLSSecret(t, lb.kubeClient)
 
 	defer func() { _ = lb.EnsureLoadBalancerDeleted(t.Context(), "linodelb", svc) }()
@@ -4975,13 +5022,15 @@ func testGetLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fakeClientset := fake.NewSimpleClientset()
+	fakeClientset := fake.NewClientset()
 	lb.kubeClient = fakeClientset
 
 	defer func() { _ = lb.EnsureLoadBalancerDeleted(t.Context(), "linodelb", svc) }()
 
 	lbStatus := makeLoadBalancerStatus(svc, nb)
-	svc.Status.LoadBalancer = *lbStatus
+	if lbStatus != nil {
+		svc.Status.LoadBalancer = *lbStatus
+	}
 	stubService(fakeClientset, svc)
 	stubService(fakeClientset, svc2)
 
@@ -5112,7 +5161,7 @@ func Test_getPortConfigAnnotation(t *testing.T) {
 }
 
 func Test_getTLSCertInfo(t *testing.T) {
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	addTLSSecret(t, kubeClient)
 
 	testcases := []struct {
