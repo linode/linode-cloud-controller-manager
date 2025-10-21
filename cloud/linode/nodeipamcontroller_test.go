@@ -134,7 +134,7 @@ func Test_startNodeIpamController(t *testing.T) {
 		allocateNodeCIDRs bool
 		clusterCIDR       string
 	}
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	tests := []struct {
 		name    string
 		args    args
