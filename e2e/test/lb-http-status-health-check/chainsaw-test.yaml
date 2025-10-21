@@ -43,7 +43,7 @@ spec:
               for i in {1..20}; do
                   nbconfig=$(curl -s \
                     -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "Content-Type: application/json" \
+                    -H "Content-Type: application/json" --fail-early --retry 3 \
                     "$LINODE_URL/v4/nodebalancers/$nbid/configs" | jq '.data[] | select(.port == 80)' || true)
 
                   if [[ -z $nbconfig ]]; then

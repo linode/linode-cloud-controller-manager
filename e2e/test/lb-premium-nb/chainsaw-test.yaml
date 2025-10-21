@@ -82,7 +82,7 @@ spec:
             for i in {1..10}; do
                 type=$(curl -s --request GET \
                   -H "Authorization: Bearer $LINODE_TOKEN" \
-                  -H "Content-Type: application/json" \
+                  -H "Content-Type: application/json" --fail-early --retry 3 \
                   -H "accept: application/json" \
                   "$LINODE_URL/v4/nodebalancers/${nbid}" | jq -r '.type')
 

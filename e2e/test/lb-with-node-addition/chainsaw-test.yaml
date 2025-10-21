@@ -43,7 +43,7 @@ spec:
               for i in {1..20}; do
                   response=$(curl -sf \
                     -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "Content-Type: application/json" \
+                    -H "Content-Type: application/json" --fail-early --retry 3 \
                     "$LINODE_URL/v4/nodebalancers/$nbid/configs" || true)
 
                   nbconfig=$(echo "$response" | jq '.data[]? | select(.port == 80)' || true)
@@ -84,7 +84,7 @@ spec:
               for i in {1..20}; do
                   response=$(curl -sf \
                     -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "Content-Type: application/json" \
+                    -H "Content-Type: application/json" --fail-early --retry 3 \
                     "$LINODE_URL/v4/nodebalancers/$nbid/configs" || true)
 
                   nbconfig=$(echo "$response" | jq '.data[]? | select(.port == 80)' || true)
