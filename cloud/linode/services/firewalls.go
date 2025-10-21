@@ -86,6 +86,10 @@ func (l *LinodeClient) DeleteNodeBalancerFirewall(
 }
 
 func ipsChanged(ips *linodego.NetworkAddresses, rules []linodego.FirewallRule) bool {
+	if ips == nil {
+		return false
+	}
+
 	var ruleIPv4s []string
 	var ruleIPv6s []string
 
@@ -260,6 +264,7 @@ func chunkIPs(ips []string) [][]string {
 	}
 
 	// Append the remaining IPs as a chunk.
+	//nolint:nilaway // we can safely slice into ips because we know it's not empty
 	chunks = append(chunks, ips[chunkCount*maxIPsPerFirewall:])
 
 	return chunks

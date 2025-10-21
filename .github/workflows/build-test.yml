@@ -73,7 +73,10 @@ jobs:
         run: make vet
 
       - name: lint
-        uses: golangci/golangci-lint-action@v8
+        run: make lint
+
+      - name: nilcheck
+        run: make nilcheck
 
       - name: Helm Lint
         run: make helm-lint
