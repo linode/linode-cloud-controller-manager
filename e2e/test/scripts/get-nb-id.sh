@@ -13,7 +13,7 @@ hostname=$(kubectl get svc $svcname -n $NAMESPACE -o json | jq -r .status.loadBa
 ip=$(echo $hostname | awk -F'.' '{gsub("-", ".", $1); print $1}')
 nbid=$(curl -s \
     -H "Authorization: Bearer $LINODE_TOKEN" \
-    -H "Content-Type: application/json" \
+    -H "Content-Type: application/json" --fail-early --retry 3 \
     -H "X-Filter: {\"ipv4\": \"$ip\"}" \
     "$LINODE_URL/v4/nodebalancers" | jq .data[].id)
 

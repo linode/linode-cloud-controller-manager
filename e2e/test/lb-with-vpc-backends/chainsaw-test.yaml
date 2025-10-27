@@ -49,7 +49,7 @@ spec:
 
               nbconfig=$(curl -s \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
+                -H "Content-Type: application/json" --fail-early --retry 3 \
                 "$LINODE_URL/v4/nodebalancers/$nbid/configs")
 
               config_id=$(echo $nbconfig | jq -r '.data[] | select(.port == 80) | .id')
@@ -57,7 +57,7 @@ spec:
               # Get nodes from the config
               nodes=$(curl -s \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
+                -H "Content-Type: application/json" --fail-early --retry 3 \
                 "$LINODE_URL/v4/nodebalancers/$nbid/configs/$config_id/nodes")
 
               # Extract all addresses and remove ports

@@ -47,7 +47,7 @@ spec:
               # Get VPC config for the old nodebalancer if it exists
               vpcconfig=$(curl -s \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
+                -H "Content-Type: application/json" --fail-early --retry 3 \
                 "$LINODE_URL/v4beta/nodebalancers/$old_nbid/vpcs")
 
               echo "Nodebalancer ID: $old_nbid"
@@ -63,7 +63,7 @@ spec:
 
               nbid=$(curl -s --request POST \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
+                -H "Content-Type: application/json" --fail-early --retry 3 \
                 -H "accept: application/json" \
                 "$LINODE_URL/v4beta/nodebalancers" \
                 --data "$data" | jq .id)

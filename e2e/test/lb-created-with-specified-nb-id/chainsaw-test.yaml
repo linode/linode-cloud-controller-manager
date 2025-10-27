@@ -44,7 +44,7 @@ spec:
 
               nbid=$(curl -s --request POST \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
+                -H "Content-Type: application/json" --fail-early --retry 3 \
                 -H "accept: application/json" \
                 "$LINODE_URL/v4beta/nodebalancers" \
                 --data "$data" | jq .id)

@@ -15,7 +15,7 @@ nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN $S
 # Get VPC config if it exists
 vpcconfig=$(curl -s \
     -H "Authorization: Bearer $LINODE_TOKEN" \
-    -H "Content-Type: application/json" \
+    -H "Content-Type: application/json" --fail-early --retry 3 \
     "$LINODE_URL/v4beta/nodebalancers/$nbid/vpcs")
 
 SUBNET_ID=$(echo $vpcconfig | jq -r ".data[] | select(.nodebalancer_id == $nbid) | .subnet_id")
