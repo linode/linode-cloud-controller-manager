@@ -23,7 +23,7 @@ spec:
 
               create_fw=$(curl -s --write-out "%{http_code}\n" --output /dev/null --request POST \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
+                -H "Content-Type: application/json" --fail-early --retry 3 \
                 -H "accept: application/json" \
                 "$LINODE_URL/v4/networking/firewalls" \
                 --data "
@@ -84,7 +84,7 @@ spec:
 
               fwid=$(curl -s \
                     -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "Content-Type: application/json" \
+                    -H "Content-Type: application/json" --fail-early --retry 3 \
                     -H "X-Filter: {\"label\": \"$FWLABEL\"}" \
                     "$LINODE_URL/v4/networking/firewalls" | jq .data[].id)
 
@@ -101,7 +101,7 @@ spec:
 
                   fwconfig=$(curl -s \
                     -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "Content-Type: application/json" \
+                    -H "Content-Type: application/json" --fail-early --retry 3 \
                     "$LINODE_URL/v4/networking/firewalls/$fwid" || true)
 
                   fw_attached_to_nb=$(echo $fwconfig | jq ".entities[] | select(.id == $nbid) | .id == $nbid")
@@ -116,7 +116,7 @@ spec:
 
               curl -s -X DELETE \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
+                -H "Content-Type: application/json" --fail-early --retry 3 \
                 "$LINODE_URL/v4/networking/firewalls/$fwid"
             check:
               ($error == null): true

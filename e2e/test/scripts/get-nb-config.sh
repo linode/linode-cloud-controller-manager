@@ -4,7 +4,7 @@ set -e
 
 nbconfig=$(curl -s \
   -H "Authorization: Bearer $LINODE_TOKEN" \
-  -H "Content-Type: application/json" \
+  -H "Content-Type: application/json" --fail-early --retry 3 \
   "$LINODE_URL/v4/nodebalancers/$NBID/configs" | jq '.data[] | select(.port == 7070)' || true )
 
 echo $nbconfig

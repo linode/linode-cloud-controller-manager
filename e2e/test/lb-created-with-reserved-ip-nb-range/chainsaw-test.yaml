@@ -24,7 +24,7 @@ spec:
 
               nbconf=$(curl -s --request POST \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
+                -H "Content-Type: application/json" --fail-early --retry 3 \
                 -H "accept: application/json" \
                 "${LINODE_URL}/v4beta/nodebalancers" \
                 --data "{\"label\": \"$LABEL\", \"region\": \"$LINODE_REGION\"}")
@@ -42,7 +42,7 @@ spec:
               ip=$(echo "$ip" | tr -d '"')
               update_ip=$(curl --no-keepalive -s --request PUT \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
+                -H "Content-Type: application/json" --fail-early --retry 3 \
                 -H "accept: application/json" \
                 "${LINODE_URL}/v4beta/networking/ips/$ip" \
                 --data "{\"reserved\": true}")
@@ -53,7 +53,7 @@ spec:
               
               del_nb=$(curl -s --no-keepalive --request DELETE \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
+                -H "Content-Type: application/json" --fail-early --retry 3 \
                 -H "accept: application/json" \
                 "${LINODE_URL}/v4beta/nodebalancers/$nbid")
               response=$($delnb)
@@ -66,7 +66,7 @@ spec:
 
               fw_id=$(curl -s --request POST \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
+                -H "Content-Type: application/json" --fail-early --retry 3 \
                 -H "accept: application/json" \
                 "$LINODE_URL/v4/networking/firewalls" \
                 --data "
@@ -135,7 +135,7 @@ spec:
 
               delete_fw=$(curl -s -X DELETE \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
+                -H "Content-Type: application/json" --fail-early --retry 3 \
                 "$LINODE_URL/v4/networking/firewalls/$fw_id")
 
               if [[ "$delete_fw" == "{}" ]]; then
@@ -146,7 +146,7 @@ spec:
 
               delete_rip=$(curl -s --request DELETE \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" \
+                -H "Content-Type: application/json" --fail-early --retry 3 \
                 "${LINODE_URL}/v4beta/networking/reserved/ips/$reserved_ip" )
 
               if [[ "$delete_rip" == "{}" ]]; then
