@@ -47,12 +47,28 @@ spec:
               echo "Nodebalancer config found, updating config stickiness"
 
               kubectl annotate --overwrite svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-default-stickiness=source_ip
-              sleep 5s
-
-              echo "Verifying that stickiness is set to source_ip"
-              nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
-              stickiness=$(echo $nbconfig | jq -r '.stickiness')
-              echo "stickiness is $stickiness"
+              
+              echo "Waiting for stickiness to be updated to source_ip..."
+              max_attempts=12
+              for i in $(seq 1 $max_attempts); do
+                echo "Attempt $i/$max_attempts: Checking stickiness..."
+                nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
+                stickiness=$(echo $nbconfig | jq -r '.stickiness')
+                echo "Current stickiness: $stickiness"
+                
+                if [[ "$stickiness" == "source_ip" ]]; then
+                  echo "Stickiness successfully updated to source_ip"
+                  break
+                fi
+                
+                if [[ $i -eq $max_attempts ]]; then
+                  echo "Timeout: Stickiness was not updated to source_ip after $max_attempts attempts"
+                  exit 1
+                fi
+                
+                echo "Waiting 10 seconds before next check..."
+                sleep 10
+              done
             check:
               ($error == null): true
-              (contains($stdout, 'stickiness is source_ip')): true
+              (contains($stdout, 'Stickiness successfully updated to source_ip')): true
