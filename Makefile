@@ -168,7 +168,7 @@ create-capl-cluster:
 	kubectl wait --for=condition=ControlPlaneReady cluster/$(CLUSTER_NAME) --timeout=600s || (kubectl get cluster -o yaml; kubectl get linodecluster -o yaml; kubectl get linodemachines -o yaml)
 	kubectl wait --for=condition=NodeHealthy=true machines -l cluster.x-k8s.io/cluster-name=$(CLUSTER_NAME) --timeout=900s
 	clusterctl get kubeconfig $(CLUSTER_NAME) > $(KUBECONFIG_PATH)
-	KUBECONFIG=$(KUBECONFIG_PATH) kubectl wait --for=condition=Ready nodes --all --timeout=600s
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl wait --for=condition=Ready nodes --all --timeout=600s || kubectl logs -n capl-system deployments/capl-controller-manager --tail=50
 	# Remove all taints from control plane node so that pods scheduled on it by tests can run (without this, some tests fail)
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl taint nodes -l node-role.kubernetes.io/control-plane node-role.kubernetes.io/control-plane-
 
