@@ -72,3 +72,8 @@ spec:
             check:
               ($error == null): true
               (contains($stdout, 'Stickiness successfully updated to source_ip')): true
+      catch:
+        - script:
+            content: |
+              echo "Test failed. Fetching CCM logs..."
+              kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-with-udp-ports-stickiness"
