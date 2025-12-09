@@ -10,7 +10,7 @@ DEVBOX_BIN              ?= $(DEVBOX_PACKAGES_DIR)/bin
 HELM                    ?= $(LOCALBIN)/helm
 HELM_VERSION            ?= v3.16.3
 GOLANGCI_LINT           ?= $(LOCALBIN)/golangci-lint
-GOLANGCI_LINT_VERSION   ?= v2.5.0
+GOLANGCI_LINT_VERSION   ?= v2.7.2
 GOLANGCI_LINT_NILAWAY   ?= $(CACHE_BIN)/golangci-lint-nilaway
 
 #####################################################################
