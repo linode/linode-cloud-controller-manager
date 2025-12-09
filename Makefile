@@ -165,10 +165,10 @@ generate-capl-cluster-manifests:
 create-capl-cluster:
 	# Create a CAPL cluster with updated CCM and wait for it to be ready
 	kubectl apply -f $(MANIFEST_NAME).yaml
-	kubectl wait --for=condition=ControlPlaneReady cluster/$(CLUSTER_NAME) --timeout=600s || (kubectl get cluster -o yaml; kubectl get linodecluster -o yaml; kubectl get linodemachines -o yaml)
+	kubectl wait --for=condition=ControlPlaneReady cluster/$(CLUSTER_NAME) --timeout=600s || (kubectl get cluster -o yaml; kubectl get linodecluster -o yaml; kubectl get linodemachines -o yaml; kubectl logs -n capl-system deployments/capl-controller-manager --tail=50)
 	kubectl wait --for=condition=NodeHealthy=true machines -l cluster.x-k8s.io/cluster-name=$(CLUSTER_NAME) --timeout=900s
 	clusterctl get kubeconfig $(CLUSTER_NAME) > $(KUBECONFIG_PATH)
-	KUBECONFIG=$(KUBECONFIG_PATH) kubectl wait --for=condition=Ready nodes --all --timeout=600s || kubectl logs -n capl-system deployments/capl-controller-manager --tail=50
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl wait --for=condition=Ready nodes --all --timeout=600s
 	# Remove all taints from control plane node so that pods scheduled on it by tests can run (without this, some tests fail)
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl taint nodes -l node-role.kubernetes.io/control-plane node-role.kubernetes.io/control-plane-
 
@@ -208,7 +208,7 @@ e2e-test:
 	REGION=$(LINODE_REGION) \
 	LINODE_TOKEN=$(LINODE_TOKEN) \
 	LINODE_URL=$(LINODE_URL) \
-	chainsaw test e2e/test --parallel 2 $(E2E_FLAGS)
+	chainsaw test e2e/test/lb-with-udp-ports-stickiness --parallel 2 $(E2E_FLAGS)
 
 .PHONY: e2e-test-bgp
 e2e-test-bgp:
