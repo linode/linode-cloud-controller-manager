@@ -209,7 +209,6 @@ e2e-test:
 	LINODE_TOKEN=$(LINODE_TOKEN) \
 	LINODE_URL=$(LINODE_URL) \
 	chainsaw test e2e/test/lb-with-udp-ports-stickiness --parallel 2 $(E2E_FLAGS)
-	KUBECONFIG=$(KUBECONFIG_PATH) kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-with-udp-ports-stickiness"
 
 .PHONY: e2e-test-bgp
 e2e-test-bgp:
