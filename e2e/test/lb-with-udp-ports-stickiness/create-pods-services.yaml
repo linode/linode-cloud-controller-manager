@@ -35,6 +35,8 @@ metadata:
   name: svc-test
   labels:
     app: lb-with-udp-ports-stickiness
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-default-algorithm: ring_hash
 spec:
   type: LoadBalancer
   selector:
