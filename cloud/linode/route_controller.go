@@ -245,9 +245,8 @@ func (r *routes) DeleteRoute(ctx context.Context, clusterName string, route *clo
 func (r *routes) handleInterfaces(ctx context.Context, intfRoutes []string, linodeInterfaceRoutes []linodego.VPCInterfaceIPv4RangeCreateOptions, instance *linodego.Instance, intfVPCIP linodego.VPCIP, route *cloudprovider.Route) error {
 	if instance.InterfaceGeneration == linodego.GenerationLinode {
 		interfaceUpdateOptions := linodego.LinodeInterfaceUpdateOptions{
-			VPC: &linodego.VPCInterfaceCreateOptions{
-				SubnetID: intfVPCIP.SubnetID,
-				IPv4:     &linodego.VPCInterfaceIPv4CreateOptions{Ranges: linodeInterfaceRoutes},
+			VPC: &linodego.VPCInterfaceUpdateOptions{
+				IPv4: &linodego.VPCInterfaceIPv4CreateOptions{Ranges: &linodeInterfaceRoutes},
 			},
 		}
 		resp, err := r.client.UpdateInterface(ctx, instance.ID, intfVPCIP.InterfaceID, interfaceUpdateOptions)
