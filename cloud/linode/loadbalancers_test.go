@@ -5592,25 +5592,19 @@ func Test_makeLoadBalancerStatus_FrontendVPC(t *testing.T) {
 }
 
 func Test_getFrontendVPCCreateOptions(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockClient := mocks.NewMockClient(ctrl)
-
 	type args struct {
-		ctx     context.Context
 		service *v1.Service
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    []linodego.NodeBalancerVPCOptions
-		wantErr bool
+		name        string
+		args        args
+		want        []linodego.NodeBalancerVPCOptions
+		wantErr     bool
+		prepareMock func(*mocks.MockClient)
 	}{
 		{
 			name: "No frontend VPC annotations",
 			args: args{
-				ctx: context.Background(),
 				service: &v1.Service{
 					ObjectMeta: metav1.ObjectMeta{
 						Annotations: map[string]string{},
@@ -5623,7 +5617,6 @@ func Test_getFrontendVPCCreateOptions(t *testing.T) {
 		{
 			name: "Frontend IPv4 range annotation",
 			args: args{
-				ctx: context.Background(),
 				service: &v1.Service{
 					ObjectMeta: metav1.ObjectMeta{
 						Annotations: map[string]string{
@@ -5644,7 +5637,6 @@ func Test_getFrontendVPCCreateOptions(t *testing.T) {
 		{
 			name: "Frontend IPv6 range annotation",
 			args: args{
-				ctx: context.Background(),
 				service: &v1.Service{
 					ObjectMeta: metav1.ObjectMeta{
 						Annotations: map[string]string{
@@ -5665,7 +5657,6 @@ func Test_getFrontendVPCCreateOptions(t *testing.T) {
 		{
 			name: "Frontend VPC and subnet names",
 			args: args{
-				ctx: context.Background(),
 				service: &v1.Service{
 					ObjectMeta: metav1.ObjectMeta{
 						Annotations: map[string]string{
@@ -5677,15 +5668,25 @@ func Test_getFrontendVPCCreateOptions(t *testing.T) {
 			},
 			want:    nil, // Will return error due to missing client setup
 			wantErr: true,
+			prepareMock: func(m *mocks.MockClient) {
+				m.EXPECT().ListVPCs(gomock.Any(), gomock.Any()).Return(nil, stderrors.New("mock error"))
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			mockClient := mocks.NewMockClient(ctrl)
+			if tt.prepareMock != nil {
+				tt.prepareMock(mockClient)
+			}
+
 			l := &loadbalancers{
 				client: mockClient,
 			}
-			got, err := l.getFrontendVPCCreateOptions(tt.args.ctx, tt.args.service)
+			got, err := l.getFrontendVPCCreateOptions(context.Background(), tt.args.service)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getFrontendVPCCreateOptions() error = %v, wantErr %v", err, tt.wantErr)
 				return

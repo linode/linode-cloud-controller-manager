@@ -870,10 +870,10 @@ func (l *loadbalancers) getFrontendVPCCreateOptions(ctx context.Context, service
 
 	// Precedence 1: IPv4/IPv6 Range Annotations - Explicit CIDR ranges
 	if hasIPv4Range || hasIPv6Range {
-		if err := validateNodeBalancerFrontendIPv4Range(frontendIPv4Range); err != nil {
+		if err = validateNodeBalancerFrontendIPv4Range(frontendIPv4Range); err != nil {
 			return nil, err
 		}
-		if err := validateNodeBalancerFrontendIPv6Range(frontendIPv6Range); err != nil {
+		if err = validateNodeBalancerFrontendIPv6Range(frontendIPv6Range); err != nil {
 			return nil, err
 		}
 		if frontendSubnetID, ok := service.GetAnnotations()[annotations.NodeBalancerFrontendSubnetID]; ok {
