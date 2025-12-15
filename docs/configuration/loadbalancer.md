@@ -194,9 +194,42 @@ By default, CCM uses first VPC and Subnet name configured with it to attach Node
 metadata:
   annotations:
     service.beta.kubernetes.io/linode-loadbalancer-backend-ipv4-range: "10.100.0.4/30"
-    service.beta.kubernetes.io/linode-loadbalancer-vpc-name: "vpc1"
-    service.beta.kubernetes.io/linode-loadbalancer-subnet-name: "subnet1"
+    service.beta.kubernetes.io/linode-loadbalancer-backend-vpc-name: "vpc1"
+    service.beta.kubernetes.io/linode-loadbalancer-backend-subnet-name: "subnet1"
 ```
+
+### Configuring NodeBalancer frontend with VPC
+
+NodeBalancers can optionally be configured with a VPC-based frontend address.
+
+Frontend VPC configuration supports the following annotations:
+
+1. Choose the frontend subnet:
+
+   - `service.beta.kubernetes.io/linode-loadbalancer-frontend-subnet-id` (preferred)
+   - OR `service.beta.kubernetes.io/linode-loadbalancer-frontend-vpc-name` and `service.beta.kubernetes.io/linode-loadbalancer-frontend-subnet-name`
+
+2. Optionally constrain the frontend address assignment within the subnet:
+
+   - `service.beta.kubernetes.io/linode-loadbalancer-frontend-ipv4-range` (CIDR)
+   - `service.beta.kubernetes.io/linode-loadbalancer-frontend-ipv6-range` (CIDR)
+
+Order of precedence:
+- If `frontend-subnet-id` is set, it is used.
+- Otherwise, `frontend-vpc-name` + `frontend-subnet-name` are used.
+- IPv4/IPv6 range annotations are optional add-ons and require one of the subnet selectors above.
+
+Example:
+```yaml
+metadata:
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-frontend-subnet-id: "169341"
+    # Optional:
+    # service.beta.kubernetes.io/linode-loadbalancer-frontend-ipv4-range: "10.0.0.0/24"
+    # service.beta.kubernetes.io/linode-loadbalancer-frontend-ipv6-range: "2001:db8::/64"
+```
+
+For a complete working example, see `examples/vpc-frontend-example.yaml`.
 
 If CCM is started with `--nodebalancer-backend-ipv4-subnet` flag, then it will not allow provisioning of nodebalancer unless subnet specified in service annotation lie within the subnet specified using the flag. This is to prevent accidental overlap between nodebalancer backend ips and pod CIDRs.
 
