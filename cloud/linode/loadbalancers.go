@@ -850,9 +850,9 @@ func (l *loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Ser
 
 // getFrontendVPCCreateOptions returns the VPC options for the NodeBalancer frontend VPC creation.
 // Order of precedence:
-// 1. Frontend IPv4/IPv6 Range Annotations - Explicit CIDR ranges
+// 1. Frontend Subnet ID Annotation - Direct subnet ID
 // 2. Frontend VPC/Subnet Name Annotations - Resolve by name
-// 3. Frontend Subnet ID Annotation - Direct subnet ID
+// 3. Frontend IPv4/IPv6 Range Annotations - Optional CIDR ranges
 func (l *loadbalancers) getFrontendVPCCreateOptions(ctx context.Context, service *v1.Service) ([]linodego.NodeBalancerVPCOptions, error) {
 	frontendIPv4Range, hasIPv4Range := service.GetAnnotations()[annotations.NodeBalancerFrontendIPv4Range]
 	frontendIPv6Range, hasIPv6Range := service.GetAnnotations()[annotations.NodeBalancerFrontendIPv6Range]
@@ -860,76 +860,45 @@ func (l *loadbalancers) getFrontendVPCCreateOptions(ctx context.Context, service
 	_, hasSubnetName := service.GetAnnotations()[annotations.NodeBalancerFrontendSubnetName]
 	_, hasSubnetID := service.GetAnnotations()[annotations.NodeBalancerFrontendSubnetID]
 
-	// If no frontend VPC annotations are present, return empty slice
+	// If no frontend VPC annotations are present, do not configure a frontend VPC.
 	if !hasIPv4Range && !hasIPv6Range && !hasVPCName && !hasSubnetName && !hasSubnetID {
 		return nil, nil
+	}
+
+	if err := validateNodeBalancerFrontendIPRange(frontendIPv4Range, "IPv4"); err != nil {
+		return nil, err
+	}
+	if err := validateNodeBalancerFrontendIPRange(frontendIPv6Range, "IPv6"); err != nil {
+		return nil, err
 	}
 
 	var subnetID int
 	var err error
 
-	// Precedence 1: IPv4/IPv6 Range Annotations - Explicit CIDR ranges
-	if hasIPv4Range || hasIPv6Range {
-		if err = validateNodeBalancerFrontendIPv4Range(frontendIPv4Range); err != nil {
-			return nil, err
-		}
-		if err = validateNodeBalancerFrontendIPv6Range(frontendIPv6Range); err != nil {
-			return nil, err
-		}
-		if frontendSubnetID, ok := service.GetAnnotations()[annotations.NodeBalancerFrontendSubnetID]; ok {
-			subnetID, err = strconv.Atoi(frontendSubnetID)
-			if err != nil {
-				return nil, fmt.Errorf("invalid frontend subnet ID: %w", err)
-			}
-		} else {
-			subnetID, err = l.getFrontendSubnetIDForSVC(ctx, service)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
-			{
-				SubnetID:  subnetID,
-				IPv4Range: frontendIPv4Range,
-				IPv6Range: frontendIPv6Range,
-			},
-		}
-		return vpcCreateOpts, nil
-	}
-
-	// Precedence 2: VPC/Subnet Name Annotations - Resolve by name
-	if hasVPCName || hasSubnetName {
-		subnetID, err = l.getFrontendSubnetIDForSVC(ctx, service)
-		if err != nil {
-			return nil, err
-		}
-
-		vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
-			{
-				SubnetID: subnetID,
-			},
-		}
-		return vpcCreateOpts, nil
-	}
-
-	// Precedence 3: Subnet ID Annotation - Direct subnet ID
 	if hasSubnetID {
 		frontendSubnetID := service.GetAnnotations()[annotations.NodeBalancerFrontendSubnetID]
 		subnetID, err = strconv.Atoi(frontendSubnetID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid frontend subnet ID: %w", err)
 		}
-
-		vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
-			{
-				SubnetID: subnetID,
-			},
+	} else if hasVPCName || hasSubnetName {
+		subnetID, err = l.getFrontendSubnetIDForSVC(ctx, service)
+		if err != nil {
+			return nil, err
 		}
-		return vpcCreateOpts, nil
+	} else {
+		// Ranges are optional but still require a subnet to target.
+		return nil, fmt.Errorf("frontend VPC configuration requires either subnet-id or both vpc-name and subnet-name annotations")
 	}
 
-	return nil, nil
+	vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
+		{
+			SubnetID:  subnetID,
+			IPv4Range: frontendIPv4Range,
+			IPv6Range: frontendIPv6Range,
+		},
+	}
+	return vpcCreateOpts, nil
 }
 
 // getFrontendSubnetIDForSVC returns the subnet ID for the frontend VPC configuration.
@@ -1540,28 +1509,13 @@ func validateNodeBalancerBackendIPv4Range(backendIPv4Range string) error {
 	return nil
 }
 
-// validateNodeBalancerFrontendIPv4Range validates the frontend IPv4 range annotation.
-// Performs basic CIDR format validation.
-func validateNodeBalancerFrontendIPv4Range(frontendIPv4Range string) error {
-	if frontendIPv4Range == "" {
+func validateNodeBalancerFrontendIPRange(frontendIPRange, ipVersion string) error {
+	if frontendIPRange == "" {
 		return nil
 	}
-	_, _, err := net.ParseCIDR(frontendIPv4Range)
+	_, _, err := net.ParseCIDR(frontendIPRange)
 	if err != nil {
-		return fmt.Errorf("invalid frontend IPv4 range '%s': %w", frontendIPv4Range, err)
-	}
-	return nil
-}
-
-// validateNodeBalancerFrontendIPv6Range validates the frontend IPv6 range annotation.
-// Performs basic CIDR format validation.
-func validateNodeBalancerFrontendIPv6Range(frontendIPv6Range string) error {
-	if frontendIPv6Range == "" {
-		return nil
-	}
-	_, _, err := net.ParseCIDR(frontendIPv6Range)
-	if err != nil {
-		return fmt.Errorf("invalid frontend IPv6 range '%s': %w", frontendIPv6Range, err)
+		return fmt.Errorf("invalid frontend %s range '%s': %w", ipVersion, frontendIPRange, err)
 	}
 	return nil
 }
