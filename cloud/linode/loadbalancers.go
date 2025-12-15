@@ -858,7 +858,7 @@ func (l *loadbalancers) getFrontendVPCCreateOptions(ctx context.Context, service
 	frontendIPv6Range, hasIPv6Range := service.GetAnnotations()[annotations.NodeBalancerFrontendIPv6Range]
 	_, hasVPCName := service.GetAnnotations()[annotations.NodeBalancerFrontendVPCName]
 	_, hasSubnetName := service.GetAnnotations()[annotations.NodeBalancerFrontendSubnetName]
-	_, hasSubnetID := service.GetAnnotations()[annotations.NodeBalancerFrontendSubnetID]
+	frontendSubnetID, hasSubnetID := service.GetAnnotations()[annotations.NodeBalancerFrontendSubnetID]
 
 	// If no frontend VPC annotations are present, do not configure a frontend VPC.
 	if !hasIPv4Range && !hasIPv6Range && !hasVPCName && !hasSubnetName && !hasSubnetID {
@@ -875,18 +875,18 @@ func (l *loadbalancers) getFrontendVPCCreateOptions(ctx context.Context, service
 	var subnetID int
 	var err error
 
-	if hasSubnetID {
-		frontendSubnetID := service.GetAnnotations()[annotations.NodeBalancerFrontendSubnetID]
+	switch {
+	case hasSubnetID:
 		subnetID, err = strconv.Atoi(frontendSubnetID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid frontend subnet ID: %w", err)
 		}
-	} else if hasVPCName || hasSubnetName {
+	case hasVPCName || hasSubnetName:
 		subnetID, err = l.getFrontendSubnetIDForSVC(ctx, service)
 		if err != nil {
 			return nil, err
 		}
-	} else {
+	default:
 		// Ranges are optional but still require a subnet to target.
 		return nil, fmt.Errorf("frontend VPC configuration requires either subnet-id or both vpc-name and subnet-name annotations")
 	}
@@ -919,17 +919,9 @@ func (l *loadbalancers) getFrontendSubnetIDForSVC(ctx context.Context, service *
 	specifiedVPCName, vpcOk := service.GetAnnotations()[annotations.NodeBalancerFrontendVPCName]
 	specifiedSubnetName, subnetOk := service.GetAnnotations()[annotations.NodeBalancerFrontendSubnetName]
 
-	// If no VPCName or SubnetName is specified, return error
-	if !vpcOk && !subnetOk {
-		return 0, fmt.Errorf("frontend VPC configuration requires either vpc-name, subnet-name, or subnet-id annotations")
-	}
-
-	// Require both VPC name and subnet name when using name-based resolution
-	if !vpcOk {
-		return 0, fmt.Errorf("frontend VPC configuration with subnet-name requires vpc-name annotation")
-	}
-	if !subnetOk {
-		return 0, fmt.Errorf("frontend VPC configuration with vpc-name requires subnet-name annotation")
+	// If no VPCName or SubnetName is specified and no subnet-id is provided, return error
+	if !vpcOk || !subnetOk {
+		return 0, fmt.Errorf("frontend VPC configuration requires either subnet-id annotation or both vpc-name and subnet-name annotations")
 	}
 
 	vpcID, err := services.GetVPCID(ctx, l.client, specifiedVPCName)
@@ -1436,9 +1428,7 @@ func makeLoadBalancerStatus(service *v1.Service, nb *linodego.NodeBalancer) *v1.
 		}
 	}
 
-	// Debug info log: Is a frontend VPC NodeBalancer?
-	isFrontendVPC := nb.FrontendAddressType != nil && *nb.FrontendAddressType == "vpc"
-	if isFrontendVPC {
+	if nb.FrontendAddressType != nil && *nb.FrontendAddressType == "vpc" {
 		klog.V(4).Infof("NodeBalancer (%d) is using frontend VPC address type", nb.ID)
 	}
 
