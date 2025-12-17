@@ -171,7 +171,7 @@ require (
 )
 
 replace (
-	github.com/linode/linodego => github.com/komer3/linodego v0.0.0-20251217180225-898c4f5734c3
+	github.com/linode/linodego => github.com/komer3/linodego v0.0.0-20251217190421-39bf98dc054f
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.34.1
 	k8s.io/cri-api => k8s.io/cri-api v0.34.1
 	k8s.io/cri-client => k8s.io/cri-client v0.34.1
