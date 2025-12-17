@@ -763,6 +763,8 @@ func (l *loadbalancers) GetLinodeNBType(service *v1.Service) linodego.NodeBalanc
 	typeStr, ok := service.GetAnnotations()[annotations.AnnLinodeNodeBalancerType]
 	if ok {
 		switch linodego.NodeBalancerPlanType(typeStr) {
+		case linodego.NBTypeCommon: // need to add this because of the golint check
+			return linodego.NBTypeCommon
 		case linodego.NBTypePremium:
 			return linodego.NBTypePremium
 		case linodego.NBTypePremium40GB:
