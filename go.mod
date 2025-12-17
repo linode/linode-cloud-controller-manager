@@ -141,7 +141,7 @@ require (
 	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/mod v0.29.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
-	golang.org/x/oauth2 v0.30.0 // indirect
+	golang.org/x/oauth2 v0.33.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/term v0.37.0 // indirect
@@ -171,6 +171,7 @@ require (
 )
 
 replace (
+	github.com/linode/linodego => github.com/komer3/linodego v0.0.0-20251217180225-898c4f5734c3
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.34.1
 	k8s.io/cri-api => k8s.io/cri-api v0.34.1
 	k8s.io/cri-client => k8s.io/cri-client v0.34.1
