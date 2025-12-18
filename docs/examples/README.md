@@ -16,6 +16,9 @@ This section provides working examples of common CCM configurations. Each exampl
    - Shared IP Load-Balancing
    - Custom Node Selection
 
+3. **Frontend VPC NodeBalancer**
+   - `examples/vpc-frontend-example.yaml`
+
 Note: To test UDP based NBs, one can use [test-server](https://github.com/rahulait/test-server) repo to run server using UDP protocol and then use the client commands in repo's readme to connect to the server.
 
 For testing these examples, see the [test script](https://github.com/linode/linode-cloud-controller-manager/blob/master/examples/test.sh).
