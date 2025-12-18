@@ -208,7 +208,7 @@ e2e-test:
 	REGION=$(LINODE_REGION) \
 	LINODE_TOKEN=$(LINODE_TOKEN) \
 	LINODE_URL=$(LINODE_URL) \
-	chainsaw test e2e/test --parallel 2 $(E2E_FLAGS)
+	chainsaw test e2e/test/lb-created-with-reserved-ip-change-ip --parallel 2 $(E2E_FLAGS)
 
 .PHONY: e2e-test-bgp
 e2e-test-bgp:

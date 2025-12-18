@@ -18,12 +18,16 @@ spec:
 
               re='^((25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})$'
 
-              reserved_ip=$(curl -s --request POST \
+              reserved_ip_resp=$(curl -s --request POST \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 -H "Content-Type: application/json" --fail-early --retry 3 \
                 -H "accept: application/json" \
                 "${LINODE_URL}/v4beta/networking/reserved/ips" \
-                --data "{\"region\": \"$LINODE_REGION\"}" | jq .address)
+                --data "{\"region\": \"$LINODE_REGION\"}")
+
+              echo "Reserved IP create response #1: $reserved_ip_resp"
+
+              reserved_ip=$(echo "$reserved_ip_resp" | jq -r .address)
 
               reserved_ip=$(echo "$reserved_ip" | tr -d '"')
               
@@ -31,12 +35,16 @@ spec:
                   echo "Reserved ip [$reserved_ip] is incorrect, failed to create a reserved ip"
               fi
 
-              reserved_ip2=$(curl -s --request POST \
+              reserved_ip2_resp=$(curl -s --request POST \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 -H "Content-Type: application/json" --fail-early --retry 3 \
                 -H "accept: application/json" \
                 "${LINODE_URL}/v4beta/networking/reserved/ips" \
-                --data "{\"region\": \"$LINODE_REGION\"}" | jq .address)
+                --data "{\"region\": \"$LINODE_REGION\"}")
+
+              echo "Reserved IP create response #2: $reserved_ip2_resp"
+
+              reserved_ip2=$(echo "$reserved_ip2_resp" | jq -r .address)
 
               reserved_ip2=$(echo "$reserved_ip2" | tr -d '"')
               
