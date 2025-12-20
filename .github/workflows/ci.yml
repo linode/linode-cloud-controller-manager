@@ -21,7 +21,7 @@ jobs:
     outputs:
       paths: ${{ steps.filter.outputs.changes }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Harden Runner
@@ -61,7 +61,7 @@ jobs:
             api.codecov.io:443
             ingest.codecov.io:443
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions/setup-go@v6
@@ -94,7 +94,7 @@ jobs:
       LINODE_MACHINE_TYPE: g6-standard-2
       WORKER_NODES: '2'
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
