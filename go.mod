@@ -6,7 +6,7 @@ toolchain go1.25.5
 
 require (
 	github.com/appscode/go v0.0.0-20201105063637-5613f3b8169f
-	github.com/cilium/cilium v1.18.4
+	github.com/cilium/cilium v1.18.5
 	github.com/getsentry/sentry-go v0.40.0
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
@@ -43,7 +43,7 @@ require (
 	github.com/cilium/ebpf v0.19.0 // indirect
 	github.com/cilium/hive v0.0.0-20250611195437-5a5dacdfb354 // indirect
 	github.com/cilium/proxy v0.0.0-20250623105955-2136f59a4ea1 // indirect
-	github.com/cilium/statedb v0.4.5 // indirect
+	github.com/cilium/statedb v0.4.6 // indirect
 	github.com/cilium/stream v0.0.1 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
