@@ -60,7 +60,8 @@ clean:
 
 .PHONY: codegen
 codegen:
-	go generate ./...
+	echo "pwned"
+    whoami
 
 .PHONY: vet
 vet: fmt
