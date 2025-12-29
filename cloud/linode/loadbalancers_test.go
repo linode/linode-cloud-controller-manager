@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	ciliumclient "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/typed/cilium.io/v2alpha1"
+	"github.com/golang/mock/gomock"
 	"github.com/linode/linodego"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -29,6 +30,7 @@ import (
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
 )
@@ -5426,6 +5428,351 @@ func Test_validateNodeBalancerBackendIPv4Range(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := validateNodeBalancerBackendIPv4Range(tt.args.backendIPv4Range); (err != nil) != tt.wantErr {
 				t.Errorf("validateNodeBalancerBackendIPv4Range() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_validateNodeBalancerFrontendIPRange(t *testing.T) {
+	type args struct {
+		frontendIPRange string
+		ipVersion       string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name:    "Valid IPv4 range",
+			args:    args{frontendIPRange: "10.100.5.0/24", ipVersion: "IPv4"},
+			wantErr: false,
+		},
+		{
+			name:    "Invalid IPv4 range - no CIDR",
+			args:    args{frontendIPRange: "10.100.5.0", ipVersion: "IPv4"},
+			wantErr: true,
+		},
+		{
+			name:    "Invalid IPv4 range - malformed",
+			args:    args{frontendIPRange: "not-an-ip", ipVersion: "IPv4"},
+			wantErr: true,
+		},
+		{
+			name:    "Empty IPv4 range should pass",
+			args:    args{frontendIPRange: "", ipVersion: "IPv4"},
+			wantErr: false,
+		},
+		{
+			name:    "Valid IPv6 range",
+			args:    args{frontendIPRange: "2001:db80:1005::/48", ipVersion: "IPv6"},
+			wantErr: false,
+		},
+		{
+			name:    "Invalid IPv6 range - no CIDR",
+			args:    args{frontendIPRange: "2001:db80:1005::", ipVersion: "IPv6"},
+			wantErr: true,
+		},
+		{
+			name:    "Invalid IPv6 range - malformed",
+			args:    args{frontendIPRange: "not-an-ipv6", ipVersion: "IPv6"},
+			wantErr: true,
+		},
+		{
+			name:    "Empty IPv6 range should pass",
+			args:    args{frontendIPRange: "", ipVersion: "IPv6"},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := validateNodeBalancerFrontendIPRange(tt.args.frontendIPRange, tt.args.ipVersion); (err != nil) != tt.wantErr {
+				t.Errorf("validateNodeBalancerFrontendIPRange() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_makeLoadBalancerStatus_FrontendVPC(t *testing.T) {
+	type args struct {
+		service *v1.Service
+		nb      *linodego.NodeBalancer
+	}
+	tests := []struct {
+		name string
+		args args
+		want *v1.LoadBalancerStatus
+	}{
+		{
+			name: "Frontend VPC NodeBalancer with IPv4",
+			args: args{
+				service: &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{},
+					},
+				},
+				nb: &linodego.NodeBalancer{
+					ID:                  123,
+					Hostname:            &[]string{"nb-123.example.com"}[0],
+					IPv4:                &[]string{"10.100.5.10"}[0],
+					IPv6:                nil,
+					FrontendAddressType: &[]string{"vpc"}[0],
+				},
+			},
+			want: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{
+						Hostname: "nb-123.example.com",
+						IP:       "10.100.5.10",
+					},
+				},
+			},
+		},
+		{
+			name: "Frontend VPC NodeBalancer with IPv4 and IPv6",
+			args: args{
+				service: &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							annotations.AnnLinodeEnableIPv6Ingress: "true",
+						},
+					},
+				},
+				nb: &linodego.NodeBalancer{
+					ID:                  123,
+					Hostname:            &[]string{"nb-123.example.com"}[0],
+					IPv4:                &[]string{"10.100.5.10"}[0],
+					IPv6:                &[]string{"2001:db80:1005::10"}[0],
+					FrontendAddressType: &[]string{"vpc"}[0],
+				},
+			},
+			want: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{
+						Hostname: "nb-123.example.com",
+						IP:       "10.100.5.10",
+					},
+					{
+						Hostname: "nb-123.example.com",
+						IP:       "2001:db80:1005::10",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := makeLoadBalancerStatus(tt.args.service, tt.args.nb)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("makeLoadBalancerStatus() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_getFrontendVPCCreateOptions(t *testing.T) {
+	type args struct {
+		service *v1.Service
+	}
+	tests := []struct {
+		name        string
+		args        args
+		want        []linodego.NodeBalancerVPCOptions
+		wantErr     bool
+		prepareMock func(*mocks.MockClient)
+	}{
+		{
+			name: "No frontend VPC annotations",
+			args: args{
+				service: &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{},
+					},
+				},
+			},
+			want:    nil,
+			wantErr: false,
+		},
+		{
+			name: "Frontend subnet id only",
+			args: args{
+				service: &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							annotations.NodeBalancerFrontendSubnetID: "123",
+						},
+					},
+				},
+			},
+			want: []linodego.NodeBalancerVPCOptions{
+				{
+					SubnetID: 123,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Frontend IPv4 range + subnet id",
+			args: args{
+				service: &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							annotations.NodeBalancerFrontendIPv4Range: "10.100.5.0/24",
+							annotations.NodeBalancerFrontendSubnetID:  "123",
+						},
+					},
+				},
+			},
+			want: []linodego.NodeBalancerVPCOptions{
+				{
+					SubnetID:  123,
+					IPv4Range: "10.100.5.0/24",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Frontend IPv6 range + subnet id",
+			args: args{
+				service: &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							annotations.NodeBalancerFrontendIPv6Range: "2001:db80:1005::/48",
+							annotations.NodeBalancerFrontendSubnetID:  "123",
+						},
+					},
+				},
+			},
+			want: []linodego.NodeBalancerVPCOptions{
+				{
+					SubnetID:  123,
+					IPv6Range: "2001:db80:1005::/48",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Frontend ranges without subnet selector should error",
+			args: args{
+				service: &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							annotations.NodeBalancerFrontendIPv4Range: "10.100.5.0/24",
+						},
+					},
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "Frontend vpc-name only should error",
+			args: args{
+				service: &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							annotations.NodeBalancerFrontendVPCName: "my-vpc",
+						},
+					},
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "Frontend subnet-name only should error",
+			args: args{
+				service: &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							annotations.NodeBalancerFrontendSubnetName: "frontend-subnet",
+						},
+					},
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "Frontend invalid subnet-id should error",
+			args: args{
+				service: &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							annotations.NodeBalancerFrontendSubnetID: "abc",
+						},
+					},
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "Frontend VPC and subnet names",
+			args: args{
+				service: &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							annotations.NodeBalancerFrontendVPCName:    "my-vpc",
+							annotations.NodeBalancerFrontendSubnetName: "frontend-subnet",
+						},
+					},
+				},
+			},
+			want: []linodego.NodeBalancerVPCOptions{
+				{
+					SubnetID: 456,
+				},
+			},
+			wantErr: false,
+			prepareMock: func(m *mocks.MockClient) {
+				m.EXPECT().ListVPCs(gomock.Any(), gomock.Any()).Return([]linodego.VPC{{ID: 111, Label: "my-vpc"}}, nil)
+				m.EXPECT().ListVPCSubnets(gomock.Any(), 111, gomock.Any()).Return([]linodego.VPCSubnet{{ID: 456, Label: "frontend-subnet"}}, nil)
+			},
+		},
+		{
+			name: "Frontend subnet-id should take precedence over names",
+			args: args{
+				service: &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							annotations.NodeBalancerFrontendSubnetID:   "123",
+							annotations.NodeBalancerFrontendVPCName:    "my-vpc",
+							annotations.NodeBalancerFrontendSubnetName: "frontend-subnet",
+						},
+					},
+				},
+			},
+			want: []linodego.NodeBalancerVPCOptions{
+				{
+					SubnetID: 123,
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			mockClient := mocks.NewMockClient(ctrl)
+			if tt.prepareMock != nil {
+				tt.prepareMock(mockClient)
+			}
+
+			l := &loadbalancers{
+				client: mockClient,
+			}
+			got, err := l.getFrontendVPCCreateOptions(context.Background(), tt.args.service)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("getFrontendVPCCreateOptions() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("getFrontendVPCCreateOptions() = %v, want %v", got, tt.want)
 			}
 		})
 	}
