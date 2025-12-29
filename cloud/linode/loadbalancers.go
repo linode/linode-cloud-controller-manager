@@ -769,6 +769,9 @@ func (l *loadbalancers) GetLinodeNBType(service *v1.Service) linodego.NodeBalanc
 			return linodego.NBTypePremium
 		case linodego.NBTypePremium40GB:
 			return linodego.NBTypePremium40GB
+		default:
+			klog.Warningf("Invalid NodeBalancer type '%s' specified in annotation for service %s/%s. Valid types are: %s, %s, %s. Defaulting to %s.",
+				typeStr, service.Namespace, service.Name, linodego.NBTypeCommon, linodego.NBTypePremium, linodego.NBTypePremium40GB, options.Options.DefaultNBType)
 		}
 	}
 
