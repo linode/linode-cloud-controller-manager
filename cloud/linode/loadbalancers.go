@@ -762,6 +762,8 @@ func (l *loadbalancers) GetLoadBalancerTags(_ context.Context, clusterName strin
 func (l *loadbalancers) GetLinodeNBType(service *v1.Service) linodego.NodeBalancerPlanType {
 	typeStr, ok := service.GetAnnotations()[annotations.AnnLinodeNodeBalancerType]
 	if ok {
+		// For Safety - avoid typos and inconsistent casing
+		typeStr = strings.ToLower(typeStr)
 		switch linodego.NodeBalancerPlanType(typeStr) {
 		case linodego.NBTypeCommon: // need to add this because of the golint check
 			return linodego.NBTypeCommon

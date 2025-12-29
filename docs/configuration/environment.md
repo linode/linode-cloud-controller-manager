@@ -46,7 +46,7 @@ The CCM supports the following flags:
 | `--load-balancer-type` | String | `nodebalancer` | Configures which type of load-balancing to use (options: nodebalancer, cilium-bgp) |
 | `--bgp-node-selector` | String | `""` | Node selector to use to perform shared IP fail-over with BGP |
 | `--ip-holder-suffix` | String | `""` | Suffix to append to the IP holder name when using shared IP fail-over with BGP |
-| `--default-nodebalancer-type` | String | `common` | Default type of NodeBalancer to create (options: common, premium, premium_40GB) |
+| `--default-nodebalancer-type` | String | `common` | Default type of NodeBalancer to create (options: common, premium, premium_40gb). Note: NodeBalancer types should always be specified in lowercase. |
 | `--nodebalancer-tags` | String (comma separated) |  | Linode tags to apply to all NodeBalancers |
 | `--nodebalancer-backend-ipv4-subnet` | String | `""` | ipv4 subnet to use for NodeBalancer backends |
 | `--nodebalancer-backend-ipv4-subnet-id` | Int | `""` | ipv4 subnet id to use for NodeBalancer backends |
