@@ -761,8 +761,20 @@ func (l *loadbalancers) GetLoadBalancerTags(_ context.Context, clusterName strin
 // GetLinodeNBType returns the NodeBalancer type for the service.
 func (l *loadbalancers) GetLinodeNBType(service *v1.Service) linodego.NodeBalancerPlanType {
 	typeStr, ok := service.GetAnnotations()[annotations.AnnLinodeNodeBalancerType]
-	if ok && linodego.NodeBalancerPlanType(typeStr) == linodego.NBTypePremium {
-		return linodego.NBTypePremium
+	if ok {
+		// For Safety - avoid typos and inconsistent casing
+		typeStr = strings.ToLower(typeStr)
+		switch linodego.NodeBalancerPlanType(typeStr) {
+		case linodego.NBTypeCommon: // need to add this because of the golint check
+			return linodego.NBTypeCommon
+		case linodego.NBTypePremium:
+			return linodego.NBTypePremium
+		case linodego.NBTypePremium40GB:
+			return linodego.NBTypePremium40GB
+		default:
+			klog.Warningf("Invalid NodeBalancer type '%s' specified in annotation for service %s/%s. Valid types are: %s, %s, %s. Defaulting to %s.",
+				typeStr, service.Namespace, service.Name, linodego.NBTypeCommon, linodego.NBTypePremium, linodego.NBTypePremium40GB, options.Options.DefaultNBType)
+		}
 	}
 
 	return linodego.NodeBalancerPlanType(options.Options.DefaultNBType)
