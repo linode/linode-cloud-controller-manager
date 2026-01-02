@@ -20,7 +20,7 @@ jobs:
     outputs:
       paths: ${{ steps.filter.outputs.changes }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Harden Runner
@@ -61,7 +61,7 @@ jobs:
             get.helm.sh:443
             golangci-lint.run:443
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - uses: actions/setup-go@v6
@@ -90,7 +90,7 @@ jobs:
   docker-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Docker Meta
