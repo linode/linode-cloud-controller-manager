@@ -730,9 +730,10 @@ func (l *loadbalancers) getNodeBalancerByIP(ctx context.Context, service *v1.Ser
 	// filter by subnet ID if specified for frontend vpc ip
 	frontendSubnetID := service.GetAnnotations()[annotations.NodeBalancerFrontendSubnetID]
 	if frontendSubnetID != "" {
-		for _, NB := range lbs {
-			if NB.FrontendVPCSubnetID != nil && strconv.Itoa(*NB.FrontendVPCSubnetID) == frontendSubnetID {
-				return &NB, nil
+		for _, lb := range lbs {
+			if lb.FrontendAddressType != nil && *lb.FrontendAddressType == "vpc" &&
+				lb.FrontendVPCSubnetID != nil && strconv.Itoa(*lb.FrontendVPCSubnetID) == frontendSubnetID {
+				return &lb, nil
 			}
 		}
 		return nil, lbNotFoundError{serviceNn: getServiceNn(service)}
