@@ -727,6 +727,7 @@ func (l *loadbalancers) getNodeBalancerByIP(ctx context.Context, service *v1.Ser
 		return nil, lbNotFoundError{serviceNn: getServiceNn(service)}
 	}
 
+	// filter by subnet ID if specified for frontend vpc ip
 	frontendSubnetID := service.GetAnnotations()[annotations.NodeBalancerFrontendSubnetID]
 	if frontendSubnetID != "" {
 		for _, NB := range lbs {
