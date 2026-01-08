@@ -726,6 +726,17 @@ func (l *loadbalancers) getNodeBalancerByIP(ctx context.Context, service *v1.Ser
 	if len(lbs) == 0 {
 		return nil, lbNotFoundError{serviceNn: getServiceNn(service)}
 	}
+
+	frontendSubnetID := service.GetAnnotations()[annotations.NodeBalancerFrontendSubnetID]
+	if frontendSubnetID != "" {
+		for _, NB := range lbs {
+			if NB.FrontendVPCSubnetID != nil && strconv.Itoa(*NB.FrontendVPCSubnetID) == frontendSubnetID {
+				return &NB, nil
+			}
+		}
+		return nil, lbNotFoundError{serviceNn: getServiceNn(service)}
+	}
+
 	klog.V(2).Infof("found NodeBalancer (%d) for service (%s) via IP (%s)", lbs[0].ID, getServiceNn(service), ip.String())
 	return &lbs[0], nil
 }
