@@ -43,6 +43,12 @@ The keys and the values in [annotations must be strings](https://kubernetes.io/d
 | `backend-ipv4-range` | string | | The IPv4 range from VPC subnet to be applied to the NodeBalancer backend. See [Nodebalancer VPC Configuration](#nodebalancer-vpc-configuration) |
 | `backend-vpc-name` | string | | VPC which is connected to the NodeBalancer backend. See [Nodebalancer VPC Configuration](#nodebalancer-vpc-configuration) |
 | `backend-subnet-name` | string | | Subnet within VPC which is connected to the NodeBalancer backend. See [Nodebalancer VPC Configuration](#nodebalancer-vpc-configuration) |
+| `backend-subnet-id` | string | | Subnet ID within VPC which is connected to the NodeBalancer backend. See [Nodebalancer VPC Configuration](#nodebalancer-vpc-configuration) |
+| `frontend-subnet-id` | string | | Subnet ID for the NodeBalancer frontend VPC configuration. See [Nodebalancer VPC Configuration](#nodebalancer-vpc-configuration) |
+| `frontend-vpc-name` | string | | Frontend VPC name for the NodeBalancer frontend VPC configuration. See [Nodebalancer VPC Configuration](#nodebalancer-vpc-configuration) |
+| `frontend-subnet-name` | string | | Frontend subnet name for the NodeBalancer frontend VPC configuration. See [Nodebalancer VPC Configuration](#nodebalancer-vpc-configuration) |
+| `frontend-ipv4-range` | string | | Optional IPv4 CIDR range from the frontend subnet. See [Nodebalancer VPC Configuration](#nodebalancer-vpc-configuration) |
+| `frontend-ipv6-range` | string | | Optional IPv6 CIDR range from the frontend subnet. See [Nodebalancer VPC Configuration](#nodebalancer-vpc-configuration) |
 | `reserved-ipv4` | string | | An existing Reserved IPv4 address that wil be used to initialize the NodeBalancer instance. See [LoadBalancer Configuration](loadbalancer.md#reserved-ipv4-addresses)) |
 
 ### Port Specific Configuration
@@ -137,8 +143,18 @@ metadata:
 metadata:
   annotations:
     service.beta.kubernetes.io/linode-loadbalancer-backend-ipv4-range: "10.100.0.0/30"
-    service.beta.kubernetes.io/linode-loadbalancer-vpc-name: "vpc1"
-    service.beta.kubernetes.io/linode-loadbalancer-subnet-name: "subnet1"
+    service.beta.kubernetes.io/linode-loadbalancer-backend-vpc-name: "vpc1"
+    service.beta.kubernetes.io/linode-loadbalancer-backend-subnet-name: "subnet1"
+```
+
+Frontend VPC configuration:
+```yaml
+metadata:
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-frontend-subnet-id: "169341"
+    # Optional:
+    # service.beta.kubernetes.io/linode-loadbalancer-frontend-ipv4-range: "10.0.0.0/24"
+    # service.beta.kubernetes.io/linode-loadbalancer-frontend-ipv6-range: "2001:db8::/64"
 ```
 
 ### Service with IPv6 Address
@@ -153,7 +169,7 @@ For more examples and detailed configuration options, see:
 - [Firewall Configuration](firewall.md)
 - [Basic Service Examples](../examples/basic.md)
 - [Advanced Configuration Examples](../examples/advanced.md)
-- [Complete Stack Example](../examples/complete-stack.md)
+- [Examples](../examples/README.md)
 
 See also:
 - [Environment Variables](environment.md)
