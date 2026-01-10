@@ -11,7 +11,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
 	github.com/hexdigest/gowrap v1.4.3
-	github.com/linode/linodego v1.58.0
+	github.com/linode/linodego v1.64.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
@@ -171,7 +171,7 @@ require (
 )
 
 replace (
-	github.com/linode/linodego => github.com/linode/linodego v1.63.1-0.20251219213351-56cd69e69d8d
+	github.com/linode/linodego => github.com/linode/linodego v1.64.0
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.34.1
 	k8s.io/cri-api => k8s.io/cri-api v0.34.1
 	k8s.io/cri-client => k8s.io/cri-client v0.34.1
