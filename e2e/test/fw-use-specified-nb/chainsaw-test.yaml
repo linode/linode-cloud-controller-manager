@@ -11,6 +11,11 @@ spec:
     - name: fwname
       value: (join('-', ['ccm-fwtest', env('CLUSTER_NAME')]))
   namespace: "fw-use-specified-nb"
+  catch:
+    - script:
+        content: |
+          echo "Test failed. Fetching CCM logs..."
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "fw-use-specified-nb" | tail -100
   steps:
     - name: Create firewall, Create pods and services
       try:

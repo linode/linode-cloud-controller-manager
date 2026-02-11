@@ -8,6 +8,11 @@ metadata:
     lke:
 spec:
   namespace: "lb-created-with-invalid-ip"
+  catch:
+    - script:
+        content: |
+          echo "Test failed. Fetching CCM logs..."
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-created-with-invalid-ip" | tail -100
   steps:
     - name: create reserved ip and nodebalancer resources
       try:

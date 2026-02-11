@@ -8,6 +8,11 @@ metadata:
     lke:
 spec:
   namespace: "lb-with-http-to-https"
+  catch:
+    - script:
+        content: |
+          echo "Test failed. Fetching CCM logs..."
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-with-http-to-https" | tail -100
   steps:
     - name: Create pods and services
       try:

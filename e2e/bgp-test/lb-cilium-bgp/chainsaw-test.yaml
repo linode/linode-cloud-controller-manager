@@ -7,6 +7,11 @@ metadata:
     all:
 spec:
   namespace: "cilium-bgp-test"
+  catch:
+    - script:
+        content: |
+          echo "Test failed. Fetching CCM logs..."
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "cilium-bgp-test" | tail -100
   steps:
     - name: Check if CCM is deployed
       try:

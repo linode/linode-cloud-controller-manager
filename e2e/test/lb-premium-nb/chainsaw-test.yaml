@@ -7,6 +7,11 @@ metadata:
     all:
 spec:
   namespace: "lb-premium-nb"
+  catch:
+    - script:
+        content: |
+          echo "Test failed. Fetching CCM logs..."
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-premium-nb" | tail -100
   steps:
     - name: Create pods and services
       try:

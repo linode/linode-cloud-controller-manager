@@ -10,6 +10,11 @@ spec:
     - name: fwname
       value: (join('-', ['ccm-fwtest', env('CLUSTER_NAME')]))
   namespace: "subnet-filtering-test"
+  catch:
+    - script:
+        content: |
+          echo "Test failed. Fetching CCM logs..."
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "subnet-filtering-test" | tail -100
   steps:
     - name: Check if the CCM for each cluster focus on their individual subnets
       try:

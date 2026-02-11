@@ -10,6 +10,11 @@ spec:
     - name: fwname
       value: (join('-', ['ccm-fwtest', env('CLUSTER_NAME')]))
   namespace: "route-controller-test"
+  catch:
+    - script:
+        content: |
+          echo "Test failed. Fetching CCM logs..."
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "route-controller-test" | tail -100
   steps:
     - name: Check if the route controller updated the config for the linode
       try:
