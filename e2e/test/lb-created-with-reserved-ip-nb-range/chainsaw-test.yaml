@@ -62,7 +62,7 @@ spec:
                 -H "Content-Type: application/json" --fail-early --retry 3 \
                 -H "accept: application/json" \
                 "${LINODE_URL}/v4beta/nodebalancers/$nbid")
-              response=$($delnb)
+              response=$del_nb
 
               if [ "$(echo "$del_nb" | jq 'length')" != 0 ]; then
                   echo "Error deleting the nodebalancer"

@@ -67,7 +67,7 @@ spec:
                 "$LINODE_URL/v4/nodebalancers/$nbid/configs/$config_id/nodes")
 
               # Extract all addresses and remove ports
-              addresses=$(echo "$json_data" | jq -r '.data[].address' | sed 's/:[0-9]*$//')
+              addresses=$(echo "$nodes" | jq -r '.data[].address' | sed 's/:[0-9]*$//')
 
               for ip in $addresses; do
                   if [[ $ip =~ ^10\.0\.0\.[0-9]+$ ]]; then
