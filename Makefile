@@ -11,8 +11,6 @@ HELM                    ?= $(LOCALBIN)/helm
 HELM_VERSION            ?= v3.16.3
 
 GOLANGCI_LINT           ?= $(LOCALBIN)/golangci-lint
-# renovate: datasource=github-tags depName=golangci/golangci-lint
-GOLANGCI_LINT_VERSION   ?= v2.5.0
 GOLANGCI_LINT_NILAWAY   ?= $(CACHE_BIN)/golangci-lint-nilaway
 
 #####################################################################
@@ -35,6 +33,9 @@ CAAPH_VERSION           ?= "v0.2.1"
 
 # renovate: datasource=github-tags depName=linode/cluster-api-provider-linode
 CAPL_VERSION            ?= "v0.8.5"
+
+# renovate: datasource=github-tags depName=golangci/golangci-lint
+GOLANGCI_LINT_VERSION   ?= "v2.7.2"
 
 CONTROLPLANE_NODES      ?= 1
 WORKER_NODES            ?= 1
@@ -176,7 +177,7 @@ generate-capl-cluster-manifests:
 create-capl-cluster:
 	# Create a CAPL cluster with updated CCM and wait for it to be ready
 	kubectl apply -f $(MANIFEST_NAME).yaml
-	kubectl wait --for=condition=ControlPlaneReady cluster/$(CLUSTER_NAME) --timeout=600s || (kubectl get cluster -o yaml; kubectl get linodecluster -o yaml; kubectl get linodemachines -o yaml)
+	kubectl wait --for=condition=ControlPlaneReady cluster/$(CLUSTER_NAME) --timeout=600s || (kubectl get cluster -o yaml; kubectl get linodecluster -o yaml; kubectl get linodemachines -o yaml; kubectl logs -n capl-system deployments/capl-controller-manager --tail=50)
 	kubectl wait --for=condition=NodeHealthy=true machines -l cluster.x-k8s.io/cluster-name=$(CLUSTER_NAME) --timeout=900s
 	clusterctl get kubeconfig $(CLUSTER_NAME) > $(KUBECONFIG_PATH)
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl wait --for=condition=Ready nodes --all --timeout=600s

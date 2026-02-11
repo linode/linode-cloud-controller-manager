@@ -726,6 +726,19 @@ func (l *loadbalancers) getNodeBalancerByIP(ctx context.Context, service *v1.Ser
 	if len(lbs) == 0 {
 		return nil, lbNotFoundError{serviceNn: getServiceNn(service)}
 	}
+
+	// filter by subnet ID if specified for frontend vpc ip
+	frontendSubnetID := service.GetAnnotations()[annotations.NodeBalancerFrontendSubnetID]
+	if frontendSubnetID != "" {
+		for _, lb := range lbs {
+			if lb.FrontendAddressType != nil && *lb.FrontendAddressType == "vpc" &&
+				lb.FrontendVPCSubnetID != nil && strconv.Itoa(*lb.FrontendVPCSubnetID) == frontendSubnetID {
+				return &lb, nil
+			}
+		}
+		return nil, lbNotFoundError{serviceNn: getServiceNn(service)}
+	}
+
 	klog.V(2).Infof("found NodeBalancer (%d) for service (%s) via IP (%s)", lbs[0].ID, getServiceNn(service), ip.String())
 	return &lbs[0], nil
 }
@@ -761,8 +774,20 @@ func (l *loadbalancers) GetLoadBalancerTags(_ context.Context, clusterName strin
 // GetLinodeNBType returns the NodeBalancer type for the service.
 func (l *loadbalancers) GetLinodeNBType(service *v1.Service) linodego.NodeBalancerPlanType {
 	typeStr, ok := service.GetAnnotations()[annotations.AnnLinodeNodeBalancerType]
-	if ok && linodego.NodeBalancerPlanType(typeStr) == linodego.NBTypePremium {
-		return linodego.NBTypePremium
+	if ok {
+		// For Safety - avoid typos and inconsistent casing
+		typeStr = strings.ToLower(typeStr)
+		switch linodego.NodeBalancerPlanType(typeStr) {
+		case linodego.NBTypeCommon: // need to add this because of the golint check
+			return linodego.NBTypeCommon
+		case linodego.NBTypePremium:
+			return linodego.NBTypePremium
+		case linodego.NBTypePremium40GB:
+			return linodego.NBTypePremium40GB
+		default:
+			klog.Warningf("Invalid NodeBalancer type '%s' specified in annotation for service %s/%s. Valid types are: %s, %s, %s. Defaulting to %s.",
+				typeStr, service.Namespace, service.Name, linodego.NBTypeCommon, linodego.NBTypePremium, linodego.NBTypePremium40GB, options.Options.DefaultNBType)
+		}
 	}
 
 	return linodego.NodeBalancerPlanType(options.Options.DefaultNBType)
@@ -848,6 +873,74 @@ func (l *loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Ser
 	return vpcCreateOpts, nil
 }
 
+// getFrontendVPCCreateOptions returns the VPC options for the NodeBalancer frontend VPC creation.
+// Order of precedence:
+// 1. Frontend Subnet ID Annotation - Direct subnet ID
+// 2. Frontend VPC/Subnet Name Annotations - Resolve by name
+// 3. Frontend IPv4/IPv6 Range Annotations - Optional CIDR ranges
+func (l *loadbalancers) getFrontendVPCCreateOptions(ctx context.Context, service *v1.Service) ([]linodego.NodeBalancerVPCOptions, error) {
+	frontendIPv4Range, hasIPv4Range := service.GetAnnotations()[annotations.NodeBalancerFrontendIPv4Range]
+	frontendIPv6Range, hasIPv6Range := service.GetAnnotations()[annotations.NodeBalancerFrontendIPv6Range]
+	vpcName, hasVPCName := service.GetAnnotations()[annotations.NodeBalancerFrontendVPCName]
+	subnetName, hasSubnetName := service.GetAnnotations()[annotations.NodeBalancerFrontendSubnetName]
+	frontendSubnetID, hasSubnetID := service.GetAnnotations()[annotations.NodeBalancerFrontendSubnetID]
+
+	// If no frontend VPC annotations are present, do not configure a frontend VPC.
+	if !hasIPv4Range && !hasIPv6Range && !hasVPCName && !hasSubnetName && !hasSubnetID {
+		return nil, nil
+	}
+
+	if err := validateNodeBalancerFrontendIPRange(frontendIPv4Range, "IPv4"); err != nil {
+		return nil, err
+	}
+	if err := validateNodeBalancerFrontendIPRange(frontendIPv6Range, "IPv6"); err != nil {
+		return nil, err
+	}
+
+	var subnetID int
+	var err error
+
+	switch {
+	case hasSubnetID:
+		subnetID, err = strconv.Atoi(frontendSubnetID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid frontend subnet ID: %w", err)
+		}
+	case hasVPCName && hasSubnetName:
+		subnetID, err = l.getSubnetIDByVPCAndSubnetNames(ctx, vpcName, subnetName)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		// Ranges are optional but still require a subnet to target.
+		return nil, fmt.Errorf("frontend VPC configuration requires either subnet-id or both vpc-name and subnet-name annotations")
+	}
+
+	vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
+		{
+			SubnetID:  subnetID,
+			IPv4Range: frontendIPv4Range,
+			IPv6Range: frontendIPv6Range,
+		},
+	}
+	return vpcCreateOpts, nil
+}
+
+// getSubnetIDByVPCAndSubnetNames returns the subnet ID for the given VPC name and subnet name.
+func (l *loadbalancers) getSubnetIDByVPCAndSubnetNames(ctx context.Context, vpcName, subnetName string) (int, error) {
+	if vpcName == "" || subnetName == "" {
+		return 0, fmt.Errorf("frontend VPC configuration requires either subnet-id annotation or both vpc-name and subnet-name annotations. No vpc-name or subnet-name annotation found")
+	}
+
+	vpcID, err := services.GetVPCID(ctx, l.client, vpcName)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get VPC ID for frontend VPC '%s': %w", vpcName, err)
+	}
+
+	// Use the VPC ID and Subnet Name to get the subnet ID
+	return services.GetSubnetID(ctx, l.client, vpcID, subnetName)
+}
+
 func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName string, service *v1.Service, configs []*linodego.NodeBalancerConfigCreateOptions) (lb *linodego.NodeBalancer, err error) {
 	connThrottle := getConnectionThrottle(service)
 
@@ -868,6 +961,13 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	// Add frontend VPC configuration
+	if frontendVPCs, err := l.getFrontendVPCCreateOptions(ctx, service); err != nil {
+		return nil, err
+	} else if len(frontendVPCs) > 0 {
+		createOpts.FrontendVPCs = frontendVPCs
 	}
 
 	// Check for static IPv4 address annotation
@@ -1336,6 +1436,10 @@ func makeLoadBalancerStatus(service *v1.Service, nb *linodego.NodeBalancer) *v1.
 		}
 	}
 
+	if nb.FrontendAddressType != nil && *nb.FrontendAddressType == "vpc" {
+		klog.V(4).Infof("NodeBalancer (%d) is using frontend VPC address type", nb.ID)
+	}
+
 	// Check for per-service IPv6 annotation first, then fall back to global setting
 	useIPv6 := getServiceBoolAnnotation(service, annotations.AnnLinodeEnableIPv6Ingress) || options.Options.EnableIPv6ForLoadBalancers
 
@@ -1399,6 +1503,17 @@ func validateNodeBalancerBackendIPv4Range(backendIPv4Range string) error {
 	}
 	if !withinCIDR {
 		return fmt.Errorf("IPv4 range %s is not within the subnet %s", backendIPv4Range, options.Options.NodeBalancerBackendIPv4Subnet)
+	}
+	return nil
+}
+
+func validateNodeBalancerFrontendIPRange(frontendIPRange, ipVersion string) error {
+	if frontendIPRange == "" {
+		return nil
+	}
+	_, _, err := net.ParseCIDR(frontendIPRange)
+	if err != nil {
+		return fmt.Errorf("invalid frontend %s range '%s': %w", ipVersion, frontendIPRange, err)
 	}
 	return nil
 }
