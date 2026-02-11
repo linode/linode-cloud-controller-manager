@@ -11,6 +11,7 @@ spec:
   catch:
     - script:
         content: |
+          set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
           kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-with-udp-ports-mode" | tail -100
   steps:

@@ -11,6 +11,7 @@ spec:
   catch:
     - script:
         content: |
+          set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
           kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-with-multiple-http-https-ports" | tail -100
   steps:
@@ -29,7 +30,7 @@ spec:
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
               kubectl -n $NAMESPACE create secret tls tls-secret-1 --cert=../certificates/server.crt --key=../certificates/server.key
               kubectl -n $NAMESPACE create secret tls tls-secret-2 --cert=../certificates/server.crt --key=../certificates/server.key
               sleep 2
@@ -68,7 +69,7 @@ spec:
         - script:
             timeout: 10m
             content: |
-              set -e
+              set -euo pipefail
               IP=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].ip)
               echo "loadbalancer ip: $IP"
 

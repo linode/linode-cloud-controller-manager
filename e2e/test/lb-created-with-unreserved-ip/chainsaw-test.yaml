@@ -11,6 +11,7 @@ spec:
   catch:
     - script:
         content: |
+          set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
           kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-created-with-unreserved-ip" | tail -100
   steps:
@@ -18,7 +19,7 @@ spec:
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
 
               unreserved_ip="100.10.10.10"
 
@@ -47,7 +48,7 @@ spec:
       cleanup: 
         - script:
             content: |
-              set -e 
+              set -euo pipefail
 
               delete_cm=$(kubectl delete configmap unreserved-ip-config -n $NAMESPACE)
               if [[ "$delete_cm" == "configmap \"unreserved-ip-config\" deleted" ]]; then
@@ -72,7 +73,7 @@ spec:
       try:
         - script: 
             content: |
-              set -e
+              set -euo pipefail
 
               unreserved_ip=$(kubectl get configmap unreserved-ip-config -o=jsonpath='{.data.UnReservedIP}' -n $NAMESPACE)
               if [[ -z "$unreserved_ip" ]]; then

@@ -11,6 +11,7 @@ spec:
   catch:
     - script:
         content: |
+          set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
           kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-with-http-to-https" | tail -100
   steps:
@@ -29,7 +30,7 @@ spec:
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
               kubectl -n $NAMESPACE create secret tls tls-secret-1 --cert=../certificates/server.crt --key=../certificates/server.key
             check:
               ($error == null): true
@@ -37,7 +38,7 @@ spec:
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-port-443='{"tls-secret-name": "tls-secret-1", "protocol": "https"}'
               kubectl patch svc svc-test -n $NAMESPACE --type='json' -p='[{"op": "add", "path": "/spec/ports/-", "value": {"name": "https", "port": 443, "targetPort": 8080, "protocol": "TCP"}}]'
               sleep 10
@@ -76,7 +77,7 @@ spec:
         - script:
             timeout: 10m
             content: |
-              set -e
+              set -euo pipefail
               IP=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].ip)
               echo "loadbalancer ip: $IP"
 

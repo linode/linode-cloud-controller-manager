@@ -11,6 +11,7 @@ spec:
   catch:
     - script:
         content: |
+          set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
           kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-simple" | tail -100
   steps:
@@ -39,7 +40,7 @@ spec:
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
               IP=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].ip)
 
               podnames=()

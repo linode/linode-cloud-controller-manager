@@ -11,6 +11,7 @@ spec:
   catch:
     - script:
         content: |
+          set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
           kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-created-with-reserved-ip-change-ip-concurrently" | tail -100
   steps:
@@ -18,8 +19,8 @@ spec:
       try:
         - script:
             content: |
+              set -euo pipefail
               #!/bin/bash
-              set -e
 
               re='^((25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})$'
 
@@ -77,7 +78,7 @@ spec:
       cleanup:
         - script:
             content: |
-              set -e 
+              set -euo pipefail
 
               reserved_ip=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.ReservedIP}' -n $NAMESPACE)
               if [ -z "$reserved_ip" ]; then
@@ -138,8 +139,8 @@ spec:
       try:
         - script:
             content: |
+              set -euo pipefail
               #!/bin/bash
-              set -e
 
               patch_annotation() {
                 VALUE=$1
@@ -193,7 +194,7 @@ spec:
       try:
         - script: 
             content: |
-              set -e
+              set -euo pipefail
 
               reserved_ip=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.ReservedIP}' -n $NAMESPACE)
               if [ -z "$reserved_ip" ]; then

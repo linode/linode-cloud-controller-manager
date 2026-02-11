@@ -13,6 +13,7 @@ spec:
   catch:
     - script:
         content: |
+          set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
           kubectl logs -n kube-system daemonsets/ccm-linode | grep "subnet-filtering-test" | tail -100
   steps:
@@ -20,7 +21,7 @@ spec:
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
 
               if [ -z "$FIRST_CONFIG" ] || [ -z "$SECOND_CONFIG" ] || [ -z "$LINODE_TOKEN" ]; then
                   echo "Error: FIRST_CONFIG, SECOND_CONFIG, and LINODE_TOKEN environment variables must be set"

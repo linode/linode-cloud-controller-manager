@@ -14,6 +14,7 @@ spec:
   catch:
     - script:
         content: |
+          set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
           kubectl logs -n kube-system daemonsets/ccm-linode | grep "fw-use-specified-nb" | tail -100
   steps:
@@ -24,7 +25,7 @@ spec:
               - name: FWLABEL
                 value: ($fwname)
             content: |
-              set -e
+              set -euo pipefail
 
               create_fw=$(curl -s --write-out "%{http_code}\n" --output /dev/null --request POST \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
@@ -84,7 +85,7 @@ spec:
               - name: FWLABEL
                 value: ($fwname)
             content: |
-              set -e
+              set -euo pipefail
               re='^[0-9]+$'
 
               fwid=$(curl -s \

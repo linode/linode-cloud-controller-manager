@@ -10,6 +10,7 @@ spec:
   catch:
     - script:
         content: |
+          set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
           kubectl logs -n kube-system daemonsets/ccm-linode | grep "cilium-bgp-test" | tail -100
   steps:
@@ -66,7 +67,7 @@ spec:
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
 
               delete_nanode() {
                 local NANODE_RESPONSE=$(curl -s -H "Authorization: Bearer $LINODE_TOKEN" \

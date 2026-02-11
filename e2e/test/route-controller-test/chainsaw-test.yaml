@@ -13,6 +13,7 @@ spec:
   catch:
     - script:
         content: |
+          set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
           kubectl logs -n kube-system daemonsets/ccm-linode | grep "route-controller-test" | tail -100
   steps:
@@ -20,7 +21,7 @@ spec:
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
 
               if [ -z "$KUBECONFIG" ] || [ -z "$LINODE_TOKEN" ]; then
                   echo "Error: KUBECONFIG and LINODE_TOKEN environment variables must be set"
@@ -70,7 +71,7 @@ spec:
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
 
               # Use last node to change its label
               node=$(kubectl get nodes -o jsonpath='{.items[-1].metadata.name}')  
