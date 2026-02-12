@@ -8,6 +8,12 @@ metadata:
     lke:
 spec:
   namespace: "lb-preserve-annotation-svc-delete"
+  catch:
+    - script:
+        content: |
+          set -euo pipefail
+          echo "Test failed. Fetching CCM logs..."
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-preserve-annotation-svc-delete" | tail -100
   steps:
     - name: Create resources
       try:
@@ -34,7 +40,7 @@ spec:
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 

@@ -8,6 +8,12 @@ metadata:
     lke:
 spec:
   namespace: "lb-updated-with-nb-id"
+  catch:
+    - script:
+        content: |
+          set -euo pipefail
+          echo "Test failed. Fetching CCM logs..."
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-updated-with-nb-id" | tail -100
   steps:
     - name: Create pods and services
       try:
@@ -35,7 +41,7 @@ spec:
         - script:
             timeout: 10m
             content: |
-              set -e
+              set -euo pipefail
 
               re='^[0-9]+$'
               LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
