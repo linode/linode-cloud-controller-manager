@@ -35,6 +35,8 @@ metadata:
   name: svc-test
   labels:
     app: lb-with-udp-ports-change-port
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-type: "premium"
 spec:
   type: LoadBalancer
   selector:

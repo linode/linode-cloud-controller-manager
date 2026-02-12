@@ -37,6 +37,7 @@ metadata:
     app: lb-with-udp-ports-stickiness
   annotations:
     service.beta.kubernetes.io/linode-loadbalancer-default-algorithm: ring_hash
+    service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-type: "premium"
 spec:
   type: LoadBalancer
   selector:
