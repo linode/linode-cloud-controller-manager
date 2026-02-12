@@ -8,12 +8,18 @@ metadata:
     lke:
 spec:
   namespace: "lb-created-with-invalid-ip"
+  catch:
+    - script:
+        content: |
+          set -euo pipefail
+          echo "Test failed. Fetching CCM logs..."
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-created-with-invalid-ip" | tail -100
   steps:
     - name: create reserved ip and nodebalancer resources
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
 
               invalid_ip="100.1000.1000.1000"
 
@@ -41,7 +47,7 @@ spec:
       cleanup:
         - script:
             content: |
-              set -e 
+              set -euo pipefail
 
               delete_cm=$(kubectl delete configmap invalid-ip-config -n $NAMESPACE)
               if [[ "$delete_cm" == "configmap \"invalid-ip-config\" deleted" ]]; then
@@ -66,7 +72,7 @@ spec:
       try:
         - script: 
             content: |
-              set -e
+              set -euo pipefail
               sleep 30
               invalid_ip=$(kubectl get configmap invalid-ip-config -o=jsonpath='{.data.InvalidIP}' -n $NAMESPACE)
               if [[ -z "$invalid_ip" ]]; then

@@ -8,6 +8,12 @@ metadata:
     lke:
 spec:
   namespace: "lb-with-proxyprotocol-set"
+  catch:
+    - script:
+        content: |
+          set -euo pipefail
+          echo "Test failed. Fetching CCM logs..."
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-with-proxyprotocol-set" | tail -100
   steps:
     - name: Create pods and services
       try:
@@ -44,7 +50,7 @@ spec:
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-port-80='{"proxy-protocol": "v1"}'
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-port-8080='{"proxy-protocol": "v2"}'
               sleep 10
@@ -54,7 +60,7 @@ spec:
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 

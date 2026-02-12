@@ -8,6 +8,12 @@ metadata:
     lke:
 spec:
   namespace: "lb-delete-svc-no-nb"
+  catch:
+    - script:
+        content: |
+          set -euo pipefail
+          echo "Test failed. Fetching CCM logs..."
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-delete-svc-no-nb" | tail -100
   steps:
     - name: Create dummy service
       try:
@@ -34,7 +40,7 @@ spec:
               - name: nbconf
                 value: (json_parse($stdout))
             content: |
-              set -e
+              set -euo pipefail
 
               re='^[0-9]+$'
               LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
@@ -80,7 +86,7 @@ spec:
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
 
               expectedId=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .metadata.annotations[])
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
@@ -95,7 +101,7 @@ spec:
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
 
               re='^[0-9]+$'
               nbid=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .metadata.annotations[])

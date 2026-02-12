@@ -7,6 +7,12 @@ metadata:
     all:
 spec:
   namespace: "lb-with-vpc-backends"
+  catch:
+    - script:
+        content: |
+          set -euo pipefail
+          echo "Test failed. Fetching CCM logs..."
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-with-vpc-backends" | tail -100
   steps:
     - name: Create pods and services
       try:
@@ -43,7 +49,7 @@ spec:
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
@@ -61,7 +67,7 @@ spec:
                 "$LINODE_URL/v4/nodebalancers/$nbid/configs/$config_id/nodes")
 
               # Extract all addresses and remove ports
-              addresses=$(echo "$json_data" | jq -r '.data[].address' | sed 's/:[0-9]*$//')
+              addresses=$(echo "$nodes" | jq -r '.data[].address' | sed 's/:[0-9]*$//')
 
               for ip in $addresses; do
                   if [[ $ip =~ ^10\.0\.0\.[0-9]+$ ]]; then

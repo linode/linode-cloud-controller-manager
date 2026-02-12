@@ -8,6 +8,12 @@ metadata:
     lke:
 spec:
   namespace: "lb-preserve-annotation-new-nb-specified"
+  catch:
+    - script:
+        content: |
+          set -euo pipefail
+          echo "Test failed. Fetching CCM logs..."
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-preserve-annotation-new-nb-specified" | tail -100
   steps:
     - name: Create resources
       try:
@@ -34,7 +40,7 @@ spec:
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
 
               re='^[0-9]+$'
 

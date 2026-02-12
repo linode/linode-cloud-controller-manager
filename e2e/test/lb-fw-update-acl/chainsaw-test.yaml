@@ -8,6 +8,12 @@ metadata:
     lke:
 spec:
   namespace: "lb-fw-update-acl"
+  catch:
+    - script:
+        content: |
+          set -euo pipefail
+          echo "Test failed. Fetching CCM logs..."
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-fw-update-acl" | tail -100
   steps:
     - name: Create pods and services
       try:
@@ -34,7 +40,7 @@ spec:
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
 
               for i in {1..10}; do
                   nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
@@ -68,7 +74,7 @@ spec:
       try:
         - script:
             content: |
-              set -e
+              set -euo pipefail
 
               for i in {1..10}; do
                   nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
