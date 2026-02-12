@@ -9,8 +9,8 @@ LOCALBIN                ?= $(CACHE_BIN)
 DEVBOX_BIN              ?= $(DEVBOX_PACKAGES_DIR)/bin
 HELM                    ?= $(LOCALBIN)/helm
 HELM_VERSION            ?= v3.16.3
+
 GOLANGCI_LINT           ?= $(LOCALBIN)/golangci-lint
-GOLANGCI_LINT_VERSION   ?= v2.7.2
 GOLANGCI_LINT_NILAWAY   ?= $(CACHE_BIN)/golangci-lint-nilaway
 
 #####################################################################
@@ -21,10 +21,22 @@ SUBNET_CLUSTER_NAME     ?= subnet-testing-$(shell git rev-parse --short HEAD)
 VPC_NAME                ?= $(CLUSTER_NAME)
 MANIFEST_NAME           ?= capl-cluster-manifests
 SUBNET_MANIFEST_NAME    ?= subnet-testing-manifests
+
+# renovate: datasource=github-tags depName=kubernetes/kubernetes
 K8S_VERSION             ?= "v1.31.2"
+
+# renovate: datasource=github-tags depName=kubernetes-sigs/cluster-api
 CAPI_VERSION            ?= "v1.8.5"
+
+# renovate: datasource=github-tags depName=kubernetes-sigs/cluster-api-addon-provider-helm
 CAAPH_VERSION           ?= "v0.2.1"
+
+# renovate: datasource=github-tags depName=linode/cluster-api-provider-linode
 CAPL_VERSION            ?= "v0.8.5"
+
+# renovate: datasource=github-tags depName=golangci/golangci-lint
+GOLANGCI_LINT_VERSION   ?= "v2.7.2"
+
 CONTROLPLANE_NODES      ?= 1
 WORKER_NODES            ?= 1
 LINODE_FIREWALL_ENABLED ?= true
