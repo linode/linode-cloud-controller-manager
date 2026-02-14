@@ -23,7 +23,7 @@ MANIFEST_NAME           ?= capl-cluster-manifests
 SUBNET_MANIFEST_NAME    ?= subnet-testing-manifests
 
 # renovate: datasource=github-tags depName=kubernetes/kubernetes
-K8S_VERSION             ?= "v1.31.2"
+K8S_VERSION             ?= "v1.35.1"
 
 # renovate: datasource=github-tags depName=kubernetes-sigs/cluster-api
 CAPI_VERSION            ?= "v1.8.5"
