@@ -29,7 +29,7 @@ K8S_VERSION             ?= "v1.31.2"
 CAPI_VERSION            ?= "v1.8.5"
 
 # renovate: datasource=github-tags depName=kubernetes-sigs/cluster-api-addon-provider-helm
-CAAPH_VERSION           ?= "v0.2.1"
+CAAPH_VERSION           ?= "v0.6.0"
 
 # renovate: datasource=github-tags depName=linode/cluster-api-provider-linode
 CAPL_VERSION            ?= "v0.8.5"
