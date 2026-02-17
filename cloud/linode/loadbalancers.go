@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
@@ -622,7 +623,8 @@ func (l *loadbalancers) deleteUnusedConfigs(ctx context.Context, nbConfigs []lin
 // shouldPreserveNodeBalancer determines whether a NodeBalancer should be deleted based on the
 // service's preserve annotation.
 func (l *loadbalancers) shouldPreserveNodeBalancer(service *v1.Service) bool {
-	return getServiceBoolAnnotation(service, annotations.AnnLinodeLoadBalancerPreserve)
+	shouldPreserve := getServiceBoolAnnotation(service, annotations.AnnLinodeLoadBalancerPreserve)
+	return shouldPreserve != nil && *shouldPreserve
 }
 
 // EnsureLoadBalancerDeleted deletes the specified loadbalancer if it exists.
@@ -1423,14 +1425,13 @@ func makeLoadBalancerStatus(service *v1.Service, nb *linodego.NodeBalancer) *v1.
 	}
 
 	// Return hostname-only if annotation is set or environment variable is set
-	if getServiceBoolAnnotation(service, annotations.AnnLinodeHostnameOnlyIngress) {
-		return &v1.LoadBalancerStatus{
-			Ingress: []v1.LoadBalancerIngress{ingress},
-		}
-	}
-
-	if val := envBoolOptions("LINODE_HOSTNAME_ONLY_INGRESS"); val {
+	useHostnameOnly := getServiceBoolAnnotation(service, annotations.AnnLinodeHostnameOnlyIngress)
+	if useHostnameOnly == nil {
+		val := envBoolOptions("LINODE_HOSTNAME_ONLY_INGRESS")
 		klog.Infof("LINODE_HOSTNAME_ONLY_INGRESS:  (%v)", val)
+		useHostnameOnly = ptr.To(envBoolOptions("LINODE_HOSTNAME_ONLY_INGRESS"))
+	}
+	if *useHostnameOnly {
 		return &v1.LoadBalancerStatus{
 			Ingress: []v1.LoadBalancerIngress{ingress},
 		}
@@ -1440,11 +1441,14 @@ func makeLoadBalancerStatus(service *v1.Service, nb *linodego.NodeBalancer) *v1.
 		klog.V(4).Infof("NodeBalancer (%d) is using frontend VPC address type", nb.ID)
 	}
 
-	// Check for per-service IPv6 annotation first, then fall back to global setting
-	useIPv6 := getServiceBoolAnnotation(service, annotations.AnnLinodeEnableIPv6Ingress) || options.Options.EnableIPv6ForLoadBalancers
+	// Check for per-service IPv6 annotation first, then fall back to global setting if not set
+	useIPv6 := getServiceBoolAnnotation(service, annotations.AnnLinodeEnableIPv6Ingress)
+	if useIPv6 == nil {
+		useIPv6 = ptr.To(options.Options.EnableIPv6ForLoadBalancers)
+	}
 
 	// When IPv6 is enabled (either per-service or globally), include both IPv4 and IPv6
-	if useIPv6 && nb.IPv6 != nil && *nb.IPv6 != "" {
+	if *useIPv6 && nb.IPv6 != nil && *nb.IPv6 != "" {
 		ingresses := []v1.LoadBalancerIngress{
 			{
 				Hostname: *nb.Hostname,
@@ -1482,13 +1486,13 @@ func getServiceNn(service *v1.Service) string {
 	return fmt.Sprintf("%s/%s", service.Namespace, service.Name)
 }
 
-func getServiceBoolAnnotation(service *v1.Service, name string) bool {
+func getServiceBoolAnnotation(service *v1.Service, name string) *bool {
 	value, ok := service.GetAnnotations()[name]
 	if !ok {
-		return false
+		return nil
 	}
 	boolValue, err := strconv.ParseBool(value)
-	return err == nil && boolValue
+	return ptr.To(err == nil && boolValue)
 }
 
 // validateNodeBalancerBackendIPv4Range validates the NodeBalancerBackendIPv4Range
