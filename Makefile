@@ -26,7 +26,7 @@ SUBNET_MANIFEST_NAME    ?= subnet-testing-manifests
 K8S_VERSION             ?= "v1.31.2"
 
 # renovate: datasource=github-tags depName=kubernetes-sigs/cluster-api
-CAPI_VERSION            ?= "v1.8.5"
+CAPI_VERSION            ?= "v1.12.3"
 
 # renovate: datasource=github-tags depName=kubernetes-sigs/cluster-api-addon-provider-helm
 CAAPH_VERSION           ?= "v0.2.1"
