@@ -32,7 +32,7 @@ CAPI_VERSION            ?= "v1.8.5"
 CAAPH_VERSION           ?= "v0.2.1"
 
 # renovate: datasource=github-tags depName=linode/cluster-api-provider-linode
-CAPL_VERSION            ?= "v0.8.5"
+CAPL_VERSION            ?= "v0.10.1"
 
 # renovate: datasource=github-tags depName=golangci/golangci-lint
 GOLANGCI_LINT_VERSION   ?= "v2.7.2"
