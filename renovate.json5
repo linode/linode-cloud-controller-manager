@@ -33,6 +33,13 @@
       "automerge": true,
     },
     {
+      "matchPackageNames": [
+        "/cluster-api/",
+        "/cluster-api-provider-linode/",
+      ],
+      "enabled": false,
+    },
+    {
       "groupName": "kubernetes",
       "groupSlug": "kubernetes-go",
       "matchDatasources": [
