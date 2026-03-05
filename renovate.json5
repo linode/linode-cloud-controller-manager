@@ -4,7 +4,7 @@
     "config:recommended"
   ],
   "schedule": [
-    "* * * * 0,6",
+    "* 0 1,15 * *",
   ],
   "labels": ["dependencies"],
   "postUpdateOptions": ["gomodTidy"],
@@ -12,6 +12,7 @@
     "enabled": true
   },
   "osvVulnerabilityAlerts": true,
+  "platformAutomerge": true,
   "customManagers": [
     {
       "customType": "regex",
@@ -27,6 +28,10 @@
     }
   ],
   "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "automerge": true,
+    },
     {
       "groupName": "kubernetes",
       "groupSlug": "kubernetes-go",
