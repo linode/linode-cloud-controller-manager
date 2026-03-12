@@ -158,7 +158,7 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.33.3 // indirect
+	k8s.io/apiextensions-apiserver v0.35.2 // indirect
 	k8s.io/apiserver v0.35.2 // indirect
 	k8s.io/controller-manager v0.35.2 // indirect
 	k8s.io/kms v0.35.2 // indirect
