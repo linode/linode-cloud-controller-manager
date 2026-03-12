@@ -3899,8 +3899,8 @@ func Test_getPortConfig(t *testing.T) {
 
 			if !reflect.DeepEqual(portConfigResult, test.expectedPortConfig) {
 				t.Error("unexpected port config")
-				t.Logf("expected: %q", test.expectedPortConfig)
-				t.Logf("actual: %q", portConfigResult)
+				t.Logf("expected: %#v", test.expectedPortConfig)
+				t.Logf("actual: %#v", portConfigResult)
 			}
 
 			if !reflect.DeepEqual(err, test.err) {
