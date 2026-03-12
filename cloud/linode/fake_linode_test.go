@@ -552,7 +552,7 @@ func (f *fakeAPI) setupRoutes() {
 			f.t.Fatal(err)
 		}
 
-		subnets := []linodego.VPCSubnet{}
+		subnets := make([]linodego.VPCSubnet, 0, len(vco.Subnets))
 		for _, s := range vco.Subnets {
 			subnet := linodego.VPCSubnet{
 				ID:    rand.Intn(9999),
