@@ -82,7 +82,7 @@ vet: fmt
 lint: golangci-lint
 	$(GOLANGCI_LINT) run -c .golangci.yml --fix
 
-.PHONY: lint
+.PHONY: nilcheck
 nilcheck: golangci-lint-nilaway ## Run nilaway against code.
 	$(GOLANGCI_LINT_NILAWAY) run -c .golangci-nilaway.yml
 
@@ -304,12 +304,12 @@ $(CLUSTERCTL): $(LOCALBIN)
 	curl -fsSL https://github.com/kubernetes-sigs/cluster-api/releases/download/$(CLUSTERCTL_VERSION)/clusterctl-$(OS)-$(ARCH_SHORT) -o $(CLUSTERCTL)
 	chmod +x $(CLUSTERCTL)
 
-.phony: golangci-lint-nilaway
+.PHONY: golangci-lint-nilaway
 golangci-lint-nilaway: $(GOLANGCI_LINT_NILAWAY)
 $(GOLANGCI_LINT_NILAWAY): $(GOLANGCI_LINT) # Build golangci-lint-nilaway from custom configuration.
 	$(GOLANGCI_LINT) custom
 
-.phony: golangci-lint
+.PHONY: golangci-lint
 golangci-lint: $(GOLANGCI_LINT)
 $(GOLANGCI_LINT): # Build golangci-lint from tools folder.
 	GOBIN=$(LOCALBIN)  go install  github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
