@@ -9,6 +9,8 @@ LOCALBIN                ?= $(CACHE_BIN)
 DEVBOX_BIN              ?= $(DEVBOX_PACKAGES_DIR)/bin
 HELM                    ?= $(LOCALBIN)/helm
 HELM_VERSION            ?= v3.16.3
+CLUSTERCTL              ?= $(CACHE_BIN)/clusterctl
+CLUSTERCTL_VERSION      ?= v1.8.5
 
 GOLANGCI_LINT           ?= $(LOCALBIN)/golangci-lint
 GOLANGCI_LINT_NILAWAY   ?= $(CACHE_BIN)/golangci-lint-nilaway
@@ -21,6 +23,8 @@ SUBNET_CLUSTER_NAME     ?= subnet-testing-$(shell git rev-parse --short HEAD)
 VPC_NAME                ?= $(CLUSTER_NAME)
 MANIFEST_NAME           ?= capl-cluster-manifests
 SUBNET_MANIFEST_NAME    ?= subnet-testing-manifests
+IPV6_CLUSTER_NAME       ?= ipv6-$(shell git rev-parse --short HEAD)
+IPV6_MANIFEST_NAME      ?= ipv6-manifests
 
 # renovate: datasource=github-tags depName=kubernetes/kubernetes
 K8S_VERSION             ?= "v1.31.2"
@@ -46,6 +50,7 @@ LINODE_URL              ?= https://api.linode.com
 KUBECONFIG_PATH         ?= $(CURDIR)/test-cluster-kubeconfig.yaml
 SUBNET_KUBECONFIG_PATH	?= $(CURDIR)/subnet-testing-kubeconfig.yaml
 MGMT_KUBECONFIG_PATH    ?= $(CURDIR)/mgmt-cluster-kubeconfig.yaml
+IPV6_KUBECONFIG_PATH    ?= $(CURDIR)/ipv6-kubeconfig.yaml
 
 # if the $DEVBOX_PACKAGES_DIR env variable exists that means we are within a devbox shell and can safely
 # use devbox's bin for our tools
@@ -54,8 +59,9 @@ ifdef DEVBOX_PACKAGES_DIR
 endif
 
 export PATH := $(CACHE_BIN):$(PATH)
-$(LOCALBIN):
-	mkdir -p $(LOCALBIN)
+TOOL_DIRS := $(sort $(LOCALBIN) $(CACHE_BIN))
+$(TOOL_DIRS):
+	mkdir -p $@
 
 export GO111MODULE=on
 
@@ -135,8 +141,8 @@ docker-build: build-linux
 docker-push:
 	docker push ${IMG}
 
-.PHONY: docker-setup
-docker-setup: docker-build docker-push
+.PHONY: build-and-push
+build-and-push: docker-build docker-push
 
 .PHONY: run
 # run the ccm locally, really only makes sense on linux anyway
@@ -160,26 +166,41 @@ run-debug: build
 #####################################################################
 
 .PHONY: mgmt-and-capl-cluster
-mgmt-and-capl-cluster: docker-setup mgmt-cluster capl-cluster
+mgmt-and-capl-cluster: build-and-push mgmt-cluster
+	$(MAKE) -j2 capl-ipv6-cluster capl-cluster
 
 .PHONY: capl-cluster
-capl-cluster: generate-capl-cluster-manifests create-capl-cluster patch-linode-ccm
+capl-cluster: generate-capl-cluster-manifests
+	MANIFEST_NAME=$(MANIFEST_NAME) CLUSTER_NAME=$(CLUSTER_NAME) KUBECONFIG_PATH=$(KUBECONFIG_PATH) \
+		$(MAKE) create-capl-cluster
+
+.PHONY: capl-ipv6-cluster
+capl-ipv6-cluster: generate-capl-ipv6-cluster-manifests
+	MANIFEST_NAME=$(IPV6_MANIFEST_NAME) CLUSTER_NAME=$(IPV6_CLUSTER_NAME) KUBECONFIG_PATH=$(IPV6_KUBECONFIG_PATH) \
+		$(MAKE) create-capl-cluster
 
 .PHONY: generate-capl-cluster-manifests
-generate-capl-cluster-manifests:
+generate-capl-cluster-manifests: clusterctl
 	# Create the CAPL cluster manifests without any CSI driver stuff
-	LINODE_FIREWALL_ENABLED=$(LINODE_FIREWALL_ENABLED) LINODE_OS=$(LINODE_OS) VPC_NAME=$(VPC_NAME) clusterctl generate cluster $(CLUSTER_NAME) \
+	LINODE_FIREWALL_ENABLED=$(LINODE_FIREWALL_ENABLED) LINODE_OS=$(LINODE_OS) VPC_NAME=$(VPC_NAME) $(CLUSTERCTL) generate cluster $(CLUSTER_NAME) \
 		--kubernetes-version $(K8S_VERSION) --infrastructure linode-linode:$(CAPL_VERSION) \
 		--control-plane-machine-count $(CONTROLPLANE_NODES) --worker-machine-count $(WORKER_NODES) > $(MANIFEST_NAME).yaml
-	yq -i e 'select(.kind == "LinodeVPC").spec.subnets = [{"ipv4": "10.0.0.0/8", "label": "default"}, {"ipv4": "172.16.0.0/16", "label": "testing"}]' $(MANIFEST_NAME).yaml
+	IMG=$(IMG) SUBNET_NAME=$(SUBNET_NAME) ./hack/patch-capl-manifest.sh $(MANIFEST_NAME).yaml
+
+.PHONY: generate-capl-ipv6-cluster-manifests
+generate-capl-ipv6-cluster-manifests: clusterctl
+	LINODE_FIREWALL_ENABLED=$(LINODE_FIREWALL_ENABLED) LINODE_OS=$(LINODE_OS) VPC_NAME=$(IPV6_CLUSTER_NAME) $(CLUSTERCTL) generate cluster $(IPV6_CLUSTER_NAME) \
+		--kubernetes-version $(K8S_VERSION) --infrastructure linode-linode:$(CAPL_VERSION) \
+		--control-plane-machine-count $(CONTROLPLANE_NODES) --worker-machine-count $(WORKER_NODES) --flavor kubeadm-dual-stack > $(IPV6_MANIFEST_NAME).yaml
+	IMG=$(IMG) ./hack/patch-capl-manifest.sh $(IPV6_MANIFEST_NAME).yaml
 
 .PHONY: create-capl-cluster
-create-capl-cluster:
+create-capl-cluster: clusterctl
 	# Create a CAPL cluster with updated CCM and wait for it to be ready
 	kubectl apply -f $(MANIFEST_NAME).yaml
 	kubectl wait --for=condition=ControlPlaneReady cluster/$(CLUSTER_NAME) --timeout=600s || (kubectl get cluster -o yaml; kubectl get linodecluster -o yaml; kubectl get linodemachines -o yaml; kubectl logs -n capl-system deployments/capl-controller-manager --tail=50)
 	kubectl wait --for=condition=NodeHealthy=true machines -l cluster.x-k8s.io/cluster-name=$(CLUSTER_NAME) --timeout=900s
-	clusterctl get kubeconfig $(CLUSTER_NAME) > $(KUBECONFIG_PATH)
+	$(CLUSTERCTL) get kubeconfig $(CLUSTER_NAME) > $(KUBECONFIG_PATH)
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl wait --for=condition=Ready nodes --all --timeout=600s
 	# Remove all taints from control plane node so that pods scheduled on it by tests can run (without this, some tests fail)
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl taint nodes -l node-role.kubernetes.io/control-plane node-role.kubernetes.io/control-plane-
@@ -187,15 +208,16 @@ create-capl-cluster:
 .PHONY: patch-linode-ccm
 patch-linode-ccm:
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl patch -n kube-system daemonset ccm-linode --type='json' -p="[{'op': 'replace', 'path': '/spec/template/spec/containers/0/image', 'value': '${IMG}'}]"
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl patch -n kube-system daemonset ccm-linode --type='json' -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/imagePullPolicy", "value": "Always"}]'
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl patch -n kube-system daemonset ccm-linode --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/env/-", "value": {"name": "LINODE_API_VERSION", "value": "v4beta"}}]'
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl rollout status -n kube-system daemonset/ccm-linode --timeout=600s
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl -n kube-system get daemonset/ccm-linode -o yaml
 
 .PHONY: mgmt-cluster
-mgmt-cluster:
+mgmt-cluster: clusterctl
 	# Create a mgmt cluster
 	ctlptl apply -f e2e/setup/ctlptl-config.yaml
-	clusterctl init \
+	$(CLUSTERCTL) init \
 		--wait-providers \
 		--wait-provider-timeout 600 \
 		--core cluster-api:$(CAPI_VERSION) \
@@ -214,13 +236,25 @@ cleanup-cluster:
 
 .PHONY: e2e-test
 e2e-test:
+    # Run ipv6 tests first and then the rest
+	$(MAKE) e2e-test-ipv6-backends
 	CLUSTER_NAME=$(CLUSTER_NAME) \
 	MGMT_KUBECONFIG=$(MGMT_KUBECONFIG_PATH) \
 	KUBECONFIG=$(KUBECONFIG_PATH) \
 	REGION=$(LINODE_REGION) \
 	LINODE_TOKEN=$(LINODE_TOKEN) \
 	LINODE_URL=$(LINODE_URL) \
-	chainsaw test e2e/test --parallel 2 $(E2E_FLAGS)
+	chainsaw test e2e/test --parallel 2 --selector all $(E2E_FLAGS)
+
+.PHONY: e2e-test-ipv6-backends
+e2e-test-ipv6-backends:
+	CLUSTER_NAME=$(IPV6_CLUSTER_NAME) \
+	MGMT_KUBECONFIG=$(MGMT_KUBECONFIG_PATH) \
+	KUBECONFIG=$(IPV6_KUBECONFIG_PATH) \
+	REGION=$(LINODE_REGION) \
+	LINODE_TOKEN=$(LINODE_TOKEN) \
+	LINODE_URL=$(LINODE_URL) \
+	chainsaw test e2e/test --selector ipv6-backends $(E2E_FLAGS)
 
 .PHONY: e2e-test-bgp
 e2e-test-bgp:
@@ -239,16 +273,9 @@ e2e-test-subnet:
 	# Generate cluster manifests for second cluster
 	SUBNET_NAME=testing CLUSTER_NAME=$(SUBNET_CLUSTER_NAME) MANIFEST_NAME=$(SUBNET_MANIFEST_NAME) VPC_NAME=$(CLUSTER_NAME) \
 		VPC_NETWORK_CIDR=172.16.0.0/16 K8S_CLUSTER_CIDR=172.16.64.0/18 make generate-capl-cluster-manifests
-	# Add subnetNames to HelmChartProxy	
-	yq e 'select(.kind == "HelmChartProxy" and .spec.chartName == "ccm-linode").spec.valuesTemplate' $(SUBNET_MANIFEST_NAME).yaml > tmp.yaml
-	yq -i e '.routeController  += {"subnetNames": "testing"}' tmp.yaml
-	yq -i e '.routeController.vpcNames = "{{.InfraCluster.spec.vpcRef.name}}"' tmp.yaml
-	yq -i e 'select(.kind == "HelmChartProxy" and .spec.chartName == "ccm-linode").spec.valuesTemplate = load_str("tmp.yaml")' $(SUBNET_MANIFEST_NAME).yaml
-	rm tmp.yaml
 	# Create the second cluster
 	MANIFEST_NAME=$(SUBNET_MANIFEST_NAME) CLUSTER_NAME=$(SUBNET_CLUSTER_NAME) KUBECONFIG_PATH=$(SUBNET_KUBECONFIG_PATH) \
 		make create-capl-cluster
-	KUBECONFIG_PATH=$(SUBNET_KUBECONFIG_PATH) make patch-linode-ccm
 	# Run chainsaw test
 	LINODE_TOKEN=$(LINODE_TOKEN) \
 		LINODE_URL=$(LINODE_URL) \
@@ -295,13 +322,13 @@ helm-template: helm
 .PHONY: kubectl
 kubectl: $(KUBECTL) ## Download kubectl locally if necessary.
 $(KUBECTL): $(LOCALBIN)
-	curl -fsSL https://dl.k8s.io/release/$(KUBECTL_VERSION)/bin/$(OS)/$(ARCH_SHORT)/kubectl -o $(KUBECTL)
+	curl -fsSL https://dl.k8s.io/release/$(KUBECTL_VERSION)/bin/$(HOSTOS)/$(ARCH_SHORT)/kubectl -o $(KUBECTL)
 	chmod +x $(KUBECTL)
 
 .PHONY: clusterctl
 clusterctl: $(CLUSTERCTL) ## Download clusterctl locally if necessary.
-$(CLUSTERCTL): $(LOCALBIN)
-	curl -fsSL https://github.com/kubernetes-sigs/cluster-api/releases/download/$(CLUSTERCTL_VERSION)/clusterctl-$(OS)-$(ARCH_SHORT) -o $(CLUSTERCTL)
+$(CLUSTERCTL): $(CACHE_BIN)
+	curl -fsSL https://github.com/kubernetes-sigs/cluster-api/releases/download/$(CLUSTERCTL_VERSION)/clusterctl-$(HOSTOS)-$(ARCH_SHORT) -o $(CLUSTERCTL)
 	chmod +x $(CLUSTERCTL)
 
 .phony: golangci-lint-nilaway

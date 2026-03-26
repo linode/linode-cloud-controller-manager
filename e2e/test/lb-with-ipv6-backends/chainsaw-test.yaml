@@ -1,0 +1,179 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: lb-with-ipv6-backends
+  labels:
+    ipv6-backends:
+spec:
+  namespace: "lb-with-ipv6-backends"
+  catch:
+    - script:
+        content: |
+          set -euo pipefail
+          echo "Test failed. Fetching CCM logs..."
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-with-ipv6-backends" | tail -100
+  steps:
+    - name: Create pods and service
+      try:
+        - apply:
+            file: create-pods-services.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that loadbalancer ip is assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test
+            status:
+              (loadBalancer.ingress[0].ip != null): true
+    - name: Check NodeBalancer backend addresses are IPv6
+      try:
+        - script:
+            content: |
+              set -euo pipefail
+
+              nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+
+              nbconfig=$(curl -s \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" --fail-early --retry 3 \
+                "$LINODE_URL/v4/nodebalancers/$nbid/configs")
+
+              config_id=$(echo "$nbconfig" | jq -r '.data[] | select(.port == 80) | .id')
+
+              nodes=$(curl -s \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" --fail-early --retry 3 \
+                "$LINODE_URL/v4/nodebalancers/$nbid/configs/$config_id/nodes")
+
+              addresses=$(echo "$nodes" | jq -r '.data[].address')
+
+              if [[ -z "$addresses" ]]; then
+                echo "NO_BACKEND_ADDRESSES"
+              fi
+
+              for address in $addresses; do
+                if [[ $address =~ ^\[(.*)\]:([0-9]+)$ ]]; then
+                  host="${BASH_REMATCH[1]}"
+                else
+                  host="${address%:*}"
+                fi
+
+                if [[ $host == *:* ]]; then
+                  echo "$address is IPv6"
+                else
+                  echo "$address is NOT IPv6"
+                fi
+              done
+            check:
+              ($error): ~
+              (contains($stdout, 'NO_BACKEND_ADDRESSES')): false
+              (contains($stdout, 'is NOT IPv6')): false
+    - name: Wait for loadbalancer to start serving traffic
+      try:
+        - script:
+            timeout: 15m
+            content: |
+              bash -ce '
+              TARGET_IP=$(kubectl get svc svc-test -n "$NAMESPACE" -o json | jq -r '"'"'.status.loadBalancer.ingress[]? | select(.ip != null and (.ip | contains(":") | not)) | .ip'"'"' | head -n1)
+              TARGET="http://$TARGET_IP:80"
+
+              for i in {1..60}; do
+                  output=$(curl -s --max-time 8 "$TARGET" | jq -r .podName 2>/dev/null || true)
+                  if [[ "$output" == *"test-"* ]]; then
+                      echo "loadbalancer ready"
+                      exit 0
+                  fi
+                  sleep 10
+              done
+
+              echo "loadbalancer not ready"
+              exit 1
+              '
+            check:
+              ($error == null): true
+              (contains($stdout, 'loadbalancer ready')): true
+    - name: Fetch loadbalancer ip and check both pods reachable
+      try:
+        - script:
+            timeout: 10m
+            content: |
+              bash -ce '
+              TARGET_IP=$(kubectl get svc svc-test -n "$NAMESPACE" -o json | jq -r '"'"'.status.loadBalancer.ingress[]? | select(.ip != null and (.ip | contains(":") | not)) | .ip'"'"' | head -n1)
+              TARGET="http://$TARGET_IP:80"
+              podnames=()
+              echo "target=$TARGET"
+              echo "pods and nodes:"
+              kubectl get pods -n "$NAMESPACE" -l app=lb-ipv6-backends -o wide
+
+              for batch in {1..5}; do
+                  echo "starting batch=$batch seen_pods=${podnames[*]:-none}"
+                  for attempt in {1..10}; do
+                      if [[ ${#podnames[@]} -ge 2 ]]; then
+                          break
+                      fi
+
+                      response=$(curl -sS --max-time 8 "$TARGET" 2>&1 || true)
+                      podname=$(printf "%s" "$response" | jq -r .podName 2>/dev/null || true)
+
+                      if [[ "$podname" == *"test-"* ]]; then
+                          echo "curl batch=$batch attempt=$attempt pod=$podname"
+                          unique=true
+                          for existing in "${podnames[@]}"; do
+                              if [[ "$existing" == "$podname" ]]; then
+                                  unique=false
+                                  break
+                              fi
+                          done
+                          if [[ "$unique" == true ]]; then
+                              podnames+=("$podname")
+                              echo "new pod observed: $podname"
+                          fi
+                      else
+                          echo "curl failed batch=$batch attempt=$attempt output=$response"
+                      fi
+                  done
+
+                  if [[ ${#podnames[@]} -ge 2 ]]; then
+                      break
+                  fi
+
+                  echo "completed batch=$batch seen_pods=${podnames[*]:-none}"
+                  if [[ "$batch" -lt 5 ]]; then
+                      echo "sleeping 10s before next batch"
+                      sleep 10
+                  fi
+              done
+
+              if [[ ${#podnames[@]} -lt 2 ]]; then
+                  echo "final seen pods: ${podnames[*]:-none}"
+                  echo "all pods failed to respond"
+              else
+                  echo "final seen pods: ${podnames[*]}"
+                  echo "all pods responded"
+              fi
+              '
+            check:
+              ($error == null): true
+              (contains($stdout, 'all pods responded')): true
+    - name: Delete Pods
+      try:
+        - delete:
+            ref:
+              apiVersion: v1
+              kind: Pod
+    - name: Delete Service
+      try:
+        - delete:
+            ref:
+              apiVersion: v1
+              kind: Service

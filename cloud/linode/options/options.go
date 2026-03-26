@@ -30,6 +30,7 @@ var Options struct {
 	DisableNodeBalancerVPCBackends    bool
 	GlobalStopChannel                 chan<- struct{}
 	EnableIPv6ForLoadBalancers        bool
+	EnableIPv6ForNodeBalancerBackends bool
 	AllocateNodeCIDRs                 bool
 	DisableIPv6NodeCIDRAllocation     bool
 	ClusterCIDRIPv4                   string
