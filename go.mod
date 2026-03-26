@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	github.com/appscode/go v0.0.0-20201105063637-5613f3b8169f
-	github.com/cilium/cilium v1.18.6
+	github.com/cilium/cilium v1.18.8
 	github.com/getsentry/sentry-go v0.43.0
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
@@ -38,7 +38,7 @@ require (
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cilium/ebpf v0.19.0 // indirect
+	github.com/cilium/ebpf v0.20.1-0.20260218191617-ee67e7f43dd9 // indirect
 	github.com/cilium/hive v0.0.0-20250611195437-5a5dacdfb354 // indirect
 	github.com/cilium/proxy v0.0.0-20250623105955-2136f59a4ea1 // indirect
 	github.com/cilium/statedb v0.4.6 // indirect
@@ -114,7 +114,7 @@ require (
 	github.com/spf13/viper v1.20.1 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
-	github.com/vishvananda/netlink v1.3.1 // indirect
+	github.com/vishvananda/netlink v1.3.2-0.20250926155043-cd3cb2e12c97 // indirect
 	github.com/vishvananda/netns v0.0.5 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.etcd.io/etcd/api/v3 v3.6.5 // indirect
