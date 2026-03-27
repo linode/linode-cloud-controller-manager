@@ -1,0 +1,53 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: lb-ipv6-backends
+  name: test
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: lb-ipv6-backends
+  template:
+    metadata:
+      labels:
+        app: lb-ipv6-backends
+    spec:
+      containers:
+      - image: appscode/test-server:2.3
+        name: test
+        ports:
+        - name: http-1
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-test
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-backends: "true"
+  labels:
+    app: lb-ipv6-backends
+spec:
+  type: LoadBalancer
+  ipFamilyPolicy: RequireDualStack
+  ipFamilies:
+    - IPv4
+    - IPv6
+  selector:
+    app: lb-ipv6-backends
+  ports:
+    - name: http-1
+      protocol: TCP
+      port: 80
+      targetPort: 8080
+  sessionAffinity: None

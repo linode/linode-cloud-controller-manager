@@ -44,6 +44,68 @@ metadata:
 
 When IPv6 is enabled (either globally or per-service), both IPv4 and IPv6 addresses will be included in the service's LoadBalancer status.
 
+### IPv6 Backend Support
+
+IPv6 frontends and IPv6 backends are configured independently. Frontend IPv6 controls what the Service publishes in `status.loadBalancer.ingress`, while backend IPv6 controls which node addresses a NodeBalancer targets.
+
+IPv6 backends require a dual-stack workload cluster. In practice, the cluster networking stack must support IPv6 NodePort traffic, and the Service itself should be created as dual-stack. A single-stack IPv4 `LoadBalancer` Service can still be annotated for IPv6 backends, but the NodeBalancer health checks and traffic path may fail because the backend NodePort is not exposed over IPv6.
+
+You can enable IPv6 backends globally for NodeBalancer services:
+
+```yaml
+spec:
+  template:
+    spec:
+      containers:
+        - name: ccm-linode
+          args:
+            - --enable-ipv6-for-nodebalancer-backends=true
+```
+
+Or per service:
+
+```yaml
+metadata:
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-backends: "true"
+```
+
+When IPv6 backends are enabled:
+- NodeBalancer backend targets use the node public IPv6 annotation `node.k8s.linode.com/public-ipv6`
+- IPv6 NodeBalancer backends are currently supported only through node public IPv6 addresses, not VPC IPv6 backend addresses
+- both VPC-backed and non-VPC-backed NodeBalancer services are affected
+- when VPC-backed NodeBalancers are enabled, CCM preserves the NodeBalancer VPC configuration instead of dropping it
+- enabling the global `--enable-ipv6-for-nodebalancer-backends` flag can migrate existing eligible NodeBalancer services from IPv4 to IPv6 backends during reconcile
+- to keep an existing Service on IPv4 while the global flag is enabled, set `service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-backends: "false"` on that Service
+- every selected backend node must have a public IPv6 address available
+- if your cluster uses VPC backends, the nodes still need public IPv6 endpoints so CCM can program IPv6 NodeBalancer backends
+- the workload cluster and Service must be configured for dual-stack networking
+- reconciliation fails and CCM logs an error if a selected backend node does not have the required public IPv6 address
+
+Recommended Service configuration for IPv6 backends:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-service
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-backends: "true"
+spec:
+  type: LoadBalancer
+  ipFamilyPolicy: RequireDualStack
+  ipFamilies:
+    - IPv4
+    - IPv6
+  ports:
+    - port: 80
+      targetPort: 8080
+  selector:
+    app: my-app
+```
+
+If your cluster does not provide IPv6-capable NodePort routing, the NodeBalancer may still be created with IPv6 backend addresses, but the backends will not become healthy. Likewise, if your cluster is using VPC backends but the nodes do not also have public IPv6 endpoints, IPv6 backend reconciliation will fail because CCM does not currently program VPC IPv6 backend addresses.
+
 ### Basic Configuration
 
 Create a LoadBalancer service:

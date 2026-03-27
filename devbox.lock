@@ -1,51 +1,51 @@
 {
   "lockfile_version": "1",
   "packages": {
-    "clusterctl@latest": {
-      "last_modified": "2025-05-16T20:19:48Z",
-      "resolved": "github:NixOS/nixpkgs/12a55407652e04dcf2309436eb06fef0d3713ef3#clusterctl",
+    "clusterctl@1.12.2": {
+      "last_modified": "2026-02-23T15:40:43Z",
+      "resolved": "github:NixOS/nixpkgs/80d901ec0377e19ac3f7bb8c035201e2e098cc97#clusterctl",
       "source": "devbox-search",
-      "version": "1.10.1",
+      "version": "1.12.2",
       "systems": {
         "aarch64-darwin": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/yqjd06qrwmh64rfcrjsvhfkn555gnl77-clusterctl-1.10.1",
+              "path": "/nix/store/778jxvqkkq2417wf7khzfwm3w1w9z4n1-clusterctl-1.12.2",
               "default": true
             }
           ],
-          "store_path": "/nix/store/yqjd06qrwmh64rfcrjsvhfkn555gnl77-clusterctl-1.10.1"
+          "store_path": "/nix/store/778jxvqkkq2417wf7khzfwm3w1w9z4n1-clusterctl-1.12.2"
         },
         "aarch64-linux": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/fkdlkd4gr4jj18g1zq87yj7whq2msn2a-clusterctl-1.10.1",
+              "path": "/nix/store/8dkagw89sav6kk19sfbvpjqa0il0pw6l-clusterctl-1.12.2",
               "default": true
             }
           ],
-          "store_path": "/nix/store/fkdlkd4gr4jj18g1zq87yj7whq2msn2a-clusterctl-1.10.1"
+          "store_path": "/nix/store/8dkagw89sav6kk19sfbvpjqa0il0pw6l-clusterctl-1.12.2"
         },
         "x86_64-darwin": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/v66xr4x87ac25k0w9lvy0x56m2ldplvs-clusterctl-1.10.1",
+              "path": "/nix/store/8844gbxh2cfkpgszmnwhxplm43pg7z1r-clusterctl-1.12.2",
               "default": true
             }
           ],
-          "store_path": "/nix/store/v66xr4x87ac25k0w9lvy0x56m2ldplvs-clusterctl-1.10.1"
+          "store_path": "/nix/store/8844gbxh2cfkpgszmnwhxplm43pg7z1r-clusterctl-1.12.2"
         },
         "x86_64-linux": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/zlds3iyclypjmkpbr88wkw69vg6pvmi7-clusterctl-1.10.1",
+              "path": "/nix/store/b9sid26w0lnafiyzxpyxcink9crcvzh6-clusterctl-1.12.2",
               "default": true
             }
           ],
-          "store_path": "/nix/store/zlds3iyclypjmkpbr88wkw69vg6pvmi7-clusterctl-1.10.1"
+          "store_path": "/nix/store/b9sid26w0lnafiyzxpyxcink9crcvzh6-clusterctl-1.12.2"
         }
       }
     },

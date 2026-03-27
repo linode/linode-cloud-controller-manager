@@ -95,6 +95,7 @@ func main() {
 	command.Flags().StringVar(&ccmOptions.Options.NodeBalancerBackendIPv4Subnet, "nodebalancer-backend-ipv4-subnet", "", "ipv4 subnet to use for NodeBalancer backends")
 	command.Flags().StringSliceVar(&ccmOptions.Options.NodeBalancerTags, "nodebalancer-tags", []string{}, "Linode tags to apply to all NodeBalancers")
 	command.Flags().BoolVar(&ccmOptions.Options.EnableIPv6ForLoadBalancers, "enable-ipv6-for-loadbalancers", false, "set both IPv4 and IPv6 addresses for all LoadBalancer services (when disabled, only IPv4 is used)")
+	command.Flags().BoolVar(&ccmOptions.Options.EnableIPv6ForNodeBalancerBackends, "enable-ipv6-for-nodebalancer-backends", false, "use public IPv6 addresses for NodeBalancer service backends, including VPC-backed NodeBalancers (when enabled, may update existing services during reconciliation and all selected backend nodes must have public IPv6)")
 	command.Flags().IntVar(&ccmOptions.Options.NodeCIDRMaskSizeIPv4, "node-cidr-mask-size-ipv4", 0, "ipv4 cidr mask size for pod cidrs allocated to nodes")
 	command.Flags().IntVar(&ccmOptions.Options.NodeCIDRMaskSizeIPv6, "node-cidr-mask-size-ipv6", 0, "ipv6 cidr mask size for pod cidrs allocated to nodes")
 	command.Flags().IntVar(&ccmOptions.Options.NodeBalancerBackendIPv4SubnetID, "nodebalancer-backend-ipv4-subnet-id", 0, "ipv4 subnet id to use for NodeBalancer backends")

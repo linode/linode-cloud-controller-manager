@@ -1,7 +1,6 @@
 {
   "packages": [
     "ctlptl@latest",
-    "clusterctl@latest",
     "docker@29.2.0",
     "envsubst@latest",
     "go@1.26.0",
@@ -12,15 +11,21 @@
     "kustomize@5.8.0",
     "kyverno-chainsaw@latest",
     "mockgen@1.6.0",
-    "yq-go@4.52.2"
+    "yq-go@4.52.2",
+    "clusterctl@1.12.2"
   ],
   "shell": {
     "init_hook": [
       "export \"GOROOT=$(go env GOROOT)\""
     ],
     "scripts": {
+      "build-and-push": "make build-and-push",
       "mgmt-and-capl-cluster": "make mgmt-and-capl-cluster",
+      "mgmt-cluster": "make mgmt-cluster",
+      "capl-cluster": "make capl-cluster",
+      "capl-ipv6-cluster": "make capl-ipv6-cluster",
       "e2e-test": "make e2e-test",
+      "e2e-test-ipv6-backends": "make e2e-test-ipv6-backends",
       "e2e-test-bgp": "make e2e-test-bgp",
       "e2e-test-subnet": "make e2e-test-subnet",
       "cleanup-cluster": "make cleanup-cluster"
