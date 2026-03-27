@@ -108,6 +108,13 @@ tolerations:
 # This can also be controlled per-service using the "service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-ingress" annotation
 # enableIPv6ForLoadBalancers: true
 
+# Enable public IPv6 backend addresses for NodeBalancer services.
+# VPC IPv6 backend addresses are not currently supported.
+# When enabled globally, both newly created and existing eligible services may be reconciled to use IPv6 backends.
+# Per-service behavior can be overridden with the "service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-backends" annotation; set it to "false" to keep a service on IPv4 backends only.
+# If your cluster uses VPC-backed NodeBalancers, the nodes must still expose public IPv6 endpoints so CCM can read the node.k8s.linode.com/public-ipv6 annotation and program IPv6 backends.
+# enableIPv6ForNodeBalancerBackends: false
+
 # disableNodeBalancerVPCBackends is used to disable the use of VPC backends for NodeBalancers.
 # When set to true, NodeBalancers will use linode private IPs for backends instead of VPC IPs.
 # disableNodeBalancerVPCBackends: false

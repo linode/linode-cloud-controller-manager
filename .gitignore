@@ -39,3 +39,8 @@ coverage.txt
 junit.xml
 
 .DS_Store
+
+# Local cluster artifacts
+*-manifests.yaml
+*-kubeconfig.yaml
+.opencode/

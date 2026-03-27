@@ -53,6 +53,7 @@ The CCM supports the following flags:
 | `--nodebalancer-backend-ipv4-subnet-name` | String | `""` | ipv4 subnet name to use for NodeBalancer backends |
 | `--disable-nodebalancer-vpc-backends` | Boolean | `false` | don't use VPC specific ip-addresses for nodebalancer backend ips when running in VPC (set to `true` for backward compatibility if needed) |
 | `--enable-ipv6-for-loadbalancers` | Boolean | `false` | Set both IPv4 and IPv6 addresses for all LoadBalancer services (when disabled, only IPv4 is used). This can also be configured per-service using the `service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-ingress` annotation. |
+| `--enable-ipv6-for-nodebalancer-backends` | Boolean | `false` | Use node public IPv6 addresses for NodeBalancer service backends. VPC IPv6 backend addresses are not supported. Can also be configured per-service using the `service.beta.kubernetes.io/linode-loadbalancer-enable-ipv6-backends` annotation. |
 | `--node-cidr-mask-size-ipv4` | Int | `24` | ipv4 cidr mask size for pod cidrs allocated to nodes |
 | `--node-cidr-mask-size-ipv6` | Int | `64` | ipv6 cidr mask size for pod cidrs allocated to nodes |
 | `--nodebalancer-prefix` | String | `ccm` | Name prefix for NoadBalancers. |

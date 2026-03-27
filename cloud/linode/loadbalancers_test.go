@@ -8,6 +8,7 @@ import (
 	stderrors "errors"
 	"fmt"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -4072,6 +4073,390 @@ func Test_getNodePrivateIP(t *testing.T) {
 				t.Logf("actual: %q", ip)
 			}
 		})
+	}
+}
+
+func Test_getNodeBackendIP(t *testing.T) {
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "svc",
+			Namespace: "default",
+		},
+	}
+
+	testcases := []struct {
+		name            string
+		node            *v1.Node
+		subnetID        int
+		useIPv6Backends bool
+		expectedIP      string
+		expectErr       bool
+	}{
+		{
+			name: "uses existing IPv4 path for non-vpc services",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-1",
+					Annotations: map[string]string{
+						annotations.AnnLinodeNodePrivateIP: "192.168.10.10",
+					},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{Type: v1.NodeInternalIP, Address: "10.0.0.2"},
+						{Type: v1.NodeExternalIP, Address: "2600:3c06::1"},
+					},
+				},
+			},
+			expectedIP: "192.168.10.10",
+		},
+		{
+			name: "uses public IPv6 annotation when IPv6 backends are enabled",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-1",
+					Annotations: map[string]string{
+						annotations.AnnLinodeNodePublicIPv6: "2600:3c06::1/128",
+					},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{Type: v1.NodeExternalIP, Address: "172.232.0.2"},
+						{Type: v1.NodeExternalIP, Address: "fd00::10"},
+					},
+				},
+			},
+			useIPv6Backends: true,
+			expectedIP:      "2600:3c06::1",
+		},
+		{
+			name: "uses public IPv6 annotation even when VPC backends are enabled",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-1",
+					Annotations: map[string]string{
+						annotations.AnnLinodeNodePrivateIP: "192.168.10.10",
+						annotations.AnnLinodeNodePublicIPv6: "2600:3c06::1/128",
+					},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{Type: v1.NodeInternalIP, Address: "10.0.0.2"},
+						{Type: v1.NodeExternalIP, Address: "fd00::20"},
+					},
+				},
+			},
+			subnetID:        100,
+			useIPv6Backends: true,
+			expectedIP:      "2600:3c06::1",
+		},
+		{
+			name: "errors when public IPv6 annotation is missing prefix length",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-1",
+					Annotations: map[string]string{
+						annotations.AnnLinodeNodePublicIPv6: "2600:3c06::2",
+					},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{Type: v1.NodeExternalIP, Address: "172.232.0.2"},
+						{Type: v1.NodeExternalIP, Address: "fd00::11"},
+					},
+				},
+			},
+			useIPv6Backends: true,
+			expectErr:       true,
+		},
+		{
+			name: "errors when public IPv6 annotation is not a valid IPv6 value",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-1",
+					Annotations: map[string]string{
+						annotations.AnnLinodeNodePublicIPv6: "not-an-ip",
+					},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{Type: v1.NodeExternalIP, Address: "172.232.0.2"},
+						{Type: v1.NodeExternalIP, Address: "2600:3c06::1"},
+					},
+				},
+			},
+			useIPv6Backends: true,
+			expectErr:       true,
+		},
+		{
+			name: "errors when IPv6 backends are requested and node lacks public IPv6 annotation",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "node-1"},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{Type: v1.NodeExternalIP, Address: "172.232.0.2"},
+						{Type: v1.NodeExternalIP, Address: "2600:3c06::1"},
+					},
+				},
+			},
+			useIPv6Backends: true,
+			expectErr:       true,
+		},
+	}
+
+	for _, test := range testcases {
+		t.Run(test.name, func(t *testing.T) {
+			ip, err := getNodeBackendIP(service, test.node, test.subnetID, test.useIPv6Backends)
+			if test.expectErr {
+				if err == nil {
+					t.Fatal("expected error")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if ip != test.expectedIP {
+				t.Fatalf("expected backend address %q, got %q", test.expectedIP, ip)
+			}
+		})
+	}
+}
+
+func Test_resolveIPv6NodeBalancerBackendState(t *testing.T) {
+	prev := options.Options.EnableIPv6ForNodeBalancerBackends
+	defer func() {
+		options.Options.EnableIPv6ForNodeBalancerBackends = prev
+	}()
+
+	testcases := []struct {
+		name            string
+		globalFlag      bool
+		service         *v1.Service
+		expectedUseIPv6 bool
+	}{
+		{
+			name:       "service annotation enables IPv6",
+			globalFlag: false,
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotations.AnnLinodeEnableIPv6Backends: "true",
+					},
+				},
+			},
+			expectedUseIPv6: true,
+		},
+		{
+			name:            "service annotation disables IPv6 even when global flag is enabled",
+			globalFlag:      true,
+			service:         &v1.Service{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{annotations.AnnLinodeEnableIPv6Backends: "false"}}},
+			expectedUseIPv6: false,
+		},
+		{
+			name:            "services use global IPv6 backend flag when annotation is absent",
+			globalFlag:      true,
+			service:         &v1.Service{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}},
+			expectedUseIPv6: true,
+		},
+		{
+			name:            "services do not use IPv6 when annotation is absent and global flag is disabled",
+			globalFlag:      false,
+			service:         &v1.Service{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}},
+			expectedUseIPv6: false,
+		},
+	}
+
+	for _, test := range testcases {
+		t.Run(test.name, func(t *testing.T) {
+			options.Options.EnableIPv6ForNodeBalancerBackends = test.globalFlag
+			useIPv6Backends := resolveIPv6NodeBalancerBackendState(test.service)
+			if useIPv6Backends != test.expectedUseIPv6 {
+				t.Fatalf("expected useIPv6Backends=%t, got %t", test.expectedUseIPv6, useIPv6Backends)
+			}
+		})
+	}
+}
+
+func Test_buildLoadBalancerRequestOmitsVPCConfigForIPv6Backends(t *testing.T) {
+	prevVPCNames := options.Options.VPCNames
+	prevSubnetNames := options.Options.SubnetNames
+	prevDisableVPC := options.Options.DisableNodeBalancerVPCBackends
+	prevEnableIPv6Backends := options.Options.EnableIPv6ForNodeBalancerBackends
+	defer func() {
+		options.Options.VPCNames = prevVPCNames
+		options.Options.SubnetNames = prevSubnetNames
+		options.Options.DisableNodeBalancerVPCBackends = prevDisableVPC
+		options.Options.EnableIPv6ForNodeBalancerBackends = prevEnableIPv6Backends
+	}()
+
+	options.Options.VPCNames = []string{"test-vpc"}
+	options.Options.SubnetNames = []string{"default"}
+	options.Options.DisableNodeBalancerVPCBackends = false
+
+	testcases := []struct {
+		name        string
+		globalFlag  bool
+		annotations map[string]string
+	}{
+		{
+			name:       "service annotation omits VPC config for IPv6 backends",
+			globalFlag: false,
+			annotations: map[string]string{
+				annotations.AnnLinodeDefaultProtocol:    "tcp",
+				annotations.AnnLinodeEnableIPv6Backends: "true",
+			},
+		},
+		{
+			name:       "global flag omits VPC config for IPv6 backends",
+			globalFlag: true,
+			annotations: map[string]string{
+				annotations.AnnLinodeDefaultProtocol: "tcp",
+			},
+		},
+	}
+
+	for _, test := range testcases {
+		t.Run(test.name, func(t *testing.T) {
+			options.Options.EnableIPv6ForNodeBalancerBackends = test.globalFlag
+
+			fake := newFake(t)
+			ts := httptest.NewServer(fake)
+			defer ts.Close()
+
+			client := linodego.NewClient(http.DefaultClient)
+			client.SetBaseURL(ts.URL)
+			lb, ok := newLoadbalancers(&client, "us-west").(*loadbalancers)
+			if !ok {
+				t.Fatal("type assertion failed")
+			}
+
+			fake.vpc[1] = &linodego.VPC{
+				ID:    1,
+				Label: "test-vpc",
+				Subnets: []linodego.VPCSubnet{
+					{
+						ID:    101,
+						Label: "default",
+						IPv4:  "10.0.0.0/8",
+					},
+				},
+			}
+			fake.subnet[101] = &linodego.VPCSubnet{
+				ID:    101,
+				Label: "default",
+				IPv4:  "10.0.0.0/8",
+			}
+
+			svc := &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test",
+					UID:         "foobar123",
+					Annotations: test.annotations,
+				},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
+						{
+							Name:     "test",
+							Protocol: "TCP",
+							Port:     int32(80),
+							NodePort: int32(30000),
+						},
+					},
+				},
+			}
+			nodes := []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-1",
+						Annotations: map[string]string{
+							annotations.AnnLinodeNodePublicIPv6: "2600:3c06:e727:1::1/128",
+						},
+					},
+					Status: v1.NodeStatus{
+						Addresses: []v1.NodeAddress{
+							{Type: v1.NodeInternalIP, Address: "10.0.0.2"},
+							{Type: v1.NodeExternalIP, Address: "fd00::30"},
+						},
+					},
+				},
+			}
+
+			_, err := lb.buildLoadBalancerRequest(t.Context(), "linodelb", svc, nodes)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var req *fakeRequest
+			for request := range fake.requests {
+				if request.Method == http.MethodPost && request.Path == "/nodebalancers" {
+					req = &request
+					break
+				}
+			}
+			if req == nil {
+				t.Fatal("expected nodebalancer create request")
+			}
+
+			var createOpts linodego.NodeBalancerCreateOptions
+			if err := json.Unmarshal([]byte(req.Body), &createOpts); err != nil {
+				t.Fatalf("unable to unmarshal create request body %#v, error: %#v", req.Body, err)
+			}
+			if len(createOpts.VPCs) != 0 {
+				t.Fatalf("expected nodebalancer create request to omit VPC config for IPv6 backends, got %#v", createOpts.VPCs)
+			}
+			if len(createOpts.Configs) != 1 || len(createOpts.Configs[0].Nodes) != 1 {
+				t.Fatalf("expected a single nodebalancer config with one backend node, got %#v", createOpts.Configs)
+			}
+			if createOpts.Configs[0].Nodes[0].SubnetID != 0 {
+				t.Fatalf("expected IPv6 backend node to omit subnet ID, got %#v", createOpts.Configs[0].Nodes[0])
+			}
+			host, _, hostPortErr := net.SplitHostPort(createOpts.Configs[0].Nodes[0].Address)
+			if hostPortErr != nil {
+				t.Fatal(hostPortErr)
+			}
+			if parsedIP := net.ParseIP(host); parsedIP == nil || parsedIP.To4() != nil {
+				t.Fatalf("expected IPv6 backend node address, got %q", createOpts.Configs[0].Nodes[0].Address)
+			}
+		})
+	}
+}
+
+func Test_buildNodeBalancerNodeConfigRebuildOptionsOmitsSubnetIDForIPv6Backends(t *testing.T) {
+	lb := &loadbalancers{}
+	service := &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc-test", Namespace: "default"}}
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-1",
+			Annotations: map[string]string{
+				annotations.AnnLinodeNodePublicIPv6: "2600:3c06:e727:1::1/128",
+			},
+		},
+	}
+
+	opts, err := lb.buildNodeBalancerNodeConfigRebuildOptions(service, node, 30000, 101, true, linodego.ProtocolTCP)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opts.SubnetID != 0 {
+		t.Fatalf("expected IPv6 backend rebuild options to omit subnet ID, got %#v", opts)
+	}
+}
+
+func Test_formatNodeBalancerBackendAddress(t *testing.T) {
+	if got := formatNodeBalancerBackendAddress("192.168.0.10", 30000); got != "192.168.0.10:30000" {
+		t.Fatalf("unexpected IPv4 backend address format: %s", got)
+	}
+
+	got := formatNodeBalancerBackendAddress("2600:3c06::1", 30000)
+	host, port, err := net.SplitHostPort(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if host != "2600:3c06::1" || port != "30000" {
+		t.Fatalf("unexpected IPv6 backend address format: host=%s port=%s", host, port)
 	}
 }
 

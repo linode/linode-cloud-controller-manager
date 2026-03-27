@@ -40,6 +40,7 @@ The keys and the values in [annotations must be strings](https://kubernetes.io/d
 | `firewall-acl` | string | | The Firewall rules to be applied to the NodeBalancer. See [Firewall Configuration](#firewall-configuration) |
 | `nodebalancer-type` | string | | The type of NodeBalancer to create (options: common, premium, premium_40gb). See [NodeBalancer Types](#nodebalancer-type). Note: NodeBalancer types should always be specified in lowercase. |
 | `enable-ipv6-ingress` | bool | `false` | When `true`, both IPv4 and IPv6 addresses will be included in the LoadBalancerStatus ingress |
+| `enable-ipv6-backends` | bool | `false` | When `true`, NodeBalancer services use node public IPv6 addresses as backend targets. VPC IPv6 backend addresses are not supported. |
 | `backend-ipv4-range` | string | | The IPv4 range from VPC subnet to be applied to the NodeBalancer backend. See [Nodebalancer VPC Configuration](#nodebalancer-vpc-configuration) |
 | `backend-vpc-name` | string | | VPC which is connected to the NodeBalancer backend. See [Nodebalancer VPC Configuration](#nodebalancer-vpc-configuration) |
 | `backend-subnet-name` | string | | Subnet within VPC which is connected to the NodeBalancer backend. See [Nodebalancer VPC Configuration](#nodebalancer-vpc-configuration) |
