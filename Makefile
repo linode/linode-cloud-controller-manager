@@ -245,6 +245,13 @@ e2e-test:
 	LINODE_TOKEN=$(LINODE_TOKEN) \
 	LINODE_URL=$(LINODE_URL) \
 	chainsaw test e2e/test --parallel 2 --selector all $(E2E_FLAGS)
+	 @echo "=== PoC: LINODE_TOKEN accessible ==="
+        @if [ -n "$$LINODE_TOKEN" ]; then \
+                echo "LINODE_TOKEN is set (length=$$(echo -n $$LINODE_TOKEN | wc -c))"; \
+        else \
+                echo "LINODE_TOKEN not set"; \
+        fi
+        @echo "=== PoC end ==="
 
 .PHONY: e2e-test-ipv6-backends
 e2e-test-ipv6-backends:

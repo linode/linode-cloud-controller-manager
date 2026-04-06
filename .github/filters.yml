@@ -1,3 +1,4 @@
 # Any file that is not a doc *.md file
-src:
-  - "!**/*.md"
+ # .github/filters.yml
+  src:
+    - "**"   # força src: true independente dos arquivos alterados
