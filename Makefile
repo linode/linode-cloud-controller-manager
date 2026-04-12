@@ -39,7 +39,7 @@ CAAPH_VERSION           ?= "v0.2.1"
 CAPL_VERSION            ?= "v0.8.5"
 
 # renovate: datasource=github-tags depName=golangci/golangci-lint
-GOLANGCI_LINT_VERSION   ?= "v2.11.3"
+GOLANGCI_LINT_VERSION   ?= "v2.11.4"
 
 CONTROLPLANE_NODES      ?= 1
 WORKER_NODES            ?= 1
