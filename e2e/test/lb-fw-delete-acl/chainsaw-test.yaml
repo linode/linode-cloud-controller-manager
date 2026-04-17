@@ -99,8 +99,6 @@ spec:
                   -H "accept: application/json" \
                   "$LINODE_URL/v4/networking/firewalls/${fwid}" || true)
 
-                echo "attempt $i: fwCount=$fwCount fwRespCode=$fwRespCode"
-
                 if [[ $fwCount -eq 0 && $fwRespCode -eq "404" ]]; then
                     echo "firewall detatched and deleted"
                     break

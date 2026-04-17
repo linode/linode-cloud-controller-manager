@@ -177,7 +177,7 @@ spec:
               #Run a curl command to the service ip
               URL="http://$service_ip:80/"
               for i in {1..10}; do
-                HTTP_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+                HTTP_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
                 if [ "$HTTP_RESPONSE" -eq 200 ]; then
                    echo "Request was successful (HTTP 200)"
                    break
