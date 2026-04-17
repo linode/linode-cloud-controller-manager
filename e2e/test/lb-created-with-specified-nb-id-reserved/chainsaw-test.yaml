@@ -170,7 +170,6 @@ spec:
               else
                 echo "IPs do not match"
               fi
-              sleep 20
 
             check:
               ($error == null): true
