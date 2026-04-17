@@ -68,42 +68,41 @@ spec:
             content: |
               set -euo pipefail
 
+              nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+
+              fw=$(curl -s --request GET \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" --fail-early --retry 3 \
+                -H "accept: application/json" \
+                "$LINODE_URL/v4/nodebalancers/${nbid}/firewalls" || true)
+
+              fwid=$(echo $fw | jq -r '.data[].id')
+
+              # Patch service to remove ACL annotation
+              kubectl patch service svc-test -n $NAMESPACE --type=json -p='[{"op": "remove", "path": "/metadata/annotations/service.beta.kubernetes.io~1linode-loadbalancer-firewall-acl"}]'
+
               for i in {1..10}; do
-                  nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+                # Check that firewall is no longer attached to nb
+                fw=$(curl -s --request GET \
+                  -H "Authorization: Bearer $LINODE_TOKEN" \
+                  -H "Content-Type: application/json" --fail-early --retry 3 \
+                  -H "accept: application/json" \
+                  "$LINODE_URL/v4/nodebalancers/${nbid}/firewalls" || true)
 
-                  fw=$(curl -s --request GET \
-                    -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "Content-Type: application/json" --fail-early --retry 3 \
-                    -H "accept: application/json" \
-                    "$LINODE_URL/v4/nodebalancers/${nbid}/firewalls" || true)
-                  
-                  fwid=$(echo $fw | jq -r '.data[].id')
+                fwCount=$(echo $fw | jq -r '.data | length')
 
-                  # Patch service to remove ACL annotation
-                  kubectl patch service svc-test -n $NAMESPACE --type=json -p='[{"op": "remove", "path": "/metadata/annotations/service.beta.kubernetes.io~1linode-loadbalancer-firewall-acl"}]'
-                  sleep 5
+                # Check if firewall is deleted
+                fwRespCode=$(curl -s -o /dev/null -w "%{http_code}" \
+                  --request GET \
+                  -H "Authorization: Bearer $LINODE_TOKEN" \
+                  -H "accept: application/json" \
+                  "$LINODE_URL/v4/networking/firewalls/${fwid}" || true)
 
-                  # Check that firewall is no longer attached to nb
-                  fw=$(curl -s --request GET \
-                    -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "Content-Type: application/json" --fail-early --retry 3 \
-                    -H "accept: application/json" \
-                    "$LINODE_URL/v4/nodebalancers/${nbid}/firewalls" || true)
-                  
-                  fwCount=$(echo $fw | jq -r '.data | length')
-
-                  # Check if firewall is deleted
-                  fwRespCode=$(curl -s -o /dev/null -w "%{http_code}" \
-                    --request GET \
-                    -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "accept: application/json" \
-                    "$LINODE_URL/v4/networking/firewalls/${fwid}" || true)
-
-                  if [[ $fwCount -eq 0 && $fwRespCode -eq "404" ]]; then
-                      echo "firewall detatched and deleted"
-                      break
-                  fi
-                  sleep 10
+                if [[ $fwCount -eq 0 && $fwRespCode -eq "404" ]]; then
+                    echo "firewall detatched and deleted"
+                    break
+                fi
+                sleep 10
               done
             check:
                 ($error == null): true
