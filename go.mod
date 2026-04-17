@@ -14,15 +14,15 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
-	k8s.io/api v0.35.2
-	k8s.io/apimachinery v0.35.2
-	k8s.io/client-go v0.35.2
-	k8s.io/cloud-provider v0.35.2
-	k8s.io/component-base v0.35.2
-	k8s.io/component-helpers v0.35.2
+	k8s.io/api v0.35.4
+	k8s.io/apimachinery v0.35.4
+	k8s.io/client-go v0.35.4
+	k8s.io/cloud-provider v0.35.4
+	k8s.io/component-base v0.35.4
+	k8s.io/component-helpers v0.35.4
 	k8s.io/klog/v2 v2.140.0
-	k8s.io/kubernetes v1.35.2
-	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
+	k8s.io/kubernetes v1.35.4
+	k8s.io/utils v0.0.0-20260319190234-28399d86e0b5
 )
 
 require (
@@ -124,12 +124,12 @@ require (
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.61.0 // indirect
-	go.opentelemetry.io/otel v1.40.0 // indirect
+	go.opentelemetry.io/otel v1.41.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.34.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.34.0 // indirect
-	go.opentelemetry.io/otel/metric v1.40.0 // indirect
+	go.opentelemetry.io/otel/metric v1.41.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.40.0 // indirect
-	go.opentelemetry.io/otel/trace v1.40.0 // indirect
+	go.opentelemetry.io/otel/trace v1.41.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.7.0 // indirect
 	go.uber.org/dig v1.17.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
@@ -157,9 +157,9 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.35.2 // indirect
-	k8s.io/apiserver v0.35.2 // indirect
-	k8s.io/controller-manager v0.35.2 // indirect
-	k8s.io/kms v0.35.2 // indirect
+	k8s.io/apiserver v0.35.4 // indirect
+	k8s.io/controller-manager v0.35.4 // indirect
+	k8s.io/kms v0.35.4 // indirect
 	k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912 // indirect
 	k8s.io/kubelet v0.0.0 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 // indirect
@@ -171,19 +171,19 @@ require (
 
 replace (
 	github.com/linode/linodego => github.com/linode/linodego v1.64.1-0.20260110062643-8a0a88cf96c9
-	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.35.2
-	k8s.io/cri-api => k8s.io/cri-api v0.35.2
-	k8s.io/cri-client => k8s.io/cri-client v0.35.2
-	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.35.2
-	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.35.2
-	k8s.io/externaljwt => k8s.io/externaljwt v0.35.2
-	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.35.2
-	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.35.2
-	k8s.io/kube-proxy => k8s.io/kube-proxy v0.35.2
-	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.35.2
-	k8s.io/kubelet => k8s.io/kubelet v0.35.2
-	k8s.io/metrics => k8s.io/metrics v0.35.2
-	k8s.io/mount-utils => k8s.io/mount-utils v0.35.2
-	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.35.2
-	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.35.2
+	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.35.4
+	k8s.io/cri-api => k8s.io/cri-api v0.35.4
+	k8s.io/cri-client => k8s.io/cri-client v0.35.4
+	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.35.4
+	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.35.4
+	k8s.io/externaljwt => k8s.io/externaljwt v0.35.4
+	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.35.4
+	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.35.4
+	k8s.io/kube-proxy => k8s.io/kube-proxy v0.35.4
+	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.35.4
+	k8s.io/kubelet => k8s.io/kubelet v0.35.4
+	k8s.io/metrics => k8s.io/metrics v0.35.4
+	k8s.io/mount-utils => k8s.io/mount-utils v0.35.4
+	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.35.4
+	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.35.4
 )
