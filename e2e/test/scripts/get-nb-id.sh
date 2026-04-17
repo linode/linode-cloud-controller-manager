@@ -9,8 +9,7 @@ if [[ -n "$1" ]]; then
     svcname="$1"
 fi
 
-hostname=$(kubectl get svc $svcname -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].hostname)
-ip=$(echo $hostname | awk -F'.' '{gsub("-", ".", $1); print $1}')
+ip=$(kubectl get svc "$svcname" -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 nbid=$(curl -s \
     -H "Authorization: Bearer $LINODE_TOKEN" \
     -H "Content-Type: application/json" --fail-early --retry 3 \
