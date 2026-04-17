@@ -82,6 +82,8 @@ spec:
               required_replicas=$((current_replicas + 1))
               KUBECONFIG=$MGMT_KUBECONFIG kubectl patch machinedeployment ${CLUSTER_NAME}-md-0 --type='merge' -p "{\"spec\":{\"replicas\":$required_replicas}}"
 
+              sleep 180
+
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
               echo "Nodebalancer ID: $nbid"
 
