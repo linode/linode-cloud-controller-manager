@@ -43,7 +43,6 @@ spec:
               set -euo pipefail
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-port-80='{"proxy-protocol": "v1"}'
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-port-8080='{"proxy-protocol": "v2"}'
-              sleep 10
     - name: Check NodeBalancerConfig for port 80 to have ProxyProtocol v1 and port 8080 to have ProxyProtocol v2
       try:
         - script:
@@ -52,19 +51,23 @@ spec:
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
-              nbconfig=$(curl -s \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                "$LINODE_URL/v4/nodebalancers/$nbid/configs")
+              for i in {1..10}; do
+                nbconfig=$(curl -s \
+                  -H "Authorization: Bearer $LINODE_TOKEN" \
+                  -H "Content-Type: application/json" --fail-early --retry 3 \
+                  "$LINODE_URL/v4/nodebalancers/$nbid/configs")
 
-              port_80_v1=$(echo $nbconfig | jq -r '.data[] | select(.port == 80) | .proxy_protocol == "v1"')
-              port_8080_v2=$(echo $nbconfig | jq -r '.data[] | select(.port == 8080) | .proxy_protocol == "v2"')
+                port_80_v1=$(echo $nbconfig | jq -r '.data[] | select(.port == 80) | .proxy_protocol == "v1"')
+                port_8080_v2=$(echo $nbconfig | jq -r '.data[] | select(.port == 8080) | .proxy_protocol == "v2"')
 
-              if [[ $port_80_v1 == "true" && $port_8080_v2 == "true" ]]; then
-                  echo "Conditions met"
-              else
-                  echo "Conditions not met"
-              fi
+                if [[ $port_80_v1 == "true" && $port_8080_v2 == "true" ]]; then
+                    echo "Conditions met"
+                    break
+                else
+                    echo "Conditions not met"
+                fi
+                sleep 10
+              done
             check:
               ($error): ~
               (contains($stdout, 'Conditions met')): true
@@ -76,7 +79,6 @@ spec:
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-default-proxy-protocol=v2
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-port-80-
               kubectl annotate --overwrite svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-port-8080='{"proxy-protocol": "v1"}'
-              sleep 10
             check:
               ($error == null): true
     - name: Check NodeBalancerConfig for port 80 to have ProxyProtocol v2 and port 8080 to have ProxyProtocol v1
@@ -87,19 +89,23 @@ spec:
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
-              nbconfig=$(curl -s \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                "$LINODE_URL/v4/nodebalancers/$nbid/configs")
+              for i in {1..10}; do
+                nbconfig=$(curl -s \
+                  -H "Authorization: Bearer $LINODE_TOKEN" \
+                  -H "Content-Type: application/json" --fail-early --retry 3 \
+                  "$LINODE_URL/v4/nodebalancers/$nbid/configs")
 
-              port_80_v2=$(echo $nbconfig | jq -r '.data[] | select(.port == 80) | .proxy_protocol == "v2"')
-              port_8080_v1=$(echo $nbconfig | jq -r '.data[] | select(.port == 8080) | .proxy_protocol == "v1"')
+                port_80_v2=$(echo $nbconfig | jq -r '.data[] | select(.port == 80) | .proxy_protocol == "v2"')
+                port_8080_v1=$(echo $nbconfig | jq -r '.data[] | select(.port == 8080) | .proxy_protocol == "v1"')
 
-              if [[ $port_80_v2 == "true" && $port_8080_v1 == "true" ]]; then
-                  echo "Conditions met"
-              else
-                  echo "Conditions not met"
-              fi
+                if [[ $port_80_v2 == "true" && $port_8080_v1 == "true" ]]; then
+                    echo "Conditions met"
+                    break
+                else
+                    echo "Conditions not met"
+                fi
+                sleep 10
+              done
             check:
               ($error): ~
               (contains($stdout, 'Conditions met')): true
