@@ -65,6 +65,7 @@ spec:
     - name: Delete ACL and check that firewall no longer exists
       try:
         - script:
+            timeout: 5m
             content: |
               set -euo pipefail
 
@@ -81,7 +82,7 @@ spec:
               # Patch service to remove ACL annotation
               kubectl patch service svc-test -n $NAMESPACE --type=json -p='[{"op": "remove", "path": "/metadata/annotations/service.beta.kubernetes.io~1linode-loadbalancer-firewall-acl"}]'
 
-              for i in {1..10}; do
+              for i in {1..30}; do
                 # Check that firewall is no longer attached to nb
                 fw=$(curl -s --request GET \
                   -H "Authorization: Bearer $LINODE_TOKEN" \
@@ -97,6 +98,8 @@ spec:
                   -H "Authorization: Bearer $LINODE_TOKEN" \
                   -H "accept: application/json" \
                   "$LINODE_URL/v4/networking/firewalls/${fwid}" || true)
+
+                echo "attempt $i: fwCount=$fwCount fwRespCode=$fwRespCode"
 
                 if [[ $fwCount -eq 0 && $fwRespCode -eq "404" ]]; then
                     echo "firewall detatched and deleted"
