@@ -27,7 +27,7 @@ IPV6_CLUSTER_NAME       ?= ipv6-$(shell git rev-parse --short HEAD)
 IPV6_MANIFEST_NAME      ?= ipv6-manifests
 
 # renovate: datasource=github-tags depName=kubernetes/kubernetes
-K8S_VERSION             ?= "v1.31.2"
+K8S_VERSION             ?= "v1.35.4"
 
 # renovate: datasource=github-tags depName=kubernetes-sigs/cluster-api
 CAPI_VERSION            ?= "v1.8.5"
