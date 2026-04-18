@@ -2,7 +2,7 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  name: c
+  name: lb-created-with-reserved-ip-multiple-change-ip
   labels:
     all:
     lke:
@@ -161,8 +161,6 @@ spec:
                 }
               }")
 
-              sleep 30
-
               patch2=$(kubectl patch service svc-test -n $NAMESPACE --patch "{
                 \"metadata\": {
                   \"annotations\": {
@@ -171,30 +169,25 @@ spec:
                 }
               }")
 
-              sleep 30
               if [[ "$patch" != "service/svc-test patched" ]]; then
                 echo "Unable to update annotation"
               fi
               if [[ "$patch2" != "service/svc-test patched" ]]; then
                 echo "Unable to update annotation"
               fi
-              
-              events=$(kubectl get events -n $NAMESPACE --field-selector reason=NodeBalancerIPChangeIgnored --sort-by='.lastTimestamp' -o json)
 
-              message=$(echo $events | jq .items[0].message)
-              message2=$(echo $events | jq .items[1].message)
+              for i in {1..10}; do
+                events=$(kubectl get events -n $NAMESPACE --field-selector reason=NodeBalancerIPChangeIgnored --sort-by='.lastTimestamp' -o json)
+                message=$(echo $events | jq .items[0].message)
+                message2=$(echo $events | jq .items[1].message)
 
-              if [[ "$message" =~ ^\"IPv4\ annotation\ changed\ to\ $reserved_ip2,\ but\ NodeBalancer\ \([0-9]+\)\ IP\ cannot\ be\ updated\ after\ creation.\ It\ will\ remain\ $reserved_ip\"$ ]]; then
-                echo "Warning event found"
-              else
-                echo "Warning event not found"
-              fi
-              
-              if [[ "$message2" =~ ^\"IPv4\ annotation\ changed\ to\ 100.10.10.10,\ but\ NodeBalancer\ \([0-9]+\)\ IP\ cannot\ be\ updated\ after\ creation.\ It\ will\ remain\ $reserved_ip\"$ ]]; then
-                echo "Warning event found"
-              else
-                echo "Warning event not found"
-              fi
+                if [[ "$message" =~ ^\"IPv4\ annotation\ changed\ to\ $reserved_ip2,\ but\ NodeBalancer\ \([0-9]+\)\ IP\ cannot\ be\ updated\ after\ creation.\ It\ will\ remain\ $reserved_ip\"$ ]] && \
+                   [[ "$message2" =~ ^\"IPv4\ annotation\ changed\ to\ 100.10.10.10,\ but\ NodeBalancer\ \([0-9]+\)\ IP\ cannot\ be\ updated\ after\ creation.\ It\ will\ remain\ $reserved_ip\"$ ]]; then
+                  echo "Warning event found"
+                  break
+                fi
+                sleep 10
+              done
             check:
               ($error == null): true
               (contains($stdout, 'No reserved ip found in configmap')): false

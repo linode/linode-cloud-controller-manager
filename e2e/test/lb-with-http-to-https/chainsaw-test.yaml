@@ -41,10 +41,9 @@ spec:
               set -euo pipefail
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-port-443='{"tls-secret-name": "tls-secret-1", "protocol": "https"}'
               kubectl patch svc svc-test -n $NAMESPACE --type='json' -p='[{"op": "add", "path": "/spec/ports/-", "value": {"name": "https", "port": 443, "targetPort": 8080, "protocol": "TCP"}}]'
-              sleep 10
             check:
               ($error == null): true
-    - name: Check endpoints
+    - name: Check endpoints have addresses
       try:
       - assert:
           resource:
@@ -54,7 +53,6 @@ spec:
               name: svc-test
             (subsets[0].addresses != null): true
             (subsets[0].ports != null): true
-            (length(subsets[0].ports)): 2
       catch:
         - describe:
             apiVersion: v1
@@ -62,6 +60,15 @@ spec:
         - describe:
             apiVersion: v1
             kind: Service
+    - name: Check endpoints have two ports
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Endpoints
+            metadata:
+              name: svc-test
+            (length(subsets[0].ports)): 2
     - name: Check that loadbalancer ip is assigned
       try:
       - assert:

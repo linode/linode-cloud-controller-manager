@@ -163,29 +163,32 @@ spec:
 
               parallel -j 2 patch_annotation ::: $reserved_ip2 "100.10.10.10"
 
-              sleep 20
+              for i in {1..10}; do
+                all_events=$(kubectl get events -n $NAMESPACE)
+                events=$(kubectl get events -n $NAMESPACE --field-selector reason=NodeBalancerIPChangeIgnored --sort-by='.lastTimestamp' -o json)
+                num_events=$(echo $events | jq '.items | length')
 
-              all_events=$(kubectl get events -n $NAMESPACE)
+                #k8s scheduler will flatten the work queue of updates for an object into a single reconcile call.
+                #If k8s scheduler squashes both the patches into 1 only 1 event is generated
 
-              events=$(kubectl get events -n $NAMESPACE --field-selector reason=NodeBalancerIPChangeIgnored --sort-by='.lastTimestamp' -o json)
-              num_events=$(echo $events | jq '.items | length')
+                if [[ num_events -eq 0 ]]; then
+                  sleep 10
+                  continue
+                fi
 
-              #k8s scheduler will flatten the work queue of updates for an object into a single reconcile call. 
-              #If k8s scheduler squashes both the patches into 1 only 1 event is generated
-
-              if [[ num_events -eq 0 ]]; then
-                echo "Warning event not found"
-              else
                 message=$(echo $events | jq .items[0].message)
                 if [[ "$message" =~ ^\"IPv4\ annotation\ changed\ to\ $reserved_ip2,\ but\ NodeBalancer\ \([0-9]+\)\ IP\ cannot\ be\ updated\ after\ creation.\ It\ will\ remain\ $reserved_ip\"$ || "$message" =~ ^\"IPv4\ annotation\ changed\ to\ 100.10.10.10,\ but\ NodeBalancer\ \([0-9]+\)\ IP\ cannot\ be\ updated\ after\ creation.\ It\ will\ remain\ $reserved_ip\"$ ]]; then
                   echo "First warning event found"
+                  break
                 elif [[ num_events -eq 2 ]]; then
                   message2=$(echo $events | jq .items[1].message)
                   if [[ "$message2" =~ ^\"IPv4\ annotation\ changed\ to\ $reserved_ip2,\ but\ NodeBalancer\ \([0-9]+\)\ IP\ cannot\ be\ updated\ after\ creation.\ It\ will\ remain\ $reserved_ip\"$ || "$message2" =~ ^\"IPv4\ annotation\ changed\ to\ 100.10.10.10,\ but\ NodeBalancer\ \([0-9]+\)\ IP\ cannot\ be\ updated\ after\ creation.\ It\ will\ remain\ $reserved_ip\"$ ]]; then
                     echo "Second warning event found"
+                    break
                   fi
                 fi
-              fi             
+                sleep 10
+              done
             check:
               ($error == null): true
               (contains($stdout, 'No reserved ip found in configmap')): false
