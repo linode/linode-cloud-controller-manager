@@ -53,12 +53,17 @@ spec:
               echo "Nodebalancer config found, updating config algorithm"
 
               kubectl annotate --overwrite svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-default-algorithm=ring_hash
-              sleep 5s
- 
+
               echo "Verifying that algorithm is set to ring hash"
-              nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
-              algorithm=$(echo $nbconfig | jq -r '.algorithm')
-              echo "algorithm is $algorithm"
+              for i in {1..10}; do
+                nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
+                algorithm=$(echo $nbconfig | jq -r '.algorithm')
+                echo "algorithm is $algorithm"
+                if [[ "$algorithm" == "ring_hash" ]]; then
+                  break
+                fi
+                sleep 10
+              done
             check:
               ($error == null): true
               (contains($stdout, 'algorithm is ring_hash')): true
