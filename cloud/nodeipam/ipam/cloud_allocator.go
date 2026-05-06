@@ -101,6 +101,15 @@ func NewLinodeCIDRAllocator(ctx context.Context, linodeClient linode.Client, cli
 		return nil, err
 	}
 
+	// Reserve the last block in the cluster range by occupying its last IP.
+	lastIP, err := netutils.GetIndexedIP(allocatorParams.ClusterCIDRs[0], int(netutils.RangeSize(allocatorParams.ClusterCIDRs[0]))-1)
+	if err != nil {
+		return nil, err
+	}
+	if err := cidrSet.Occupy(&net.IPNet{IP: lastIP.To4(), Mask: net.CIDRMask(32, 32)}); err != nil {
+		return nil, err
+	}
+
 	ca := &cloudAllocator{
 		client:                        client,
 		linodeClient:                  linodeClient,
@@ -184,7 +193,6 @@ func NewLinodeCIDRAllocator(ctx context.Context, linodeClient linode.Client, cli
 
 	return ca, nil
 }
-
 func (c *cloudAllocator) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 

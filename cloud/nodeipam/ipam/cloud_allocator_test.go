@@ -17,6 +17,7 @@ limitations under the License.
 package ipam
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"testing"
@@ -28,6 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/test"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -93,6 +95,50 @@ func TestComputeStableIPv6PodCIDR(t *testing.T) {
 				t.Fatalf("cidr mismatch: got %s want %s", got.String(), tc.wantCIDR)
 			}
 		})
+	}
+}
+
+func TestNewLinodeCIDRAllocatorReservesFinalCIDR(t *testing.T) {
+	_, clusterCIDR, err := netutils.ParseCIDRSloppy("10.0.0.0/28")
+	if err != nil {
+		t.Fatalf("parse cluster cidr: %v", err)
+	}
+
+	_, tCtx := ktesting.NewTestContext(t)
+	fakeNodeHandler := &testutil.FakeNodeHandler{Clientset: fake.NewClientset()}
+	allocatorParams := CIDRAllocatorParams{
+		ClusterCIDRs:      []*net.IPNet{clusterCIDR},
+		ServiceCIDR:       nil,
+		NodeCIDRMaskSizes: []int{30, 112},
+	}
+
+	allocator, err := NewLinodeCIDRAllocator(tCtx, nil, fakeNodeHandler, test.FakeNodeInformer(fakeNodeHandler), allocatorParams, nil)
+	if err != nil {
+		t.Fatalf("failed to create allocator: %v", err)
+	}
+
+	cloudAllocator, ok := allocator.(*cloudAllocator)
+	if !ok {
+		t.Fatalf("found non-default implementation of CIDRAllocator")
+	}
+
+	reserved := "10.0.0.12/30"
+
+	for i := 0; i < 3; i++ {
+		cidr, err := cloudAllocator.cidrSet.AllocateNext()
+		if err != nil {
+			t.Fatalf("unexpected error allocating cidr %d: %v", i, err)
+		}
+		if cidr.String() != fmt.Sprintf("10.0.0.%d/30", i*4) {
+			t.Fatalf("unexpected cidr %d: got %s", i, cidr.String())
+		}
+		if cidr.String() == reserved {
+			t.Fatalf("allocated reserved cidr %s", cidr.String())
+		}
+	}
+
+	if _, err := cloudAllocator.cidrSet.AllocateNext(); !errors.Is(err, cidrset.ErrCIDRRangeNoCIDRsRemaining) {
+		t.Fatalf("expected cidr exhaustion after reserving final block, got %v", err)
 	}
 }
 
