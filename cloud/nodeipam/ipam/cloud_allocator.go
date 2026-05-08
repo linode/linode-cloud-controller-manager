@@ -45,6 +45,8 @@ import (
 	netutils "k8s.io/utils/net"
 
 	linode "github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
 )
 
 type cloudAllocator struct {
@@ -101,13 +103,19 @@ func NewLinodeCIDRAllocator(ctx context.Context, linodeClient linode.Client, cli
 		return nil, err
 	}
 
-	// Reserve the last block in the cluster range by occupying its last IP.
-	lastIP, err := netutils.GetIndexedIP(allocatorParams.ClusterCIDRs[0], int(netutils.RangeSize(allocatorParams.ClusterCIDRs[0]))-1)
+	reserveFinalIPv4Block, err := shouldReserveFinalIPv4Block(ctx, linodeClient, allocatorParams.ClusterCIDRs[0])
 	if err != nil {
 		return nil, err
 	}
-	if err := cidrSet.Occupy(&net.IPNet{IP: lastIP.To4(), Mask: net.CIDRMask(32, 32)}); err != nil {
-		return nil, err
+	if reserveFinalIPv4Block {
+		// Reserve the last block in the cluster range by occupying its last IP.
+		lastIP, err := lastIPForCIDR(allocatorParams.ClusterCIDRs[0])
+		if err != nil {
+			return nil, err
+		}
+		if err := cidrSet.Occupy(&net.IPNet{IP: lastIP.To4(), Mask: net.CIDRMask(32, 32)}); err != nil {
+			return nil, err
+		}
 	}
 
 	ca := &cloudAllocator{
@@ -193,6 +201,45 @@ func NewLinodeCIDRAllocator(ctx context.Context, linodeClient linode.Client, cli
 
 	return ca, nil
 }
+
+func shouldReserveFinalIPv4Block(ctx context.Context, client linode.Client, clusterCIDR *net.IPNet) (bool, error) {
+	if clusterCIDR == nil || len(options.Options.VPCNames) == 0 || len(options.Options.SubnetNames) == 0 {
+		return false, nil
+	}
+
+	vpcID, err := services.GetVPCID(ctx, client, options.Options.VPCNames[0])
+	if err != nil {
+		return false, err
+	}
+	subnetID, err := services.GetSubnetID(ctx, client, vpcID, options.Options.SubnetNames[0])
+	if err != nil {
+		return false, err
+	}
+	subnet, err := client.GetVPCSubnet(ctx, vpcID, subnetID)
+	if err != nil {
+		return false, err
+	}
+	_, subnetCIDR, err := net.ParseCIDR(subnet.IPv4)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse subnet cidr %s: %w", subnet.IPv4, err)
+	}
+
+	clusterLastIP, err := lastIPForCIDR(clusterCIDR)
+	if err != nil {
+		return false, err
+	}
+	subnetLastIP, err := lastIPForCIDR(subnetCIDR)
+	if err != nil {
+		return false, err
+	}
+
+	return clusterLastIP.Equal(subnetLastIP), nil
+}
+
+func lastIPForCIDR(cidr *net.IPNet) (net.IP, error) {
+	return netutils.GetIndexedIP(cidr, int(netutils.RangeSize(cidr))-1)
+}
+
 func (c *cloudAllocator) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 

@@ -17,6 +17,7 @@ limitations under the License.
 package ipam
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -37,6 +38,8 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
 )
 
 type testCase struct {
@@ -98,48 +101,155 @@ func TestComputeStableIPv6PodCIDR(t *testing.T) {
 	}
 }
 
-func TestNewLinodeCIDRAllocatorReservesFinalCIDR(t *testing.T) {
+func TestNewLinodeCIDRAllocatorFinalCIDRReservation(t *testing.T) {
 	_, clusterCIDR, err := netutils.ParseCIDRSloppy("10.0.0.0/28")
 	if err != nil {
 		t.Fatalf("parse cluster cidr: %v", err)
 	}
 
-	_, tCtx := ktesting.NewTestContext(t)
-	fakeNodeHandler := &testutil.FakeNodeHandler{Clientset: fake.NewClientset()}
-	allocatorParams := CIDRAllocatorParams{
-		ClusterCIDRs:      []*net.IPNet{clusterCIDR},
-		ServiceCIDR:       nil,
-		NodeCIDRMaskSizes: []int{30, 112},
-	}
+	for _, tc := range []struct {
+		name        string
+		vpcNames    []string
+		subnetNames []string
+		subnetCIDR  string
+		wantCIDRs   []string
+	}{
+		{
+			name:        "reserve final cidr when subnet end matches",
+			vpcNames:    []string{"test-vpc"},
+			subnetNames: []string{"default"},
+			subnetCIDR:  "10.0.0.0/28",
+			wantCIDRs:   []string{"10.0.0.0/30", "10.0.0.4/30", "10.0.0.8/30"},
+		},
+		{
+			name:      "do not reserve final cidr without subnet target",
+			wantCIDRs: []string{"10.0.0.0/30", "10.0.0.4/30", "10.0.0.8/30", "10.0.0.12/30"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setNodeIPAMSubnetOptionsForTest(t, tc.vpcNames, tc.subnetNames)
 
-	allocator, err := NewLinodeCIDRAllocator(tCtx, nil, fakeNodeHandler, test.FakeNodeInformer(fakeNodeHandler), allocatorParams, nil)
+			var client *mocks.MockClient
+			if tc.subnetCIDR != "" {
+				ctrl := gomock.NewController(t)
+				client = mocks.NewMockClient(ctrl)
+				expectNodeIPAMSubnetLookup(client, tc.subnetCIDR)
+			}
+
+			_, tCtx := ktesting.NewTestContext(t)
+			fakeNodeHandler := &testutil.FakeNodeHandler{Clientset: fake.NewClientset()}
+			allocatorParams := CIDRAllocatorParams{
+				ClusterCIDRs:      []*net.IPNet{clusterCIDR},
+				ServiceCIDR:       nil,
+				NodeCIDRMaskSizes: []int{30, 112},
+			}
+
+			allocator, err := NewLinodeCIDRAllocator(tCtx, client, fakeNodeHandler, test.FakeNodeInformer(fakeNodeHandler), allocatorParams, nil)
+			if err != nil {
+				t.Fatalf("failed to create allocator: %v", err)
+			}
+
+			cloudAllocator, ok := allocator.(*cloudAllocator)
+			if !ok {
+				t.Fatalf("found non-default implementation of CIDRAllocator")
+			}
+
+			for i, wantCIDR := range tc.wantCIDRs {
+				cidr, err := cloudAllocator.cidrSet.AllocateNext()
+				if err != nil {
+					t.Fatalf("unexpected error allocating cidr %d: %v", i, err)
+				}
+				if cidr.String() != wantCIDR {
+					t.Fatalf("unexpected cidr %d: got %s want %s", i, cidr.String(), wantCIDR)
+				}
+			}
+
+			if _, err := cloudAllocator.cidrSet.AllocateNext(); !errors.Is(err, cidrset.ErrCIDRRangeNoCIDRsRemaining) {
+				t.Fatalf("expected cidr exhaustion after allocations, got %v", err)
+			}
+		})
+	}
+}
+
+func TestShouldReserveFinalIPv4Block(t *testing.T) {
+	_, clusterCIDR, err := net.ParseCIDR("10.0.4.0/22")
 	if err != nil {
-		t.Fatalf("failed to create allocator: %v", err)
+		t.Fatalf("parse cluster cidr: %v", err)
 	}
 
-	cloudAllocator, ok := allocator.(*cloudAllocator)
-	if !ok {
-		t.Fatalf("found non-default implementation of CIDRAllocator")
-	}
+	for _, tc := range []struct {
+		name        string
+		vpcNames    []string
+		subnetNames []string
+		subnetCIDR  string
+		want        bool
+	}{
+		{
+			name:        "cluster and subnet share end ip so reserve",
+			vpcNames:    []string{"test-vpc"},
+			subnetNames: []string{"default"},
+			subnetCIDR:  "10.0.0.0/21",
+			want:        true,
+		},
+		{
+			name:        "cluster and subnet end ip differ so no reserve",
+			vpcNames:    []string{"test-vpc"},
+			subnetNames: []string{"default"},
+			subnetCIDR:  "10.0.0.0/20",
+			want:        false,
+		},
+		{
+			name:     "missing subnet target does not reserve",
+			vpcNames: []string{"test-vpc"},
+			want:     false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setNodeIPAMSubnetOptionsForTest(t, tc.vpcNames, tc.subnetNames)
 
-	reserved := "10.0.0.12/30"
+			var client *mocks.MockClient
+			if tc.subnetCIDR != "" {
+				ctrl := gomock.NewController(t)
+				client = mocks.NewMockClient(ctrl)
+				expectNodeIPAMSubnetLookup(client, tc.subnetCIDR)
+			}
 
-	for i := 0; i < 3; i++ {
-		cidr, err := cloudAllocator.cidrSet.AllocateNext()
-		if err != nil {
-			t.Fatalf("unexpected error allocating cidr %d: %v", i, err)
-		}
-		if cidr.String() != fmt.Sprintf("10.0.0.%d/30", i*4) {
-			t.Fatalf("unexpected cidr %d: got %s", i, cidr.String())
-		}
-		if cidr.String() == reserved {
-			t.Fatalf("allocated reserved cidr %s", cidr.String())
-		}
+			reserve, err := shouldReserveFinalIPv4Block(context.Background(), client, clusterCIDR)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if reserve != tc.want {
+				t.Fatalf("unexpected reserve result: got %t want %t", reserve, tc.want)
+			}
+		})
 	}
+}
 
-	if _, err := cloudAllocator.cidrSet.AllocateNext(); !errors.Is(err, cidrset.ErrCIDRRangeNoCIDRsRemaining) {
-		t.Fatalf("expected cidr exhaustion after reserving final block, got %v", err)
-	}
+func expectNodeIPAMSubnetLookup(client *mocks.MockClient, subnetCIDR string) {
+	client.EXPECT().ListVPCs(gomock.Any(), gomock.Any()).Return([]linodego.VPC{{ID: 1, Label: "test-vpc"}}, nil)
+	client.EXPECT().ListVPCSubnets(gomock.Any(), 1, gomock.Any()).Return([]linodego.VPCSubnet{{ID: 2, Label: "default"}}, nil)
+	client.EXPECT().GetVPCSubnet(gomock.Any(), 1, 2).Return(&linodego.VPCSubnet{ID: 2, Label: "default", IPv4: subnetCIDR}, nil)
+}
+
+func setNodeIPAMSubnetOptionsForTest(t *testing.T, vpcNames, subnetNames []string) {
+	t.Helper()
+
+	prevVPCNames := options.Options.VPCNames
+	prevSubnetNames := options.Options.SubnetNames
+	prevVpcIDs := services.VpcIDs
+	prevSubnetIDs := services.SubnetIDs
+
+	options.Options.VPCNames = vpcNames
+	options.Options.SubnetNames = subnetNames
+	services.VpcIDs = map[string]int{}
+	services.SubnetIDs = map[string]int{}
+
+	t.Cleanup(func() {
+		options.Options.VPCNames = prevVPCNames
+		options.Options.SubnetNames = prevSubnetNames
+		services.VpcIDs = prevVpcIDs
+		services.SubnetIDs = prevSubnetIDs
+	})
 }
 
 func TestGetIPv6RangeFromLinodeInterface(t *testing.T) {
