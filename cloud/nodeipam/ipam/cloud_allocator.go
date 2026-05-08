@@ -103,6 +103,9 @@ func NewLinodeCIDRAllocator(ctx context.Context, linodeClient linode.Client, cli
 		return nil, err
 	}
 
+	// Using Linode API, check if we need to reserve the final block in the cluster CIDR.
+	// Reserve when cluster CIDR last IP is the same as the VPC subnet last IP. 
+	// We cannot reserve that block since the last IP is a reserved IP for VPC functionality.
 	reserveFinalIPv4Block, err := shouldReserveFinalIPv4Block(ctx, linodeClient, allocatorParams.ClusterCIDRs[0])
 	if err != nil {
 		return nil, err
