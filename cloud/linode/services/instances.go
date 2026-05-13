@@ -103,8 +103,7 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 		}
 		resp, err := GetVPCIPAddresses(ctx, client, vpcName)
 		if err != nil {
-			klog.Errorf("failed updating instances cache for VPC %s. Error: %s", vpcName, err.Error())
-			continue
+			return fmt.Errorf("failed updating instances cache for VPC %s: %w", vpcName, err)
 		}
 		for _, vpcip := range resp {
 			if vpcip.Address == nil {
@@ -115,8 +114,7 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 
 		resp, err = GetVPCIPv6Addresses(ctx, client, vpcName)
 		if err != nil {
-			klog.Errorf("failed updating instances cache for VPC %s. Error: %s", vpcName, err.Error())
-			continue
+			return fmt.Errorf("failed updating instances cache for VPC %s: %w", vpcName, err)
 		}
 		for _, vpcip := range resp {
 			if len(vpcip.IPv6Addresses) == 0 {
