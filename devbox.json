@@ -1,17 +1,17 @@
 {
   "packages": [
-    "ctlptl@latest",
-    "docker@29.2.0",
-    "envsubst@latest",
-    "go@1.26.0",
-    "golangci-lint@2.4.0",
-    "jq@latest",
-    "kind@latest",
-    "kubectl@latest",
-    "kustomize@5.8.0",
-    "kyverno-chainsaw@latest",
+    "ctlptl@0.9.3",
+    "docker@29.4.3",
+    "envsubst@1.4.3",
+    "go@1.26.2",
+    "golangci-lint@2.12.2",
+    "jq@1.8.1",
+    "kind@0.31.0",
+    "kubectl@1.36.1",
+    "kustomize@5.8.1",
+    "kyverno-chainsaw@0.2.14",
     "mockgen@1.6.0",
-    "yq-go@4.52.2",
+    "yq-go@4.53.2",
     "clusterctl@1.12.2"
   ],
   "shell": {
