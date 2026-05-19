@@ -456,6 +456,116 @@ func TestMalformedProviders(t *testing.T) {
 	})
 }
 
+func TestRefreshInstancesVPCErrors(t *testing.T) {
+	ctx := t.Context()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	c := mocks.NewMockClient(ctrl)
+
+	t.Run("returns error when GetVPCIPAddresses fails", func(t *testing.T) {
+		instances := NewInstances(c)
+		node := nodeWithProviderID(ccmUtils.ProviderIDPrefix + "123")
+
+		options.Options.VPCNames = []string{"test"}
+		VpcIDs["test"] = 1
+		defer func() {
+			options.Options.VPCNames = []string{}
+			delete(VpcIDs, "test")
+		}()
+
+		apiErr := fmt.Errorf("VPC API error")
+		c.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
+			{ID: 123, Label: "test-instance"},
+		}, nil)
+		c.EXPECT().ListVPCIPAddresses(gomock.Any(), 1, gomock.Any()).Return(nil, apiErr)
+
+		_, err := instances.InstanceExists(ctx, node)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "failed updating instances cache for VPC test")
+	})
+
+	t.Run("returns error when GetVPCIPv6Addresses fails", func(t *testing.T) {
+		instances := NewInstances(c)
+		node := nodeWithProviderID(ccmUtils.ProviderIDPrefix + "123")
+
+		options.Options.VPCNames = []string{"test"}
+		VpcIDs["test"] = 1
+		defer func() {
+			options.Options.VPCNames = []string{}
+			delete(VpcIDs, "test")
+		}()
+
+		vpcIP := "10.0.0.2"
+		apiErr := fmt.Errorf("VPC IPv6 API error")
+		c.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
+			{ID: 123, Label: "test-instance"},
+		}, nil)
+		c.EXPECT().ListVPCIPAddresses(gomock.Any(), 1, gomock.Any()).Return([]linodego.VPCIP{
+			{Address: &vpcIP, LinodeID: 123, VPCID: 1},
+		}, nil)
+		c.EXPECT().ListVPCIPv6Addresses(gomock.Any(), 1, gomock.Any()).Return(nil, apiErr)
+
+		_, err := instances.InstanceExists(ctx, node)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "failed updating instances cache for VPC test")
+	})
+
+	t.Run("does not update cache when GetVPCIPAddresses fails", func(t *testing.T) {
+		instances := NewInstances(c)
+		node := nodeWithProviderID(ccmUtils.ProviderIDPrefix + "123")
+
+		options.Options.VPCNames = []string{"test"}
+		VpcIDs["test"] = 1
+		defer func() {
+			options.Options.VPCNames = []string{}
+			delete(VpcIDs, "test")
+		}()
+
+		apiErr := fmt.Errorf("VPC API error")
+		c.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
+			{ID: 123, Label: "test-instance"},
+		}, nil)
+		c.EXPECT().ListVPCIPAddresses(gomock.Any(), 1, gomock.Any()).Return(nil, apiErr)
+
+		_, err := instances.InstanceExists(ctx, node)
+		require.Error(t, err)
+
+		// Cache must not be stamped so the next call retries instead of
+		// serving the empty/stale data that caused the original node-deletion bug.
+		assert.True(t, instances.nodeCache.lastUpdate.IsZero(), "cache lastUpdate should remain zero after a failed refresh")
+	})
+
+	t.Run("does not update cache when GetVPCIPv6Addresses fails", func(t *testing.T) {
+		instances := NewInstances(c)
+		node := nodeWithProviderID(ccmUtils.ProviderIDPrefix + "123")
+
+		options.Options.VPCNames = []string{"test"}
+		VpcIDs["test"] = 1
+		defer func() {
+			options.Options.VPCNames = []string{}
+			delete(VpcIDs, "test")
+		}()
+
+		vpcIP := "10.0.0.2"
+		apiErr := fmt.Errorf("VPC IPv6 API error")
+		c.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
+			{ID: 123, Label: "test-instance"},
+		}, nil)
+		c.EXPECT().ListVPCIPAddresses(gomock.Any(), 1, gomock.Any()).Return([]linodego.VPCIP{
+			{Address: &vpcIP, LinodeID: 123, VPCID: 1},
+		}, nil)
+		c.EXPECT().ListVPCIPv6Addresses(gomock.Any(), 1, gomock.Any()).Return(nil, apiErr)
+
+		_, err := instances.InstanceExists(ctx, node)
+		require.Error(t, err)
+
+		// Cache must not be stamped so the next call retries instead of
+		// serving the empty/stale data that caused the original node-deletion bug.
+		assert.True(t, instances.nodeCache.lastUpdate.IsZero(), "cache lastUpdate should remain zero after a failed refresh")
+	})
+}
+
 func TestInstanceShutdown(t *testing.T) {
 	ctx := t.Context()
 	ctrl := gomock.NewController(t)
