@@ -7,10 +7,15 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 
 	"golang.org/x/exp/slices"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 
@@ -21,12 +26,16 @@ import (
 
 const (
 	// The name of this cloudprovider
-	ProviderName           = "linode"
-	accessTokenEnv         = "LINODE_API_TOKEN"
-	regionEnv              = "LINODE_REGION"
-	ciliumLBType           = "cilium-bgp"
-	nodeBalancerLBType     = "nodebalancer"
-	tokenHealthCheckPeriod = 5 * time.Minute
+	ProviderName                = "linode"
+	regionEnv                   = "LINODE_REGION"
+	defaultTokenSecretName      = "ccm-linode"
+	defaultTokenSecretKey       = "apiToken"
+	defaultTokenSecretNamespace = "kube-system"
+	tokenSecretCacheTTLEnv      = "LINODE_API_TOKEN_CACHE_TTL_SECONDS"
+	defaultTokenSecretCacheTTL  = time.Minute
+	ciliumLBType                = "cilium-bgp"
+	nodeBalancerLBType          = "nodebalancer"
+	tokenHealthCheckPeriod      = 5 * time.Minute
 )
 
 var supportedLoadBalancerTypes = []string{ciliumLBType, nodeBalancerLBType}
@@ -43,7 +52,68 @@ var (
 	instanceCache               *services.Instances
 	ipHolderCharLimit           int = 23
 	NodeBalancerPrefixCharLimit int = 19
+
+	newKubernetesClient = defaultKubernetesClient
 )
+
+type tokenSecretProvider struct {
+	kubeClient kubernetes.Interface
+	namespace  string
+	name       string
+	key        string
+	now        func() time.Time
+	cacheTTL   time.Duration
+
+	mu          sync.RWMutex
+	cachedToken string
+	expiresAt   time.Time
+}
+
+func (t *tokenSecretProvider) String() string {
+	return fmt.Sprintf("%s/%s[%s]", t.namespace, t.name, t.key)
+}
+
+func (t *tokenSecretProvider) nowTime() time.Time {
+	if t.now != nil {
+		return t.now()
+	}
+
+	return time.Now()
+}
+
+func (t *tokenSecretProvider) GetToken(ctx context.Context) (string, error) {
+	now := t.nowTime()
+
+	t.mu.RLock()
+	if t.cachedToken != "" && now.Before(t.expiresAt) {
+		token := t.cachedToken
+		t.mu.RUnlock()
+		return token, nil
+	}
+	t.mu.RUnlock()
+
+	secret, err := t.kubeClient.CoreV1().Secrets(t.namespace).Get(ctx, t.name, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to get secret %s: %w", t.String(), err)
+	}
+
+	rawToken, found := secret.Data[t.key]
+	if !found {
+		return "", fmt.Errorf("secret %s does not contain key %q", t.String(), t.key)
+	}
+
+	token := string(rawToken)
+	if token == "" {
+		return "", fmt.Errorf("secret %s key %q is empty", t.String(), t.key)
+	}
+
+	t.mu.Lock()
+	t.cachedToken = token
+	t.expiresAt = t.nowTime().Add(t.cacheTTL)
+	t.mu.Unlock()
+
+	return token, nil
+}
 
 func init() {
 	registerMetrics()
@@ -56,8 +126,8 @@ func init() {
 
 // newLinodeClientWithPrometheus creates a new client kept in its own local
 // scope and returns an instrumented one that should be used and passed around
-func newLinodeClientWithPrometheus(apiToken string, timeout time.Duration) (client.Client, error) {
-	linodeClient, err := client.New(apiToken, timeout)
+func newLinodeClientWithPrometheus(apiToken string, timeout time.Duration, tokenProvider client.TokenProvider) (client.Client, error) {
+	linodeClient, err := client.New(apiToken, timeout, tokenProvider)
 	if err != nil {
 		return nil, fmt.Errorf("client was not created successfully: %w", err)
 	}
@@ -69,16 +139,70 @@ func newLinodeClientWithPrometheus(apiToken string, timeout time.Duration) (clie
 	return client.NewClientWithPrometheus(linodeClient), nil
 }
 
+func defaultKubernetesClient() (kubernetes.Interface, error) {
+	var (
+		kubeConfig *rest.Config
+		err        error
+	)
+
+	kubeconfigFlag := options.Options.KubeconfigFlag
+	if kubeconfigFlag == nil || kubeconfigFlag.Value.String() == "" {
+		kubeConfig, err = rest.InClusterConfig()
+	} else {
+		kubeConfig, err = clientcmd.BuildConfigFromFlags("", kubeconfigFlag.Value.String())
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return kubernetes.NewForConfig(kubeConfig)
+}
+
+func tokenSecretCacheTTLFromEnv() time.Duration {
+	tokenCacheTTL := defaultTokenSecretCacheTTL
+	if raw, ok := os.LookupEnv(tokenSecretCacheTTLEnv); ok {
+		if ttlSeconds, err := strconv.Atoi(raw); err == nil && ttlSeconds > 0 {
+			tokenCacheTTL = time.Duration(ttlSeconds) * time.Second
+		}
+	}
+
+	return tokenCacheTTL
+}
+
 func newCloud() (cloudprovider.Interface, error) {
 	region := os.Getenv(regionEnv)
 	if region == "" {
 		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", regionEnv)
 	}
 
-	// Read environment variables (from secrets)
-	apiToken := os.Getenv(accessTokenEnv)
-	if apiToken == "" {
-		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", accessTokenEnv)
+	secretName := options.Options.LinodeAPITokenSecretName
+	if secretName == "" {
+		secretName = defaultTokenSecretName
+	}
+	secretKey := options.Options.LinodeAPITokenSecretKey
+	if secretKey == "" {
+		secretKey = defaultTokenSecretKey
+	}
+	secretNamespace := options.Options.LinodeAPITokenSecretNamespace
+	if secretNamespace == "" {
+		secretNamespace = defaultTokenSecretNamespace
+	}
+
+	kubeClient, err := newKubernetesClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kubernetes client for token secret retrieval: %w", err)
+	}
+
+	tokenProvider := tokenSecretProvider{
+		kubeClient: kubeClient,
+		namespace:  secretNamespace,
+		name:       secretName,
+		key:        secretKey,
+	}
+
+	apiToken, err := tokenProvider.GetToken(context.Background())
+	if err != nil {
+		return nil, err
 	}
 
 	// set timeout used by linodeclient for API calls
@@ -89,7 +213,9 @@ func newCloud() (cloudprovider.Interface, error) {
 		}
 	}
 
-	linodeClient, err := newLinodeClientWithPrometheus(apiToken, timeout)
+	tokenProvider.cacheTTL = tokenSecretCacheTTLFromEnv()
+
+	linodeClient, err := newLinodeClientWithPrometheus(apiToken, timeout, tokenProvider.GetToken)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +230,7 @@ func newCloud() (cloudprovider.Interface, error) {
 		}
 
 		if !authenticated {
-			return nil, fmt.Errorf("linode api token %q is invalid", accessTokenEnv)
+			return nil, fmt.Errorf("linode api token from secret %s is invalid", tokenProvider.String())
 		}
 
 		healthChecker = newHealthChecker(linodeClient, tokenHealthCheckPeriod, options.Options.GlobalStopChannel)

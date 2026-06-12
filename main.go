@@ -103,6 +103,9 @@ func main() {
 	command.Flags().BoolVar(&ccmOptions.Options.DisableNodeBalancerVPCBackends, "disable-nodebalancer-vpc-backends", false, "disables nodebalancer backends in VPCs (when enabled, nodebalancers will only have private IPs as backends for backward compatibility)")
 	command.Flags().StringVar(&ccmOptions.Options.NodeBalancerPrefix, "nodebalancer-prefix", "ccm", fmt.Sprintf("Name prefix for NoadBalancers. (max. %v char.)", linode.NodeBalancerPrefixCharLimit))
 	command.Flags().BoolVar(&ccmOptions.Options.DisableIPv6NodeCIDRAllocation, "disable-ipv6-node-cidr-allocation", false, "disables IPv6 node cidr allocation by ipam controller (when enabled, IPv6 cidr ranges will be allocated to nodes)")
+	command.Flags().StringVar(&ccmOptions.Options.LinodeAPITokenSecretName, "linode-api-token-secret-name", "", "name of kubernetes secret containing Linode API token")
+	command.Flags().StringVar(&ccmOptions.Options.LinodeAPITokenSecretKey, "linode-api-token-secret-key", "", "key in kubernetes secret containing Linode API token")
+	command.Flags().StringVar(&ccmOptions.Options.LinodeAPITokenSecretNamespace, "linode-api-token-secret-namespace", "", "namespace of kubernetes secret containing Linode API token")
 
 	// Set static flags
 	command.Flags().VisitAll(func(fl *pflag.Flag) {

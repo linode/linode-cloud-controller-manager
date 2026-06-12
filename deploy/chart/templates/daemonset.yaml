@@ -160,6 +160,9 @@ spec:
             {{- with .Values.tokenHealthChecker }}
             - --enable-token-health-checker={{ . }}
             {{- end }}
+            - --linode-api-token-secret-name={{ if .Values.secretRef }}{{ .Values.secretRef.name | default "ccm-linode" }}{{ else }}ccm-linode{{ end }}
+            - --linode-api-token-secret-key={{ if .Values.secretRef }}{{ .Values.secretRef.apiTokenRef | default "apiToken" }}{{ else }}apiToken{{ end }}
+            - --linode-api-token-secret-namespace={{ if .Values.secretRef }}{{ .Values.secretRef.namespace | default .Values.namespace }}{{ else }}{{ .Values.namespace }}{{ end }}
             {{- with .Values.nodeBalancerTags }}
             - --nodebalancer-tags={{ join " " . }}
             {{- end }}
@@ -215,11 +218,6 @@ spec:
             - name: KUBERNETES_SERVICE_PORT
               value: {{ .Values.k8sServicePort | quote }}
             {{- end }}
-            - name: LINODE_API_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ if .Values.secretRef }}{{ .Values.secretRef.name | default "ccm-linode" }}{{ else }}"ccm-linode"{{ end }}
-                  key: {{ if .Values.secretRef }}{{ .Values.secretRef.apiTokenRef | default "apiToken" }}{{ else }}"apiToken"{{ end }}
             - name: LINODE_REGION
               valueFrom:
                 secretKeyRef:

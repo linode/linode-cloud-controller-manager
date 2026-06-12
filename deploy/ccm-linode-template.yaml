@@ -115,15 +115,13 @@ spec:
           - --v=3
           - --secure-port=10253
           - --webhook-secure-port=0
+          - --linode-api-token-secret-name=ccm-linode
+          - --linode-api-token-secret-key=apiToken
+          - --linode-api-token-secret-namespace=kube-system
           volumeMounts:
           - mountPath: /etc/kubernetes
             name: k8s
           env:
-            - name: LINODE_API_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: ccm-linode
-                  key: apiToken
             - name: LINODE_REGION
               valueFrom:
                 secretKeyRef:

@@ -7,6 +7,7 @@ region: ""
 # Set these values if your APIToken and region are already present in a k8s secret.
 # secretRef:
 #   name: "linode-ccm"
+#   namespace: "kube-system"
 #   apiTokenRef: "apiToken"
 #   regionRef: "region"
 
