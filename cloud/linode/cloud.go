@@ -24,6 +24,7 @@ import (
 const (
 	// The name of this cloudprovider
 	ProviderName             = "linode"
+	accessTokenEnv           = "LINODE_API_TOKEN"
 	regionEnv                = "LINODE_REGION"
 	tokenFilePathEnv         = "LINODE_API_TOKEN_FILE"
 	defaultTokenFilePath     = "/var/run/secrets/linode/api-token"
@@ -58,6 +59,18 @@ type tokenFileProvider struct {
 	mu          sync.RWMutex
 	cachedToken string
 	expiresAt   time.Time
+}
+
+type staticTokenProvider struct {
+	token string
+}
+
+func (t staticTokenProvider) GetToken(context.Context) (string, error) {
+	if t.token == "" {
+		return "", fmt.Errorf("%s must be set in the environment (use a k8s secret)", accessTokenEnv)
+	}
+
+	return t.token, nil
 }
 
 func (t *tokenFileProvider) String() string {
@@ -139,23 +152,38 @@ func tokenFileCacheTTLFromEnv() time.Duration {
 	return tokenCacheTTL
 }
 
+func tokenProviderFromFileOrEnv() (string, client.TokenProvider, string, error) {
+	tokenFilePath := strings.TrimSpace(os.Getenv(tokenFilePathEnv))
+	if tokenFilePath == "" {
+		tokenFilePath = defaultTokenFilePath
+	}
+
+	fileProvider := tokenFileProvider{
+		path:     tokenFilePath,
+		cacheTTL: tokenFileCacheTTLFromEnv(),
+	}
+
+	apiToken, fileErr := fileProvider.GetToken(context.Background())
+	if fileErr == nil {
+		return apiToken, fileProvider.GetToken, fmt.Sprintf("file %q", fileProvider.String()), nil
+	}
+
+	envToken := strings.TrimSpace(os.Getenv(accessTokenEnv))
+	if envToken != "" {
+		envProvider := staticTokenProvider{token: envToken}
+		return envToken, envProvider.GetToken, fmt.Sprintf("environment variable %q", accessTokenEnv), nil
+	}
+
+	return "", nil, "", fmt.Errorf("failed to load linode api token from %s=%q: %w; fallback %s is not set", tokenFilePathEnv, tokenFilePath, fileErr, accessTokenEnv)
+}
+
 func newCloud() (cloudprovider.Interface, error) {
 	region := os.Getenv(regionEnv)
 	if region == "" {
 		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", regionEnv)
 	}
 
-	tokenFilePath := os.Getenv(tokenFilePathEnv)
-	if tokenFilePath == "" {
-		tokenFilePath = defaultTokenFilePath
-	}
-
-	tokenProvider := tokenFileProvider{
-		path:     tokenFilePath,
-		cacheTTL: tokenFileCacheTTLFromEnv(),
-	}
-
-	apiToken, err := tokenProvider.GetToken(context.Background())
+	apiToken, tokenProvider, tokenSourceDescription, err := tokenProviderFromFileOrEnv()
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +196,7 @@ func newCloud() (cloudprovider.Interface, error) {
 		}
 	}
 
-	linodeClient, err := newLinodeClientWithPrometheus(apiToken, timeout, tokenProvider.GetToken)
+	linodeClient, err := newLinodeClientWithPrometheus(apiToken, timeout, tokenProvider)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +211,7 @@ func newCloud() (cloudprovider.Interface, error) {
 		}
 
 		if !authenticated {
-			return nil, fmt.Errorf("linode api token from file %q is invalid", tokenProvider.String())
+			return nil, fmt.Errorf("linode api token from %s is invalid", tokenSourceDescription)
 		}
 
 		healthChecker = newHealthChecker(linodeClient, tokenHealthCheckPeriod, options.Options.GlobalStopChannel)

@@ -86,6 +86,46 @@ func TestTokenFileCacheTTLFromEnv(t *testing.T) {
 	})
 }
 
+func TestTokenProviderFromFileOrEnv(t *testing.T) {
+	t.Run("uses file token when available", func(t *testing.T) {
+		t.Setenv(accessTokenEnv, "env-token")
+		configureTokenFile(t, "file-token")
+
+		apiToken, tokenProvider, source, err := tokenProviderFromFileOrEnv()
+		require.NoError(t, err)
+		assert.Equal(t, "file-token", apiToken)
+		assert.Equal(t, "file \""+os.Getenv(tokenFilePathEnv)+"\"", source)
+
+		token, err := tokenProvider(t.Context())
+		require.NoError(t, err)
+		assert.Equal(t, "file-token", token)
+	})
+
+	t.Run("falls back to env token when file missing", func(t *testing.T) {
+		t.Setenv(accessTokenEnv, "env-token")
+		t.Setenv(tokenFilePathEnv, filepath.Join(t.TempDir(), "missing-token-file"))
+
+		apiToken, tokenProvider, source, err := tokenProviderFromFileOrEnv()
+		require.NoError(t, err)
+		assert.Equal(t, "env-token", apiToken)
+		assert.Equal(t, "environment variable \"LINODE_API_TOKEN\"", source)
+
+		token, err := tokenProvider(t.Context())
+		require.NoError(t, err)
+		assert.Equal(t, "env-token", token)
+	})
+
+	t.Run("errors when both file and env token unavailable", func(t *testing.T) {
+		t.Setenv(accessTokenEnv, "")
+		t.Setenv(tokenFilePathEnv, filepath.Join(t.TempDir(), "missing-token-file"))
+
+		_, _, _, err := tokenProviderFromFileOrEnv()
+		require.Error(t, err)
+		require.ErrorContains(t, err, "LINODE_API_TOKEN")
+		require.ErrorContains(t, err, "failed to load linode api token")
+	})
+}
+
 func TestNewCloudRouteControllerDisabled(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
