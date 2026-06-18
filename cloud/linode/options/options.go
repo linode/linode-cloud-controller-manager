@@ -37,7 +37,4 @@ var Options struct {
 	NodeCIDRMaskSizeIPv4              int
 	NodeCIDRMaskSizeIPv6              int
 	NodeBalancerPrefix                string
-	LinodeAPITokenSecretName          string
-	LinodeAPITokenSecretKey           string
-	LinodeAPITokenSecretNamespace     string
 }

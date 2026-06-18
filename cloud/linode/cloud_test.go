@@ -1,6 +1,8 @@
 package linode
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -9,10 +11,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	k8sfake "k8s.io/client-go/kubernetes/fake"
 	cloudprovider "k8s.io/cloud-provider"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
@@ -20,54 +18,31 @@ import (
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
 )
 
-func configureKubernetesClientWithTokenSecret(t *testing.T, namespace string, tokenData map[string]string) {
+func configureTokenFile(t *testing.T, token string) string {
 	t.Helper()
 
-	fakeClient := k8sfake.NewSimpleClientset()
-	secretData := make(map[string][]byte, len(tokenData))
-	for key, value := range tokenData {
-		secretData[key] = []byte(value)
-	}
-
-	_, err := fakeClient.CoreV1().Secrets(namespace).Create(t.Context(), &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ccm-linode",
-			Namespace: namespace,
-		},
-		Data: secretData,
-	}, metav1.CreateOptions{})
+	tokenFilePath := filepath.Join(t.TempDir(), "api-token")
+	err := os.WriteFile(tokenFilePath, []byte(token), 0o600)
 	require.NoError(t, err)
+	t.Setenv(tokenFilePathEnv, tokenFilePath)
 
-	original := newKubernetesClient
-	t.Cleanup(func() {
-		newKubernetesClient = original
-	})
-
-	newKubernetesClient = func() (kubernetes.Interface, error) { return fakeClient, nil }
+	return tokenFilePath
 }
 
-func TestTokenSecretProviderCache(t *testing.T) {
-	namespace := "kube-system"
-	secretName := "ccm-linode"
-	secretKey := "apiToken"
+func updateTokenFile(t *testing.T, tokenFilePath, token string) {
+	t.Helper()
 
-	client := k8sfake.NewSimpleClientset(&v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
-			Namespace: namespace,
-		},
-		Data: map[string][]byte{
-			secretKey: []byte("token-v1"),
-		},
-	})
+	err := os.WriteFile(tokenFilePath, []byte(token), 0o600)
+	require.NoError(t, err)
+}
+
+func TestTokenFileProviderCache(t *testing.T) {
+	tokenFilePath := configureTokenFile(t, "token-v1")
 
 	now := time.Now()
-	provider := &tokenSecretProvider{
-		kubeClient: client,
-		namespace:  namespace,
-		name:       secretName,
-		key:        secretKey,
-		cacheTTL:   defaultTokenSecretCacheTTL,
+	provider := &tokenFileProvider{
+		path:     tokenFilePath,
+		cacheTTL: defaultTokenFileCacheTTL,
 		now: func() time.Time {
 			return now
 		},
@@ -77,41 +52,37 @@ func TestTokenSecretProviderCache(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "token-v1", firstToken)
 
-	secret, err := client.CoreV1().Secrets(namespace).Get(t.Context(), secretName, metav1.GetOptions{})
-	require.NoError(t, err)
-	secret.Data[secretKey] = []byte("token-v2")
-	_, err = client.CoreV1().Secrets(namespace).Update(t.Context(), secret, metav1.UpdateOptions{})
-	require.NoError(t, err)
+	updateTokenFile(t, tokenFilePath, "token-v2")
 
 	cachedToken, err := provider.GetToken(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, "token-v1", cachedToken)
 
-	now = now.Add(defaultTokenSecretCacheTTL + time.Second)
+	now = now.Add(defaultTokenFileCacheTTL + time.Second)
 	refreshedToken, err := provider.GetToken(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, "token-v2", refreshedToken)
 }
 
-func TestTokenSecretCacheTTLFromEnv(t *testing.T) {
+func TestTokenFileCacheTTLFromEnv(t *testing.T) {
 	t.Run("uses default ttl", func(t *testing.T) {
-		t.Setenv(tokenSecretCacheTTLEnv, "")
-		assert.Equal(t, defaultTokenSecretCacheTTL, tokenSecretCacheTTLFromEnv())
+		t.Setenv(tokenCacheTTLEnv, "")
+		assert.Equal(t, defaultTokenFileCacheTTL, tokenFileCacheTTLFromEnv())
 	})
 
 	t.Run("uses configured ttl when valid", func(t *testing.T) {
-		t.Setenv(tokenSecretCacheTTLEnv, "7")
-		assert.Equal(t, 7*time.Second, tokenSecretCacheTTLFromEnv())
+		t.Setenv(tokenCacheTTLEnv, "7")
+		assert.Equal(t, 7*time.Second, tokenFileCacheTTLFromEnv())
 	})
 
 	t.Run("falls back to default ttl when invalid", func(t *testing.T) {
-		t.Setenv(tokenSecretCacheTTLEnv, "invalid")
-		assert.Equal(t, defaultTokenSecretCacheTTL, tokenSecretCacheTTLFromEnv())
+		t.Setenv(tokenCacheTTLEnv, "invalid")
+		assert.Equal(t, defaultTokenFileCacheTTL, tokenFileCacheTTLFromEnv())
 	})
 
 	t.Run("falls back to default ttl when non-positive", func(t *testing.T) {
-		t.Setenv(tokenSecretCacheTTLEnv, "0")
-		assert.Equal(t, defaultTokenSecretCacheTTL, tokenSecretCacheTTLFromEnv())
+		t.Setenv(tokenCacheTTLEnv, "0")
+		assert.Equal(t, defaultTokenFileCacheTTL, tokenFileCacheTTLFromEnv())
 	})
 }
 
@@ -121,7 +92,7 @@ func TestNewCloudRouteControllerDisabled(t *testing.T) {
 
 	t.Setenv("LINODE_REGION", "us-east")
 	t.Setenv("LINODE_REQUEST_TIMEOUT_SECONDS", "10")
-	configureKubernetesClientWithTokenSecret(t, "kube-system", map[string]string{"apiToken": "dummyapitoken"})
+	configureTokenFile(t, "dummyapitoken")
 	options.Options.NodeBalancerPrefix = "ccm"
 
 	t.Run("should not fail if vpc is empty and routecontroller is disabled", func(t *testing.T) {
@@ -147,12 +118,15 @@ func TestNewCloud(t *testing.T) {
 	t.Setenv("LINODE_REQUEST_TIMEOUT_SECONDS", "10")
 	t.Setenv("LINODE_ROUTES_CACHE_TTL_SECONDS", "60")
 	t.Setenv("LINODE_URL", "https://api.linode.com/v4")
-	configureKubernetesClientWithTokenSecret(t, "kube-system", map[string]string{"apiToken": "dummyapitoken"})
+	tokenFilePath := configureTokenFile(t, "dummyapitoken")
 	options.Options.LinodeGoDebug = true
 	options.Options.NodeBalancerPrefix = "ccm"
 
 	t.Run("should fail if api token is empty", func(t *testing.T) {
-		configureKubernetesClientWithTokenSecret(t, "kube-system", map[string]string{"apiToken": ""})
+		t.Cleanup(func() {
+			updateTokenFile(t, tokenFilePath, "dummyapitoken")
+		})
+		updateTokenFile(t, tokenFilePath, "")
 		_, err := newCloud()
 		assert.Error(t, err, "expected error when api token is empty")
 	})

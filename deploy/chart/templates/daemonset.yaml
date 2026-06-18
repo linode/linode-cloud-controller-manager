@@ -160,9 +160,6 @@ spec:
             {{- with .Values.tokenHealthChecker }}
             - --enable-token-health-checker={{ . }}
             {{- end }}
-            - --linode-api-token-secret-name={{ if .Values.secretRef }}{{ .Values.secretRef.name | default "ccm-linode" }}{{ else }}ccm-linode{{ end }}
-            - --linode-api-token-secret-key={{ if .Values.secretRef }}{{ .Values.secretRef.apiTokenRef | default "apiToken" }}{{ else }}apiToken{{ end }}
-            - --linode-api-token-secret-namespace={{ if .Values.secretRef }}{{ .Values.secretRef.namespace | default .Values.namespace }}{{ else }}{{ .Values.namespace }}{{ end }}
             {{- with .Values.nodeBalancerTags }}
             - --nodebalancer-tags={{ join " " . }}
             {{- end }}
@@ -206,6 +203,9 @@ spec:
           volumeMounts:
             - mountPath: /etc/kubernetes
               name: k8s
+            - mountPath: /var/run/secrets/linode
+              name: linode-api-token
+              readOnly: true
             {{- with .Values.volumeMounts}}
             {{- toYaml . | nindent 12 }}
             {{- end}}
@@ -223,6 +223,8 @@ spec:
                 secretKeyRef:
                   name: {{ if .Values.secretRef }}{{ .Values.secretRef.name | default "ccm-linode" }}{{ else }}"ccm-linode"{{ end }}
                   key: {{ if .Values.secretRef }}{{ .Values.secretRef.regionRef | default "region" }}{{ else }}"region"{{ end }}
+            - name: LINODE_API_TOKEN_FILE
+              value: /var/run/secrets/linode/api-token
             {{- with .Values.env}}
             {{- toYaml . | nindent 12 }}
             {{- end}}
@@ -234,6 +236,12 @@ spec:
           hostPath:
             path: /etc/kubernetes
         {{- end }}
+        - name: linode-api-token
+          secret:
+            secretName: {{ if .Values.secretRef }}{{ .Values.secretRef.name | default "ccm-linode" }}{{ else }}ccm-linode{{ end }}
+            items:
+              - key: {{ if .Values.secretRef }}{{ .Values.secretRef.apiTokenRef | default "apiToken" }}{{ else }}apiToken{{ end }}
+                path: api-token
         {{- with .Values.volumes}}
         {{- toYaml . | nindent 8 }}
         {{- end}}
