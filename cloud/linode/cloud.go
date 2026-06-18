@@ -163,7 +163,7 @@ func newCloud() (cloudprovider.Interface, error) {
 	// set timeout used by linodeclient for API calls
 	timeout := client.DefaultClientTimeout
 	if raw, ok := os.LookupEnv("LINODE_REQUEST_TIMEOUT_SECONDS"); ok {
-		if t, err := strconv.Atoi(raw); err == nil && t > 0 {
+		if t, atoiErr := strconv.Atoi(raw); atoiErr == nil && t > 0 {
 			timeout = time.Duration(t) * time.Second
 		}
 	}
