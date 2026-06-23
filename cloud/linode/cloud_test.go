@@ -1,9 +1,12 @@
 package linode
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -15,13 +18,119 @@ import (
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
 )
 
+func configureTokenFile(t *testing.T, token string) string {
+	t.Helper()
+
+	tokenFilePath := filepath.Join(t.TempDir(), "api-token")
+	err := os.WriteFile(tokenFilePath, []byte(token), 0o600)
+	require.NoError(t, err)
+	t.Setenv(tokenFilePathEnv, tokenFilePath)
+
+	return tokenFilePath
+}
+
+func updateTokenFile(t *testing.T, tokenFilePath, token string) {
+	t.Helper()
+
+	err := os.WriteFile(tokenFilePath, []byte(token), 0o600)
+	require.NoError(t, err)
+}
+
+func TestTokenFileProviderCache(t *testing.T) {
+	tokenFilePath := configureTokenFile(t, "token-v1")
+
+	now := time.Now()
+	provider := &tokenFileProvider{
+		path:     tokenFilePath,
+		cacheTTL: defaultTokenFileCacheTTL,
+		now: func() time.Time {
+			return now
+		},
+	}
+
+	firstToken, err := provider.GetToken(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, "token-v1", firstToken)
+
+	updateTokenFile(t, tokenFilePath, "token-v2")
+
+	cachedToken, err := provider.GetToken(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, "token-v1", cachedToken)
+
+	now = now.Add(defaultTokenFileCacheTTL + time.Second)
+	refreshedToken, err := provider.GetToken(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, "token-v2", refreshedToken)
+}
+
+func TestTokenFileCacheTTLFromEnv(t *testing.T) {
+	t.Run("uses default ttl", func(t *testing.T) {
+		t.Setenv(tokenCacheTTLEnv, "")
+		assert.Equal(t, defaultTokenFileCacheTTL, tokenFileCacheTTLFromEnv())
+	})
+
+	t.Run("uses configured ttl when valid", func(t *testing.T) {
+		t.Setenv(tokenCacheTTLEnv, "7")
+		assert.Equal(t, 7*time.Second, tokenFileCacheTTLFromEnv())
+	})
+
+	t.Run("falls back to default ttl when invalid", func(t *testing.T) {
+		t.Setenv(tokenCacheTTLEnv, "invalid")
+		assert.Equal(t, defaultTokenFileCacheTTL, tokenFileCacheTTLFromEnv())
+	})
+
+	t.Run("falls back to default ttl when non-positive", func(t *testing.T) {
+		t.Setenv(tokenCacheTTLEnv, "0")
+		assert.Equal(t, defaultTokenFileCacheTTL, tokenFileCacheTTLFromEnv())
+	})
+}
+
+func TestTokenProviderFromFileOrEnv(t *testing.T) {
+	t.Run("uses file token when available", func(t *testing.T) {
+		t.Setenv(accessTokenEnv, "env-token")
+		configureTokenFile(t, "file-token")
+
+		tokenProvider, source, err := tokenProviderFromFileOrEnv()
+		require.NoError(t, err)
+		assert.Equal(t, "file \""+os.Getenv(tokenFilePathEnv)+"\"", source)
+
+		token, err := tokenProvider(t.Context())
+		require.NoError(t, err)
+		assert.Equal(t, "file-token", token)
+	})
+
+	t.Run("falls back to env token when file missing", func(t *testing.T) {
+		t.Setenv(accessTokenEnv, "env-token")
+		t.Setenv(tokenFilePathEnv, filepath.Join(t.TempDir(), "missing-token-file"))
+
+		tokenProvider, source, err := tokenProviderFromFileOrEnv()
+		require.NoError(t, err)
+		assert.Equal(t, "environment variable \"LINODE_API_TOKEN\"", source)
+
+		token, err := tokenProvider(t.Context())
+		require.NoError(t, err)
+		assert.Equal(t, "env-token", token)
+	})
+
+	t.Run("errors when both file and env token unavailable", func(t *testing.T) {
+		t.Setenv(accessTokenEnv, "")
+		t.Setenv(tokenFilePathEnv, filepath.Join(t.TempDir(), "missing-token-file"))
+
+		_, _, err := tokenProviderFromFileOrEnv()
+		require.Error(t, err)
+		require.ErrorContains(t, err, "LINODE_API_TOKEN")
+		require.ErrorContains(t, err, "failed to load linode api token")
+	})
+}
+
 func TestNewCloudRouteControllerDisabled(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	t.Setenv("LINODE_API_TOKEN", "dummyapitoken")
 	t.Setenv("LINODE_REGION", "us-east")
 	t.Setenv("LINODE_REQUEST_TIMEOUT_SECONDS", "10")
+	configureTokenFile(t, "dummyapitoken")
 	options.Options.NodeBalancerPrefix = "ccm"
 
 	t.Run("should not fail if vpc is empty and routecontroller is disabled", func(t *testing.T) {
@@ -43,16 +152,19 @@ func TestNewCloud(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	t.Setenv("LINODE_API_TOKEN", "dummyapitoken")
 	t.Setenv("LINODE_REGION", "us-east")
 	t.Setenv("LINODE_REQUEST_TIMEOUT_SECONDS", "10")
 	t.Setenv("LINODE_ROUTES_CACHE_TTL_SECONDS", "60")
 	t.Setenv("LINODE_URL", "https://api.linode.com/v4")
+	tokenFilePath := configureTokenFile(t, "dummyapitoken")
 	options.Options.LinodeGoDebug = true
 	options.Options.NodeBalancerPrefix = "ccm"
 
 	t.Run("should fail if api token is empty", func(t *testing.T) {
-		t.Setenv("LINODE_API_TOKEN", "")
+		t.Cleanup(func() {
+			updateTokenFile(t, tokenFilePath, "dummyapitoken")
+		})
+		updateTokenFile(t, tokenFilePath, "")
 		_, err := newCloud()
 		assert.Error(t, err, "expected error when api token is empty")
 	})

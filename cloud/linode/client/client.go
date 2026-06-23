@@ -23,6 +23,8 @@ const (
 	DefaultLinodeAPIURL  = "https://api.linode.com"
 )
 
+type TokenProvider func(context.Context) (string, error)
+
 type Client interface {
 	GetInstance(context.Context, int) (*linodego.Instance, error)
 	ListInstances(context.Context, *linodego.ListOptions) ([]linodego.Instance, error)
@@ -75,21 +77,42 @@ type Client interface {
 // linodego.Client implements Client
 var _ Client = (*linodego.Client)(nil)
 
-// New creates a new linode client with a given token and default timeout
-func New(token string, timeout time.Duration) (*linodego.Client, error) {
+type tokenTransport struct {
+	base          http.RoundTripper
+	tokenProvider TokenProvider
+}
+
+func (t *tokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	token, err := t.tokenProvider(req.Context())
+	if err != nil {
+		return nil, err
+	}
+
+	clone := req.Clone(req.Context())
+	clone.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	return t.base.RoundTrip(clone)
+}
+
+// New creates a new linode client with a given token and default timeout.
+func New(timeout time.Duration, tokenProvider TokenProvider) (*linodego.Client, error) {
 	userAgent := fmt.Sprintf("linode-cloud-controller-manager %s", linodego.DefaultUserAgent)
 	apiURL := os.Getenv("LINODE_URL")
 	if apiURL == "" {
 		apiURL = DefaultLinodeAPIURL
 	}
+	httpClient := &http.Client{Timeout: timeout}
+	httpClient.Transport = &tokenTransport{
+		base:          http.DefaultTransport,
+		tokenProvider: tokenProvider,
+	}
 
-	linodeClient := linodego.NewClient(&http.Client{Timeout: timeout})
+	linodeClient := linodego.NewClient(httpClient)
 	client, err := linodeClient.UseURL(apiURL)
 	if err != nil {
 		return nil, err
 	}
 	client.SetUserAgent(userAgent)
-	client.SetToken(token)
 
 	klog.V(3).Infof("Linode client created with default timeout of %v", timeout)
 	return client, nil

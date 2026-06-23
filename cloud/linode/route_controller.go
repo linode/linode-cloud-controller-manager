@@ -254,6 +254,10 @@ func (r *routes) handleInterfaces(ctx context.Context, intfRoutes []string, lino
 			klog.V(4).Infof("Unable to update legacy interface %d for node %s", intfVPCIP.InterfaceID, route.TargetNode)
 			return err
 		}
+		if resp.VPC == nil {
+			klog.V(4).Infof("update legacy interface %d for node %s. Nil VPC returned. resp is %+v", intfVPCIP.InterfaceID, route.TargetNode, resp)
+			return nil
+		}
 		klog.V(4).Infof("Updated routes for node %s. Current routes: %v", route.TargetNode, resp.VPC.IPv4.Ranges)
 	} else {
 		interfaceUpdateOptions := linodego.InstanceConfigInterfaceUpdateOptions{
