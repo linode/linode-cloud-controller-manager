@@ -1,5 +1,19 @@
 apiVersion: apps/v1
 kind: DaemonSet
+{{- $secretName := "ccm-linode" }}
+{{- $apiTokenKey := "apiToken" }}
+{{- $regionKey := "region" }}
+{{- $mountSecret := false }}
+{{- $tokenFilePath := "/var/run/secrets/linode/api-token" }}
+{{- if .Values.secretRef }}
+{{- $secretName = (.Values.secretRef.name | default "ccm-linode") }}
+{{- $apiTokenKey = (.Values.secretRef.apiTokenRef | default "apiToken") }}
+{{- $regionKey = (.Values.secretRef.regionRef | default "region") }}
+{{- $mountSecret = (.Values.secretRef.mountSecret | default false) }}
+{{- $tokenFilePath = (.Values.secretRef.mountPath | default "/var/run/secrets/linode/api-token") }}
+{{- end }}
+{{- $tokenFileDir := dir $tokenFilePath }}
+{{- $tokenFileName := base $tokenFilePath }}
 metadata:
   name: ccm-linode
   labels:
@@ -203,9 +217,11 @@ spec:
           volumeMounts:
             - mountPath: /etc/kubernetes
               name: k8s
-            - mountPath: /var/run/secrets/linode
+            {{- if $mountSecret }}
+            - mountPath: {{ $tokenFileDir | quote }}
               name: linode-api-token
               readOnly: true
+            {{- end }}
             {{- with .Values.volumeMounts}}
             {{- toYaml . | nindent 12 }}
             {{- end}}
@@ -221,10 +237,18 @@ spec:
             - name: LINODE_REGION
               valueFrom:
                 secretKeyRef:
-                  name: {{ if .Values.secretRef }}{{ .Values.secretRef.name | default "ccm-linode" }}{{ else }}"ccm-linode"{{ end }}
-                  key: {{ if .Values.secretRef }}{{ .Values.secretRef.regionRef | default "region" }}{{ else }}"region"{{ end }}
+                  name: {{ $secretName }}
+                  key: {{ $regionKey }}
+            {{- if $mountSecret }}
             - name: LINODE_API_TOKEN_FILE
-              value: /var/run/secrets/linode/api-token
+              value: {{ $tokenFilePath | quote }}
+            {{- else }}
+            - name: LINODE_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: {{ $apiTokenKey }}
+            {{- end }}
             {{- with .Values.env}}
             {{- toYaml . | nindent 12 }}
             {{- end}}
@@ -236,12 +260,14 @@ spec:
           hostPath:
             path: /etc/kubernetes
         {{- end }}
+        {{- if $mountSecret }}
         - name: linode-api-token
           secret:
-            secretName: {{ if .Values.secretRef }}{{ .Values.secretRef.name | default "ccm-linode" }}{{ else }}ccm-linode{{ end }}
+            secretName: {{ $secretName }}
             items:
-              - key: {{ if .Values.secretRef }}{{ .Values.secretRef.apiTokenRef | default "apiToken" }}{{ else }}apiToken{{ end }}
-                path: api-token
+              - key: {{ $apiTokenKey }}
+                path: {{ $tokenFileName }}
+        {{- end }}
         {{- with .Values.volumes}}
         {{- toYaml . | nindent 8 }}
         {{- end}}

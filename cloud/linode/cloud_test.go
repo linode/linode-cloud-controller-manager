@@ -91,9 +91,8 @@ func TestTokenProviderFromFileOrEnv(t *testing.T) {
 		t.Setenv(accessTokenEnv, "env-token")
 		configureTokenFile(t, "file-token")
 
-		apiToken, tokenProvider, source, err := tokenProviderFromFileOrEnv()
+		tokenProvider, source, err := tokenProviderFromFileOrEnv()
 		require.NoError(t, err)
-		assert.Equal(t, "file-token", apiToken)
 		assert.Equal(t, "file \""+os.Getenv(tokenFilePathEnv)+"\"", source)
 
 		token, err := tokenProvider(t.Context())
@@ -105,9 +104,8 @@ func TestTokenProviderFromFileOrEnv(t *testing.T) {
 		t.Setenv(accessTokenEnv, "env-token")
 		t.Setenv(tokenFilePathEnv, filepath.Join(t.TempDir(), "missing-token-file"))
 
-		apiToken, tokenProvider, source, err := tokenProviderFromFileOrEnv()
+		tokenProvider, source, err := tokenProviderFromFileOrEnv()
 		require.NoError(t, err)
-		assert.Equal(t, "env-token", apiToken)
 		assert.Equal(t, "environment variable \"LINODE_API_TOKEN\"", source)
 
 		token, err := tokenProvider(t.Context())
@@ -119,7 +117,7 @@ func TestTokenProviderFromFileOrEnv(t *testing.T) {
 		t.Setenv(accessTokenEnv, "")
 		t.Setenv(tokenFilePathEnv, filepath.Join(t.TempDir(), "missing-token-file"))
 
-		_, _, _, err := tokenProviderFromFileOrEnv()
+		_, _, err := tokenProviderFromFileOrEnv()
 		require.Error(t, err)
 		require.ErrorContains(t, err, "LINODE_API_TOKEN")
 		require.ErrorContains(t, err, "failed to load linode api token")

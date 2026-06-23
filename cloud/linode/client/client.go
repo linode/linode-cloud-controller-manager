@@ -95,18 +95,12 @@ func (t *tokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 // New creates a new linode client with a given token and default timeout.
-func New(token string, timeout time.Duration, tokenProvider TokenProvider) (*linodego.Client, error) {
+func New(timeout time.Duration, tokenProvider TokenProvider) (*linodego.Client, error) {
 	userAgent := fmt.Sprintf("linode-cloud-controller-manager %s", linodego.DefaultUserAgent)
 	apiURL := os.Getenv("LINODE_URL")
 	if apiURL == "" {
 		apiURL = DefaultLinodeAPIURL
 	}
-	if tokenProvider == nil {
-		tokenProvider = func(context.Context) (string, error) {
-			return token, nil
-		}
-	}
-
 	httpClient := &http.Client{Timeout: timeout}
 	httpClient.Transport = &tokenTransport{
 		base:          http.DefaultTransport,

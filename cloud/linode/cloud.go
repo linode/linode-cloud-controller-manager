@@ -129,8 +129,8 @@ func init() {
 
 // newLinodeClientWithPrometheus creates a new client kept in its own local
 // scope and returns an instrumented one that should be used and passed around
-func newLinodeClientWithPrometheus(apiToken string, timeout time.Duration, tokenProvider client.TokenProvider) (client.Client, error) {
-	linodeClient, err := client.New(apiToken, timeout, tokenProvider)
+func newLinodeClientWithPrometheus(timeout time.Duration, tokenProvider client.TokenProvider) (client.Client, error) {
+	linodeClient, err := client.New(timeout, tokenProvider)
 	if err != nil {
 		return nil, fmt.Errorf("client was not created successfully: %w", err)
 	}
@@ -141,6 +141,7 @@ func newLinodeClientWithPrometheus(apiToken string, timeout time.Duration, token
 
 	return client.NewClientWithPrometheus(linodeClient), nil
 }
+
 func tokenFileCacheTTLFromEnv() time.Duration {
 	tokenCacheTTL := defaultTokenFileCacheTTL
 	if raw, ok := os.LookupEnv(tokenCacheTTLEnv); ok {
@@ -152,7 +153,7 @@ func tokenFileCacheTTLFromEnv() time.Duration {
 	return tokenCacheTTL
 }
 
-func tokenProviderFromFileOrEnv() (string, client.TokenProvider, string, error) {
+func tokenProviderFromFileOrEnv() (client.TokenProvider, string, error) {
 	tokenFilePath := strings.TrimSpace(os.Getenv(tokenFilePathEnv))
 	if tokenFilePath == "" {
 		tokenFilePath = defaultTokenFilePath
@@ -163,18 +164,17 @@ func tokenProviderFromFileOrEnv() (string, client.TokenProvider, string, error) 
 		cacheTTL: tokenFileCacheTTLFromEnv(),
 	}
 
-	apiToken, fileErr := fileProvider.GetToken(context.Background())
+	_, fileErr := fileProvider.GetToken(context.Background())
 	if fileErr == nil {
-		return apiToken, fileProvider.GetToken, fmt.Sprintf("file %q", fileProvider.String()), nil
+		return fileProvider.GetToken, fmt.Sprintf("file %q", fileProvider.String()), nil
 	}
 
-	envToken := strings.TrimSpace(os.Getenv(accessTokenEnv))
-	if envToken != "" {
+	if envToken := strings.TrimSpace(os.Getenv(accessTokenEnv)); envToken != "" {
 		envProvider := staticTokenProvider{token: envToken}
-		return envToken, envProvider.GetToken, fmt.Sprintf("environment variable %q", accessTokenEnv), nil
+		return envProvider.GetToken, fmt.Sprintf("environment variable %q", accessTokenEnv), nil
 	}
 
-	return "", nil, "", fmt.Errorf("failed to load linode api token from %s=%q: %w; fallback %s is not set", tokenFilePathEnv, tokenFilePath, fileErr, accessTokenEnv)
+	return nil, "", fmt.Errorf("failed to load linode api token from %s=%q: %w; fallback %s is not set", tokenFilePathEnv, tokenFilePath, fileErr, accessTokenEnv)
 }
 
 func newCloud() (cloudprovider.Interface, error) {
@@ -183,7 +183,7 @@ func newCloud() (cloudprovider.Interface, error) {
 		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", regionEnv)
 	}
 
-	apiToken, tokenProvider, tokenSourceDescription, err := tokenProviderFromFileOrEnv()
+	tokenProvider, tokenSourceDescription, err := tokenProviderFromFileOrEnv()
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func newCloud() (cloudprovider.Interface, error) {
 		}
 	}
 
-	linodeClient, err := newLinodeClientWithPrometheus(apiToken, timeout, tokenProvider)
+	linodeClient, err := newLinodeClientWithPrometheus(timeout, tokenProvider)
 	if err != nil {
 		return nil, err
 	}

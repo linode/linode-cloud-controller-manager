@@ -39,6 +39,23 @@ sharedIPLoadBalancing:
 allowUnauthorizedMetrics=true
 ```
 
+### Token injection modes
+
+- **Legacy mode (default):** `secretRef.mountSecret` unset/false. Chart injects `LINODE_API_TOKEN` from Secret key.
+- **Mounted mode:** set `secretRef.mountSecret: true`. Chart mounts token file and sets `LINODE_API_TOKEN_FILE`.
+
+Mounted mode example:
+
+```yaml
+secretRef:
+  name: linode-ccm
+  apiTokenRef: apiToken
+  regionRef: region
+  mountSecret: true
+  # Optional, defaults to /var/run/secrets/linode/api-token
+  mountPath: /var/run/secrets/linode/api-token
+```
+
 3. Install the CCM:
 ```bash
 helm install ccm-linode \

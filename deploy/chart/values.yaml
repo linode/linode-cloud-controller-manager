@@ -10,6 +10,11 @@ region: ""
 #   # NOTE: Secrets are namespace-scoped; the referenced secret must be in the same namespace as the DaemonSet/release.
 #   apiTokenRef: "apiToken"
 #   regionRef: "region"
+#   # Enable mounted token file mode. Default false/unset keeps legacy env injection mode.
+#   mountSecret: false
+#   # Optional token file path used when mountSecret=true.
+#   # Defaults to /var/run/secrets/linode/api-token.
+#   mountPath: /var/run/secrets/linode/api-token
 
 # Ensures the CCM runs on control plane nodes
 affinity:
