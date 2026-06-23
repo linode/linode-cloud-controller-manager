@@ -7,6 +7,8 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -21,12 +23,16 @@ import (
 
 const (
 	// The name of this cloudprovider
-	ProviderName           = "linode"
-	accessTokenEnv         = "LINODE_API_TOKEN"
-	regionEnv              = "LINODE_REGION"
-	ciliumLBType           = "cilium-bgp"
-	nodeBalancerLBType     = "nodebalancer"
-	tokenHealthCheckPeriod = 5 * time.Minute
+	ProviderName             = "linode"
+	accessTokenEnv           = "LINODE_API_TOKEN"
+	regionEnv                = "LINODE_REGION"
+	tokenFilePathEnv         = "LINODE_API_TOKEN_FILE"
+	defaultTokenFilePath     = "/var/run/secrets/linode/api-token"
+	tokenCacheTTLEnv         = "LINODE_API_TOKEN_CACHE_TTL_SECONDS"
+	defaultTokenFileCacheTTL = time.Minute
+	ciliumLBType             = "cilium-bgp"
+	nodeBalancerLBType       = "nodebalancer"
+	tokenHealthCheckPeriod   = 5 * time.Minute
 )
 
 var supportedLoadBalancerTypes = []string{ciliumLBType, nodeBalancerLBType}
@@ -45,6 +51,73 @@ var (
 	NodeBalancerPrefixCharLimit int = 19
 )
 
+type tokenFileProvider struct {
+	path     string
+	now      func() time.Time
+	cacheTTL time.Duration
+
+	mu          sync.RWMutex
+	cachedToken string
+	expiresAt   time.Time
+}
+
+type staticTokenProvider struct {
+	token string
+}
+
+func (t staticTokenProvider) GetToken(context.Context) (string, error) {
+	if t.token == "" {
+		return "", fmt.Errorf("%s must be set in the environment (use a k8s secret)", accessTokenEnv)
+	}
+
+	return t.token, nil
+}
+
+func (t *tokenFileProvider) String() string {
+	return t.path
+}
+
+func (t *tokenFileProvider) nowTime() time.Time {
+	if t.now != nil {
+		return t.now()
+	}
+
+	return time.Now()
+}
+
+func (t *tokenFileProvider) GetToken(_ context.Context) (string, error) {
+	now := t.nowTime()
+	cacheTTL := t.cacheTTL
+	if cacheTTL <= 0 {
+		cacheTTL = defaultTokenFileCacheTTL
+	}
+
+	t.mu.RLock()
+	if t.cachedToken != "" && now.Before(t.expiresAt) {
+		token := t.cachedToken
+		t.mu.RUnlock()
+		return token, nil
+	}
+	t.mu.RUnlock()
+
+	rawToken, err := os.ReadFile(t.path)
+	if err != nil {
+		return "", fmt.Errorf("failed to read token file %q: %w", t.String(), err)
+	}
+
+	token := strings.TrimSpace(string(rawToken))
+	if token == "" {
+		return "", fmt.Errorf("token file %q is empty", t.String())
+	}
+
+	t.mu.Lock()
+	t.cachedToken = token
+	t.expiresAt = t.nowTime().Add(cacheTTL)
+	t.mu.Unlock()
+
+	return token, nil
+}
+
 func init() {
 	registerMetrics()
 	cloudprovider.RegisterCloudProvider(
@@ -56,8 +129,8 @@ func init() {
 
 // newLinodeClientWithPrometheus creates a new client kept in its own local
 // scope and returns an instrumented one that should be used and passed around
-func newLinodeClientWithPrometheus(apiToken string, timeout time.Duration) (client.Client, error) {
-	linodeClient, err := client.New(apiToken, timeout)
+func newLinodeClientWithPrometheus(timeout time.Duration, tokenProvider client.TokenProvider) (client.Client, error) {
+	linodeClient, err := client.New(timeout, tokenProvider)
 	if err != nil {
 		return nil, fmt.Errorf("client was not created successfully: %w", err)
 	}
@@ -69,27 +142,61 @@ func newLinodeClientWithPrometheus(apiToken string, timeout time.Duration) (clie
 	return client.NewClientWithPrometheus(linodeClient), nil
 }
 
+func tokenFileCacheTTLFromEnv() time.Duration {
+	tokenCacheTTL := defaultTokenFileCacheTTL
+	if raw, ok := os.LookupEnv(tokenCacheTTLEnv); ok {
+		if ttlSeconds, err := strconv.Atoi(raw); err == nil && ttlSeconds > 0 {
+			tokenCacheTTL = time.Duration(ttlSeconds) * time.Second
+		}
+	}
+
+	return tokenCacheTTL
+}
+
+func tokenProviderFromFileOrEnv() (client.TokenProvider, string, error) {
+	tokenFilePath := strings.TrimSpace(os.Getenv(tokenFilePathEnv))
+	if tokenFilePath == "" {
+		tokenFilePath = defaultTokenFilePath
+	}
+
+	fileProvider := tokenFileProvider{
+		path:     tokenFilePath,
+		cacheTTL: tokenFileCacheTTLFromEnv(),
+	}
+
+	_, fileErr := fileProvider.GetToken(context.Background())
+	if fileErr == nil {
+		return fileProvider.GetToken, fmt.Sprintf("file %q", fileProvider.String()), nil
+	}
+
+	if envToken := strings.TrimSpace(os.Getenv(accessTokenEnv)); envToken != "" {
+		envProvider := staticTokenProvider{token: envToken}
+		return envProvider.GetToken, fmt.Sprintf("environment variable %q", accessTokenEnv), nil
+	}
+
+	return nil, "", fmt.Errorf("failed to load linode api token from %s=%q: %w; fallback %s is not set", tokenFilePathEnv, tokenFilePath, fileErr, accessTokenEnv)
+}
+
 func newCloud() (cloudprovider.Interface, error) {
 	region := os.Getenv(regionEnv)
 	if region == "" {
 		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", regionEnv)
 	}
 
-	// Read environment variables (from secrets)
-	apiToken := os.Getenv(accessTokenEnv)
-	if apiToken == "" {
-		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", accessTokenEnv)
+	tokenProvider, tokenSourceDescription, err := tokenProviderFromFileOrEnv()
+	if err != nil {
+		return nil, err
 	}
 
 	// set timeout used by linodeclient for API calls
 	timeout := client.DefaultClientTimeout
 	if raw, ok := os.LookupEnv("LINODE_REQUEST_TIMEOUT_SECONDS"); ok {
-		if t, err := strconv.Atoi(raw); err == nil && t > 0 {
+		if t, atoiErr := strconv.Atoi(raw); atoiErr == nil && t > 0 {
 			timeout = time.Duration(t) * time.Second
 		}
 	}
 
-	linodeClient, err := newLinodeClientWithPrometheus(apiToken, timeout)
+	linodeClient, err := newLinodeClientWithPrometheus(timeout, tokenProvider)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +211,7 @@ func newCloud() (cloudprovider.Interface, error) {
 		}
 
 		if !authenticated {
-			return nil, fmt.Errorf("linode api token %q is invalid", accessTokenEnv)
+			return nil, fmt.Errorf("linode api token from %s is invalid", tokenSourceDescription)
 		}
 
 		healthChecker = newHealthChecker(linodeClient, tokenHealthCheckPeriod, options.Options.GlobalStopChannel)

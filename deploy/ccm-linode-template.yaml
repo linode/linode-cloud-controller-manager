@@ -118,12 +118,12 @@ spec:
           volumeMounts:
           - mountPath: /etc/kubernetes
             name: k8s
+          - mountPath: /var/run/secrets/linode
+            name: linode-api-token
+            readOnly: true
           env:
-            - name: LINODE_API_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: ccm-linode
-                  key: apiToken
+            - name: LINODE_API_TOKEN_FILE
+              value: /var/run/secrets/linode/api-token
             - name: LINODE_REGION
               valueFrom:
                 secretKeyRef:
@@ -138,3 +138,9 @@ spec:
       - name: k8s
         hostPath:
           path: /etc/kubernetes
+      - name: linode-api-token
+        secret:
+          secretName: ccm-linode
+          items:
+          - key: apiToken
+            path: api-token
