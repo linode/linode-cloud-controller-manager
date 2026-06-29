@@ -103,6 +103,7 @@ func main() {
 	command.Flags().BoolVar(&ccmOptions.Options.DisableNodeBalancerVPCBackends, "disable-nodebalancer-vpc-backends", false, "disables nodebalancer backends in VPCs (when enabled, nodebalancers will only have private IPs as backends for backward compatibility)")
 	command.Flags().StringVar(&ccmOptions.Options.NodeBalancerPrefix, "nodebalancer-prefix", "ccm", fmt.Sprintf("Name prefix for NoadBalancers. (max. %v char.)", linode.NodeBalancerPrefixCharLimit))
 	command.Flags().BoolVar(&ccmOptions.Options.DisableIPv6NodeCIDRAllocation, "disable-ipv6-node-cidr-allocation", false, "disables IPv6 node cidr allocation by ipam controller (when enabled, IPv6 cidr ranges will be allocated to nodes)")
+	command.Flags().StringVar(&ccmOptions.Options.LinodeTagFilter, "linode-tag-filter", "", "tag filter for linodes (e.g. cluster name)")
 
 	// Set static flags
 	command.Flags().VisitAll(func(fl *pflag.Flag) {

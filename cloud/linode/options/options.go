@@ -37,4 +37,5 @@ var Options struct {
 	NodeCIDRMaskSizeIPv4              int
 	NodeCIDRMaskSizeIPv6              int
 	NodeBalancerPrefix                string
+	LinodeTagFilter                   string
 }
