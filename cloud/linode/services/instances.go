@@ -17,7 +17,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
+	linodeClient "github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
 	ccmUtils "github.com/linode/linode-cloud-controller-manager/cloud/linode/utils"
 	"github.com/linode/linode-cloud-controller-manager/sentry"
@@ -80,7 +80,7 @@ func (nc *nodeCache) getInstanceAddresses(instance linodego.Instance, vpcips []s
 
 // refreshInstances conditionally loads all instances from the Linode API and caches them.
 // It does not refresh if the last update happened less than `nodeCache.ttl` ago.
-func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client) error {
+func (nc *nodeCache) refreshInstances(ctx context.Context, client linodeClient.Client) error {
 	nc.Lock()
 	defer nc.Unlock()
 
@@ -88,7 +88,16 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 		return nil
 	}
 
-	instances, err := client.ListInstances(ctx, nil)
+	filter := linodego.Filter{}
+	if options.Options.LinodeTagFilter != "" {
+		filter.AddField(linodego.Contains, "tags", options.Options.LinodeTagFilter)
+	}
+	filterJSON, err := filter.MarshalJSON()
+	if err != nil {
+		return fmt.Errorf("failed to marshal filter: %w", err)
+	}
+
+	instances, err := client.ListInstances(ctx, &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: string(filterJSON)})
 	if err != nil {
 		return err
 	}
@@ -150,13 +159,13 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client client.Client)
 }
 
 type Instances struct {
-	client client.Client
+	client linodeClient.Client
 
 	nodeCache *nodeCache
 }
 
 // NewInstances creates a new Instances cache with a specified TTL for the nodeCache.
-func NewInstances(client client.Client) *Instances {
+func NewInstances(client linodeClient.Client) *Instances {
 	timeout := 15
 	if raw, ok := os.LookupEnv("LINODE_INSTANCE_CACHE_TTL"); ok {
 		if t, err := strconv.Atoi(raw); t > 0 && err == nil {

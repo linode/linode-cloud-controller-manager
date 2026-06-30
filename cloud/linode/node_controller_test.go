@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
+	linodeClient "github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
 )
@@ -51,7 +52,7 @@ func TestNodeController_Run(t *testing.T) {
 	stopCh := make(chan struct{})
 	go nodeCtrl.Run(stopCh)
 
-	client.EXPECT().ListInstances(gomock.Any(), nil).AnyTimes().Return([]linodego.Instance{}, &linodego.Error{Code: http.StatusTooManyRequests, Message: "Too many requests"})
+	client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).AnyTimes().Return([]linodego.Instance{}, &linodego.Error{Code: http.StatusTooManyRequests, Message: "Too many requests"})
 	// Add the node to the informer
 	err = nodeCtrl.informer.Informer().GetStore().Add(node)
 	require.NoError(t, err, "expected no error when adding node to informer")
@@ -93,7 +94,7 @@ func TestNodeController_processNext(t *testing.T) {
 
 	t.Run("should return no error on unknown errors", func(t *testing.T) {
 		controller.addNodeToQueue(node)
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, errors.New("lookup failed"))
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{}, errors.New("lookup failed"))
 		result := controller.processNext()
 		assert.True(t, result, "processNext should return true")
 		if queue.Len() != 0 {
@@ -115,7 +116,7 @@ func TestNodeController_processNext(t *testing.T) {
 		controller.addNodeToQueue(node)
 		publicIP := net.ParseIP("172.234.31.123")
 		privateIP := net.ParseIP("192.168.159.135")
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
 			{ID: 111, Label: "test", IPv4: []*net.IP{&publicIP, &privateIP}, HostUUID: "111"},
 		}, nil)
 		result := controller.processNext()
@@ -143,7 +144,7 @@ func TestNodeController_processNext(t *testing.T) {
 		controller.addNodeToQueue(node2)
 		publicIP := net.ParseIP("172.234.31.123")
 		privateIP := net.ParseIP("192.168.159.135")
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
 			{ID: 112, Label: "test-node2", IPv4: []*net.IP{&publicIP, &privateIP}, HostUUID: "112"},
 		}, nil)
 		result := controller.processNext()
@@ -171,7 +172,7 @@ func TestNodeController_processNext(t *testing.T) {
 		client := mocks.NewMockClient(ctrl)
 		controller.instances = services.NewInstances(client)
 		retryInterval = 1 * time.Nanosecond
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, &linodego.Error{Code: http.StatusTooManyRequests, Message: "Too many requests"})
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{}, &linodego.Error{Code: http.StatusTooManyRequests, Message: "Too many requests"})
 		result := controller.processNext()
 		time.Sleep(1 * time.Second)
 		assert.True(t, result, "processNext should return true")
@@ -187,7 +188,7 @@ func TestNodeController_processNext(t *testing.T) {
 		client := mocks.NewMockClient(ctrl)
 		controller.instances = services.NewInstances(client)
 		retryInterval = 1 * time.Nanosecond
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, &linodego.Error{Code: http.StatusInternalServerError, Message: "Too many requests"})
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{}, &linodego.Error{Code: http.StatusInternalServerError, Message: "Too many requests"})
 		result := controller.processNext()
 		time.Sleep(1 * time.Second)
 		assert.True(t, result, "processNext should return true")
@@ -228,7 +229,7 @@ func TestNodeController_handleNode(t *testing.T) {
 	publicIP := net.ParseIP("172.234.31.123")
 	privateIP := net.ParseIP("192.168.159.135")
 	publicIPv6SLAAC := "2001:db::f03c:91ff:fe2b:1a2b"
-	client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
+	client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
 		{ID: 123, Label: "test-node", IPv4: []*net.IP{&publicIP, &privateIP}, IPv6: publicIPv6SLAAC, HostUUID: "123"},
 	}, nil)
 	err = nodeCtrl.handleNode(t.Context(), node)
@@ -251,7 +252,7 @@ func TestNodeController_handleNode(t *testing.T) {
 	client = mocks.NewMockClient(ctrl)
 	nodeCtrl.instances = services.NewInstances(client)
 	nodeCtrl.metadataLastUpdate["test-node"] = time.Now().Add(-2 * nodeCtrl.ttl)
-	client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, errors.New("lookup failed"))
+	client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{}, errors.New("lookup failed"))
 	err = nodeCtrl.handleNode(t.Context(), node)
 	require.Error(t, err, "expected error during handleNode, got nil")
 
@@ -259,7 +260,7 @@ func TestNodeController_handleNode(t *testing.T) {
 	client = mocks.NewMockClient(ctrl)
 	nodeCtrl.instances = services.NewInstances(client)
 	nodeCtrl.metadataLastUpdate["test-node"] = time.Now().Add(-2 * nodeCtrl.ttl)
-	client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
+	client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
 		{ID: 123, Label: "test-node", IPv4: []*net.IP{&publicIP, &privateIP}, IPv6: publicIPv6SLAAC, HostUUID: "123"},
 	}, nil)
 	err = nodeCtrl.handleNode(t.Context(), node)

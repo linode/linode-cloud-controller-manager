@@ -4135,7 +4135,7 @@ func Test_getNodeBackendIP(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-1",
 					Annotations: map[string]string{
-						annotations.AnnLinodeNodePrivateIP: "192.168.10.10",
+						annotations.AnnLinodeNodePrivateIP:  "192.168.10.10",
 						annotations.AnnLinodeNodePublicIPv6: "2600:3c06::1/128",
 					},
 				},
