@@ -21,6 +21,7 @@ const (
 	// DefaultClientTimeout is the default timeout for a client Linode API call
 	DefaultClientTimeout = 120 * time.Second
 	DefaultLinodeAPIURL  = "https://api.linode.com"
+	MaxPageSize          = 500
 )
 
 type TokenProvider func(context.Context) (string, error)

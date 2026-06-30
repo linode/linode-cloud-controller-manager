@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	linodeClient "github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 	"github.com/linode/linodego"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -53,7 +54,7 @@ func TestListRoutes(t *testing.T) {
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
-		client.EXPECT().ListInstances(gomock.Any(), gomock.Any()).Times(1).Return([]linodego.Instance{}, nil)
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return([]linodego.VPCIP{}, nil)
 		client.EXPECT().ListVPCIPv6Addresses(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.VPCIP{}, nil)
 		routes, err := routeController.ListRoutes(ctx, "test")
@@ -78,7 +79,7 @@ func TestListRoutes(t *testing.T) {
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{validInstance}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return([]linodego.VPCIP{}, nil)
 		client.EXPECT().ListVPCIPv6Addresses(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.VPCIP{}, nil)
 		routes, err := routeController.ListRoutes(ctx, "test")
@@ -106,7 +107,7 @@ func TestListRoutes(t *testing.T) {
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{validInstance}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(4).Return(noRoutesInVPC, nil)
 		client.EXPECT().ListVPCIPv6Addresses(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.VPCIP{}, nil)
 		routes, err := routeController.ListRoutes(ctx, "test")
@@ -155,7 +156,7 @@ func TestListRoutes(t *testing.T) {
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{validInstance}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(4).Return(routesInVPC, nil)
 		client.EXPECT().ListVPCIPv6Addresses(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.VPCIP{}, nil)
 		routes, err := routeController.ListRoutes(ctx, "test")
@@ -204,7 +205,7 @@ func TestListRoutes(t *testing.T) {
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{validInstance}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(4).Return(routesInDifferentVPC, nil)
 		client.EXPECT().ListVPCIPv6Addresses(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.VPCIP{}, nil)
 		routes, err := routeController.ListRoutes(ctx, "test")
@@ -300,7 +301,7 @@ func TestListRoutes(t *testing.T) {
 
 		registeredK8sNodeCache.addNodeToCache(node2)
 
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance, validInstance2, validInstance3}, nil)
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{validInstance, validInstance2, validInstance3}, nil)
 		c1 := client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(routesInVPC, nil)
 		c2 := client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).After(c1).Times(1).Return(routesInVPC2, nil)
 		c3 := client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).After(c2).Times(1).Return(routesInVPC, nil)
@@ -385,7 +386,7 @@ func TestCreateRoute(t *testing.T) {
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{validInstance}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return(noRoutesInVPC, nil)
 		client.EXPECT().ListVPCIPv6Addresses(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.VPCIP{}, nil)
 		client.EXPECT().UpdateInstanceConfigInterface(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&instanceConfigIntfWithVPCAndRoute, nil)
@@ -416,7 +417,7 @@ func TestCreateRoute(t *testing.T) {
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{validInstance}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return(noRoutesInVPC, nil)
 		client.EXPECT().ListVPCIPv6Addresses(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.VPCIP{}, nil)
 		client.EXPECT().UpdateInterface(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&interfaceWithVPCAndRoute, nil)
@@ -485,7 +486,7 @@ func TestCreateRoute(t *testing.T) {
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{validInstance}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return(routesInVPC, nil)
 		client.EXPECT().ListVPCIPv6Addresses(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.VPCIP{}, nil)
 		err = routeController.CreateRoute(ctx, "dummy", "dummy", route)
@@ -500,7 +501,7 @@ func TestCreateRoute(t *testing.T) {
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCIP{}, nil)
 		client.EXPECT().ListVPCIPv6Addresses(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.VPCIP{}, nil)
 		err = routeController.CreateRoute(ctx, "dummy", "dummy", route)
@@ -544,7 +545,7 @@ func TestDeleteRoute(t *testing.T) {
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCIP{}, nil)
 		client.EXPECT().ListVPCIPv6Addresses(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.VPCIP{}, nil)
 		err = routeController.DeleteRoute(ctx, "dummy", route)
@@ -576,7 +577,7 @@ func TestDeleteRoute(t *testing.T) {
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{validInstance}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return(noRoutesInVPC, nil)
 		client.EXPECT().ListVPCIPv6Addresses(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.VPCIP{}, nil)
 		client.EXPECT().UpdateInstanceConfigInterface(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&instanceConfigIntfWithVPCAndNoRoute, nil)
@@ -598,7 +599,7 @@ func TestDeleteRoute(t *testing.T) {
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{validInstance}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return(noRoutesInVPC, nil)
 		client.EXPECT().ListVPCIPv6Addresses(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.VPCIP{}, nil)
 		client.EXPECT().UpdateInterface(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&interfaceWitVPCAndNoRoute, nil)
@@ -632,7 +633,7 @@ func TestDeleteRoute(t *testing.T) {
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{validInstance}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return(routesInVPC, nil)
 		client.EXPECT().ListVPCIPv6Addresses(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.VPCIP{}, nil)
 		client.EXPECT().UpdateInstanceConfigInterface(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&instanceConfigIntfWithVPCAndNoRoute, nil)
@@ -649,7 +650,7 @@ func TestDeleteRoute(t *testing.T) {
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{validInstance}, nil)
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{validInstance}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return(routesInVPC, nil)
 		client.EXPECT().ListVPCIPv6Addresses(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.VPCIP{}, nil)
 		client.EXPECT().UpdateInterface(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&interfaceWitVPCAndNoRoute, nil)

@@ -195,6 +195,9 @@ spec:
             {{- if .Values.nodeBalancerPrefix }}
             - --nodebalancer-prefix={{ .Values.nodeBalancerPrefix }}
             {{- end }}
+            {{- if .Values.linodeTagFilter }}
+            - --linode-tag-filter={{ .Values.linodeTagFilter }}
+            {{- end }}
             {{- if .Values.extraArgs }}
             {{- toYaml .Values.extraArgs | nindent 12 }}
             {{- end }}

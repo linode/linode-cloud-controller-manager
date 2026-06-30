@@ -137,6 +137,9 @@ tolerations:
 # nodeBalancerPrefix is used to add prefix for nodeBalancer name. Default is "ccm"
 # nodeBalancerPrefix: ""
 
+# linodeTagFilter is used to filter the instances returned to the CCM. Default is no filter.
+# linodeTagFilter: ""
+
 # This section adds the ability to pass environment variables to adjust CCM defaults
 # https://github.com/linode/linode-cloud-controller-manager/blob/master/cloud/linode/loadbalancers.go
 # LINODE_HOSTNAME_ONLY_INGRESS type bool is supported

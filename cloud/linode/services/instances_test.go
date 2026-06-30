@@ -16,6 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cloudprovider "k8s.io/cloud-provider"
 
+	linodeClient "github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
 	ccmUtils "github.com/linode/linode-cloud-controller-manager/cloud/linode/utils"
@@ -47,7 +48,7 @@ func TestInstanceExists(t *testing.T) {
 	t.Run("should return false if linode does not exist (by providerID)", func(t *testing.T) {
 		instances := NewInstances(client)
 		node := nodeWithProviderID(ccmUtils.ProviderIDPrefix + "123")
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{}, nil)
 
 		exists, err := instances.InstanceExists(ctx, node)
 		require.NoError(t, err)
@@ -57,7 +58,7 @@ func TestInstanceExists(t *testing.T) {
 	t.Run("should return true if linode exists (by provider)", func(t *testing.T) {
 		instances := NewInstances(client)
 		node := nodeWithProviderID(ccmUtils.ProviderIDPrefix + "123")
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
 			{
 				ID:     123,
 				Label:  "mock",
@@ -76,7 +77,7 @@ func TestInstanceExists(t *testing.T) {
 		name := "some-name"
 		node := nodeWithName(name)
 
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
 			{ID: 123, Label: name},
 		}, nil)
 
@@ -98,7 +99,7 @@ func TestMetadataRetrieval(t *testing.T) {
 		publicIP := net.ParseIP("172.234.31.123")
 		privateIP := net.ParseIP("192.168.159.135")
 		expectedInstance := linodego.Instance{Label: "expected-instance", ID: 12345, IPv4: []*net.IP{&publicIP, &privateIP}}
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{{Label: "wrong-instance", ID: 3456, IPv4: []*net.IP{&publicIP, &privateIP}}, expectedInstance}, nil)
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{{Label: "wrong-instance", ID: 3456, IPv4: []*net.IP{&publicIP, &privateIP}}, expectedInstance}, nil)
 		name := "expected-instance"
 		node := nodeWithName(name)
 
@@ -112,7 +113,7 @@ func TestMetadataRetrieval(t *testing.T) {
 		id := 456302
 		providerID := ccmUtils.ProviderIDPrefix + strconv.Itoa(id)
 		node := nodeWithProviderID(providerID)
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{}, nil)
 		meta, err := instances.InstanceMetadata(ctx, node)
 
 		require.ErrorIs(t, err, cloudprovider.InstanceNotFound)
@@ -127,7 +128,7 @@ func TestMetadataRetrieval(t *testing.T) {
 		privateIPv4 := net.ParseIP("192.168.133.65")
 		linodeType := typeG6
 		region := usEast
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
 			{ID: id, Label: instanceName, Type: linodeType, Region: region, IPv4: []*net.IP{&publicIPv4, &privateIPv4}},
 		}, nil)
 
@@ -162,6 +163,7 @@ func TestMetadataRetrieval(t *testing.T) {
 		linodeType := typeG6
 
 		options.Options.VPCNames = []string{"test"}
+		options.Options.LinodeTagFilter = "test-cluster"
 		VpcIDs["test"] = 1
 		options.Options.EnableRouteController = true
 
@@ -200,7 +202,13 @@ func TestMetadataRetrieval(t *testing.T) {
 			},
 		}
 
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{instance}, nil)
+		filter := linodego.Filter{}
+		filter.AddField(linodego.Contains, "tags", "test-cluster")
+		filterJSON, err := filter.MarshalJSON()
+		if err != nil {
+			t.Fatalf("failed to marshal filter: %v", err)
+		}
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: string(filterJSON)}).Times(1).Return([]linodego.Instance{instance}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), VpcIDs["test"], gomock.Any()).Return(routesInVPC, nil)
 		client.EXPECT().ListVPCIPv6Addresses(gomock.Any(), VpcIDs["test"], gomock.Any()).Return([]linodego.VPCIP{}, nil)
 
@@ -233,6 +241,7 @@ func TestMetadataRetrieval(t *testing.T) {
 		}, meta.NodeAddresses)
 
 		options.Options.VPCNames = []string{}
+		options.Options.LinodeTagFilter = ""
 	})
 
 	ipTests := []struct {
@@ -353,7 +362,7 @@ func TestMetadataRetrieval(t *testing.T) {
 
 			linodeType := typeG6
 			region := usEast
-			client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
+			client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
 				{ID: id, Label: name, Type: linodeType, Region: region, IPv4: ips, IPv6: test.inputIPv6},
 			}, nil)
 
@@ -422,7 +431,7 @@ func TestMetadataRetrieval(t *testing.T) {
 		for _, test := range getByIPTests {
 			t.Run(fmt.Sprintf("gets linode by IP - %s", test.name), func(t *testing.T) {
 				instances := NewInstances(client)
-				client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{{ID: 3456, IPv4: []*net.IP{&wrongIP}}, expectedInstance}, nil)
+				client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{{ID: 3456, IPv4: []*net.IP{&wrongIP}}, expectedInstance}, nil)
 				node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node-1"}, Status: v1.NodeStatus{Addresses: test.nodeAddresses}}
 				meta, err := instances.InstanceMetadata(ctx, &node)
 				if test.expectedErr != nil {
@@ -448,7 +457,7 @@ func TestMalformedProviders(t *testing.T) {
 		instances := NewInstances(client)
 		providerID := ccmUtils.ProviderIDPrefix + "abc"
 		node := nodeWithProviderID(providerID)
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{}, nil)
 		meta, err := instances.InstanceMetadata(ctx, node)
 
 		require.ErrorIs(t, err, ccmUtils.InvalidProviderIDError{Value: providerID})
@@ -475,7 +484,7 @@ func TestRefreshInstancesVPCErrors(t *testing.T) {
 		}()
 
 		apiErr := fmt.Errorf("VPC API error")
-		c.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
+		c.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
 			{ID: 123, Label: "test-instance"},
 		}, nil)
 		c.EXPECT().ListVPCIPAddresses(gomock.Any(), 1, gomock.Any()).Return(nil, apiErr)
@@ -498,7 +507,7 @@ func TestRefreshInstancesVPCErrors(t *testing.T) {
 
 		vpcIP := "10.0.0.2"
 		apiErr := fmt.Errorf("VPC IPv6 API error")
-		c.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
+		c.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
 			{ID: 123, Label: "test-instance"},
 		}, nil)
 		c.EXPECT().ListVPCIPAddresses(gomock.Any(), 1, gomock.Any()).Return([]linodego.VPCIP{
@@ -523,7 +532,7 @@ func TestRefreshInstancesVPCErrors(t *testing.T) {
 		}()
 
 		apiErr := fmt.Errorf("VPC API error")
-		c.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
+		c.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
 			{ID: 123, Label: "test-instance"},
 		}, nil)
 		c.EXPECT().ListVPCIPAddresses(gomock.Any(), 1, gomock.Any()).Return(nil, apiErr)
@@ -549,7 +558,7 @@ func TestRefreshInstancesVPCErrors(t *testing.T) {
 
 		vpcIP := "10.0.0.2"
 		apiErr := fmt.Errorf("VPC IPv6 API error")
-		c.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
+		c.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
 			{ID: 123, Label: "test-instance"},
 		}, nil)
 		c.EXPECT().ListVPCIPAddresses(gomock.Any(), 1, gomock.Any()).Return([]linodego.VPCIP{
@@ -577,7 +586,7 @@ func TestInstanceShutdown(t *testing.T) {
 		instances := NewInstances(client)
 		id := 12345
 		node := nodeWithProviderID(ccmUtils.ProviderIDPrefix + strconv.Itoa(id))
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{}, nil)
 		shutdown, err := instances.InstanceShutdown(ctx, node)
 
 		require.Error(t, err)
@@ -588,7 +597,7 @@ func TestInstanceShutdown(t *testing.T) {
 		instances := NewInstances(client)
 		name := "some-name"
 		node := nodeWithName(name)
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{}, nil)
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{}, nil)
 		shutdown, err := instances.InstanceShutdown(ctx, node)
 
 		require.Error(t, err)
@@ -599,7 +608,7 @@ func TestInstanceShutdown(t *testing.T) {
 		instances := NewInstances(client)
 		id := 12345
 		node := nodeWithProviderID(ccmUtils.ProviderIDPrefix + strconv.Itoa(id))
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
 			{ID: id, Label: "offline-linode", Status: linodego.InstanceOffline},
 		}, nil)
 		shutdown, err := instances.InstanceShutdown(ctx, node)
@@ -612,7 +621,7 @@ func TestInstanceShutdown(t *testing.T) {
 		instances := NewInstances(client)
 		id := 12345
 		node := nodeWithProviderID(ccmUtils.ProviderIDPrefix + strconv.Itoa(id))
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
 			{ID: id, Label: "shutting-down-linode", Status: linodego.InstanceShuttingDown},
 		}, nil)
 		shutdown, err := instances.InstanceShutdown(ctx, node)
@@ -625,7 +634,7 @@ func TestInstanceShutdown(t *testing.T) {
 		instances := NewInstances(client)
 		id := 12345
 		node := nodeWithProviderID(ccmUtils.ProviderIDPrefix + strconv.Itoa(id))
-		client.EXPECT().ListInstances(gomock.Any(), nil).Times(1).Return([]linodego.Instance{
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
 			{ID: id, Label: "running-linode", Status: linodego.InstanceRunning},
 		}, nil)
 		shutdown, err := instances.InstanceShutdown(ctx, node)
