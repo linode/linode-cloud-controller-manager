@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/appscode/go/wait"
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	v1 "k8s.io/api/core/v1"
 	v1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"

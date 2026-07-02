@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	linodego "github.com/linode/linodego"
+	linodego "github.com/linode/linodego/v2"
 )
 
 // MockClient is a mock of Client interface.
@@ -36,7 +36,7 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 }
 
 // AddInstanceIPAddress mocks base method.
-func (m *MockClient) AddInstanceIPAddress(arg0 context.Context, arg1 int, arg2 bool) (*linodego.InstanceIP, error) {
+func (m *MockClient) AddInstanceIPAddress(arg0 context.Context, arg1 int, arg2 linodego.InstanceIPAddOptions) (*linodego.InstanceIP, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddInstanceIPAddress", arg0, arg1, arg2)
 	ret0, _ := ret[0].(*linodego.InstanceIP)
@@ -539,10 +539,10 @@ func (mr *MockClientMockRecorder) ShareIPAddresses(arg0, arg1 interface{}) *gomo
 }
 
 // UpdateFirewallRules mocks base method.
-func (m *MockClient) UpdateFirewallRules(arg0 context.Context, arg1 int, arg2 linodego.FirewallRuleSet) (*linodego.FirewallRuleSet, error) {
+func (m *MockClient) UpdateFirewallRules(arg0 context.Context, arg1 int, arg2 linodego.FirewallRulesUpdateOptions) (*linodego.FirewallRules, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateFirewallRules", arg0, arg1, arg2)
-	ret0, _ := ret[0].(*linodego.FirewallRuleSet)
+	ret0, _ := ret[0].(*linodego.FirewallRules)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

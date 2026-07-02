@@ -6,8 +6,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	linodeClient "github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -16,6 +15,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/utils/ptr"
 
+	linodeClient "github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
@@ -67,7 +67,7 @@ func TestListRoutes(t *testing.T) {
 		Label:  name,
 		Type:   linodeType,
 		Region: region,
-		IPv4:   []*net.IP{&publicIPv4, &privateIPv4},
+		IPv4:   []net.IP{publicIPv4, privateIPv4},
 	}
 
 	t.Run("should return no routes if instance exists but is not connected to VPC", func(t *testing.T) {
@@ -242,14 +242,14 @@ func TestListRoutes(t *testing.T) {
 			Label:  instance2Label,
 			Type:   linodeType,
 			Region: region,
-			IPv4:   []*net.IP{&publicIPv4, &privateIPv4},
+			IPv4:   []net.IP{publicIPv4, privateIPv4},
 		}
 		validInstance3 := linodego.Instance{
 			ID:     instance3ID,
 			Label:  instance3Label,
 			Type:   linodeType,
 			Region: region,
-			IPv4:   []*net.IP{&publicIPv4, &privateIPv4},
+			IPv4:   []net.IP{publicIPv4, privateIPv4},
 		}
 
 		routesInVPC2 := []linodego.VPCIP{
@@ -347,7 +347,7 @@ func TestCreateRoute(t *testing.T) {
 		Label:  name,
 		Type:   linodeType,
 		Region: region,
-		IPv4:   []*net.IP{&publicIPv4, &privateIPv4},
+		IPv4:   []net.IP{publicIPv4, privateIPv4},
 	}
 
 	vpcIP := "10.0.0.2"
@@ -527,7 +527,7 @@ func TestDeleteRoute(t *testing.T) {
 		Label:  name,
 		Type:   linodeType,
 		Region: region,
-		IPv4:   []*net.IP{&publicIPv4, &privateIPv4},
+		IPv4:   []net.IP{publicIPv4, privateIPv4},
 	}
 
 	vpcIP := "10.0.0.2"

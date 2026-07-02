@@ -13,7 +13,7 @@ import (
 	ciliumclient "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/typed/cilium.io/v2alpha1"
 	slimv1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/apis/meta/v1"
 	"github.com/google/uuid"
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -218,7 +218,7 @@ func (l *loadbalancers) createSharedIP(ctx context.Context, nodes []*v1.Node, ip
 		return "", err
 	}
 
-	newSharedIP, err := l.client.AddInstanceIPAddress(ctx, ipHolder.ID, true)
+	newSharedIP, err := l.client.AddInstanceIPAddress(ctx, ipHolder.ID, linodego.InstanceIPAddOptions{Public: true})
 	if err != nil {
 		return "", err
 	}

@@ -9,7 +9,7 @@ import (
 	ciliumfake "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/fake"
 	fakev2alpha1 "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/typed/cilium.io/v2alpha1/fake"
 	"github.com/golang/mock/gomock"
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -84,7 +84,7 @@ var (
 		Label:  fmt.Sprintf("%s-%s", ipHolderLabelPrefix, zone),
 		Type:   "g6-standard-1",
 		Region: "us-west",
-		IPv4:   []*net.IP{&publicIPv4},
+		IPv4:   []net.IP{publicIPv4},
 	}
 	newIpHolderInstance = linodego.Instance{}
 )
@@ -208,7 +208,7 @@ func createNewIpHolderInstance() linodego.Instance {
 		Label:  generateClusterScopedIPHolderLinodeName(zone, options.Options.IpHolderSuffix),
 		Type:   "g6-standard-1",
 		Region: "us-west",
-		IPv4:   []*net.IP{&publicIPv4},
+		IPv4:   []net.IP{publicIPv4},
 	}
 }
 
@@ -246,10 +246,10 @@ func testNoBGPNodeLabel(t *testing.T, mc *mocks.MockClient) {
 	mc.EXPECT().CreateInstance(gomock.Any(), gomock.Any()).Times(1).Return(&newIpHolderInstance, nil)
 	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), newIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
 		IPv4: &linodego.InstanceIPv4Response{
-			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
+			Public: []linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
 		},
 	}, nil)
-	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), newIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), newIpHolderInstance.ID, linodego.InstanceIPAddOptions{Public: true}).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
 		IPs:      []string{dummySharedIP},
 		LinodeID: 11111,
@@ -325,10 +325,10 @@ func testCreateWithExistingIPHolderWithOldIpHolderNamingConvention(t *testing.T,
 	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{oldIpHolderInstance}, nil)
 	dummySharedIP := dummyIP
-	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), oldIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), oldIpHolderInstance.ID, linodego.InstanceIPAddOptions{Public: true}).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
 	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), oldIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
 		IPv4: &linodego.InstanceIPv4Response{
-			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
+			Public: []linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
 		},
 	}, nil)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
@@ -371,10 +371,10 @@ func testCreateWithExistingIPHolderWithNewIpHolderNamingConvention(t *testing.T,
 	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{oldIpHolderInstance}, nil)
 	dummySharedIP := dummyIP
-	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), oldIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), oldIpHolderInstance.ID, linodego.InstanceIPAddOptions{Public: true}).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
 	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), oldIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
 		IPv4: &linodego.InstanceIPv4Response{
-			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
+			Public: []linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
 		},
 	}, nil)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
@@ -417,10 +417,10 @@ func testCreateWithExistingIPHolderWithNewIpHolderNamingConventionUsingLongSuffi
 	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{oldIpHolderInstance}, nil)
 	dummySharedIP := dummyIP
-	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), oldIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), oldIpHolderInstance.ID, linodego.InstanceIPAddOptions{Public: true}).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
 	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), oldIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
 		IPv4: &linodego.InstanceIPv4Response{
-			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
+			Public: []linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
 		},
 	}, nil)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
@@ -472,10 +472,10 @@ func testCreateWithNoExistingIPHolderUsingNoSuffix(t *testing.T, mc *mocks.MockC
 	mc.EXPECT().CreateInstance(gomock.Any(), gomock.Any()).Times(1).Return(&newIpHolderInstance, nil)
 	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), newIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
 		IPv4: &linodego.InstanceIPv4Response{
-			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
+			Public: []linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
 		},
 	}, nil)
-	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), newIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), newIpHolderInstance.ID, linodego.InstanceIPAddOptions{Public: true}).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
 		IPs:      []string{dummySharedIP},
 		LinodeID: 11111,
@@ -525,10 +525,10 @@ func testCreateWithNoExistingIPHolderUsingShortSuffix(t *testing.T, mc *mocks.Mo
 	mc.EXPECT().CreateInstance(gomock.Any(), gomock.Any()).Times(1).Return(&newIpHolderInstance, nil)
 	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), newIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
 		IPv4: &linodego.InstanceIPv4Response{
-			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
+			Public: []linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
 		},
 	}, nil)
-	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), newIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), newIpHolderInstance.ID, linodego.InstanceIPAddOptions{Public: true}).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
 		IPs:      []string{dummySharedIP},
 		LinodeID: 11111,
@@ -578,10 +578,10 @@ func testCreateWithNoExistingIPHolderUsingLongSuffix(t *testing.T, mc *mocks.Moc
 	mc.EXPECT().CreateInstance(gomock.Any(), gomock.Any()).Times(1).Return(&newIpHolderInstance, nil)
 	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), newIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
 		IPv4: &linodego.InstanceIPv4Response{
-			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
+			Public: []linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
 		},
 	}, nil)
-	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), newIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), newIpHolderInstance.ID, linodego.InstanceIPAddOptions{Public: true}).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
 		IPs:      []string{dummySharedIP},
 		LinodeID: 11111,
@@ -692,10 +692,10 @@ func testCiliumUpdateLoadBalancerAddNodeWithOldIpHolderNamingConvention(t *testi
 	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{oldIpHolderInstance}, nil)
 	dummySharedIP := dummyIP
-	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), oldIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), oldIpHolderInstance.ID, linodego.InstanceIPAddOptions{Public: true}).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
 	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), oldIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
 		IPv4: &linodego.InstanceIPv4Response{
-			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
+			Public: []linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
 		},
 	}, nil)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
@@ -719,7 +719,7 @@ func testCiliumUpdateLoadBalancerAddNodeWithOldIpHolderNamingConvention(t *testi
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{oldIpHolderInstance}, nil)
 	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), oldIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
 		IPv4: &linodego.InstanceIPv4Response{
-			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
+			Public: []linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
 		},
 	}, nil)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
@@ -762,10 +762,10 @@ func testCiliumUpdateLoadBalancerAddNodeWithNewIpHolderNamingConvention(t *testi
 	}
 	mc.EXPECT().ListInstances(gomock.Any(), linodego.NewListOptions(1, string(rawFilter))).Times(1).Return([]linodego.Instance{newIpHolderInstance}, nil)
 	dummySharedIP := dummyIP
-	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), newIpHolderInstance.ID, true).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
+	mc.EXPECT().AddInstanceIPAddress(gomock.Any(), newIpHolderInstance.ID, linodego.InstanceIPAddOptions{Public: true}).Times(1).Return(&linodego.InstanceIP{Address: dummySharedIP}, nil)
 	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), newIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
 		IPv4: &linodego.InstanceIPv4Response{
-			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
+			Public: []linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
 		},
 	}, nil)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{
@@ -801,7 +801,7 @@ func testCiliumUpdateLoadBalancerAddNodeWithNewIpHolderNamingConvention(t *testi
 
 	mc.EXPECT().GetInstanceIPAddresses(gomock.Any(), newIpHolderInstance.ID).Times(1).Return(&linodego.InstanceIPAddressResponse{
 		IPv4: &linodego.InstanceIPv4Response{
-			Public: []*linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
+			Public: []linodego.InstanceIP{{Address: publicIPv4.String()}, {Address: dummySharedIP}},
 		},
 	}, nil)
 	mc.EXPECT().ShareIPAddresses(gomock.Any(), linodego.IPAddressesShareOptions{

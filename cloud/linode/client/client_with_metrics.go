@@ -8,7 +8,7 @@ import (
 	"context"
 
 	_ "github.com/hexdigest/gowrap"
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -34,7 +34,7 @@ func NewClientWithPrometheus(base Client) ClientWithPrometheus {
 }
 
 // AddInstanceIPAddress implements Client
-func (_d ClientWithPrometheus) AddInstanceIPAddress(ctx context.Context, linodeID int, public bool) (ip1 *linodego.InstanceIP, err error) {
+func (_d ClientWithPrometheus) AddInstanceIPAddress(ctx context.Context, linodeID int, options linodego.InstanceIPAddOptions) (ip1 *linodego.InstanceIP, err error) {
 	defer func() {
 		result := "ok"
 		if err != nil {
@@ -43,7 +43,7 @@ func (_d ClientWithPrometheus) AddInstanceIPAddress(ctx context.Context, linodeI
 
 		ClientMethodCounterVec.WithLabelValues("AddInstanceIPAddress", result).Inc()
 	}()
-	return _d.base.AddInstanceIPAddress(ctx, linodeID, public)
+	return _d.base.AddInstanceIPAddress(ctx, linodeID, options)
 }
 
 // CreateFirewall implements Client
@@ -476,7 +476,7 @@ func (_d ClientWithPrometheus) ShareIPAddresses(ctx context.Context, opts linode
 }
 
 // UpdateFirewallRules implements Client
-func (_d ClientWithPrometheus) UpdateFirewallRules(ctx context.Context, i1 int, f1 linodego.FirewallRuleSet) (fp1 *linodego.FirewallRuleSet, err error) {
+func (_d ClientWithPrometheus) UpdateFirewallRules(ctx context.Context, i1 int, f1 linodego.FirewallRulesUpdateOptions) (fp1 *linodego.FirewallRules, err error) {
 	defer func() {
 		result := "ok"
 		if err != nil {

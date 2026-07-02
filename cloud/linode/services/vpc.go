@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	"k8s.io/klog/v2"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
