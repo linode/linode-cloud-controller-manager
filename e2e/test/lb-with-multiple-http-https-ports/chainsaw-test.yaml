@@ -10,6 +10,9 @@ spec:
   namespace: "lb-with-multiple-http-https-ports"
   catch:
     - script:
+        shell: bash
+        shellArgs:
+          - -c
         content: |
           set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
@@ -29,6 +32,9 @@ spec:
     - name: Create secrets
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
               kubectl -n $NAMESPACE create secret tls tls-secret-1 --cert=../certificates/server.crt --key=../certificates/server.key
@@ -67,6 +73,9 @@ spec:
     - name: Fetch loadbalancer ip and check if pod reachable on different ports with different protocols
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             timeout: 10m
             content: |
               set -euo pipefail

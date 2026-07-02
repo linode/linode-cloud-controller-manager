@@ -10,6 +10,9 @@ spec:
   namespace: "lb-preserve-annotation-new-nb-specified"
   catch:
     - script:
+        shell: bash
+        shellArgs:
+          - -c
         content: |
           set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
@@ -39,6 +42,9 @@ spec:
     - name: Create new nodebalancer and update service to use it
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
 

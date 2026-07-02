@@ -10,6 +10,9 @@ spec:
   namespace: "lb-with-proxyprotocol-override"
   catch:
     - script:
+        shell: bash
+        shellArgs:
+          - -c
         content: |
           set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
@@ -49,6 +52,9 @@ spec:
     - name: Annotate service port 80 with v1 and 8080 with v2
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-port-80='{"proxy-protocol": "v1"}'
@@ -56,6 +62,9 @@ spec:
     - name: Check NodeBalancerConfig for port 80 to have ProxyProtocol v1 and port 8080 to have ProxyProtocol v2
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
 
@@ -84,6 +93,9 @@ spec:
     - name: Update service annotation for port 80 to v2 and 8080 with v1
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-default-proxy-protocol=v2
@@ -94,6 +106,9 @@ spec:
     - name: Check NodeBalancerConfig for port 80 to have ProxyProtocol v2 and port 8080 to have ProxyProtocol v1
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
 

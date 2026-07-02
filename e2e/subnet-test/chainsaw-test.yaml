@@ -12,6 +12,9 @@ spec:
   namespace: "subnet-filtering-test"
   catch:
     - script:
+        shell: bash
+        shellArgs:
+          - -c
         content: |
           set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
@@ -20,6 +23,9 @@ spec:
     - name: Check if the CCM for each cluster focus on their individual subnets
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
 

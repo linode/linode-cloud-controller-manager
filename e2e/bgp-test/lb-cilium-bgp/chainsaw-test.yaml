@@ -9,6 +9,9 @@ spec:
   namespace: "cilium-bgp-test"
   catch:
     - script:
+        shell: bash
+        shellArgs:
+          - -c
         content: |
           set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
@@ -66,6 +69,9 @@ spec:
     - name: Verify IP sharing on labeled nodes
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
 

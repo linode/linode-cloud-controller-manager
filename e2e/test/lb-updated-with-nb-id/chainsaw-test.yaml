@@ -10,6 +10,9 @@ spec:
   namespace: "lb-updated-with-nb-id"
   catch:
     - script:
+        shell: bash
+        shellArgs:
+          - -c
         content: |
           set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
@@ -39,6 +42,9 @@ spec:
     - name: Create nodebalancer, annotate svc with nodebalancer id and validate
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             timeout: 10m
             content: |
               set -euo pipefail
