@@ -29,24 +29,20 @@ jobs:
         with:
           files: |
             ./release/helm-chart-${{ github.ref_name }}.tgz
-      - name: Docker Meta
-        id: meta
-        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6.0.0
+
+      - name: Set up Mise
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
         with:
-          images: |
-            linode/linode-cloud-controller-manager
-          tags: |
-            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
-            type=semver,pattern={{raw}},value=${{ github.ref_name }}
+          install_args: go ko
+
       - name: Login to Docker Hub
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Build and Push to Docker Hub
-        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Build and Push to Docker Hub with ko
+        run: mise run ko-publish
+        env:
+          KO_DOCKER_REPO: docker.io/linode/linode-cloud-controller-manager
+          IMAGE_TAGS: ${{ github.ref_name }}
