@@ -66,13 +66,6 @@
       "matchPackageNames": [
         "go.opentelemetry.io/**"
       ]
-    },
-    {
-      "groupName": "devbox",
-      "groupSlug": "devbox",
-      "matchDatasources": [
-        "devbox"
-      ]
     }
   ]
 }

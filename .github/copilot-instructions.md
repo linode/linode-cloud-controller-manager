@@ -43,14 +43,14 @@ Two distinct implementations:
 
 ### Building & Testing
 ```bash
-# Use devbox for development environment
-devbox shell
+# Use mise for the development environment
+mise install
 
 # Build binary
-make build
+mise run build
 
 # Run tests with coverage
-make test-coverage
+mise run test
 
 # Generate mocks (run after changing client interface)
 make mockgen

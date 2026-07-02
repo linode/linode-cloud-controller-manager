@@ -1,0 +1,127 @@
+[settings]
+minimum_release_age = "7d"  # only install versions released more than 7 days ago - https://mise.en.dev/security.html#minimum-release-age
+
+[env]
+EXP_CLUSTER_RESOURCE_SET = "true"
+GOTOOLCHAIN = "auto"
+
+[tools]
+go = "1.26.4"
+golangci-lint = "2.11.4"
+helm = "3.16.3"
+kubectl = "1.35.5"
+kustomize = "5.8.1"
+kind = "0.31.0"
+ctlptl = "0.9.0"
+clusterctl = "1.8.5"
+"go:github.com/kyverno/chainsaw" = "0.2.15"
+"go:github.com/golang/mock/mockgen" = "1.6.0"
+yq = "4.52.2"
+jq = "1.8.1"
+envsubst = "1.4.3"
+
+[tasks.build]
+description = "Build the CCM binary"
+run = "make build"
+
+[tasks.clean]
+description = "Clean up build artifacts"
+run = "make clean"
+
+[tasks.codegen]
+description = "Generate code"
+run = "make codegen"
+
+[tasks.docker-build]
+description = "Build the Docker image with the current Make target"
+run = "make docker-build"
+
+[tasks.docker-push]
+description = "Push the Docker image built by the current Make target"
+run = "make docker-push"
+
+[tasks.fmt]
+description = "Run go fmt"
+run = "make fmt"
+
+[tasks.gosec]
+description = "Run gosec in the project containerized workflow"
+run = "make gosec"
+
+[tasks.helm-lint]
+description = "Lint the Helm chart"
+run = "make helm-lint"
+
+[tasks.mgmt-and-capl-cluster]
+description = "Create the management cluster and both CAPL test clusters"
+run = "make mgmt-and-capl-cluster"
+
+[tasks.mgmt-cluster]
+description = "Create the CAPL management cluster"
+run = "make mgmt-cluster"
+
+[tasks.capl-cluster]
+description = "Create the primary CAPL child cluster"
+run = "make capl-cluster"
+
+[tasks.capl-ipv6-cluster]
+description = "Create the IPv6 CAPL child cluster"
+run = "make capl-ipv6-cluster"
+
+[tasks.e2e-test]
+description = "Run the standard e2e suite"
+run = "make e2e-test"
+
+[tasks.e2e-test-ipv6-backends]
+description = "Run the IPv6 backend e2e slice"
+run = "make e2e-test-ipv6-backends"
+
+[tasks.e2e-test-bgp]
+description = "Run the Cilium BGP e2e test"
+run = "make e2e-test-bgp"
+
+[tasks.e2e-test-subnet]
+description = "Run the subnet filtering e2e test"
+run = "make e2e-test-subnet"
+
+[tasks.cleanup-cluster]
+description = "Clean up CAPL test clusters"
+run = "make cleanup-cluster"
+
+[tasks.vet]
+description = "Run go vet"
+run = "make vet"
+
+[tasks.lint]
+description = "Run golangci-lint"
+run = "make lint"
+
+[tasks.build-nilaway]
+description = "Build the custom NilAway-enabled golangci-lint binary"
+hide = true
+run = "mkdir -p ./bin && golangci-lint custom"
+
+[tasks.nilcheck]
+description = "Run nilaway lint checks"
+run = "mise run build-nilaway && ./bin/golangci-lint-nilaway run -c .golangci-nilaway.yml"
+
+[tasks.release]
+description = "Create the release chart artifact"
+run = "make release"
+
+[tasks.run]
+description = "Run the CCM locally"
+run = "make run"
+
+[tasks.run-debug]
+description = "Run the CCM locally with linodego debug enabled"
+run = "make run-debug"
+
+[tasks.test]
+description = "Run unit tests"
+run = "make test"
+
+
+
+
+

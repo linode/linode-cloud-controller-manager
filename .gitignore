@@ -44,3 +44,6 @@ junit.xml
 *-manifests.yaml
 *-kubeconfig.yaml
 .opencode/
+
+# Local dev setup
+.envrc
