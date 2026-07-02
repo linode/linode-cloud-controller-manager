@@ -19,6 +19,7 @@ spec:
           kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-fw-delete-acl" | tail -100
   steps:
     - name: Create pods and services
+      skipDelete: true
       try:
         - apply:
             file: create-pods-services.yaml
@@ -118,6 +119,7 @@ spec:
                 ($error == null): true
                 (contains($stdout, 'firewall detatched and deleted')): true
     - name: Refresh service by adding the ACL again
+      skipDelete: true
       try:
         - apply:
             file: create-pods-services.yaml
