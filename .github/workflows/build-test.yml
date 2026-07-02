@@ -53,6 +53,7 @@ jobs:
             golang.org:443
             proxy.golang.org:443
             sum.golang.org:443
+            dl.google.com:443
             *.githubusercontent.com:443
             storage.googleapis.com:443
             cli.codecov.io:443
@@ -60,32 +61,39 @@ jobs:
             ingest.codecov.io:443
             get.helm.sh:443
             golangci-lint.run:443
+            mise.jdx.dev:443
+            mise-versions.jdx.dev:443
+            tuf-repo-cdn.sigstore.dev:443
+            dl.k8s.io:443
+            get.helm.sh:443
+            githubapp.com:443
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+
+      - name: Set up Mise
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
         with:
-          go-version-file: go.mod
-          check-latest: true
+          install_args: go golangci-lint helm
 
       - name: Vet
-        run: make vet
+        run: mise run vet
 
       - name: lint
-        run: make lint
+        run: mise run lint
 
       - name: nilcheck
-        run: make nilcheck
+        run: mise run nilcheck
 
       - name: Helm Lint
-        run: make helm-lint
+        run: mise run helm-lint
 
       - name: Test
-        run: make test
+        run: mise run test
 
       - name: Build
-        run: make build
+        run: mise run build
 
   docker-build:
     runs-on: ubuntu-latest
@@ -99,6 +107,7 @@ jobs:
             api.github.com:443
             auth.docker.io:443
             dl-cdn.alpinelinux.org:443
+            dl.google.com:443
             github.com:443
             production.cloudflare.docker.com:443
             proxy.golang.org:443
@@ -106,6 +115,9 @@ jobs:
             storage.googleapis.com:443
             production.cloudfront.docker.com:443
             sentry.io:443
+            dl.k8s.io:443
+            get.helm.sh:443
+            githubapp.com:443
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
