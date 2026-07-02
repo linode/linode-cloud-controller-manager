@@ -10,6 +10,9 @@ spec:
   namespace: "lb-created-with-reserved-and-nb-id-annotations"
   catch:
     - script:
+        shell: bash
+        shellArgs:
+          - -c
         content: |
           set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
@@ -36,6 +39,9 @@ spec:
     - name: create reserved ip and nodebalancer resources
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
 
@@ -93,6 +99,9 @@ spec:
             kind: Service
       cleanup:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
 

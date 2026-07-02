@@ -12,6 +12,9 @@ spec:
   namespace: "route-controller-test"
   catch:
     - script:
+        shell: bash
+        shellArgs:
+          - -c
         content: |
           set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
@@ -20,6 +23,9 @@ spec:
     - name: Check if the route controller updated the config for the linode
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
 
@@ -70,6 +76,9 @@ spec:
     - name: Modify instance label using linodeAPI and check if it still has the route configured
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
 

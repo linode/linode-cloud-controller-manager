@@ -10,6 +10,9 @@ spec:
   namespace: "lb-fw-delete-acl"
   catch:
     - script:
+        shell: bash
+        shellArgs:
+          - -c
         content: |
           set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
@@ -39,6 +42,9 @@ spec:
     - name: Fetch Nodebalancer ID, make sure it has firewall attached
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
 
@@ -65,6 +71,9 @@ spec:
     - name: Delete ACL and check that firewall no longer exists
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             timeout: 5m
             content: |
               set -euo pipefail
@@ -119,6 +128,9 @@ spec:
     - name: Delete service and make sure nb and fw are deleted automatically
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
 

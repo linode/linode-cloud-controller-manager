@@ -10,6 +10,9 @@ spec:
   namespace: "lb-with-proxyprotocol-default-annotation"
   catch:
     - script:
+        shell: bash
+        shellArgs:
+          - -c
         content: |
           set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
@@ -39,6 +42,9 @@ spec:
     - name: Add ProxyProtocol v2 using deprecated annotation
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-proxy-protocol=v2
@@ -47,6 +53,9 @@ spec:
     - name: Check NodeBalancerConfig for port 80 and 8080 have ProxyProtocol v2
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
 
@@ -75,6 +84,9 @@ spec:
     - name: Add default annotation for ProxyProtocol v1
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-default-proxy-protocol=v1
@@ -83,6 +95,9 @@ spec:
     - name: Check NodeBalancerConfig for port 80 and 8080 have ProxyProtocol v1
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
 

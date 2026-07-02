@@ -10,6 +10,9 @@ spec:
   namespace: "lb-delete-svc-use-specified-nb"
   catch:
     - script:
+        shell: bash
+        shellArgs:
+          - -c
         content: |
           set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
@@ -36,6 +39,9 @@ spec:
     - name: Create nodebalancer and create resources
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             outputs:
               - name: nbconf
                 value: (json_parse($stdout))
@@ -85,6 +91,9 @@ spec:
     - name: Validate nodebalancer id
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
 

@@ -9,6 +9,9 @@ spec:
   namespace: "lb-with-ipv6-backends"
   catch:
     - script:
+        shell: bash
+        shellArgs:
+          - -c
         content: |
           set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
@@ -38,6 +41,9 @@ spec:
     - name: Check NodeBalancer backend addresses are IPv6
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
 
@@ -81,6 +87,9 @@ spec:
     - name: Wait for loadbalancer to start serving traffic
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             timeout: 15m
             content: |
               bash -ce '
@@ -105,6 +114,9 @@ spec:
     - name: Fetch loadbalancer ip and check both pods reachable
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             timeout: 10m
             content: |
               bash -ce '
