@@ -68,6 +68,9 @@ spec:
             kind: Service
       cleanup:
         - script: 
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
 
@@ -88,7 +91,7 @@ spec:
               fi
 
               delete_cm=$(kubectl delete configmap reserved-ip-config -n $NAMESPACE)
-              if [[ "$delete_cm" == "configmap \"reserved-ip-config\" deleted" ]]; then
+              if [[ "$delete_cm" == *'configmap "reserved-ip-config" deleted'* ]]; then
                 echo "Configmap deleted successfully"
               else
                 echo "Unable to delete the configmap: $delete_cm. Error: $delete_cm"
@@ -158,6 +161,9 @@ spec:
     - name: get service ip and compare with reserved ip
       try:
         - script: 
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
 
