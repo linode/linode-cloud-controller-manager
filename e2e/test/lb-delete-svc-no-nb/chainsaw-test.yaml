@@ -37,7 +37,6 @@ spec:
             status:
               (loadBalancer.ingress[0].ip != null): true
     - name: Create nodebalancer and create resources
-      skipDelete: true
       try:
         - script:
             shell: bash
