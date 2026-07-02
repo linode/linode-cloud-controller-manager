@@ -9,6 +9,9 @@ spec:
   namespace: "lb-premium-nb"
   catch:
     - script:
+        shell: bash
+        shellArgs:
+          - -c
         content: |
           set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
@@ -38,6 +41,9 @@ spec:
     - name: Fetch loadbalancer ip and check both pods reachable
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             timeout: 10m
             content: |
               set -euo pipefail
@@ -81,6 +87,9 @@ spec:
     - name: Check nodebalancer type
       try:
       - script:
+          shell: bash
+          shellArgs:
+            - -c
           content: |
             set -euo pipefail
 

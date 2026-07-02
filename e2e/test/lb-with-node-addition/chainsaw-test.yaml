@@ -9,6 +9,9 @@ spec:
   namespace: "lb-with-node-addition"
   catch:
     - script:
+        shell: bash
+        shellArgs:
+          - -c
         content: |
           set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
@@ -38,6 +41,9 @@ spec:
     - name: Validate nodebalancer has 2 nodes
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             timeout: 10m
             content: |
               set -euo pipefail
@@ -74,6 +80,9 @@ spec:
     - name: Add new node and check nodebalancer gets updated
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             timeout: 10m
             content: |
               set -euo pipefail

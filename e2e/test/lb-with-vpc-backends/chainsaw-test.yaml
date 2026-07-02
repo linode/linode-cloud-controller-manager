@@ -9,6 +9,9 @@ spec:
   namespace: "lb-with-vpc-backends"
   catch:
     - script:
+        shell: bash
+        shellArgs:
+          - -c
         content: |
           set -euo pipefail
           echo "Test failed. Fetching CCM logs..."
@@ -48,6 +51,9 @@ spec:
     - name: Check NodeBalancerConfig for backend ips
       try:
         - script:
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
 
