@@ -2,19 +2,6 @@ IMG                     ?= linode/linode-cloud-controller-manager:canary
 RELEASE_DIR             ?= release
 PLATFORM                ?= linux/amd64
 
-# Use CACHE_BIN for tools that cannot use devbox and LOCALBIN for tools that can use either method
-CACHE_BIN               ?= $(CURDIR)/bin
-LOCALBIN                ?= $(CACHE_BIN)
-
-DEVBOX_BIN              ?= $(DEVBOX_PACKAGES_DIR)/bin
-HELM                    ?= $(LOCALBIN)/helm
-HELM_VERSION            ?= v3.16.3
-CLUSTERCTL              ?= $(CACHE_BIN)/clusterctl
-CLUSTERCTL_VERSION      ?= v1.8.5
-
-GOLANGCI_LINT           ?= $(LOCALBIN)/golangci-lint
-GOLANGCI_LINT_NILAWAY   ?= $(CACHE_BIN)/golangci-lint-nilaway
-
 #####################################################################
 # Dev Setup
 #####################################################################
@@ -38,9 +25,6 @@ CAAPH_VERSION           ?= "v0.2.1"
 # renovate: datasource=github-tags depName=linode/cluster-api-provider-linode
 CAPL_VERSION            ?= "v0.8.5"
 
-# renovate: datasource=github-tags depName=golangci/golangci-lint
-GOLANGCI_LINT_VERSION   ?= "v2.11.4"
-
 CONTROLPLANE_NODES      ?= 1
 WORKER_NODES            ?= 1
 LINODE_FIREWALL_ENABLED ?= true
@@ -51,17 +35,6 @@ KUBECONFIG_PATH         ?= $(CURDIR)/test-cluster-kubeconfig.yaml
 SUBNET_KUBECONFIG_PATH	?= $(CURDIR)/subnet-testing-kubeconfig.yaml
 MGMT_KUBECONFIG_PATH    ?= $(CURDIR)/mgmt-cluster-kubeconfig.yaml
 IPV6_KUBECONFIG_PATH    ?= $(CURDIR)/ipv6-kubeconfig.yaml
-
-# if the $DEVBOX_PACKAGES_DIR env variable exists that means we are within a devbox shell and can safely
-# use devbox's bin for our tools
-ifdef DEVBOX_PACKAGES_DIR
-	LOCALBIN = $(DEVBOX_BIN)
-endif
-
-export PATH := $(CACHE_BIN):$(PATH)
-TOOL_DIRS := $(sort $(LOCALBIN) $(CACHE_BIN))
-$(TOOL_DIRS):
-	mkdir -p $@
 
 export GO111MODULE=on
 
@@ -74,7 +47,7 @@ clean:
 	@rm -rf ./.tmp
 	@rm -rf dist/*
 	@rm -rf $(RELEASE_DIR)
-	@rm -rf $(LOCALBIN)
+	@rm -rf ./bin
 
 .PHONY: codegen
 codegen:
@@ -85,12 +58,8 @@ vet: fmt
 	go vet ./...
 
 .PHONY: lint
-lint: golangci-lint
-	$(GOLANGCI_LINT) run -c .golangci.yml --fix
-
-.PHONY: lint
-nilcheck: golangci-lint-nilaway ## Run nilaway against code.
-	$(GOLANGCI_LINT_NILAWAY) run -c .golangci-nilaway.yml
+lint:
+	golangci-lint run -c .golangci.yml --fix
 
 .PHONY: gosec
 gosec: ## Run gosec against code.
@@ -180,27 +149,27 @@ capl-ipv6-cluster: generate-capl-ipv6-cluster-manifests
 		$(MAKE) create-capl-cluster
 
 .PHONY: generate-capl-cluster-manifests
-generate-capl-cluster-manifests: clusterctl
+generate-capl-cluster-manifests:
 	# Create the CAPL cluster manifests without any CSI driver stuff
-	LINODE_FIREWALL_ENABLED=$(LINODE_FIREWALL_ENABLED) LINODE_OS=$(LINODE_OS) VPC_NAME=$(VPC_NAME) $(CLUSTERCTL) generate cluster $(CLUSTER_NAME) \
+	LINODE_FIREWALL_ENABLED=$(LINODE_FIREWALL_ENABLED) LINODE_OS=$(LINODE_OS) VPC_NAME=$(VPC_NAME) clusterctl generate cluster $(CLUSTER_NAME) \
 		--kubernetes-version $(K8S_VERSION) --infrastructure linode-linode:$(CAPL_VERSION) \
 		--control-plane-machine-count $(CONTROLPLANE_NODES) --worker-machine-count $(WORKER_NODES) > $(MANIFEST_NAME).yaml
 	IMG=$(IMG) SUBNET_NAME=$(SUBNET_NAME) ./hack/patch-capl-manifest.sh $(MANIFEST_NAME).yaml
 
 .PHONY: generate-capl-ipv6-cluster-manifests
-generate-capl-ipv6-cluster-manifests: clusterctl
-	LINODE_FIREWALL_ENABLED=$(LINODE_FIREWALL_ENABLED) LINODE_OS=$(LINODE_OS) VPC_NAME=$(IPV6_CLUSTER_NAME) $(CLUSTERCTL) generate cluster $(IPV6_CLUSTER_NAME) \
+generate-capl-ipv6-cluster-manifests:
+	LINODE_FIREWALL_ENABLED=$(LINODE_FIREWALL_ENABLED) LINODE_OS=$(LINODE_OS) VPC_NAME=$(IPV6_CLUSTER_NAME) clusterctl generate cluster $(IPV6_CLUSTER_NAME) \
 		--kubernetes-version $(K8S_VERSION) --infrastructure linode-linode:$(CAPL_VERSION) \
 		--control-plane-machine-count $(CONTROLPLANE_NODES) --worker-machine-count $(WORKER_NODES) --flavor kubeadm-dual-stack > $(IPV6_MANIFEST_NAME).yaml
 	IMG=$(IMG) ./hack/patch-capl-manifest.sh $(IPV6_MANIFEST_NAME).yaml
 
 .PHONY: create-capl-cluster
-create-capl-cluster: clusterctl
+create-capl-cluster:
 	# Create a CAPL cluster with updated CCM and wait for it to be ready
 	kubectl apply -f $(MANIFEST_NAME).yaml
 	kubectl wait --for=condition=ControlPlaneReady cluster/$(CLUSTER_NAME) --timeout=600s || (kubectl get cluster -o yaml; kubectl get linodecluster -o yaml; kubectl get linodemachines -o yaml; kubectl logs -n capl-system deployments/capl-controller-manager --tail=50)
 	kubectl wait --for=condition=NodeHealthy=true machines -l cluster.x-k8s.io/cluster-name=$(CLUSTER_NAME) --timeout=900s
-	$(CLUSTERCTL) get kubeconfig $(CLUSTER_NAME) > $(KUBECONFIG_PATH)
+	clusterctl get kubeconfig $(CLUSTER_NAME) > $(KUBECONFIG_PATH)
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl wait --for=condition=Ready nodes --all --timeout=600s
 	# Remove all taints from control plane node so that pods scheduled on it by tests can run (without this, some tests fail)
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl taint nodes -l node-role.kubernetes.io/control-plane node-role.kubernetes.io/control-plane-
@@ -214,10 +183,10 @@ patch-linode-ccm:
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl -n kube-system get daemonset/ccm-linode -o yaml
 
 .PHONY: mgmt-cluster
-mgmt-cluster: clusterctl
+mgmt-cluster:
 	# Create a mgmt cluster
 	ctlptl apply -f e2e/setup/ctlptl-config.yaml
-	$(CLUSTERCTL) init \
+	clusterctl init \
 		--wait-providers \
 		--wait-provider-timeout 600 \
 		--core cluster-api:$(CAPI_VERSION) \
@@ -283,60 +252,15 @@ e2e-test-subnet:
 		SECOND_CONFIG=$(SUBNET_KUBECONFIG_PATH) \
 		chainsaw test e2e/subnet-test $(E2E_FLAGS)
 
-#####################################################################
-# OS / ARCH
-#####################################################################
-
-# Set the host's OS. Only linux and darwin supported for now
-HOSTOS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
-ifeq ($(filter darwin linux,$(HOSTOS)),)
-$(error build only supported on linux and darwin host currently)
-endif
-ARCH=$(shell uname -m)
-ARCH_SHORT=$(ARCH)
-ifeq ($(ARCH_SHORT),x86_64)
-ARCH_SHORT := amd64
-else ifeq ($(ARCH_SHORT),aarch64)
-ARCH_SHORT := arm64
-endif
-
-.PHONY: helm
-helm: $(HELM) ## Download helm locally if necessary
-$(HELM): $(LOCALBIN)
-	@curl -fsSL https://get.helm.sh/helm-$(HELM_VERSION)-$(HOSTOS)-$(ARCH_SHORT).tar.gz | tar -xz
-	@mv $(HOSTOS)-$(ARCH_SHORT)/helm $(HELM)
-	@rm -rf helm.tgz $(HOSTOS)-$(ARCH_SHORT)
-
 .PHONY: helm-lint
-helm-lint: helm
+helm-lint:
 #Verify lint works when region and apiToken are passed, and when it is passed as reference.
-	@$(HELM) lint deploy/chart --set apiToken="apiToken",region="us-east"
-	@$(HELM) lint deploy/chart --set secretRef.apiTokenRef="apiToken",secretRef.name="api",secretRef.regionRef="us-east"
+	@helm lint deploy/chart --set apiToken="apiToken",region="us-east"
+	@helm lint deploy/chart --set secretRef.apiTokenRef="apiToken",secretRef.name="api",secretRef.regionRef="us-east"
 
 .PHONY: helm-template
-helm-template: helm
+helm-template:
 #Verify template works when region and apiToken are passed, and when it is passed as reference.
-	@$(HELM) template foo deploy/chart --set apiToken="apiToken",region="us-east" > /dev/null
-	@$(HELM) template foo deploy/chart --set secretRef.apiTokenRef="apiToken",secretRef.name="api",secretRef.regionRef="us-east" > /dev/null
+	@helm template foo deploy/chart --set apiToken="apiToken",region="us-east" > /dev/null
+	@helm template foo deploy/chart --set secretRef.apiTokenRef="apiToken",secretRef.name="api",secretRef.regionRef="us-east" > /dev/null
 
-.PHONY: kubectl
-kubectl: $(KUBECTL) ## Download kubectl locally if necessary.
-$(KUBECTL): $(LOCALBIN)
-	curl -fsSL https://dl.k8s.io/release/$(KUBECTL_VERSION)/bin/$(HOSTOS)/$(ARCH_SHORT)/kubectl -o $(KUBECTL)
-	chmod +x $(KUBECTL)
-
-.PHONY: clusterctl
-clusterctl: $(CLUSTERCTL) ## Download clusterctl locally if necessary.
-$(CLUSTERCTL): $(CACHE_BIN)
-	curl -fsSL https://github.com/kubernetes-sigs/cluster-api/releases/download/$(CLUSTERCTL_VERSION)/clusterctl-$(HOSTOS)-$(ARCH_SHORT) -o $(CLUSTERCTL)
-	chmod +x $(CLUSTERCTL)
-
-.phony: golangci-lint-nilaway
-golangci-lint-nilaway: $(GOLANGCI_LINT_NILAWAY)
-$(GOLANGCI_LINT_NILAWAY): $(GOLANGCI_LINT) # Build golangci-lint-nilaway from custom configuration.
-	$(GOLANGCI_LINT) custom
-
-.phony: golangci-lint
-golangci-lint: $(GOLANGCI_LINT)
-$(GOLANGCI_LINT): # Build golangci-lint from tools folder.
-	GOBIN=$(LOCALBIN)  go install  github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)

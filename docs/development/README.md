@@ -3,19 +3,29 @@
 ## Prerequisites
 
 The Linode Cloud Controller Manager development requires:
+
 - A fairly up-to-date GNU tools environment
-- Go 1.23 or higher
+- Go 1.26 or higher
 
 ### Setting Up Development Environment
 
-#### Option 1: Using Devbox (Recommended)
-The simplest way to set up your development environment is using [Devbox](https://www.jetpack.io/devbox/):
+#### Option 1: Using Mise (Recommended)
 
-1. Install Devbox by following the instructions at [jetpack.io/devbox/docs/installing_devbox/](https://www.jetpack.io/devbox/docs/installing_devbox/)
+The simplest way to set up your development environment is using [mise](https://mise.jdx.dev/):
 
-2. Start the development environment:
+1. Install mise by following the instructions at [mise.jdx.dev](https://mise.jdx.dev/getting-started.html)
+
+1. Install the pinned toolchain from the repository root:
+
 ```bash
-devbox shell
+mise install
+```
+
+1. Run commands through mise so the pinned toolchain is used:
+
+```bash
+mise run build
+mise run test
 ```
 
 This will automatically set up all required dependencies and tools for development.
@@ -25,6 +35,7 @@ This will automatically set up all required dependencies and tools for developme
 1. If you haven't set up a Go development environment, follow [these instructions](https://golang.org/doc/install) to install Go.
 
 On macOS, you can use Homebrew:
+
 ```bash
 brew install golang
 ```
@@ -32,6 +43,7 @@ brew install golang
 ## Getting Started
 
 ### Download Source
+
 ```bash
 go get github.com/linode/linode-cloud-controller-manager
 cd $(go env GOPATH)/src/github.com/linode/linode-cloud-controller-manager
@@ -40,6 +52,7 @@ cd $(go env GOPATH)/src/github.com/linode/linode-cloud-controller-manager
 ### Building the Project
 
 #### Build Binary
+
 Use the following Make targets to build and run a local binary:
 
 ```bash
@@ -54,6 +67,9 @@ dist/linode-cloud-controller-manager
 ```
 
 #### Building Docker Images
+
+These targets still rely on a system Docker installation in this first migration phase.
+
 To build and push a Docker image:
 
 ```bash
@@ -66,14 +82,17 @@ IMG=linode/linode-cloud-controller-manager:canary make docker-push
 ```
 
 To run the Docker image:
+
 ```bash
 docker run -ti linode/linode-cloud-controller-manager:canary
 ```
 
 ### Managing Dependencies
+
 The Linode Cloud Controller Manager uses [Go Modules](https://blog.golang.org/using-go-modules) to manage dependencies.
 
 To update or add dependencies:
+
 ```bash
 go mod tidy
 ```
@@ -81,6 +100,7 @@ go mod tidy
 ## Development Guidelines
 
 ### Code Quality Standards
+
 - Write correct, up-to-date, bug-free, fully functional, secure, and efficient code
 - Use the latest stable version of Go
 - Follow Go idioms and best practices
@@ -91,6 +111,7 @@ go mod tidy
 - Leave NO todos, placeholders, or incomplete implementations
 
 ### Code Structure
+
 - Include necessary imports and declarations
 - Implement proper logging using appropriate logging mechanisms
 - Consider implementing middleware or interceptors for cross-cutting concerns
@@ -98,6 +119,7 @@ go mod tidy
 - Use appropriate naming conventions and code organization
 
 ### Security & Performance
+
 - Implement security best practices
 - Consider rate limiting when appropriate
 - Include authentication/authorization where needed
@@ -105,12 +127,14 @@ go mod tidy
 - Consider scalability in design decisions
 
 ### Documentation & Testing
+
 - Provide brief comments for complex logic or language-specific idioms
 - Include clear documentation for public interfaces
 - Write tests using appropriate testing frameworks
 - Document any assumptions or limitations
 
 ### Pull Request Process
+
 1. Ensure your code follows the project's coding standards
 2. Update documentation as needed
 3. Add or update tests as appropriate
@@ -118,4 +142,5 @@ go mod tidy
 5. Submit the PR with a clear description of the changes
 
 ## Getting Help
-For development related questions or discussions, join us in #linode on the [Kubernetes Slack](https://kubernetes.slack.com/messages/CD4B15LUR/details/). 
+
+For development related questions or discussions, join us in #linode on the [Kubernetes Slack](https://kubernetes.slack.com/messages/CD4B15LUR/details/).
