@@ -1,4 +1,14 @@
-IMG                     ?= linode/linode-cloud-controller-manager:canary
+DEFAULT_KO_DOCKER_REPO  := docker.io/linode/linode-cloud-controller-manager
+DEFAULT_IMAGE_TAGS      := canary
+
+ifdef IMG
+IMG_REPO_FROM_REF       := $(shell printf '%s\n' "$(IMG)" | sed 's/:[^:]*$$//')
+IMG_TAG_FROM_REF        := $(shell printf '%s\n' "$(IMG)" | sed 's/^.*://')
+endif
+
+KO_DOCKER_REPO          ?= $(or $(IMG_REPO_FROM_REF),$(DEFAULT_KO_DOCKER_REPO))
+IMAGE_TAGS              ?= $(or $(IMG_TAG_FROM_REF),$(DEFAULT_IMAGE_TAGS))
+IMG                     ?= $(KO_DOCKER_REPO):$(IMAGE_TAGS)
 RELEASE_DIR             ?= release
 PLATFORM                ?= linux/amd64
 
@@ -95,23 +105,20 @@ release:
 	tar -czvf ./$(RELEASE_DIR)/helm-chart-$(IMAGE_VERSION).tgz -C ./deploy/chart .
 
 .PHONY: imgname
-# print the Docker image name that will be used
+# print the container image name that will be used
 # useful for subsequently defining it on the shell
 imgname:
 	echo IMG=${IMG}
 
-.PHONY: docker-build
-# we cross compile the binary for linux, then build a container
-docker-build: build-linux
-	DOCKER_BUILDKIT=1 docker build --platform=$(PLATFORM) --tag ${IMG} .
+.PHONY: ko-build
+# build the container image locally without pushing it to a registry
+ko-build:
+	CGO_ENABLED=0 ko build --local --bare --tags "$(IMAGE_TAGS)" --platform=$(PLATFORM) .
 
-.PHONY: docker-push
-# must run the docker build before pushing the image
-docker-push:
-	docker push ${IMG}
-
-.PHONY: build-and-push
-build-and-push: docker-build docker-push
+.PHONY: ko-publish
+# build the container image and publish it to the registry named by IMG
+ko-publish:
+	CGO_ENABLED=0 KO_DOCKER_REPO="$(KO_DOCKER_REPO)" ko build --bare --tags "$(IMAGE_TAGS)" --platform=$(PLATFORM) .
 
 .PHONY: run
 # run the ccm locally, really only makes sense on linux anyway
@@ -135,7 +142,7 @@ run-debug: build
 #####################################################################
 
 .PHONY: mgmt-and-capl-cluster
-mgmt-and-capl-cluster: build-and-push mgmt-cluster
+mgmt-and-capl-cluster: ko-publish mgmt-cluster
 	$(MAKE) -j2 capl-ipv6-cluster capl-cluster
 
 .PHONY: capl-cluster
@@ -199,8 +206,8 @@ mgmt-cluster:
 .PHONY: cleanup-cluster
 cleanup-cluster:
 	kubectl delete cluster -A --all --timeout=180s
-	kubectl delete linodefirewalls -A --all --timeout=60s
-	kubectl delete lvpc -A --all --timeout=60s
+	kubectl delete linodefirewalls -A --all --timeout=180s
+	kubectl delete lvpc -A --all --timeout=180s
 	kind delete cluster -n caplccm
 
 .PHONY: e2e-test

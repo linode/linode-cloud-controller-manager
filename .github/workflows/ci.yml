@@ -96,7 +96,9 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.github_token }}
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
-      IMG: linode/linode-cloud-controller-manager:${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'latest' || format('pr-{0}', github.event.pull_request.number) || github.ref_name }}
+      KO_DOCKER_REPO: docker.io/linode/linode-cloud-controller-manager
+      IMAGE_TAGS: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'latest' || format('pr-{0}', github.event.pull_request.number) || github.ref_name }}
+      IMG: docker.io/linode/linode-cloud-controller-manager:${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'latest' || format('pr-{0}', github.event.pull_request.number) || github.ref_name }}
       LINODE_REGION: us-lax
       LINODE_CONTROL_PLANE_MACHINE_TYPE: g6-standard-2
       LINODE_MACHINE_TYPE: g6-standard-2

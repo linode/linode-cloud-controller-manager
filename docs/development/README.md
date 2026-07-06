@@ -53,38 +53,37 @@ cd $(go env GOPATH)/src/github.com/linode/linode-cloud-controller-manager
 
 #### Build Binary
 
-Use the following Make targets to build and run a local binary:
+Use the following mise tasks to build and run a local binary:
 
 ```bash
 # Build the binary
-make build
+mise run build
 
 # Run the binary
-make run
+mise run run
 
 # You can also run the binary directly to pass additional args
 dist/linode-cloud-controller-manager
 ```
 
-#### Building Docker Images
+#### Building Container Images
 
-These targets still rely on a system Docker installation in this first migration phase.
+The local image build task loads the built image into your local Docker-compatible daemon.
 
-To build and push a Docker image:
+To build and push an image with ko:
 
 ```bash
-# Set the repo/image:tag with the TAG environment variable
-# Then run the docker-build make target
-IMG=linode/linode-cloud-controller-manager:canary make docker-build
+# Build locally into your Docker-compatible daemon
+IMAGE_TAGS=canary mise run ko-build
 
-# Push Image
-IMG=linode/linode-cloud-controller-manager:canary make docker-push
+# Publish Image
+KO_DOCKER_REPO=docker.io/linode/linode-cloud-controller-manager IMAGE_TAGS=canary mise run ko-publish
 ```
 
-To run the Docker image:
+To run the locally built image after `ko-build`:
 
 ```bash
-docker run -ti linode/linode-cloud-controller-manager:canary
+docker run -ti ko.local/github.com/linode/linode-cloud-controller-manager:canary
 ```
 
 ### Managing Dependencies

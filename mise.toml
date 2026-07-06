@@ -14,6 +14,7 @@ kustomize = "5.8.1"
 kind = "0.31.0"
 ctlptl = "0.9.0"
 clusterctl = "1.8.5"
+ko = "0.19.1"
 "go:github.com/kyverno/chainsaw" = "0.2.15"
 "go:github.com/golang/mock/mockgen" = "1.6.0"
 yq = "4.52.2"
@@ -32,13 +33,13 @@ run = "make clean"
 description = "Generate code"
 run = "make codegen"
 
-[tasks.docker-build]
-description = "Build the Docker image with the current Make target"
-run = "make docker-build"
+[tasks.ko-build]
+description = "Build the container image locally with ko"
+run = "make ko-build"
 
-[tasks.docker-push]
-description = "Push the Docker image built by the current Make target"
-run = "make docker-push"
+[tasks.ko-publish]
+description = "Build and publish the container image with ko"
+run = "make ko-publish"
 
 [tasks.fmt]
 description = "Run go fmt"
@@ -120,8 +121,3 @@ run = "make run-debug"
 [tasks.test]
 description = "Run unit tests"
 run = "make test"
-
-
-
-
-
