@@ -1,6 +1,14 @@
-KO_DOCKER_REPO          ?= docker.io/linode/linode-cloud-controller-manager
-IMAGE_TAGS              ?= canary
-IMG                     ?= $(KO_DOCKER_REPO):canary
+DEFAULT_KO_DOCKER_REPO  := docker.io/linode/linode-cloud-controller-manager
+DEFAULT_IMAGE_TAGS      := canary
+
+ifdef IMG
+IMG_REPO_FROM_REF       := $(shell printf '%s\n' "$(IMG)" | sed 's/:[^:]*$$//')
+IMG_TAG_FROM_REF        := $(shell printf '%s\n' "$(IMG)" | sed 's/^.*://')
+endif
+
+KO_DOCKER_REPO          ?= $(or $(IMG_REPO_FROM_REF),$(DEFAULT_KO_DOCKER_REPO))
+IMAGE_TAGS              ?= $(or $(IMG_TAG_FROM_REF),$(DEFAULT_IMAGE_TAGS))
+IMG                     ?= $(KO_DOCKER_REPO):$(IMAGE_TAGS)
 RELEASE_DIR             ?= release
 PLATFORM                ?= linux/amd64
 
