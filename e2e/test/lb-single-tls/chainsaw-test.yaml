@@ -30,6 +30,7 @@ spec:
             check:
               ($error == null): true
     - name: Create pods and services
+      skipDelete: true
       try:
         - apply:
             file: create-pods-services.yaml

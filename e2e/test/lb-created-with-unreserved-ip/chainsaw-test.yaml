@@ -60,7 +60,7 @@ spec:
               set -euo pipefail
 
               delete_cm=$(kubectl delete configmap unreserved-ip-config -n $NAMESPACE)
-              if [[ "$delete_cm" == "configmap \"unreserved-ip-config\" deleted" ]]; then
+              if [[ "$delete_cm" == *'configmap "unreserved-ip-config" deleted'* ]]; then
                 echo "Configmap deleted successfully"
               else
                 echo "Unable to delete the configmap: $delete_cm. Error: $delete_cm"
@@ -81,6 +81,9 @@ spec:
     - name: get service ip and compare with unreserved ip
       try:
         - script: 
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
 
