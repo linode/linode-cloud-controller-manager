@@ -39,6 +39,16 @@ spec:
               name: svc-test
             (subsets[0].addresses != null): true
             (subsets[0].ports != null): true
+    - name: Check that loadbalancer ip is assigned
+      try:
+      - assert:
+          resource:
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: svc-test
+            status:
+              (loadBalancer.ingress[0].ip != null): true
     - name: Add ProxyProtocol v2 using deprecated annotation
       try:
         - script:

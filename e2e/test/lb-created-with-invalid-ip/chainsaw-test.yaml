@@ -59,7 +59,7 @@ spec:
               set -euo pipefail
 
               delete_cm=$(kubectl delete configmap invalid-ip-config -n $NAMESPACE)
-              if [[ "$delete_cm" == "configmap \"invalid-ip-config\" deleted" ]]; then
+              if [[ "$delete_cm" == *'configmap "invalid-ip-config" deleted'* ]]; then
                 echo "Configmap deleted successfully"
               else
                 echo "Unable to delete the configmap: $delete_cm. Error: $delete_cm"
@@ -80,6 +80,9 @@ spec:
     - name: get service ip and compare with invalid ip
       try:
         - script: 
+            shell: bash
+            shellArgs:
+              - -c
             content: |
               set -euo pipefail
               invalid_ip=$(kubectl get configmap invalid-ip-config -o=jsonpath='{.data.InvalidIP}' -n $NAMESPACE)

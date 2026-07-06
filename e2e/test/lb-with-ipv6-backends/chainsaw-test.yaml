@@ -18,6 +18,7 @@ spec:
           kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-with-ipv6-backends" | tail -100
   steps:
     - name: Create pods and service
+      skipDelete: true
       try:
         - apply:
             file: create-pods-services.yaml
