@@ -206,8 +206,8 @@ mgmt-cluster:
 .PHONY: cleanup-cluster
 cleanup-cluster:
 	kubectl delete cluster -A --all --timeout=180s
-	kubectl delete linodefirewalls -A --all --timeout=60s
-	kubectl delete lvpc -A --all --timeout=60s
+	kubectl delete linodefirewalls -A --all --timeout=180s
+	kubectl delete lvpc -A --all --timeout=180s
 	kind delete cluster -n caplccm
 
 .PHONY: e2e-test
