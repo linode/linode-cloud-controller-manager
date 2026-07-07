@@ -186,7 +186,7 @@ func (s *nodeController) Run(stopCh <-chan struct{}) {
 					return
 				}
 
-				klog.Infof("NodeController will handle newly created node (%s) metadata", node.Name)
+				klog.V(4).Infof("NodeController will handle newly created node (%s) metadata", node.Name)
 				s.addNodeToQueue(node)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
@@ -195,7 +195,7 @@ func (s *nodeController) Run(stopCh <-chan struct{}) {
 					return
 				}
 
-				klog.Infof("NodeController will handle newly updated node (%s) metadata", node.Name)
+				klog.V(4).Infof("NodeController will handle newly updated node (%s) metadata", node.Name)
 				s.addNodeToQueue(node)
 			},
 		},
