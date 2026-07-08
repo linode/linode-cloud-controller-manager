@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -117,7 +117,7 @@ func TestNodeController_processNext(t *testing.T) {
 		publicIP := net.ParseIP("172.234.31.123")
 		privateIP := net.ParseIP("192.168.159.135")
 		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
-			{ID: 111, Label: "test", IPv4: []*net.IP{&publicIP, &privateIP}, HostUUID: "111"},
+			{ID: 111, Label: "test", IPv4: []net.IP{publicIP, privateIP}, HostUUID: "111"},
 		}, nil)
 		result := controller.processNext()
 		assert.True(t, result, "processNext should return true")
@@ -145,7 +145,7 @@ func TestNodeController_processNext(t *testing.T) {
 		publicIP := net.ParseIP("172.234.31.123")
 		privateIP := net.ParseIP("192.168.159.135")
 		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
-			{ID: 112, Label: "test-node2", IPv4: []*net.IP{&publicIP, &privateIP}, HostUUID: "112"},
+			{ID: 112, Label: "test-node2", IPv4: []net.IP{publicIP, privateIP}, HostUUID: "112"},
 		}, nil)
 		result := controller.processNext()
 		assert.True(t, result, "processNext should return true")
@@ -230,7 +230,7 @@ func TestNodeController_handleNode(t *testing.T) {
 	privateIP := net.ParseIP("192.168.159.135")
 	publicIPv6SLAAC := "2001:db::f03c:91ff:fe2b:1a2b"
 	client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
-		{ID: 123, Label: "test-node", IPv4: []*net.IP{&publicIP, &privateIP}, IPv6: publicIPv6SLAAC, HostUUID: "123"},
+		{ID: 123, Label: "test-node", IPv4: []net.IP{publicIP, privateIP}, IPv6: publicIPv6SLAAC, HostUUID: "123"},
 	}, nil)
 	err = nodeCtrl.handleNode(t.Context(), node)
 	require.NoError(t, err, "expected no error during handleNode")
@@ -261,7 +261,7 @@ func TestNodeController_handleNode(t *testing.T) {
 	nodeCtrl.instances = services.NewInstances(client)
 	nodeCtrl.metadataLastUpdate["test-node"] = time.Now().Add(-2 * nodeCtrl.ttl)
 	client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
-		{ID: 123, Label: "test-node", IPv4: []*net.IP{&publicIP, &privateIP}, IPv6: publicIPv6SLAAC, HostUUID: "123"},
+		{ID: 123, Label: "test-node", IPv4: []net.IP{publicIP, privateIP}, IPv6: publicIPv6SLAAC, HostUUID: "123"},
 	}, nil)
 	err = nodeCtrl.handleNode(t.Context(), node)
 	assert.NoError(t, err, "expected no error during handleNode")

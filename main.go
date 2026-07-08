@@ -7,7 +7,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	"github.com/spf13/pflag"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"

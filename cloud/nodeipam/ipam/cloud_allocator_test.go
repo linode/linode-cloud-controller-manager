@@ -26,7 +26,7 @@ import (
 
 	"github.com/appscode/go/wait"
 	"github.com/golang/mock/gomock"
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"

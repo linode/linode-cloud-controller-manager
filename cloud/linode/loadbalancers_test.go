@@ -20,7 +20,7 @@ import (
 
 	ciliumclient "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/typed/cilium.io/v2alpha1"
 	"github.com/golang/mock/gomock"
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -327,7 +327,10 @@ func TestCCMLoadBalancers(t *testing.T) {
 		fake := newFake(t)
 		ts := httptest.NewServer(fake)
 
-		linodeClient := linodego.NewClient(http.DefaultClient)
+		linodeClient, err := linodego.NewClient(http.DefaultClient)
+		if err != nil {
+			t.Fatalf("error creating fake linode client: %v", err)
+		}
 		linodeClient.SetBaseURL(ts.URL)
 
 		t.Run(tc.name, func(t *testing.T) {
@@ -1995,16 +1998,21 @@ func testUpdateLoadBalancerAddNewFirewall(t *testing.T, client *linodego.Client,
 	fwClient := services.LinodeClient{Client: client}
 	fw, err := fwClient.CreateFirewall(t.Context(), linodego.FirewallCreateOptions{
 		Label: "test",
-		Rules: linodego.FirewallRuleSet{Inbound: []linodego.FirewallRule{{
-			Action:      "ACCEPT",
-			Label:       "inbound-rule123",
-			Description: "inbound rule123",
-			Ports:       "4321",
-			Protocol:    linodego.TCP,
-			Addresses: linodego.NetworkAddresses{
-				IPv4: &[]string{"0.0.0.0/0"},
-			},
-		}}, Outbound: []linodego.FirewallRule{}, InboundPolicy: "ACCEPT", OutboundPolicy: "ACCEPT"},
+		Rules: linodego.FirewallRulesCreateOptions{
+			Inbound: []linodego.FirewallRuleInbound{{
+				Action:      "ACCEPT",
+				Label:       "inbound-rule123",
+				Description: "inbound rule123",
+				Ports:       "4321",
+				Protocol:    linodego.TCP,
+				Addresses: linodego.NetworkAddresses{
+					IPv4: []string{"0.0.0.0/0"},
+				},
+			}},
+			Outbound:       []linodego.FirewallRuleOutbound{},
+			InboundPolicy:  "ACCEPT",
+			OutboundPolicy: "ACCEPT",
+		},
 	})
 	if err != nil {
 		t.Errorf("CreatingFirewall returned an error: %s", err)
@@ -2364,16 +2372,21 @@ func testUpdateLoadBalancerUpdateFirewallRemoveACLaddID(t *testing.T, client *li
 	fwClient := services.LinodeClient{Client: client}
 	fw, err := fwClient.CreateFirewall(t.Context(), linodego.FirewallCreateOptions{
 		Label: "test",
-		Rules: linodego.FirewallRuleSet{Inbound: []linodego.FirewallRule{{
-			Action:      "ACCEPT",
-			Label:       "inbound-rule123",
-			Description: "inbound rule123",
-			Ports:       "4321",
-			Protocol:    linodego.TCP,
-			Addresses: linodego.NetworkAddresses{
-				IPv4: &[]string{"0.0.0.0/0"},
-			},
-		}}, Outbound: []linodego.FirewallRule{}, InboundPolicy: "ACCEPT", OutboundPolicy: "ACCEPT"},
+		Rules: linodego.FirewallRulesCreateOptions{
+			Inbound: []linodego.FirewallRuleInbound{{
+				Action:      "ACCEPT",
+				Label:       "inbound-rule123",
+				Description: "inbound rule123",
+				Ports:       "4321",
+				Protocol:    linodego.TCP,
+				Addresses: linodego.NetworkAddresses{
+					IPv4: []string{"0.0.0.0/0"},
+				},
+			}},
+			Outbound:       []linodego.FirewallRuleOutbound{},
+			InboundPolicy:  "ACCEPT",
+			OutboundPolicy: "ACCEPT",
+		},
 	})
 	if err != nil {
 		t.Errorf("Error creating firewall %s", err)
@@ -2462,16 +2475,21 @@ func testUpdateLoadBalancerUpdateFirewallRemoveIDaddACL(t *testing.T, client *li
 	fwClient := services.LinodeClient{Client: client}
 	fw, err := fwClient.CreateFirewall(t.Context(), linodego.FirewallCreateOptions{
 		Label: "test",
-		Rules: linodego.FirewallRuleSet{Inbound: []linodego.FirewallRule{{
-			Action:      "ACCEPT",
-			Label:       "inbound-rule123",
-			Description: "inbound rule123",
-			Ports:       "4321",
-			Protocol:    linodego.TCP,
-			Addresses: linodego.NetworkAddresses{
-				IPv4: &[]string{"0.0.0.0/0"},
-			},
-		}}, Outbound: []linodego.FirewallRule{}, InboundPolicy: "ACCEPT", OutboundPolicy: "ACCEPT"},
+		Rules: linodego.FirewallRulesCreateOptions{
+			Inbound: []linodego.FirewallRuleInbound{{
+				Action:      "ACCEPT",
+				Label:       "inbound-rule123",
+				Description: "inbound rule123",
+				Ports:       "4321",
+				Protocol:    linodego.TCP,
+				Addresses: linodego.NetworkAddresses{
+					IPv4: []string{"0.0.0.0/0"},
+				},
+			}},
+			Outbound:       []linodego.FirewallRuleOutbound{},
+			InboundPolicy:  "ACCEPT",
+			OutboundPolicy: "ACCEPT",
+		},
 	})
 	if err != nil {
 		t.Errorf("Error creating firewall %s", err)
@@ -2678,7 +2696,7 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 		t.Errorf("expected non nil IPv4, got %v", fwIPs)
 	}
 
-	if len(*fwIPs) != 2 {
+	if len(fwIPs) != 2 {
 		t.Errorf("expected two IPv4 ips, got %v", fwIPs)
 	}
 
@@ -2686,7 +2704,7 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 		t.Errorf("expected non nil IPv6, got %v", firewallsNew[0].Rules.Inbound[0].Addresses.IPv6)
 	}
 
-	if len(*firewallsNew[0].Rules.Inbound[0].Addresses.IPv6) != 2 {
+	if len(firewallsNew[0].Rules.Inbound[0].Addresses.IPv6) != 2 {
 		t.Errorf("expected two IPv6 ips, got %v", firewallsNew[0].Rules.Inbound[0].Addresses.IPv6)
 	}
 
@@ -2724,7 +2742,7 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 		t.Errorf("expected non nil IPv4, got %v", fwIPs)
 	}
 
-	if len(*fwIPs) != 2 {
+	if len(fwIPs) != 2 {
 		t.Errorf("expected two IPv4 ips, got %v", fwIPs)
 	}
 
@@ -2732,7 +2750,7 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 		t.Errorf("expected non nil IPv6, got %v", firewallsNew[0].Rules.Inbound[0].Addresses.IPv6)
 	}
 
-	if len(*firewallsNew[0].Rules.Inbound[0].Addresses.IPv6) != 2 {
+	if len(firewallsNew[0].Rules.Inbound[0].Addresses.IPv6) != 2 {
 		t.Errorf("expected two IPv6 ips, got %v", firewallsNew[0].Rules.Inbound[0].Addresses.IPv6)
 	}
 
@@ -2770,7 +2788,7 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 		t.Errorf("expected non nil IPv4, got %v", fwIPs)
 	}
 
-	if len(*fwIPs) != 1 {
+	if len(fwIPs) != 1 {
 		t.Errorf("expected one IPv4, got %v", fwIPs)
 	}
 
@@ -2778,7 +2796,7 @@ func testUpdateLoadBalancerUpdateFirewallACL(t *testing.T, client *linodego.Clie
 		t.Errorf("expected non nil IPv6, got %v", firewallsNew[0].Rules.Inbound[0].Addresses.IPv6)
 	}
 
-	if len(*firewallsNew[0].Rules.Inbound[0].Addresses.IPv6) != 1 {
+	if len(firewallsNew[0].Rules.Inbound[0].Addresses.IPv6) != 1 {
 		t.Errorf("expected one IPv6, got %v", firewallsNew[0].Rules.Inbound[0].Addresses.IPv6)
 	}
 
@@ -2794,16 +2812,21 @@ func testUpdateLoadBalancerUpdateFirewall(t *testing.T, client *linodego.Client,
 
 	firewallCreateOpts := linodego.FirewallCreateOptions{
 		Label: "test",
-		Rules: linodego.FirewallRuleSet{Inbound: []linodego.FirewallRule{{
-			Action:      "ACCEPT",
-			Label:       "inbound-rule123",
-			Description: "inbound rule123",
-			Ports:       "4321",
-			Protocol:    linodego.TCP,
-			Addresses: linodego.NetworkAddresses{
-				IPv4: &[]string{"0.0.0.0/0"},
-			},
-		}}, Outbound: []linodego.FirewallRule{}, InboundPolicy: "ACCEPT", OutboundPolicy: "ACCEPT"},
+		Rules: linodego.FirewallRulesCreateOptions{
+			Inbound: []linodego.FirewallRuleInbound{{
+				Action:      "ACCEPT",
+				Label:       "inbound-rule123",
+				Description: "inbound rule123",
+				Ports:       "4321",
+				Protocol:    linodego.TCP,
+				Addresses: linodego.NetworkAddresses{
+					IPv4: []string{"0.0.0.0/0"},
+				},
+			}},
+			Outbound:       []linodego.FirewallRuleOutbound{},
+			InboundPolicy:  "ACCEPT",
+			OutboundPolicy: "ACCEPT",
+		},
 	}
 
 	svc := &v1.Service{
@@ -2932,16 +2955,21 @@ func testUpdateLoadBalancerDeleteFirewallRemoveID(t *testing.T, client *linodego
 
 	firewallCreateOpts := linodego.FirewallCreateOptions{
 		Label: "test",
-		Rules: linodego.FirewallRuleSet{Inbound: []linodego.FirewallRule{{
-			Action:      "ACCEPT",
-			Label:       "inbound-rule123",
-			Description: "inbound rule123",
-			Ports:       "4321",
-			Protocol:    linodego.TCP,
-			Addresses: linodego.NetworkAddresses{
-				IPv4: &[]string{"0.0.0.0/0"},
-			},
-		}}, Outbound: []linodego.FirewallRule{}, InboundPolicy: "ACCEPT", OutboundPolicy: "ACCEPT"},
+		Rules: linodego.FirewallRulesCreateOptions{
+			Inbound: []linodego.FirewallRuleInbound{{
+				Action:      "ACCEPT",
+				Label:       "inbound-rule123",
+				Description: "inbound rule123",
+				Ports:       "4321",
+				Protocol:    linodego.TCP,
+				Addresses: linodego.NetworkAddresses{
+					IPv4: []string{"0.0.0.0/0"},
+				},
+			}},
+			Outbound:       []linodego.FirewallRuleOutbound{},
+			InboundPolicy:  "ACCEPT",
+			OutboundPolicy: "ACCEPT",
+		},
 	}
 
 	svc := &v1.Service{
@@ -4326,7 +4354,10 @@ func Test_buildLoadBalancerRequestOmitsVPCConfigForIPv6Backends(t *testing.T) {
 			ts := httptest.NewServer(fake)
 			defer ts.Close()
 
-			client := linodego.NewClient(http.DefaultClient)
+			client, err := linodego.NewClient(http.DefaultClient)
+			if err != nil {
+				t.Fatal(err)
+			}
 			client.SetBaseURL(ts.URL)
 			lb, ok := newLoadbalancers(&client, "us-west").(*loadbalancers)
 			if !ok {
@@ -4384,7 +4415,7 @@ func Test_buildLoadBalancerRequestOmitsVPCConfigForIPv6Backends(t *testing.T) {
 				},
 			}
 
-			_, err := lb.buildLoadBalancerRequest(t.Context(), "linodelb", svc, nodes)
+			_, err = lb.buildLoadBalancerRequest(t.Context(), "linodelb", svc, nodes)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -4404,8 +4435,8 @@ func Test_buildLoadBalancerRequestOmitsVPCConfigForIPv6Backends(t *testing.T) {
 			if err := json.Unmarshal([]byte(req.Body), &createOpts); err != nil {
 				t.Fatalf("unable to unmarshal create request body %#v, error: %#v", req.Body, err)
 			}
-			if len(createOpts.VPCs) != 0 {
-				t.Fatalf("expected nodebalancer create request to omit VPC config for IPv6 backends, got %#v", createOpts.VPCs)
+			if len(createOpts.BackendVPCs) != 0 {
+				t.Fatalf("expected nodebalancer create request to omit VPC config for IPv6 backends, got %#v", createOpts.BackendVPCs)
 			}
 			if len(createOpts.Configs) != 1 || len(createOpts.Configs[0].Nodes) != 1 {
 				t.Fatalf("expected a single nodebalancer config with one backend node, got %#v", createOpts.Configs)
@@ -4611,7 +4642,7 @@ func testEnsureLoadBalancerPreserveAnnotation(t *testing.T, client *linodego.Cli
 				Spec: testServiceSpec,
 			}
 
-			nb, err := lb.createNodeBalancer(t.Context(), "linodelb", svc, []*linodego.NodeBalancerConfigCreateOptions{})
+			nb, err := lb.createNodeBalancer(t.Context(), "linodelb", svc, []linodego.NodeBalancerConfigCreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -4697,7 +4728,7 @@ func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client, fake *
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	configs := []*linodego.NodeBalancerConfigCreateOptions{}
+	configs := []linodego.NodeBalancerConfigCreateOptions{}
 	_, err := lb.createNodeBalancer(t.Context(), "linodelb", svc, configs)
 	if err != nil {
 		t.Fatal(err)
@@ -4753,7 +4784,7 @@ func testEnsureExistingLoadBalancer(t *testing.T, client *linodego.Client, _ *fa
 	lb.kubeClient = fake.NewClientset()
 	addTLSSecret(t, lb.kubeClient)
 
-	configs := []*linodego.NodeBalancerConfigCreateOptions{}
+	configs := []linodego.NodeBalancerConfigCreateOptions{}
 	nb, err := lb.createNodeBalancer(t.Context(), "linodelb", svc, configs)
 	if err != nil {
 		t.Fatal(err)
@@ -5172,7 +5203,7 @@ func testGetNodeBalancerByStatus(t *testing.T, client *linodego.Client, _ *fakeA
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			expectedNB, err := lb.createNodeBalancer(t.Context(), "linodelb", test.service, []*linodego.NodeBalancerConfigCreateOptions{})
+			expectedNB, err := lb.createNodeBalancer(t.Context(), "linodelb", test.service, []linodego.NodeBalancerConfigCreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -5421,7 +5452,7 @@ func testGetLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
 		},
 	}
 
-	configs := []*linodego.NodeBalancerConfigCreateOptions{}
+	configs := []linodego.NodeBalancerConfigCreateOptions{}
 	nb, err := lb.createNodeBalancer(t.Context(), "linodelb", svc, configs)
 	if err != nil {
 		t.Fatal(err)
@@ -5919,7 +5950,7 @@ func Test_makeLoadBalancerStatus_FrontendVPC(t *testing.T) {
 					Hostname:            &[]string{"nb-123.example.com"}[0],
 					IPv4:                &[]string{"10.100.5.10"}[0],
 					IPv6:                nil,
-					FrontendAddressType: &[]string{"vpc"}[0],
+					FrontendAddressType: linodego.NodeBalancerVPCFrontendAddressTypeVPC,
 				},
 			},
 			want: &v1.LoadBalancerStatus{
@@ -5946,7 +5977,7 @@ func Test_makeLoadBalancerStatus_FrontendVPC(t *testing.T) {
 					Hostname:            &[]string{"nb-123.example.com"}[0],
 					IPv4:                &[]string{"10.100.5.10"}[0],
 					IPv6:                &[]string{"2001:db80:1005::10"}[0],
-					FrontendAddressType: &[]string{"vpc"}[0],
+					FrontendAddressType: linodego.NodeBalancerVPCFrontendAddressTypeVPC,
 				},
 			},
 			want: &v1.LoadBalancerStatus{
@@ -5981,7 +6012,7 @@ func Test_getFrontendVPCCreateOptions(t *testing.T) {
 	tests := []struct {
 		name        string
 		args        args
-		want        []linodego.NodeBalancerVPCOptions
+		want        []linodego.NodeBalancerFrontendVPCOptions
 		wantErr     bool
 		prepareMock func(*mocks.MockClient)
 	}{
@@ -6008,7 +6039,7 @@ func Test_getFrontendVPCCreateOptions(t *testing.T) {
 					},
 				},
 			},
-			want: []linodego.NodeBalancerVPCOptions{
+			want: []linodego.NodeBalancerFrontendVPCOptions{
 				{
 					SubnetID: 123,
 				},
@@ -6027,7 +6058,7 @@ func Test_getFrontendVPCCreateOptions(t *testing.T) {
 					},
 				},
 			},
-			want: []linodego.NodeBalancerVPCOptions{
+			want: []linodego.NodeBalancerFrontendVPCOptions{
 				{
 					SubnetID:  123,
 					IPv4Range: "10.100.5.0/24",
@@ -6047,7 +6078,7 @@ func Test_getFrontendVPCCreateOptions(t *testing.T) {
 					},
 				},
 			},
-			want: []linodego.NodeBalancerVPCOptions{
+			want: []linodego.NodeBalancerFrontendVPCOptions{
 				{
 					SubnetID:  123,
 					IPv6Range: "2001:db80:1005::/48",
@@ -6123,7 +6154,7 @@ func Test_getFrontendVPCCreateOptions(t *testing.T) {
 					},
 				},
 			},
-			want: []linodego.NodeBalancerVPCOptions{
+			want: []linodego.NodeBalancerFrontendVPCOptions{
 				{
 					SubnetID: 456,
 				},
@@ -6147,7 +6178,7 @@ func Test_getFrontendVPCCreateOptions(t *testing.T) {
 					},
 				},
 			},
-			want: []linodego.NodeBalancerVPCOptions{
+			want: []linodego.NodeBalancerFrontendVPCOptions{
 				{
 					SubnetID: 123,
 				},

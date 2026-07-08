@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 )

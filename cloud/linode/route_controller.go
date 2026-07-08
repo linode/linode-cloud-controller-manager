@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -246,7 +246,7 @@ func (r *routes) handleInterfaces(ctx context.Context, intfRoutes []string, lino
 	if instance.InterfaceGeneration == linodego.GenerationLinode {
 		interfaceUpdateOptions := linodego.LinodeInterfaceUpdateOptions{
 			VPC: &linodego.VPCInterfaceUpdateOptions{
-				IPv4: &linodego.VPCInterfaceIPv4CreateOptions{Ranges: &linodeInterfaceRoutes},
+				IPv4: &linodego.VPCInterfaceIPv4CreateOptions{Ranges: linodeInterfaceRoutes},
 			},
 		}
 		resp, err := r.client.UpdateInterface(ctx, instance.ID, intfVPCIP.InterfaceID, interfaceUpdateOptions)
@@ -261,7 +261,7 @@ func (r *routes) handleInterfaces(ctx context.Context, intfRoutes []string, lino
 		klog.V(4).Infof("Updated routes for node %s. Current routes: %v", route.TargetNode, resp.VPC.IPv4.Ranges)
 	} else {
 		interfaceUpdateOptions := linodego.InstanceConfigInterfaceUpdateOptions{
-			IPRanges: &intfRoutes,
+			IPRanges: intfRoutes,
 		}
 		resp, err := r.client.UpdateInstanceConfigInterface(ctx, instance.ID, intfVPCIP.ConfigID, intfVPCIP.InterfaceID, interfaceUpdateOptions)
 		if err != nil {

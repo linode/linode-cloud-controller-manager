@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 )
 
 const (
@@ -47,10 +47,10 @@ func IgnoreLinodeAPIError(err error, code int) error {
 	return err
 }
 
-func IsPrivate(ip *net.IP, linodeExternalNetwork *net.IPNet) bool {
+func IsPrivate(ip net.IP, linodeExternalNetwork *net.IPNet) bool {
 	if linodeExternalNetwork == nil {
 		return ip.IsPrivate()
 	}
 
-	return ip.IsPrivate() && !linodeExternalNetwork.Contains(*ip)
+	return ip.IsPrivate() && !linodeExternalNetwork.Contains(ip)
 }

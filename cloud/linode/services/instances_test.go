@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -98,8 +98,8 @@ func TestMetadataRetrieval(t *testing.T) {
 		instances := NewInstances(client)
 		publicIP := net.ParseIP("172.234.31.123")
 		privateIP := net.ParseIP("192.168.159.135")
-		expectedInstance := linodego.Instance{Label: "expected-instance", ID: 12345, IPv4: []*net.IP{&publicIP, &privateIP}}
-		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{{Label: "wrong-instance", ID: 3456, IPv4: []*net.IP{&publicIP, &privateIP}}, expectedInstance}, nil)
+		expectedInstance := linodego.Instance{Label: "expected-instance", ID: 12345, IPv4: []net.IP{publicIP, privateIP}}
+		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{{Label: "wrong-instance", ID: 3456, IPv4: []net.IP{publicIP, privateIP}}, expectedInstance}, nil)
 		name := "expected-instance"
 		node := nodeWithName(name)
 
@@ -129,7 +129,7 @@ func TestMetadataRetrieval(t *testing.T) {
 		linodeType := typeG6
 		region := usEast
 		client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
-			{ID: id, Label: instanceName, Type: linodeType, Region: region, IPv4: []*net.IP{&publicIPv4, &privateIPv4}},
+			{ID: id, Label: instanceName, Type: linodeType, Region: region, IPv4: []net.IP{publicIPv4, privateIPv4}},
 		}, nil)
 
 		meta, err := instances.InstanceMetadata(ctx, node)
@@ -172,7 +172,7 @@ func TestMetadataRetrieval(t *testing.T) {
 			Label:  instanceName,
 			Type:   linodeType,
 			Region: usEast,
-			IPv4:   []*net.IP{&publicIPv4, &privateIPv4},
+			IPv4:   []net.IP{publicIPv4, privateIPv4},
 			IPv6:   ipv6Addr,
 		}
 		vpcIP := "10.0.0.2"
@@ -351,13 +351,13 @@ func TestMetadataRetrieval(t *testing.T) {
 			if test.existingAddresses != nil {
 				node.Status.Addresses = append(node.Status.Addresses, test.existingAddresses...)
 			}
-			ips := make([]*net.IP, 0, len(test.inputIPv4s))
+			ips := make([]net.IP, 0, len(test.inputIPv4s))
 			for _, ip := range test.inputIPv4s {
 				parsed := net.ParseIP(ip)
 				if parsed == nil {
 					t.Fatalf("cannot parse %v as an ipv4", ip)
 				}
-				ips = append(ips, &parsed)
+				ips = append(ips, parsed)
 			}
 
 			linodeType := typeG6
@@ -426,12 +426,12 @@ func TestMetadataRetrieval(t *testing.T) {
 		publicIP := net.ParseIP("172.234.31.123")
 		privateIP := net.ParseIP("192.168.159.135")
 		wrongIP := net.ParseIP("1.2.3.4")
-		expectedInstance := linodego.Instance{Label: "expected-instance", ID: 12345, IPv4: []*net.IP{&publicIP, &privateIP}}
+		expectedInstance := linodego.Instance{Label: "expected-instance", ID: 12345, IPv4: []net.IP{publicIP, privateIP}}
 
 		for _, test := range getByIPTests {
 			t.Run(fmt.Sprintf("gets linode by IP - %s", test.name), func(t *testing.T) {
 				instances := NewInstances(client)
-				client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{{ID: 3456, IPv4: []*net.IP{&wrongIP}}, expectedInstance}, nil)
+				client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{{ID: 3456, IPv4: []net.IP{wrongIP}}, expectedInstance}, nil)
 				node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node-1"}, Status: v1.NodeStatus{Addresses: test.nodeAddresses}}
 				meta, err := instances.InstanceMetadata(ctx, &node)
 				if test.expectedErr != nil {

@@ -16,7 +16,7 @@ import (
 
 	"github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2alpha1"
 	ciliumclient "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/typed/cilium.io/v2alpha1"
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -423,7 +423,7 @@ func (l *loadbalancers) updateNodeBalancer(
 	tags := l.GetLoadBalancerTags(ctx, clusterName, service)
 	if !reflect.DeepEqual(nb.Tags, tags) {
 		update := nb.GetUpdateOptions()
-		update.Tags = &tags
+		update.Tags = tags
 		nb, err = l.client.UpdateNodeBalancer(ctx, nb.ID, update)
 		if err != nil {
 			sentry.CaptureError(ctx, err)
@@ -712,8 +712,7 @@ func (l *loadbalancers) getNodeBalancerByIP(ctx context.Context, service *v1.Ser
 	frontendSubnetID := service.GetAnnotations()[annotations.NodeBalancerFrontendSubnetID]
 	if frontendSubnetID != "" {
 		for _, lb := range lbs {
-			if lb.FrontendAddressType != nil && *lb.FrontendAddressType == "vpc" &&
-				lb.FrontendVPCSubnetID != nil && strconv.Itoa(*lb.FrontendVPCSubnetID) == frontendSubnetID {
+			if lb.FrontendAddressType == "vpc" && lb.FrontendVPCSubnetID != nil && strconv.Itoa(*lb.FrontendVPCSubnetID) == frontendSubnetID {
 				return &lb, nil
 			}
 		}
@@ -781,7 +780,7 @@ func (l *loadbalancers) GetLinodeNBType(service *v1.Service) linodego.NodeBalanc
 // 3. NodeBalancerBackendIPv4SubnetID/NodeBalancerBackendIPv4SubnetName flag
 // 4. NodeBalancerBackendIPv4Subnet flag
 // 5. Default to using the subnet ID of the service's VPC
-func (l *loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Service) ([]linodego.NodeBalancerVPCOptions, error) {
+func (l *loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Service) ([]linodego.NodeBalancerBackendVPCOptions, error) {
 	// Evaluate subnetID based on annotations or flags
 	subnetID, err := l.getSubnetIDForSVC(ctx, service)
 	if err != nil {
@@ -797,7 +796,7 @@ func (l *loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Ser
 		// If the user has specified a NodeBalancerBackendIPv4Range, use that
 		// for the NodeBalancer backend ipv4 range
 		if backendIPv4Range != "" {
-			vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
+			vpcCreateOpts := []linodego.NodeBalancerBackendVPCOptions{
 				{
 					SubnetID:  subnetID,
 					IPv4Range: backendIPv4Range,
@@ -813,7 +812,7 @@ func (l *loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Ser
 	_, vpcInAnnotation := service.GetAnnotations()[annotations.NodeBalancerBackendVPCName]
 	_, subnetInAnnotation := service.GetAnnotations()[annotations.NodeBalancerBackendSubnetName]
 	if vpcInAnnotation || subnetInAnnotation {
-		vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
+		vpcCreateOpts := []linodego.NodeBalancerBackendVPCOptions{
 			{
 				SubnetID: subnetID,
 			},
@@ -824,7 +823,7 @@ func (l *loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Ser
 	// Precedence 3: If the user has specified a NodeBalancerBackendIPv4SubnetID, use that
 	// and auto-allocate subnets from it for the NodeBalancer
 	if options.Options.NodeBalancerBackendIPv4SubnetID != 0 {
-		vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
+		vpcCreateOpts := []linodego.NodeBalancerBackendVPCOptions{
 			{
 				SubnetID: options.Options.NodeBalancerBackendIPv4SubnetID,
 			},
@@ -835,7 +834,7 @@ func (l *loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Ser
 	// Precedence 4: If the user has specified a NodeBalancerBackendIPv4Subnet, use that
 	// and auto-allocate subnets from it for the NodeBalancer
 	if options.Options.NodeBalancerBackendIPv4Subnet != "" {
-		vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
+		vpcCreateOpts := []linodego.NodeBalancerBackendVPCOptions{
 			{
 				SubnetID:            subnetID,
 				IPv4Range:           options.Options.NodeBalancerBackendIPv4Subnet,
@@ -846,7 +845,7 @@ func (l *loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Ser
 	}
 
 	// Default to using the subnet ID of the service's VPC
-	vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
+	vpcCreateOpts := []linodego.NodeBalancerBackendVPCOptions{
 		{
 			SubnetID: subnetID,
 		},
@@ -859,7 +858,7 @@ func (l *loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Ser
 // 1. Frontend Subnet ID Annotation - Direct subnet ID
 // 2. Frontend VPC/Subnet Name Annotations - Resolve by name
 // 3. Frontend IPv4/IPv6 Range Annotations - Optional CIDR ranges
-func (l *loadbalancers) getFrontendVPCCreateOptions(ctx context.Context, service *v1.Service) ([]linodego.NodeBalancerVPCOptions, error) {
+func (l *loadbalancers) getFrontendVPCCreateOptions(ctx context.Context, service *v1.Service) ([]linodego.NodeBalancerFrontendVPCOptions, error) {
 	frontendIPv4Range, hasIPv4Range := service.GetAnnotations()[annotations.NodeBalancerFrontendIPv4Range]
 	frontendIPv6Range, hasIPv6Range := service.GetAnnotations()[annotations.NodeBalancerFrontendIPv6Range]
 	vpcName, hasVPCName := service.GetAnnotations()[annotations.NodeBalancerFrontendVPCName]
@@ -897,7 +896,7 @@ func (l *loadbalancers) getFrontendVPCCreateOptions(ctx context.Context, service
 		return nil, fmt.Errorf("frontend VPC configuration requires either subnet-id or both vpc-name and subnet-name annotations")
 	}
 
-	vpcCreateOpts := []linodego.NodeBalancerVPCOptions{
+	vpcCreateOpts := []linodego.NodeBalancerFrontendVPCOptions{
 		{
 			SubnetID:  subnetID,
 			IPv4Range: frontendIPv4Range,
@@ -922,7 +921,7 @@ func (l *loadbalancers) getSubnetIDByVPCAndSubnetNames(ctx context.Context, vpcN
 	return services.GetSubnetID(ctx, l.client, vpcID, subnetName)
 }
 
-func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName string, service *v1.Service, configs []*linodego.NodeBalancerConfigCreateOptions) (lb *linodego.NodeBalancer, err error) {
+func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName string, service *v1.Service, configs []linodego.NodeBalancerConfigCreateOptions) (lb *linodego.NodeBalancer, err error) {
 	connThrottle := getConnectionThrottle(service)
 	useIPv6Backends := resolveIPv6NodeBalancerBackendState(service)
 
@@ -939,7 +938,7 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 	}
 
 	if !useIPv6Backends && len(options.Options.VPCNames) > 0 && !options.Options.DisableNodeBalancerVPCBackends {
-		createOpts.VPCs, err = l.getVPCCreateOptions(ctx, service)
+		createOpts.BackendVPCs, err = l.getVPCCreateOptions(ctx, service)
 		if err != nil {
 			return nil, err
 		}
@@ -1136,7 +1135,7 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 		return nil, fmt.Errorf("%w: cluster %s, service %s", errNoNodesAvailable, clusterName, getServiceNn(service))
 	}
 	ports := service.Spec.Ports
-	configs := make([]*linodego.NodeBalancerConfigCreateOptions, 0, len(ports))
+	configs := make([]linodego.NodeBalancerConfigCreateOptions, 0, len(ports))
 	useIPv6Backends := resolveIPv6NodeBalancerBackendState(service)
 
 	subnetID, err := l.getBackendSubnetID(ctx, service, useIPv6Backends)
@@ -1160,7 +1159,7 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 			createOpt.Nodes = append(createOpt.Nodes, newNodeOpts.NodeBalancerNodeCreateOptions)
 		}
 
-		configs = append(configs, &createOpt)
+		configs = append(configs, createOpt)
 	}
 	return l.createNodeBalancer(ctx, clusterName, service, configs)
 }
@@ -1489,7 +1488,7 @@ func makeLoadBalancerStatus(service *v1.Service, nb *linodego.NodeBalancer) *v1.
 		}
 	}
 
-	if nb.FrontendAddressType != nil && *nb.FrontendAddressType == "vpc" {
+	if nb.FrontendAddressType == "vpc" {
 		klog.V(4).Infof("NodeBalancer (%d) is using frontend VPC address type", nb.ID)
 	}
 
