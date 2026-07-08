@@ -11,7 +11,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	"k8s.io/klog/v2"
 
 	_ "github.com/hexdigest/gowrap"
@@ -33,7 +33,7 @@ type Client interface {
 	ListInstanceConfigs(ctx context.Context, linodeID int, opts *linodego.ListOptions) ([]linodego.InstanceConfig, error)
 
 	GetInstanceIPAddresses(context.Context, int) (*linodego.InstanceIPAddressResponse, error)
-	AddInstanceIPAddress(ctx context.Context, linodeID int, public bool) (*linodego.InstanceIP, error)
+	AddInstanceIPAddress(ctx context.Context, linodeID int, options linodego.InstanceIPAddOptions) (*linodego.InstanceIP, error)
 	DeleteInstanceIPAddress(ctx context.Context, linodeID int, ipAddress string) error
 	ShareIPAddresses(ctx context.Context, opts linodego.IPAddressesShareOptions) error
 
@@ -67,7 +67,7 @@ type Client interface {
 	CreateFirewall(ctx context.Context, opts linodego.FirewallCreateOptions) (*linodego.Firewall, error)
 	DeleteFirewall(ctx context.Context, fwid int) error
 	GetFirewall(context.Context, int) (*linodego.Firewall, error)
-	UpdateFirewallRules(context.Context, int, linodego.FirewallRuleSet) (*linodego.FirewallRuleSet, error)
+	UpdateFirewallRules(context.Context, int, linodego.FirewallRulesUpdateOptions) (*linodego.FirewallRules, error)
 
 	ReserveIPAddress(ctx context.Context, opts linodego.ReserveIPOptions) (*linodego.InstanceIP, error)
 	DeleteReservedIPAddress(ctx context.Context, ipAddress string) error
@@ -97,6 +97,7 @@ func (t *tokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // New creates a new linode client with a given token and default timeout.
 func New(timeout time.Duration, tokenProvider TokenProvider) (*linodego.Client, error) {
+	var client *linodego.Client
 	userAgent := fmt.Sprintf("linode-cloud-controller-manager %s", linodego.DefaultUserAgent)
 	apiURL := os.Getenv("LINODE_URL")
 	if apiURL == "" {
@@ -108,8 +109,11 @@ func New(timeout time.Duration, tokenProvider TokenProvider) (*linodego.Client, 
 		tokenProvider: tokenProvider,
 	}
 
-	linodeClient := linodego.NewClient(httpClient)
-	client, err := linodeClient.UseURL(apiURL)
+	linodeClient, err := linodego.NewClient(httpClient)
+	if err != nil {
+		return nil, err
+	}
+	client, err = linodeClient.UseURL(apiURL)
 	if err != nil {
 		return nil, err
 	}

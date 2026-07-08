@@ -4,21 +4,21 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	v1 "k8s.io/api/core/v1"
 )
 
 // makeOldRuleSet constructs a FirewallRuleSet with the given IPs, ports string, and policy.
-func makeOldRuleSet(ipList []string, ports string, policy string) linodego.FirewallRuleSet {
-	ips := linodego.NetworkAddresses{IPv4: &ipList}
-	rule := linodego.FirewallRule{
+func makeOldRuleSet(ipList []string, ports string, policy string) linodego.FirewallRules {
+	ips := linodego.NetworkAddresses{IPv4: ipList}
+	rule := linodego.FirewallRuleInbound{
 		Protocol:  "TCP",
 		Ports:     ports,
 		Addresses: ips,
 	}
-	return linodego.FirewallRuleSet{
+	return linodego.FirewallRules{
 		InboundPolicy: policy,
-		Inbound:       []linodego.FirewallRule{rule},
+		Inbound:       []linodego.FirewallRuleInbound{rule},
 	}
 }
 
@@ -37,7 +37,7 @@ func TestRuleChanged(t *testing.T) {
 			oldIPs:     []string{"1.2.3.4/32"},
 			oldPorts:   "80,8080",
 			policy:     drop,
-			newACL:     aclConfig{AllowList: &linodego.NetworkAddresses{IPv4: &[]string{"1.2.3.4/32"}}},
+			newACL:     aclConfig{AllowList: &linodego.NetworkAddresses{IPv4: []string{"1.2.3.4/32"}}},
 			svcPorts:   []int32{80, 8080},
 			wantChange: false,
 		},
@@ -46,7 +46,7 @@ func TestRuleChanged(t *testing.T) {
 			oldIPs:     []string{"1.2.3.4/32"},
 			oldPorts:   "80",
 			policy:     drop,
-			newACL:     aclConfig{AllowList: &linodego.NetworkAddresses{IPv4: &[]string{"5.6.7.8/32"}}},
+			newACL:     aclConfig{AllowList: &linodego.NetworkAddresses{IPv4: []string{"5.6.7.8/32"}}},
 			svcPorts:   []int32{80},
 			wantChange: true,
 		},
@@ -55,7 +55,7 @@ func TestRuleChanged(t *testing.T) {
 			oldIPs:     []string{"1.2.3.4/32"},
 			oldPorts:   "80",
 			policy:     drop,
-			newACL:     aclConfig{AllowList: &linodego.NetworkAddresses{IPv4: &[]string{"1.2.3.4/32"}}},
+			newACL:     aclConfig{AllowList: &linodego.NetworkAddresses{IPv4: []string{"1.2.3.4/32"}}},
 			svcPorts:   []int32{80, 8080},
 			wantChange: true,
 		},

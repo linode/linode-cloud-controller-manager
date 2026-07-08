@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	"golang.org/x/exp/slices"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
@@ -85,7 +85,7 @@ func (l *LinodeClient) DeleteNodeBalancerFirewall(
 	return nil
 }
 
-func ipsChanged(ips *linodego.NetworkAddresses, rules []linodego.FirewallRule) bool {
+func ipsChanged(ips *linodego.NetworkAddresses, rules []linodego.FirewallRuleInbound) bool {
 	if ips == nil {
 		return false
 	}
@@ -95,10 +95,10 @@ func ipsChanged(ips *linodego.NetworkAddresses, rules []linodego.FirewallRule) b
 
 	for _, rule := range rules {
 		if rule.Addresses.IPv4 != nil {
-			ruleIPv4s = append(ruleIPv4s, *rule.Addresses.IPv4...)
+			ruleIPv4s = append(ruleIPv4s, rule.Addresses.IPv4...)
 		}
 		if rule.Addresses.IPv6 != nil {
-			ruleIPv6s = append(ruleIPv6s, *rule.Addresses.IPv6...)
+			ruleIPv6s = append(ruleIPv6s, rule.Addresses.IPv6...)
 		}
 	}
 
@@ -111,10 +111,10 @@ func ipsChanged(ips *linodego.NetworkAddresses, rules []linodego.FirewallRule) b
 	}
 
 	if ips.IPv4 != nil {
-		if len(*ips.IPv4) != len(ruleIPv4s) {
+		if len(ips.IPv4) != len(ruleIPv4s) {
 			return true
 		}
-		for _, ipv4 := range *ips.IPv4 {
+		for _, ipv4 := range ips.IPv4 {
 			if !slices.Contains(ruleIPv4s, ipv4) {
 				return true
 			}
@@ -122,10 +122,10 @@ func ipsChanged(ips *linodego.NetworkAddresses, rules []linodego.FirewallRule) b
 	}
 
 	if ips.IPv6 != nil {
-		if len(*ips.IPv6) != len(ruleIPv6s) {
+		if len(ips.IPv6) != len(ruleIPv6s) {
 			return true
 		}
-		for _, ipv6 := range *ips.IPv6 {
+		for _, ipv6 := range ips.IPv6 {
 			if !slices.Contains(ruleIPv6s, ipv6) {
 				return true
 			}
@@ -170,7 +170,7 @@ func parsePorts(ports string) ([]int32, error) {
 	return result, nil
 }
 
-func isPortsChanged(rules []linodego.FirewallRule, service *v1.Service) bool {
+func isPortsChanged(rules []linodego.FirewallRuleInbound, service *v1.Service) bool {
 	// Service has at least one port, so we can check if there are any rules in firewall
 	// We only care about the first rule, as all rules should have same ports
 	if len(rules) == 0 {
@@ -216,7 +216,7 @@ func isPortsChanged(rules []linodego.FirewallRule, service *v1.Service) bool {
 
 // ruleChanged takes an old FirewallRuleSet and new aclConfig and returns if
 // the IPs of the FirewallRuleSet would be changed with the new ACL Config
-func ruleChanged(old linodego.FirewallRuleSet, newACL aclConfig, service *v1.Service) bool {
+func ruleChanged(old linodego.FirewallRules, newACL aclConfig, service *v1.Service) bool {
 	var ips *linodego.NetworkAddresses
 	if newACL.AllowList != nil {
 		// this is a allowList, this means that the rules should have `DROP` as inboundpolicy
@@ -292,10 +292,10 @@ func processACL(fwcreateOpts *linodego.FirewallCreateOptions, aclType, label, sv
 	// Linode has a limitation of firewall rules with a max of 255 IPs per rule
 	var ipv4s, ipv6s []string // doing this to avoid dereferencing a nil pointer
 	if ips.IPv6 != nil {
-		ipv6s = *ips.IPv6
+		ipv6s = ips.IPv6
 	}
 	if ips.IPv4 != nil {
-		ipv4s = *ips.IPv4
+		ipv4s = ips.IPv4
 	}
 
 	if len(ipv4s)+len(ipv6s) > maxIPsPerFirewall {
@@ -303,13 +303,13 @@ func processACL(fwcreateOpts *linodego.FirewallCreateOptions, aclType, label, sv
 		for i, chunk := range ipv4chunks {
 			v4chunk := chunk
 			desc := fmt.Sprintf("Rule %d, Created by linode-ccm: %s, for %s", i, label, svcName)
-			fwcreateOpts.Rules.Inbound = append(fwcreateOpts.Rules.Inbound, linodego.FirewallRule{
+			fwcreateOpts.Rules.Inbound = append(fwcreateOpts.Rules.Inbound, linodego.FirewallRuleInbound{
 				Action:      aclType,
 				Label:       ruleLabel,
 				Description: truncateFWRuleDesc(desc),
 				Protocol:    linodego.TCP, // Nodebalancers support only TCP.
 				Ports:       ports,
-				Addresses:   linodego.NetworkAddresses{IPv4: &v4chunk},
+				Addresses:   linodego.NetworkAddresses{IPv4: v4chunk},
 			})
 		}
 
@@ -317,18 +317,18 @@ func processACL(fwcreateOpts *linodego.FirewallCreateOptions, aclType, label, sv
 		for i, chunk := range ipv6chunks {
 			v6chunk := chunk
 			desc := fmt.Sprintf("Rule %d, Created by linode-ccm: %s, for %s", i, label, svcName)
-			fwcreateOpts.Rules.Inbound = append(fwcreateOpts.Rules.Inbound, linodego.FirewallRule{
+			fwcreateOpts.Rules.Inbound = append(fwcreateOpts.Rules.Inbound, linodego.FirewallRuleInbound{
 				Action:      aclType,
 				Label:       ruleLabel,
 				Description: truncateFWRuleDesc(desc),
 				Protocol:    linodego.TCP, // Nodebalancers support only TCP.
 				Ports:       ports,
-				Addresses:   linodego.NetworkAddresses{IPv6: &v6chunk},
+				Addresses:   linodego.NetworkAddresses{IPv6: v6chunk},
 			})
 		}
 	} else {
 		desc := fmt.Sprintf("Created by linode-ccm: %s, for %s", label, svcName)
-		fwcreateOpts.Rules.Inbound = append(fwcreateOpts.Rules.Inbound, linodego.FirewallRule{
+		fwcreateOpts.Rules.Inbound = append(fwcreateOpts.Rules.Inbound, linodego.FirewallRuleInbound{
 			Action:      aclType,
 			Label:       ruleLabel,
 			Description: truncateFWRuleDesc(desc),
@@ -557,7 +557,12 @@ func (l *LinodeClient) updateNodeBalancerFirewallWithACL(
 			if err != nil {
 				return err
 			}
-			if _, err = l.Client.UpdateFirewallRules(ctx, firewalls[0].ID, fwCreateOpts.Rules); err != nil {
+			if _, err = l.Client.UpdateFirewallRules(ctx, firewalls[0].ID, linodego.FirewallRulesUpdateOptions{
+				Inbound:        fwCreateOpts.Rules.Inbound,
+				InboundPolicy:  fwCreateOpts.Rules.InboundPolicy,
+				Outbound:       fwCreateOpts.Rules.Outbound,
+				OutboundPolicy: fwCreateOpts.Rules.OutboundPolicy,
+			}); err != nil {
 				return err
 			}
 		}

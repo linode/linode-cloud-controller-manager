@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 )
 
 const apiVersion = "v4"
@@ -531,9 +531,15 @@ func (f *fakeAPI) setupRoutes() {
 		}
 
 		firewall := linodego.Firewall{
-			ID:     rand.Intn(9999),
-			Label:  fco.Label,
-			Rules:  fco.Rules,
+			ID:    rand.Intn(9999),
+			Label: fco.Label,
+			Rules: linodego.FirewallRules{
+				Inbound:        fco.Rules.Inbound,
+				InboundPolicy:  fco.Rules.InboundPolicy,
+				Outbound:       fco.Rules.Outbound,
+				OutboundPolicy: fco.Rules.OutboundPolicy,
+				Version:        1,
+			},
 			Tags:   fco.Tags,
 			Status: "enabled",
 		}
@@ -735,7 +741,7 @@ func (f *fakeAPI) setupRoutes() {
 	})
 
 	f.mux.HandleFunc("PUT /v4/networking/firewalls/{firewallID}/rules", func(w http.ResponseWriter, r *http.Request) {
-		fwrs := new(linodego.FirewallRuleSet)
+		fwrs := new(linodego.FirewallRulesUpdateOptions)
 		if err := json.NewDecoder(r.Body).Decode(fwrs); err != nil {
 			f.t.Fatal(err)
 		}
@@ -785,7 +791,7 @@ func (f *fakeAPI) setupRoutes() {
 				nb.Label = nbuo.Label
 			}
 			if nbuo.Tags != nil {
-				nb.Tags = *nbuo.Tags
+				nb.Tags = nbuo.Tags
 			}
 
 			f.nb[strconv.Itoa(nb.ID)] = nb

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	v1 "k8s.io/api/core/v1"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
