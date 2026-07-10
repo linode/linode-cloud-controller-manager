@@ -35,6 +35,7 @@ metadata:
   name: svc-test
   annotations:
     service.beta.kubernetes.io/linode-loadbalancer-reserved-ipv4: ($nb_conf.reserved_ip)
+    service.beta.kubernetes.io/linode-loadbalancer-retain-reserved-ipv4: "false"
     service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id: ($nb_conf.nb_id)
   labels:
     app: created-with-reserved-ip-and-nb-id-annotations
