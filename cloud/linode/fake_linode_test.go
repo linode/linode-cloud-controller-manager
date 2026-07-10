@@ -333,6 +333,10 @@ func (f *fakeAPI) setupRoutes() {
 		_, _ = w.Write(resp)
 	})
 
+	f.mux.HandleFunc("DELETE /v4/networking/reserved/ips/{ipAddress}", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
 	f.mux.HandleFunc("POST /v4/nodebalancers", func(w http.ResponseWriter, r *http.Request) {
 		nbco := linodego.NodeBalancerCreateOptions{}
 		if err := json.NewDecoder(r.Body).Decode(&nbco); err != nil {
