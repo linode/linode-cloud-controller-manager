@@ -29,6 +29,8 @@ type fakeAPI struct {
 	vpc    map[int]*linodego.VPC
 	subnet map[int]*linodego.VPCSubnet
 
+	failDeleteReservedIP bool
+
 	requests map[fakeRequest]struct{}
 	mux      *http.ServeMux
 }
@@ -334,6 +336,12 @@ func (f *fakeAPI) setupRoutes() {
 	})
 
 	f.mux.HandleFunc("DELETE /v4/networking/reserved/ips/{ipAddress}", func(w http.ResponseWriter, r *http.Request) {
+		if f.failDeleteReservedIP {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{"errors":[{"reason":"forced reserved IP delete failure"}]}`))
+			return
+		}
+
 		w.WriteHeader(http.StatusOK)
 	})
 

@@ -4757,6 +4757,37 @@ func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client, fake *
 			}
 		})
 	}
+
+	t.Run("load balancer delete returns error when reserved ip deletion fails", func(t *testing.T) {
+		fake.ResetRequests()
+		fake.failDeleteReservedIP = true
+		defer func() { fake.failDeleteReservedIP = false }()
+
+		service := newService("test-delete-reserved-ip-fails", map[string]string{
+			annotations.AnnLinodeDefaultProtocol:                "tcp",
+			annotations.AnnLinodeLoadBalancerRetainReservedIPv4: "false",
+		})
+
+		nb, err := lb.createNodeBalancer(t.Context(), "linodelb", service, []linodego.NodeBalancerConfigCreateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		service.Status.LoadBalancer = *makeLoadBalancerStatus(service, nb)
+
+		err = lb.EnsureLoadBalancerDeleted(t.Context(), "linodelb", service)
+		if err == nil {
+			t.Fatal("expected reserved IP deletion error")
+		}
+
+		ingressIP := service.Status.LoadBalancer.Ingress[0].IP
+		if !fake.didRequestOccur(http.MethodDelete, fmt.Sprintf("/networking/reserved/ips/%s", ingressIP), "") {
+			t.Fatal("expected reserved IP delete request")
+		}
+
+		if fake.didRequestOccur(http.MethodDelete, fmt.Sprintf("/nodebalancers/%d", nb.ID), "") {
+			t.Fatal("unexpected node balancer delete request after reserved IP deletion failure")
+		}
+	})
 }
 
 func testEnsureExistingLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {
