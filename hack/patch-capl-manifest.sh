@@ -50,6 +50,11 @@ patch_ccm_values_template() {
   ' "${MANIFEST_PATH}"
 }
 
+patch_cilium_values_template() {
+  yq -i e 'select(.kind == "HelmChartProxy" and .spec.chartName == "cilium" and (.metadata.name | test("^ipv6"))).spec.valuesTemplate =
+    load_str("hack/cilium-values-ipv6.yaml")' "${MANIFEST_PATH}"
+}
+
 patch_vpc_resources() {
   yq -i e '
     select(.kind == "LinodeVPC") |= (
@@ -73,3 +78,4 @@ patch_vpc_resources() {
 
 patch_vpc_resources
 patch_ccm_values_template
+patch_cilium_values_template
