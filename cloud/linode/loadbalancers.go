@@ -606,6 +606,13 @@ func (l *loadbalancers) shouldPreserveNodeBalancer(service *v1.Service) bool {
 	return shouldPreserve != nil && *shouldPreserve
 }
 
+// shouldRetainReservedIP determines whether a reserved IP should be retained based on the
+// service's retain reserved IP annotation. If the annotation is not present, the default behavior is to retain the reserved IP.
+func (l *loadbalancers) shouldRetainReservedIP(service *v1.Service) bool {
+	shouldRetain := getServiceBoolAnnotation(service, annotations.AnnLinodeLoadBalancerRetainReservedIPv4)
+	return shouldRetain == nil || *shouldRetain
+}
+
 // EnsureLoadBalancerDeleted deletes the specified loadbalancer if it exists.
 // nil is returned if the load balancer for service does not exist or is
 // successfully deleted.
@@ -666,6 +673,15 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 	fwClient := services.LinodeClient{Client: l.client}
 	if err = fwClient.DeleteNodeBalancerFirewall(ctx, service, nb); err != nil {
 		return err
+	}
+
+	if !l.shouldRetainReservedIP(service) {
+		klog.Infof("deleting reserved IP (%s) for NodeBalancer (%d) for service (%s)", *nb.IPv4, nb.ID, serviceNn)
+		if err = l.client.DeleteReservedIPAddress(ctx, *nb.IPv4); err != nil {
+			klog.Errorf("failed to delete reserved IP (%s) for NodeBalancer (%d) for service (%s): %s", *nb.IPv4, nb.ID, serviceNn, err)
+			sentry.CaptureError(ctx, err)
+			return err
+		}
 	}
 
 	if err = l.client.DeleteNodeBalancer(ctx, nb.ID); err != nil {

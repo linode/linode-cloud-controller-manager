@@ -4667,60 +4667,60 @@ func testEnsureLoadBalancerPreserveAnnotation(t *testing.T, client *linodego.Cli
 func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client, fake *fakeAPI) {
 	t.Helper()
 
-	svc := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test",
-			UID:  "foobar123",
-			Annotations: map[string]string{
-				annotations.AnnLinodeDefaultProtocol: "tcp",
+	newService := func(name string, annotationsMap map[string]string) *v1.Service {
+		return &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        name,
+				UID:         types.UID(name + "-uid"),
+				Annotations: annotationsMap,
 			},
-		},
-		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{
-				{
-					Name:     "test",
-					Protocol: "TCP",
-					Port:     int32(80),
-					NodePort: int32(30000),
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{
+						Name:     "test",
+						Protocol: "TCP",
+						Port:     int32(80),
+						NodePort: int32(30000),
+					},
 				},
 			},
-		},
+		}
 	}
+
 	testcases := []struct {
-		name        string
-		clusterName string
-		service     *v1.Service
-		err         error
+		name                   string
+		clusterName            string
+		service                *v1.Service
+		createNodeBalancer     bool
+		expectReservedIPDelete bool
+		err                    error
 	}{
 		{
-			"load balancer delete",
-			"linodelb",
-			svc,
-			nil,
+			name:                   "load balancer delete retains reserved ip by default",
+			clusterName:            "linodelb",
+			service:                newService("test-retain-default", map[string]string{annotations.AnnLinodeDefaultProtocol: "tcp"}),
+			createNodeBalancer:     true,
+			expectReservedIPDelete: false,
+			err:                    nil,
 		},
 		{
-			"load balancer not exists",
-			"linodelb",
-			&v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "notexists",
-					UID:  "notexists123",
-					Annotations: map[string]string{
-						annotations.AnnLinodeDefaultProtocol: "tcp",
-					},
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{
-						{
-							Name:     "test",
-							Protocol: "TCP",
-							Port:     int32(80),
-							NodePort: int32(30000),
-						},
-					},
-				},
-			},
-			nil,
+			name:        "load balancer delete removes reserved ip when retain annotation is false",
+			clusterName: "linodelb",
+			service: newService("test-delete-reserved-ip", map[string]string{
+				annotations.AnnLinodeDefaultProtocol:                "tcp",
+				annotations.AnnLinodeLoadBalancerRetainReservedIPv4: "false",
+			}),
+			createNodeBalancer:     true,
+			expectReservedIPDelete: true,
+			err:                    nil,
+		},
+		{
+			name:                   "load balancer not exists",
+			clusterName:            "linodelb",
+			service:                newService("notexists", map[string]string{annotations.AnnLinodeDefaultProtocol: "tcp"}),
+			createNodeBalancer:     false,
+			expectReservedIPDelete: false,
+			err:                    nil,
 		},
 	}
 
@@ -4728,23 +4728,66 @@ func testEnsureLoadBalancerDeleted(t *testing.T, client *linodego.Client, fake *
 	if !assertion {
 		t.Error("type assertion failed")
 	}
-	configs := []linodego.NodeBalancerConfigCreateOptions{}
-	_, err := lb.createNodeBalancer(t.Context(), "linodelb", svc, configs)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = lb.EnsureLoadBalancerDeleted(t.Context(), "linodelb", svc) }()
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
+			fake.ResetRequests()
+
+			if test.createNodeBalancer {
+				nb, err := lb.createNodeBalancer(t.Context(), test.clusterName, test.service, []linodego.NodeBalancerConfigCreateOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				test.service.Status.LoadBalancer = *makeLoadBalancerStatus(test.service, nb)
+			}
+
 			err := lb.EnsureLoadBalancerDeleted(t.Context(), test.clusterName, test.service)
 			if !reflect.DeepEqual(err, test.err) {
 				t.Error("unexpected error")
 				t.Logf("expected: %v", test.err)
 				t.Logf("actual: %v", err)
 			}
+
+			if test.createNodeBalancer {
+				ingressIP := test.service.Status.LoadBalancer.Ingress[0].IP
+				didDeleteReservedIP := fake.didRequestOccur(http.MethodDelete, fmt.Sprintf("/networking/reserved/ips/%s", ingressIP), "")
+				if didDeleteReservedIP != test.expectReservedIPDelete {
+					t.Fatalf("reserved IP delete request mismatch: got %v, want %v", didDeleteReservedIP, test.expectReservedIPDelete)
+				}
+			}
 		})
 	}
+
+	t.Run("load balancer delete returns error when reserved ip deletion fails", func(t *testing.T) {
+		fake.ResetRequests()
+		fake.failDeleteReservedIP = true
+		defer func() { fake.failDeleteReservedIP = false }()
+
+		service := newService("test-delete-reserved-ip-fails", map[string]string{
+			annotations.AnnLinodeDefaultProtocol:                "tcp",
+			annotations.AnnLinodeLoadBalancerRetainReservedIPv4: "false",
+		})
+
+		nb, err := lb.createNodeBalancer(t.Context(), "linodelb", service, []linodego.NodeBalancerConfigCreateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		service.Status.LoadBalancer = *makeLoadBalancerStatus(service, nb)
+
+		err = lb.EnsureLoadBalancerDeleted(t.Context(), "linodelb", service)
+		if err == nil {
+			t.Fatal("expected reserved IP deletion error")
+		}
+
+		ingressIP := service.Status.LoadBalancer.Ingress[0].IP
+		if !fake.didRequestOccur(http.MethodDelete, fmt.Sprintf("/networking/reserved/ips/%s", ingressIP), "") {
+			t.Fatal("expected reserved IP delete request")
+		}
+
+		if fake.didRequestOccur(http.MethodDelete, fmt.Sprintf("/nodebalancers/%d", nb.ID), "") {
+			t.Fatal("unexpected node balancer delete request after reserved IP deletion failure")
+		}
+	})
 }
 
 func testEnsureExistingLoadBalancer(t *testing.T, client *linodego.Client, _ *fakeAPI) {

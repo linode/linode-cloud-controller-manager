@@ -3,6 +3,7 @@
 ## Overview
 
 The CCM supports two types of LoadBalancer implementations:
+
 1. Linode NodeBalancers (default)
 2. BGP-based IP sharing
 
@@ -11,6 +12,7 @@ For implementation examples, see [Basic Service Examples](../examples/basic.md#l
 ## NodeBalancer Implementation
 
 When using NodeBalancers, the CCM automatically:
+
 1. Creates and configures a NodeBalancer
 2. Sets up backend nodes
 3. Manages health checks
@@ -20,7 +22,7 @@ For more details, see [Linode NodeBalancer Documentation](https://www.linode.com
 
 ### IPv6 Support
 
-NodeBalancers support both IPv4 and IPv6 ingress addresses. By default, the CCM uses only IPv4 address for LoadBalancer services. 
+NodeBalancers support both IPv4 and IPv6 ingress addresses. By default, the CCM uses only IPv4 address for LoadBalancer services.
 
 You can enable IPv6 addresses globally for all services by setting the `enable-ipv6-for-loadbalancers` flag:
 
@@ -71,6 +73,7 @@ metadata:
 ```
 
 When IPv6 backends are enabled:
+
 - NodeBalancer backend targets use the node public IPv6 annotation `node.k8s.linode.com/public-ipv6`
 - IPv6 NodeBalancer backends are currently supported only through node public IPv6 addresses, not VPC IPv6 backend addresses
 - both VPC-backed and non-VPC-backed NodeBalancer services are affected
@@ -109,6 +112,7 @@ If your cluster does not provide IPv6-capable NodePort routing, the NodeBalancer
 ### Basic Configuration
 
 Create a LoadBalancer service:
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -128,13 +132,16 @@ See [Advanced Configuration Examples](../examples/advanced.md#loadbalancer-servi
 ### NodeBalancer Settings
 
 #### Protocol Configuration
+
 Available protocols:
+
 - `tcp` (default)
 - `http`
 - `https`
 - `udp`
 
 Set the default protocol:
+
 ```yaml
 metadata:
   annotations:
@@ -146,6 +153,7 @@ See [Service Annotations](annotations.md#basic-configuration) for all protocol o
 ### Health Checks
 
 Configure health checks using annotations:
+
 ```yaml
 metadata:
   annotations:
@@ -157,6 +165,7 @@ metadata:
 ```
 
 Available check types:
+
 - `none`: No health check
 - `connection`: TCP connection check
 - `http`: HTTP status check
@@ -167,6 +176,7 @@ For more details, see [Health Check Configuration](annotations.md#health-check-c
 ### SSL/TLS Configuration
 
 1. Create a TLS secret:
+
 ```yaml
 apiVersion: v1
 kind: Secret
@@ -178,7 +188,8 @@ data:
   tls.key: <base64-encoded-key>
 ```
 
-2. Reference in service annotation:
+1. Reference in service annotation:
+
 ```yaml
 metadata:
   annotations:
@@ -192,6 +203,7 @@ metadata:
 ### Connection Throttling
 
 Limit connections from the same client IP:
+
 ```yaml
 metadata:
   annotations:
@@ -201,6 +213,7 @@ metadata:
 ### Proxy Protocol
 
 Enable proxy protocol for client IP preservation:
+
 ```yaml
 metadata:
   annotations:
@@ -212,6 +225,7 @@ metadata:
 BGP-based IP sharing provides a more cost-effective solution for multiple LoadBalancer services. For detailed setup instructions, see [Cilium BGP Documentation](https://docs.cilium.io/en/stable/network/bgp-control-plane/bgp-control-plane/).
 
 ### Prerequisites
+
 - [Cilium CNI](https://docs.cilium.io/en/stable/network/bgp-control-plane/bgp-control-plane/) with BGP control plane enabled
 - Additional IP provisioning enabled on your account (contact [Linode Support](https://www.linode.com/support/))
 - Nodes labeled for BGP peering
@@ -219,6 +233,7 @@ BGP-based IP sharing provides a more cost-effective solution for multiple LoadBa
 ### Configuration
 
 1. Enable BGP in CCM deployment:
+
 ```yaml
 args:
   - --load-balancer-type=cilium-bgp
@@ -226,25 +241,30 @@ args:
   - --ip-holder-suffix=mycluster
 ```
 
-2. Label nodes that should participate in BGP peering:
+1. Label nodes that should participate in BGP peering:
+
 ```bash
 kubectl label node my-node cilium-bgp-peering=true
 ```
 
-3. Create LoadBalancer services as normal - the CCM will automatically use BGP-based IP sharing instead of creating NodeBalancers.
+1. Create LoadBalancer services as normal - the CCM will automatically use BGP-based IP sharing instead of creating NodeBalancers.
 
 ### Environment Variables
+
 - `BGP_CUSTOM_ID_MAP`: Use your own map instead of default region map for BGP
 - `BGP_PEER_PREFIX`: Use your own BGP peer prefix instead of default one
 
 For more details, see [Environment Variables](environment.md#network-configuration).
 
 ## Configuring NodeBalancers directly with VPC
+
 NodeBalancers can be configured to have VPC specific ips configured as backend nodes. It requires:
+
 1. VPC with a subnet and Linodes in VPC
 2. Each NodeBalancer created within that VPC needs a free /30 or bigger subnet from the subnet to which Linodes are connected
 
 Specify NodeBalancer backend ipv4 range when creating service:
+
 ```yaml
 metadata:
   annotations:
@@ -252,6 +272,7 @@ metadata:
 ```
 
 By default, CCM uses first VPC and Subnet name configured with it to attach NodeBalancers to that VPC subnet. To overwrite those, use:
+
 ```yaml
 metadata:
   annotations:
@@ -277,11 +298,13 @@ Frontend VPC configuration supports the following annotations:
    - `service.beta.kubernetes.io/linode-loadbalancer-frontend-ipv6-range` (CIDR)
 
 Order of precedence:
+
 - If `frontend-subnet-id` is set, it is used.
 - Otherwise, `frontend-vpc-name` + `frontend-subnet-name` are used.
 - IPv4/IPv6 range annotations are optional add-ons and require one of the subnet selectors above.
 
 Example:
+
 ```yaml
 metadata:
   annotations:
@@ -300,6 +323,7 @@ If CCM is started with `--nodebalancer-backend-ipv4-subnet` flag, then it will n
 ### Using Existing NodeBalancers
 
 Specify an existing NodeBalancer:
+
 ```yaml
 metadata:
   annotations:
@@ -309,17 +333,31 @@ metadata:
 ### Reserved IPv4 addresses
 
 Create an new NodeBalancer with an existing Reserved IPv4 Address:
-```
+
+```yaml
 metadata:
   annotations:
     service.beta.kubernetes.io/linode-loadbalancer-reserved-ipv4: "100.100.100.100"
 ```
+
 The annotation must be present when the Service is created in order to take effect.
 
+### Retaining Reserved IPv4 addresses
+
+Retain a reserved IPv4 address when the NodeBalancer is deleted:
+
+```yaml
+metadata:
+  annotations:
+    service.beta.kubernetes.io/linode-loadbalancer-retain-reserved-ipv4: "true"
+```
+
+The default behavior is to retain the reserved IPv4 address when the NodeBalancer is deleted. Setting this annotation to "false" will release the reserved IPv4 address when the NodeBalancer is deleted.
 
 ### NodeBalancer Preservation
 
 Prevent NodeBalancer deletion when service is deleted:
+
 ```yaml
 metadata:
   annotations:
@@ -329,6 +367,7 @@ metadata:
 ### Port Configuration
 
 Configure individual ports:
+
 ```yaml
 metadata:
   annotations:
@@ -343,6 +382,7 @@ metadata:
 ### Tags
 
 Add tags to NodeBalancer:
+
 ```yaml
 metadata:
   annotations:
@@ -350,6 +390,7 @@ metadata:
 ```
 
 ### Excluding nodes from nodebalancer
+
 Add a label to the node object to exclude
 
 ```yaml

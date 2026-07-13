@@ -90,27 +90,10 @@ spec:
             content: |
               set -euo pipefail
 
-              reserved_ip=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.ReservedIP}' -n $NAMESPACE)
-              if [ -z "$reserved_ip" ]; then
-                  echo "Error: No reserved ip found in configmap"
-                  exit 1
-              fi
-
               reserved_ip2=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.ReservedIP2}' -n $NAMESPACE)
               if [ -z "$reserved_ip2" ]; then
                   echo "Error: No reserved ip found in configmap"
                   exit 1
-              fi
-
-              delete_rip=$(curl -s --request DELETE \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                "${LINODE_URL}/v4beta/networking/reserved/ips/$reserved_ip" )
-
-              if [[ "$delete_rip" == "{}" ]]; then
-                echo "Reserved IP $reserved_ip deleted successfully"
-              else
-                echo "Unable to delete reserved ip: $reserved_ip. Error: $delete_rip"
               fi
 
               delete_rip2=$(curl -s --request DELETE \
