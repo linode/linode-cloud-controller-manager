@@ -24,16 +24,13 @@ IPV6_CLUSTER_NAME       ?= ipv6-$(shell git rev-parse --short HEAD)
 IPV6_MANIFEST_NAME      ?= ipv6-manifests
 
 # renovate: datasource=github-tags depName=kubernetes/kubernetes
-K8S_VERSION             ?= "v1.31.2"
+K8S_VERSION             ?= "v1.36.2"
 
 # renovate: datasource=github-tags depName=kubernetes-sigs/cluster-api
-CAPI_VERSION            ?= "v1.8.5"
-
-# renovate: datasource=github-tags depName=kubernetes-sigs/cluster-api-addon-provider-helm
-CAAPH_VERSION           ?= "v0.2.1"
+CAPI_VERSION            ?= "v1.13.3"
 
 # renovate: datasource=github-tags depName=linode/cluster-api-provider-linode
-CAPL_VERSION            ?= "v0.8.5"
+CAPL_VERSION            ?= "v0.10.7"
 
 CONTROLPLANE_NODES      ?= 1
 WORKER_NODES            ?= 1
@@ -199,7 +196,7 @@ mgmt-cluster:
 		--core cluster-api:$(CAPI_VERSION) \
 		--bootstrap kubeadm:$(CAPI_VERSION) \
 		--control-plane kubeadm:$(CAPI_VERSION) \
-		--addon helm:$(CAAPH_VERSION) \
+		--addon helm \
 		--infrastructure linode-linode:$(CAPL_VERSION)
 	kind get kubeconfig --name=caplccm > $(MGMT_KUBECONFIG_PATH)
 
