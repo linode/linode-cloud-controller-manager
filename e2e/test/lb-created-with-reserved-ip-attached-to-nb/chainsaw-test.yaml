@@ -106,25 +106,9 @@ spec:
             content: |
               set -euo pipefail
 
-              reserved_ip=$(kubectl get configmap nb-config -o=jsonpath='{.data.Reserved_IP}' -n $NAMESPACE)
-              if [ -z "$reserved_ip" ]; then
-                  echo "Error: No reserved ip found in configmap"
-              fi
-
               nb_id=$(kubectl get configmap nb-config -o=jsonpath='{.data.NB_ID}' -n $NAMESPACE)
               if [ -z "$nb_id" ]; then
                   echo "Error: No nb id found in configmap"
-              fi
-
-              delete_rip=$(curl -s --request DELETE \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                "${LINODE_URL}/v4beta/networking/reserved/ips/$reserved_ip" )
-
-              if [[ "$delete_rip" == "{}" ]]; then
-                echo "Reserved IP $reserved_ip deleted successfully"
-              else
-                echo "Unable to delete reserved ip: $reserved_ip. Error: $delete_rip"
               fi
 
                del_nb=$(curl -s --request DELETE \
@@ -148,7 +132,6 @@ spec:
               ($error == null): true
               (contains($stdout, 'No reserved ip found in configmap')): false
               (contains($stdout, 'Unable to delete the configmap')): false
-              (contains($stdout, 'Unable to delete reserved ip')): false
               (contains($stdout, 'No nb id found in configmap')): false
               (contains($stdout, 'Unable to delete NB')): false
     - name: Check that loadbalancer ip is assigned

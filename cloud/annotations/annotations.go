@@ -29,6 +29,10 @@ const (
 	// for the NodeBalancer. If not specified, Linode will automatically assign an IPv4 address.
 	AnnLinodeLoadBalancerReservedIPv4 = "service.beta.kubernetes.io/linode-loadbalancer-reserved-ipv4"
 
+	// AnnLinodeLoadBalancerRetainReservedIPv4 is the annotation used to specify whether a reserved IPv4 address
+	// should be retained when the NodeBalancer is deleted. Defaults to "true".
+	AnnLinodeLoadBalancerRetainReservedIPv4 = "service.beta.kubernetes.io/linode-loadbalancer-retain-reserved-ipv4"
+
 	AnnLinodeLoadBalancerPreserve = "service.beta.kubernetes.io/linode-loadbalancer-preserve"
 	AnnLinodeNodeBalancerID       = "service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"
 	AnnLinodeNodeBalancerType     = "service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-type"

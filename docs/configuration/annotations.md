@@ -5,6 +5,7 @@
 Service annotations allow you to customize the behavior of your LoadBalancer services. All Service annotations must be prefixed with: `service.beta.kubernetes.io/linode-loadbalancer-`
 
 For implementation details, see:
+
 - [LoadBalancer Configuration](loadbalancer.md)
 - [Basic Service Examples](../examples/basic.md)
 - [Advanced Configuration Examples](../examples/advanced.md)
@@ -50,7 +51,8 @@ The keys and the values in [annotations must be strings](https://kubernetes.io/d
 | `frontend-subnet-name` | string | | Frontend subnet name for the NodeBalancer frontend VPC configuration. See [Nodebalancer VPC Configuration](#nodebalancer-vpc-configuration) |
 | `frontend-ipv4-range` | string | | Optional IPv4 CIDR range from the frontend subnet. See [Nodebalancer VPC Configuration](#nodebalancer-vpc-configuration) |
 | `frontend-ipv6-range` | string | | Optional IPv6 CIDR range from the frontend subnet. See [Nodebalancer VPC Configuration](#nodebalancer-vpc-configuration) |
-| `reserved-ipv4` | string | | An existing Reserved IPv4 address that wil be used to initialize the NodeBalancer instance. See [LoadBalancer Configuration](loadbalancer.md#reserved-ipv4-addresses)) |
+| `reserved-ipv4` | string | | An existing Reserved IPv4 address that will be used to initialize the NodeBalancer instance. See [LoadBalancer Configuration](loadbalancer.md#reserved-ipv4-addresses) |
+| `retain-reserved-ipv4` | bool | `true` | When `false`, deleting a `LoadBalancer` service also releases the reserved IPv4 address attached to the NodeBalancer |
 
 ### Port Specific Configuration
 
@@ -70,6 +72,7 @@ metadata:
 ```
 
 Available port options:
+
 - `protocol`: Protocol for this port (tcp, http, https)
 - `tls-secret-name`: Name of TLS secret for HTTPS. The secret type should be `kubernetes.io/tls`
 - `proxy-protocol`: Proxy protocol version for this port
@@ -84,7 +87,9 @@ Available port options:
 | `proxy-protocol` | `none`, `v1`, `v2` | `none` | Specifies whether to use a version of Proxy Protocol on the underlying NodeBalancer | Q4 2021 |
 
 ### Annotation Boolean Values
+
 For annotations with bool value types, the following string values are interpreted as `true`:
+
 - `"1"`
 - `"t"`
 - `"T"`
@@ -97,6 +102,7 @@ Any other values will be interpreted as `false`. For more details, see [strconv.
 ## Examples
 
 ### Basic HTTP Service
+
 ```yaml
 metadata:
   annotations:
@@ -106,6 +112,7 @@ metadata:
 ```
 
 ### HTTPS Service with TLS
+
 ```yaml
 metadata:
   annotations:
@@ -117,6 +124,7 @@ metadata:
 ```
 
 ### Firewall Configuration
+
 ```yaml
 metadata:
   annotations:
@@ -130,9 +138,11 @@ metadata:
 ```
 
 ### NodeBalancer Type
+
 Linode supports nodebalancers of different types: common, premium, and premium_40gb. By default, nodebalancers of type common are provisioned. If an account is allowed to provision premium nodebalancers and one wants to use them, it can be achieved by specifying the annotation:
 
 **Note:** NodeBalancer types should always be specified in lowercase. The controller will automatically convert uppercase values to lowercase for safety.
+
 ```yaml
 metadata:
   annotations:
@@ -140,6 +150,7 @@ metadata:
 ```
 
 ### Nodebalancer VPC Configuration
+
 ```yaml
 metadata:
   annotations:
@@ -149,6 +160,7 @@ metadata:
 ```
 
 Frontend VPC configuration:
+
 ```yaml
 metadata:
   annotations:
@@ -159,6 +171,7 @@ metadata:
 ```
 
 ### Service with IPv6 Address
+
 ```yaml
 metadata:
   annotations:
@@ -166,6 +179,7 @@ metadata:
 ```
 
 For more examples and detailed configuration options, see:
+
 - [LoadBalancer Configuration](loadbalancer.md)
 - [Firewall Configuration](firewall.md)
 - [Basic Service Examples](../examples/basic.md)
@@ -173,6 +187,7 @@ For more examples and detailed configuration options, see:
 - [Examples](../examples/README.md)
 
 See also:
+
 - [Environment Variables](environment.md)
 - [Route Configuration](routes.md)
 - [Session Affinity](session-affinity.md)
