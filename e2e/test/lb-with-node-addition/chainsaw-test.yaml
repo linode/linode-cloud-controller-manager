@@ -87,9 +87,9 @@ spec:
             content: |
               set -euo pipefail
 
-              current_replicas=$(KUBECONFIG=$MGMT_KUBECONFIG kubectl get machinedeployment ${CLUSTER_NAME}-md-0 -o=jsonpath='{.spec.replicas}')
+              current_replicas=$(KUBECONFIG=$MGMT_KUBECONFIG kubectl get machinedeployment ${CLUSTER_NAME} -o=jsonpath='{.spec.replicas}')
               required_replicas=$((current_replicas + 1))
-              KUBECONFIG=$MGMT_KUBECONFIG kubectl patch machinedeployment ${CLUSTER_NAME}-md-0 --type='merge' -p "{\"spec\":{\"replicas\":$required_replicas}}"
+              KUBECONFIG=$MGMT_KUBECONFIG kubectl patch machinedeployment ${CLUSTER_NAME} --type='merge' -p "{\"spec\":{\"replicas\":$required_replicas}}"
 
               sleep 180
 
@@ -120,7 +120,7 @@ spec:
                   fi
               done
 
-              #KUBECONFIG=$MGMT_KUBECONFIG kubectl patch machinedeployment ${CLUSTER_NAME}-md-0 --type='merge' -p "{\"spec\":{\"replicas\":$current_replicas}}"
+              #KUBECONFIG=$MGMT_KUBECONFIG kubectl patch machinedeployment ${CLUSTER_NAME} --type='merge' -p "{\"spec\":{\"replicas\":$current_replicas}}"
             check:
               ($error == null): true
               (contains($stdout, 'all nodes up')): true

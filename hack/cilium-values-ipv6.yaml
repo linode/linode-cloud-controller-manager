@@ -1,0 +1,18 @@
+bgpControlPlane:
+  enabled: true
+policyAuditMode: true
+hostFirewall:
+  enabled: true
+extraConfig:
+  allow-localhost: policy
+ipv6:
+  enabled: true
+ipam:
+  mode: kubernetes
+k8s:
+  requireIPv4PodCIDR: true
+hubble:
+  relay:
+    enabled: true
+  ui:
+    enabled: true

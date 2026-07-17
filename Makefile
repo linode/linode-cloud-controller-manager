@@ -24,16 +24,13 @@ IPV6_CLUSTER_NAME       ?= ipv6-$(shell git rev-parse --short HEAD)
 IPV6_MANIFEST_NAME      ?= ipv6-manifests
 
 # renovate: datasource=github-tags depName=kubernetes/kubernetes
-K8S_VERSION             ?= "v1.31.2"
+K8S_VERSION             ?= "v1.36.2"
 
 # renovate: datasource=github-tags depName=kubernetes-sigs/cluster-api
-CAPI_VERSION            ?= "v1.8.5"
-
-# renovate: datasource=github-tags depName=kubernetes-sigs/cluster-api-addon-provider-helm
-CAAPH_VERSION           ?= "v0.2.1"
+CAPI_VERSION            ?= "v1.13.3"
 
 # renovate: datasource=github-tags depName=linode/cluster-api-provider-linode
-CAPL_VERSION            ?= "v0.8.5"
+CAPL_VERSION            ?= "v0.10.8"
 
 CONTROLPLANE_NODES      ?= 1
 WORKER_NODES            ?= 1
@@ -142,7 +139,7 @@ run-debug: build
 #####################################################################
 
 .PHONY: mgmt-and-capl-cluster
-mgmt-and-capl-cluster: ko-publish mgmt-cluster
+mgmt-and-capl-cluster: mgmt-cluster
 	$(MAKE) -j2 capl-ipv6-cluster capl-cluster
 
 .PHONY: capl-cluster
@@ -167,14 +164,14 @@ generate-capl-cluster-manifests:
 generate-capl-ipv6-cluster-manifests:
 	LINODE_FIREWALL_ENABLED=$(LINODE_FIREWALL_ENABLED) LINODE_OS=$(LINODE_OS) VPC_NAME=$(IPV6_CLUSTER_NAME) clusterctl generate cluster $(IPV6_CLUSTER_NAME) \
 		--kubernetes-version $(K8S_VERSION) --infrastructure linode-linode:$(CAPL_VERSION) \
-		--control-plane-machine-count $(CONTROLPLANE_NODES) --worker-machine-count $(WORKER_NODES) --flavor kubeadm-dual-stack > $(IPV6_MANIFEST_NAME).yaml
+		--control-plane-machine-count $(CONTROLPLANE_NODES) --worker-machine-count $(WORKER_NODES) --flavor kubeadm-dual-stack-vpcless > $(IPV6_MANIFEST_NAME).yaml
 	IMG=$(IMG) ./hack/patch-capl-manifest.sh $(IPV6_MANIFEST_NAME).yaml
 
 .PHONY: create-capl-cluster
 create-capl-cluster:
 	# Create a CAPL cluster with updated CCM and wait for it to be ready
 	kubectl apply -f $(MANIFEST_NAME).yaml
-	kubectl wait --for=condition=ControlPlaneReady cluster/$(CLUSTER_NAME) --timeout=600s || (kubectl get cluster -o yaml; kubectl get linodecluster -o yaml; kubectl get linodemachines -o yaml; kubectl logs -n capl-system deployments/capl-controller-manager --tail=50)
+	kubectl wait --for=condition=ControlPlaneInitialized cluster/$(CLUSTER_NAME) --timeout=600s || (kubectl get cluster -o yaml; kubectl get linodecluster -o yaml; kubectl get linodemachines -o yaml; kubectl logs -n capl-system deployments/capl-controller-manager --tail=100)
 	kubectl wait --for=condition=NodeHealthy=true machines -l cluster.x-k8s.io/cluster-name=$(CLUSTER_NAME) --timeout=900s
 	clusterctl get kubeconfig $(CLUSTER_NAME) > $(KUBECONFIG_PATH)
 	KUBECONFIG=$(KUBECONFIG_PATH) kubectl wait --for=condition=Ready nodes --all --timeout=600s
@@ -199,7 +196,7 @@ mgmt-cluster:
 		--core cluster-api:$(CAPI_VERSION) \
 		--bootstrap kubeadm:$(CAPI_VERSION) \
 		--control-plane kubeadm:$(CAPI_VERSION) \
-		--addon helm:$(CAAPH_VERSION) \
+		--addon helm \
 		--infrastructure linode-linode:$(CAPL_VERSION)
 	kind get kubeconfig --name=caplccm > $(MGMT_KUBECONFIG_PATH)
 

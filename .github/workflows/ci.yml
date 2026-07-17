@@ -121,6 +121,9 @@ jobs:
       - name: Set up Mise
         uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
 
+      - name: Build and push the CCM PR image
+        run: mise run ko-publish
+
       - name: Setup CAPL Management Kind Cluster and CAPL Child Cluster For Testing
         run: mise run mgmt-and-capl-cluster
 
