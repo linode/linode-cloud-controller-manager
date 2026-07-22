@@ -1,11 +1,15 @@
-{{- if not .Values.secretRef }}
+{{/*
+Create a Secret when apiToken is provided. Leave apiToken empty and set
+secretRef.name to use an externally managed Secret instead.
+*/}}
+{{- if .Values.apiToken }}
 apiVersion: v1
 kind: Secret
 metadata:
-  name: ccm-linode
-  namespace: {{ required ".Values.namespace required" .Values.namespace }}
+  name: {{ .Values.secretRef.name | quote }}
+  namespace: {{ required ".Values.namespace required" .Values.namespace | quote }}
 stringData:
-  apiToken: {{ required ".Values.apiToken required" .Values.apiToken }}
-  region: {{ required ".Values.region required" .Values.region }}
+  {{ .Values.secretRef.apiTokenRef | quote }}: {{ required ".Values.apiToken required" .Values.apiToken | quote }}
+  {{ .Values.secretRef.regionRef | quote }}: {{ required ".Values.region required" .Values.region | quote }}
 type: Opaque
 {{- end }}
