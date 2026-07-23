@@ -19,7 +19,6 @@ spec:
           kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-update-port" | tail -100
   steps:
     - name: Create pods and services
-      skipDelete: true
       try:
         - apply:
             file: create-pods-services.yaml
@@ -83,7 +82,6 @@ spec:
               ($error == null): true
               (contains($stdout, 'all pods responded')): true
     - name: Update service
-      skipDelete: true
       try:
         - apply:
             file: update-port-service.yaml
@@ -156,15 +154,3 @@ spec:
             check:
                 ($error == null): true
                 (contains($stdout, 'firewall rule updated with new port')): true
-    - name: Delete Pods
-      try:
-        - delete:
-            ref:
-              apiVersion: v1
-              kind: Pod
-    - name: Delete Service
-      try:
-        - delete:
-            ref:
-              apiVersion: v1
-              kind: Service

@@ -14,9 +14,38 @@ spec:
         shellArgs:
           - -c
         content: |
-          set -euo pipefail
+          set -uo pipefail
           echo "Test failed. Fetching CCM logs..."
-          kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-preserve-annotation-new-nb-specified" | tail -100
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-preserve-annotation-new-nb-specified" | tail -100 || true
+
+          # svc-test carries the preserve annotation (so CCM will not delete its
+          # NodeBalancer when the service is removed), and this test also creates a
+          # second NodeBalancer via the API. If the test fails partway, delete any
+          # NodeBalancers it created here (best-effort, idempotent) so they do not
+          # leak. Candidate ids come from the nb-cleanup ConfigMap (written as the
+          # ids are obtained) plus the one the service currently points to.
+          echo "Cleaning up NodeBalancers (if any)..."
+          nbids=""
+          if kubectl get configmap nb-cleanup -n "$NAMESPACE" >/dev/null 2>&1; then
+            nbids="$(kubectl get configmap nb-cleanup -n "$NAMESPACE" -o jsonpath='{.data.old} {.data.new}' 2>/dev/null || true)"
+          fi
+          ip=$(kubectl get svc svc-test -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+          if [[ -n "$ip" ]]; then
+            current=$(curl -s \
+              -H "Authorization: Bearer $LINODE_TOKEN" \
+              -H "X-Filter: {\"ipv4\": \"$ip\"}" \
+              "$LINODE_URL/v4/nodebalancers" | jq -r '.data[0].id // empty' || true)
+            nbids="$nbids $current"
+          fi
+          for nbid in $nbids; do
+            if [[ "$nbid" =~ ^[0-9]+$ ]]; then
+              echo "Deleting NodeBalancer $nbid"
+              curl -s -o /dev/null -X DELETE \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                "$LINODE_URL/v4/nodebalancers/$nbid" || true
+            fi
+          done
+          kubectl delete svc svc-test -n "$NAMESPACE" --ignore-not-found --timeout=60s || true
   steps:
     - name: Create resources
       try:
@@ -53,6 +82,11 @@ spec:
               # Get existing nodebalancer id
               old_nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
+              # Record the existing NodeBalancer id so the test-level catch can
+              # clean it up if a later command fails (svc-test uses the preserve
+              # annotation, so CCM will not delete it automatically).
+              kubectl create configmap nb-cleanup -n $NAMESPACE --from-literal=old=$old_nbid --dry-run=client -o yaml | kubectl apply -f -
+
               # Create new nodebalancer and use it
               LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
 
@@ -84,6 +118,10 @@ spec:
                   echo "Nodebalancer id [$nbid] is incorrect, failed to create nodebalancer"
                   exit 1
               fi
+
+              # Record the newly created NodeBalancer id as well so the catch block
+              # can clean up both NodeBalancers if a later command fails.
+              kubectl create configmap nb-cleanup -n $NAMESPACE --from-literal=old=$old_nbid --from-literal=new=$nbid --dry-run=client -o yaml | kubectl apply -f -
 
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id=$nbid
 

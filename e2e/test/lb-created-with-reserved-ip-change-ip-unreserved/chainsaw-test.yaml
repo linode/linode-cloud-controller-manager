@@ -75,6 +75,20 @@ spec:
               set -euo pipefail
 
 
+              # Release the primary reserved IP if it still exists. On the happy
+              # path CCM already released it when svc-test was torn down, so this
+              # is a best-effort, idempotent no-op; on failure paths it prevents
+              # the reserved IP from leaking (chainsaw does not track reserved IPs
+              # created via the API). The UnreservedIP value is not a real
+              # reservation, so it is intentionally left alone.
+              primary_ip=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.ReservedIP}' -n $NAMESPACE 2>/dev/null || true)
+              if [[ "$primary_ip" =~ ^[0-9.]+$ ]]; then
+                echo "Releasing reserved IP $primary_ip (best-effort)"
+                curl -s -o /dev/null --request DELETE \
+                  -H "Authorization: Bearer $LINODE_TOKEN" \
+                  "${LINODE_URL}/v4beta/networking/reserved/ips/$primary_ip" || true
+              fi
+
               delete_cm=$(kubectl delete configmap reserved-ip-config -n $NAMESPACE)
               if [[ "$delete_cm" == *'configmap "reserved-ip-config" deleted'* ]]; then
                 echo "Configmap deleted successfully"

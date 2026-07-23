@@ -15,6 +15,7 @@ A Cloud Controller Manager (CCM) is a Kubernetes control plane component that em
 ### Core Components
 
 #### Node Controller
+
 - Initializes node configuration with Linode-specific information
   - Sets node addresses (public/private IPs)
   - Labels nodes with region/zone information
@@ -25,6 +26,7 @@ A Cloud Controller Manager (CCM) is a Kubernetes control plane component that em
   - Manages node cleanup
 
 #### Service Controller
+
 - Manages LoadBalancer service implementations using Linode NodeBalancers
   - Creates and configures NodeBalancers
   - Updates backend pools
@@ -39,6 +41,7 @@ A Cloud Controller Manager (CCM) is a Kubernetes control plane component that em
   - Custom firewall rules and security configurations
 
 #### Route Controller
+
 - Manages VPC and private network integration
   - Configures routes for pod CIDR ranges
   - Handles cross-node pod communication
@@ -48,6 +51,7 @@ A Cloud Controller Manager (CCM) is a Kubernetes control plane component that em
   - Configures network routes for optimal communication
 
 #### NodeIPAM Controller
+
 - Manages and configures pod CIDRs to nodes
 
 ## Requirements
@@ -60,6 +64,7 @@ A Cloud Controller Manager (CCM) is a Kubernetes control plane component that em
 ## Documentation
 
 ### Quick Start
+
 - [Getting Started Guide](docs/getting-started/README.md) - Start here for installation and setup
   - [Overview](docs/getting-started/overview.md) - Learn about CCM basics
   - [Requirements](docs/getting-started/requirements.md) - Check prerequisites
@@ -70,6 +75,7 @@ A Cloud Controller Manager (CCM) is a Kubernetes control plane component that em
   - [Troubleshooting](docs/getting-started/troubleshooting.md) - Common issues and solutions
 
 ### Configuration
+
 - [Configuration Guide](docs/configuration/README.md) - Detailed configuration options
   - [LoadBalancer Services](docs/configuration/loadbalancer.md)
   - [Service Annotations](docs/configuration/annotations.md)
@@ -81,6 +87,7 @@ A Cloud Controller Manager (CCM) is a Kubernetes control plane component that em
   - [NodeIPAM Configuration](docs/configuration/nodeipam.md)
 
 ### Examples and Development
+
 - [Examples](docs/examples/README.md) - Real-world usage examples
   - [Basic Services](docs/examples/basic.md)
   - [Advanced Configuration](docs/examples/advanced.md)
@@ -90,13 +97,14 @@ A Cloud Controller Manager (CCM) is a Kubernetes control plane component that em
 
 ### Community Support
 
-For general help or discussion, join us in #linode on the [Kubernetes Slack](https://kubernetes.slack.com/messages/CD4B15LUR/details/). 
+For general help or discussion, join us in #linode on the [Kubernetes Slack](https://kubernetes.slack.com/messages/CD4B15LUR/details/).
 
 To sign up for Kubernetes Slack, use the [Kubernetes Slack inviter](http://slack.kubernetes.io/).
 
 ### Issue Tracking
 
 If you've found a bug or want to request a feature:
+
 - Check the [GitHub Issues](https://github.com/linode/linode-cloud-controller-manager/issues)
 - Submit a [Pull Request](https://github.com/linode/linode-cloud-controller-manager/pulls)
 

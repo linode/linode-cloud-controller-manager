@@ -11,7 +11,8 @@
   "labels": ["dependencies"],
   "postUpdateOptions": ["gomodTidy"],
   "vulnerabilityAlerts": {
-    "enabled": true
+    "enabled": true,
+    "groupName": "security updates"
   },
   "osvVulnerabilityAlerts": true,
   "platformAutomerge": true,

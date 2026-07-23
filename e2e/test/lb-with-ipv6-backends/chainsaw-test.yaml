@@ -18,7 +18,6 @@ spec:
           kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-with-ipv6-backends" | tail -100
   steps:
     - name: Create pods and service
-      skipDelete: true
       try:
         - apply:
             file: create-pods-services.yaml
@@ -178,15 +177,3 @@ spec:
             check:
               ($error == null): true
               (contains($stdout, 'all pods responded')): true
-    - name: Delete Pods
-      try:
-        - delete:
-            ref:
-              apiVersion: v1
-              kind: Pod
-    - name: Delete Service
-      try:
-        - delete:
-            ref:
-              apiVersion: v1
-              kind: Service
