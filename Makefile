@@ -202,6 +202,7 @@ mgmt-cluster:
 
 .PHONY: cleanup-cluster
 cleanup-cluster:
+	KUBECONFIG=$(KUBECONFIG_PATH) kubectl delete svc -A --field-selector spec.type=LoadBalancer
 	kubectl delete cluster -A --all --timeout=180s
 	kubectl delete linodefirewalls -A --all --timeout=180s
 	kubectl delete lvpc -A --all --timeout=180s
