@@ -16,10 +16,30 @@ spec:
         shell: bash
         shellArgs:
           - -c
+        env:
+          - name: FWLABEL
+            value: ($fwname)
         content: |
-          set -euo pipefail
+          set -uo pipefail
           echo "Test failed. Fetching CCM logs..."
-          kubectl logs -n kube-system daemonsets/ccm-linode | grep "fw-use-specified-nb" | tail -100
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "fw-use-specified-nb" | tail -100 || true
+
+          # This test creates a Firewall directly via the Linode API, which chainsaw
+          # does not track and will not auto-delete. If a step fails before the test
+          # deletes it, the firewall would leak. Look it up by its (deterministic)
+          # label and delete it here (best-effort, idempotent).
+          echo "Cleaning up firewall (if any)..."
+          fwid=$(curl -s \
+            -H "Authorization: Bearer $LINODE_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "X-Filter: {\"label\": \"$FWLABEL\"}" \
+            "$LINODE_URL/v4/networking/firewalls" | jq -r '.data[0].id // empty' 2>/dev/null || true)
+          if [[ "$fwid" =~ ^[0-9]+$ ]]; then
+            echo "Deleting firewall $fwid"
+            curl -s -o /dev/null -X DELETE \
+              -H "Authorization: Bearer $LINODE_TOKEN" \
+              "$LINODE_URL/v4/networking/firewalls/$fwid" || true
+          fi
   steps:
     - name: Create firewall, Create pods and services
       try:

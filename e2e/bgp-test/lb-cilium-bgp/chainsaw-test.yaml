@@ -13,9 +13,26 @@ spec:
         shellArgs:
           - -c
         content: |
-          set -euo pipefail
+          set -uo pipefail
           echo "Test failed. Fetching CCM logs..."
-          kubectl logs -n kube-system daemonsets/ccm-linode | grep "cilium-bgp-test" | tail -100
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "cilium-bgp-test" | tail -100 || true
+
+          # In BGP mode CCM creates a nanode (a small Linode instance) to hold the
+          # shared LoadBalancer IP once the Service is created. The final step
+          # deletes it, but if an earlier step fails that step never runs and the
+          # nanode would leak. Delete it here by its label suffix (best-effort,
+          # idempotent). chainsaw does not track instances created via the API.
+          echo "Cleaning up BGP IP-holder nanode (if any)..."
+          if [[ -n "${CLUSTER_NAME:-}" ]]; then
+            nanode_id=$(curl -s -H "Authorization: Bearer $LINODE_TOKEN" \
+              "$LINODE_URL/v4/linode/instances" \
+              | jq -r --arg cluster "$CLUSTER_NAME" '.data[] | select(.label | endswith($cluster)) | .id' 2>/dev/null || true)
+            if [[ "$nanode_id" =~ ^[0-9]+$ ]]; then
+              echo "Deleting nanode $nanode_id"
+              curl -s -o /dev/null -X DELETE -H "Authorization: Bearer $LINODE_TOKEN" \
+                "$LINODE_URL/v4/linode/instances/$nanode_id" || true
+            fi
+          fi
   steps:
     - name: Check if CCM is deployed
       try:

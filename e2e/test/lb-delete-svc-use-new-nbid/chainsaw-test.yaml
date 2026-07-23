@@ -14,9 +14,28 @@ spec:
         shellArgs:
           - -c
         content: |
-          set -euo pipefail
+          set -uo pipefail
           echo "Test failed. Fetching CCM logs..."
-          kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-delete-svc-use-new-nbid" | tail -100
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-delete-svc-use-new-nbid" | tail -100 || true
+
+          # This test creates NodeBalancers directly via the Linode API, which
+          # chainsaw does not track and will not auto-delete. Their ids are recorded
+          # in the nb-cleanup ConfigMap as they are created. If a step fails before
+          # a NodeBalancer is adopted by a Service (so CCM would clean it up), delete
+          # it here so it does not leak (best-effort, idempotent).
+          echo "Cleaning up NodeBalancers created via the API (if any)..."
+          nbids=""
+          if kubectl get configmap nb-cleanup -n "$NAMESPACE" >/dev/null 2>&1; then
+            nbids="$(kubectl get configmap nb-cleanup -n "$NAMESPACE" -o jsonpath='{.data.nb1} {.data.nb2}' 2>/dev/null || true)"
+          fi
+          for nbid in $nbids; do
+            if [[ "$nbid" =~ ^[0-9]+$ ]]; then
+              echo "Deleting NodeBalancer $nbid"
+              curl -s -o /dev/null -X DELETE \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                "$LINODE_URL/v4/nodebalancers/$nbid" || true
+            fi
+          done
   steps:
     - name: Create dummy service
       try:
@@ -65,6 +84,11 @@ spec:
                   echo "Nodebalancer id [$nbid] is incorrect, failed to create nodebalancer"
                   exit 1
               fi
+
+              # Record the NodeBalancer id so the test-level catch can delete it if
+              # a later step fails before it is adopted by a Service (chainsaw does
+              # not track NodeBalancers created via the API).
+              kubectl create configmap nb-cleanup -n "$NAMESPACE" --from-literal=nb1="$nbid" --dry-run=client -o yaml | kubectl apply -f - >/dev/null 2>&1 || true
 
               echo "{\"id\": \"$nbid\"}"
             check:
@@ -149,6 +173,11 @@ spec:
                   echo "Nodebalancer id [$nbid] is incorrect, failed to create nodebalancer"
                   exit 1
               fi
+
+              # Record both NodeBalancer ids so the test-level catch can clean up
+              # either one if a later step fails (chainsaw does not track
+              # NodeBalancers created via the API).
+              kubectl create configmap nb-cleanup -n "$NAMESPACE" --from-literal=nb1="$old_nbid" --from-literal=nb2="$nbid" --dry-run=client -o yaml | kubectl apply -f - >/dev/null 2>&1 || true
 
               kubectl annotate --overwrite svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id=$nbid
 
