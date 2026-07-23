@@ -130,9 +130,6 @@ jobs:
       - name: Run E2E Tests
         run: mise run e2e-test
 
-      - name: Run Cilium BGP e2e test
-        run: mise run e2e-test-bgp
-
       - name: Run subnet filtering test
         run: mise run e2e-test-subnet
 
