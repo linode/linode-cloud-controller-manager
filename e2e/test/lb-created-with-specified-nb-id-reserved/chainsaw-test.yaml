@@ -106,6 +106,26 @@ spec:
               set -euo pipefail
 
 
+              # Delete the NodeBalancer created via the API and release the reserved
+              # IP if they still exist. On the happy path CCM already did both when
+              # svc-test was torn down, so these are best-effort, idempotent no-ops;
+              # on failure paths they prevent leaks (chainsaw does not track
+              # NodeBalancers or reserved IPs created via the API).
+              cleanup_nb_id=$(kubectl get configmap nb-config -o=jsonpath='{.data.NB_ID}' -n $NAMESPACE 2>/dev/null || true)
+              if [[ "$cleanup_nb_id" =~ ^[0-9]+$ ]]; then
+                echo "Deleting NodeBalancer $cleanup_nb_id (best-effort)"
+                curl -s -o /dev/null --request DELETE \
+                  -H "Authorization: Bearer $LINODE_TOKEN" \
+                  "${LINODE_URL}/v4beta/nodebalancers/$cleanup_nb_id" || true
+              fi
+              primary_ip=$(kubectl get configmap nb-config -o=jsonpath='{.data.Reserved_IP}' -n $NAMESPACE 2>/dev/null || true)
+              if [[ "$primary_ip" =~ ^[0-9.]+$ ]]; then
+                echo "Releasing reserved IP $primary_ip (best-effort)"
+                curl -s -o /dev/null --request DELETE \
+                  -H "Authorization: Bearer $LINODE_TOKEN" \
+                  "${LINODE_URL}/v4beta/networking/reserved/ips/$primary_ip" || true
+              fi
+
               delete_cm=$(kubectl delete configmap nb-config -n $NAMESPACE)
               if [[ "$delete_cm" == *'configmap "nb-config" deleted'* ]]; then
                 echo "Configmap deleted successfully"

@@ -14,12 +14,39 @@ spec:
         shellArgs:
           - -c
         content: |
-          set -euo pipefail
+          set -uo pipefail
           echo "Test failed. Fetching CCM logs..."
-          kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-preserve-annotation-svc-delete" | tail -100
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-preserve-annotation-svc-delete" | tail -100 || true
+
+          # svc-test carries the preserve annotation, so CCM does not delete its
+          # NodeBalancer when the service is removed. If the test fails partway,
+          # clean up the NodeBalancer here (best-effort, idempotent) so it does
+          # not leak. The id is read from the nb-cleanup ConfigMap when present
+          # (written before the service is deleted), otherwise looked up via the
+          # service's ingress IP.
+          echo "Cleaning up preserved NodeBalancer (if any)..."
+          nbid=""
+          if kubectl get configmap nb-cleanup -n "$NAMESPACE" >/dev/null 2>&1; then
+            nbid=$(kubectl get configmap nb-cleanup -n "$NAMESPACE" -o jsonpath='{.data.nbid}' 2>/dev/null || true)
+          fi
+          if ! [[ "$nbid" =~ ^[0-9]+$ ]]; then
+            ip=$(kubectl get svc svc-test -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+            if [[ -n "$ip" ]]; then
+              nbid=$(curl -s \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "X-Filter: {\"ipv4\": \"$ip\"}" \
+                "$LINODE_URL/v4/nodebalancers" | jq -r '.data[0].id // empty' || true)
+            fi
+          fi
+          if [[ "$nbid" =~ ^[0-9]+$ ]]; then
+            echo "Deleting NodeBalancer $nbid"
+            curl -s -o /dev/null -X DELETE \
+              -H "Authorization: Bearer $LINODE_TOKEN" \
+              "$LINODE_URL/v4/nodebalancers/$nbid" || true
+          fi
+          kubectl delete svc svc-test -n "$NAMESPACE" --ignore-not-found --timeout=60s || true
   steps:
     - name: Create resources
-      skipDelete: true
       try:
         - apply:
             file: create-pods-services.yaml
@@ -50,6 +77,11 @@ spec:
               set -euo pipefail
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+
+              # Record the NodeBalancer id so the test-level catch can delete it if
+              # a later command fails after the service is gone (the preserve
+              # annotation means CCM will not delete it automatically).
+              kubectl create configmap nb-cleanup -n $NAMESPACE --from-literal=nbid=$nbid --dry-run=client -o yaml | kubectl apply -f -
 
               kubectl --timeout=60s -n $NAMESPACE delete deploy test
               kubectl --timeout=60s -n $NAMESPACE delete svc svc-test
