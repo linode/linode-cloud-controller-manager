@@ -1,20 +1,24 @@
-# apiToken [Required if secretRef is not set] - Must be a Linode APIv4 Personal Access Token with all permissions. (https://cloud.linode.com/profile/tokens)
+# apiToken [Required unless using an externally managed Secret] - Must be a Linode APIv4 Personal Access Token with all permissions. (https://cloud.linode.com/profile/tokens)
+# When set, the chart creates a Secret named secretRef.name. Leave empty if the Secret already exists.
 apiToken: ""
 
-# region [Required if secretRef is not set] - Must be a Linode region. (https://api.linode.com/v4/regions)
+# region [Required when apiToken is set] - Must be a Linode region. (https://api.linode.com/v4/regions)
 region: ""
 
-# Set these values if your APIToken and region are already present in a k8s secret.
-# secretRef:
-#   name: "linode-ccm"
-#   # NOTE: Secrets are namespace-scoped; the referenced secret must be in the same namespace as the DaemonSet/release.
-#   apiTokenRef: "apiToken"
-#   regionRef: "region"
-#   # Enable mounted token file mode. Default false/unset keeps legacy env injection mode.
-#   mountSecret: false
-#   # Optional token file path used when mountSecret=true.
-#   # Defaults to /var/run/secrets/linode/api-token.
-#   mountPath: /var/run/secrets/linode/api-token
+# Secret used by the CCM for the Linode API token (and by the chart-created
+# Secret when apiToken/region are set). Override name/keys when using an existing Secret.
+# Leave apiToken empty and point name at your Secret to use an externally managed one.
+# NOTE: Secrets are namespace-scoped; the referenced secret must be in the same namespace as the DaemonSet/release.
+secretRef:
+  name: "ccm-linode"
+  apiTokenRef: "apiToken"
+  regionRef: "region"
+  # Enable mounted token file mode. Default false keeps legacy LINODE_API_TOKEN env injection via secretKeyRef.
+  # When true, the Secret is mounted and the CCM re-reads the token (with a short cache) so you can
+  # rotate the PAT without restarting CCM pods.
+  mountSecret: false
+  # Token file path used when mountSecret=true.
+  mountPath: /var/run/secrets/linode/api-token
 
 # Ensures the CCM runs on control plane nodes
 affinity:
