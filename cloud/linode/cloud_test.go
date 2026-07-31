@@ -209,19 +209,6 @@ func TestNewCloud(t *testing.T) {
 		assert.Error(t, err, "expected error if incorrect loadbalancertype is set")
 	})
 
-	t.Run("should fail if ipholdersuffix is longer than 23 chars", func(t *testing.T) {
-		suffix := options.Options.IpHolderSuffix
-		options.Options.IpHolderSuffix = strings.Repeat("a", 24)
-		rtEnabled := options.Options.EnableRouteController
-		options.Options.EnableRouteController = false
-		defer func() {
-			options.Options.IpHolderSuffix = suffix
-			options.Options.EnableRouteController = rtEnabled
-		}()
-		_, err := newCloud()
-		assert.Error(t, err, "expected error if ipholdersuffix is longer than 23 chars")
-	})
-
 	t.Run("should fail if nodebalancer-prefix is longer than 19 chars", func(t *testing.T) {
 		prefix := options.Options.NodeBalancerPrefix
 		rtEnabled := options.Options.EnableRouteController

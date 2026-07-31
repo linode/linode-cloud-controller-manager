@@ -19,8 +19,6 @@ var Options struct {
 	SubnetNames                       []string
 	SubnetIDs                         []int
 	LoadBalancerType                  string
-	BGPNodeSelector                   string
-	IpHolderSuffix                    string
 	LinodeExternalNetwork             *net.IPNet
 	NodeBalancerTags                  []string
 	DefaultNBType                     string

@@ -35,10 +35,7 @@ A Cloud Controller Manager (CCM) is a Kubernetes control plane component that em
   - Health checks
   - Session affinity
   - Protocol configuration
-- Supports multiple load balancing approaches
-  - Traditional NodeBalancer deployment
-  - BGP-based IP sharing for cost optimization
-  - Custom firewall rules and security configurations
+- Supports NodeBalancer deployment with custom firewall rules and security configurations
 
 #### Route Controller
 

@@ -30,12 +30,11 @@ const (
 	defaultTokenFilePath     = "/var/run/secrets/linode/api-token"
 	tokenCacheTTLEnv         = "LINODE_API_TOKEN_CACHE_TTL_SECONDS"
 	defaultTokenFileCacheTTL = time.Minute
-	ciliumLBType             = "cilium-bgp"
 	nodeBalancerLBType       = "nodebalancer"
 	tokenHealthCheckPeriod   = 5 * time.Minute
 )
 
-var supportedLoadBalancerTypes = []string{ciliumLBType, nodeBalancerLBType}
+var supportedLoadBalancerTypes = []string{nodeBalancerLBType}
 
 type linodeCloud struct {
 	client                   client.Client
@@ -47,7 +46,6 @@ type linodeCloud struct {
 
 var (
 	instanceCache               *services.Instances
-	ipHolderCharLimit           int = 23
 	NodeBalancerPrefixCharLimit int = 19
 )
 
@@ -250,16 +248,6 @@ func newCloud() (cloudprovider.Interface, error) {
 			options.Options.LoadBalancerType,
 			supportedLoadBalancerTypes,
 		)
-	}
-
-	if options.Options.IpHolderSuffix != "" {
-		klog.Infof("Using IP holder suffix '%s'\n", options.Options.IpHolderSuffix)
-	}
-
-	if len(options.Options.IpHolderSuffix) > ipHolderCharLimit {
-		msg := fmt.Sprintf("ip-holder-suffix must be %d characters or less: %s is %d characters\n", ipHolderCharLimit, options.Options.IpHolderSuffix, len(options.Options.IpHolderSuffix))
-		klog.Error(msg)
-		return nil, fmt.Errorf("%s", msg)
 	}
 
 	if len(options.Options.NodeBalancerPrefix) > NodeBalancerPrefixCharLimit {

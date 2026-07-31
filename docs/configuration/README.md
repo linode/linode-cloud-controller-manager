@@ -6,7 +6,6 @@ The Linode Cloud Controller Manager (CCM) offers extensive configuration options
 
 1. **[LoadBalancer Services](loadbalancer.md)**
    - NodeBalancer implementation
-   - BGP-based IP sharing
    - Protocol configuration
    - Health checks
    - SSL/TLS setup
@@ -32,7 +31,6 @@ The Linode Cloud Controller Manager (CCM) offers extensive configuration options
    - Cache settings
    - API configuration
    - Network settings
-   - BGP configuration
    - IPv6 configuration
    - [See configuration reference](environment.md#flags)
 
