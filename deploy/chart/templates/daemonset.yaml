@@ -155,6 +155,15 @@ spec:
             {{- with $clusterCIDR }}
             - --cluster-cidr={{ . }}
             {{- end }}
+            {{- if .Values.sharedIPLoadBalancing }}
+            {{- with .Values.sharedIPLoadBalancing.bgpNodeSelector }}
+            - --bgp-node-selector={{ . }}
+            {{- end }}
+            {{- with .Values.sharedIPLoadBalancing.ipHolderSuffix }}
+            - --ip-holder-suffix={{ . }}
+            {{- end}}
+            - --load-balancer-type={{ required "A valid .Values.sharedIPLoadBalancing.loadBalancerType is required for shared IP load-balancing" .Values.sharedIPLoadBalancing.loadBalancerType }}
+            {{- end }}
             {{- with .Values.tokenHealthChecker }}
             - --enable-token-health-checker={{ . }}
             {{- end }}

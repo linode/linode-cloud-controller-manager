@@ -30,6 +30,7 @@ const (
 	defaultTokenFilePath     = "/var/run/secrets/linode/api-token"
 	tokenCacheTTLEnv         = "LINODE_API_TOKEN_CACHE_TTL_SECONDS"
 	defaultTokenFileCacheTTL = time.Minute
+	ciliumLBType             = "cilium-bgp"
 	nodeBalancerLBType       = "nodebalancer"
 	tokenHealthCheckPeriod   = 5 * time.Minute
 )
@@ -240,6 +241,19 @@ func newCloud() (cloudprovider.Interface, error) {
 	routes, err := newRoutes(linodeClient, instanceCache)
 	if err != nil {
 		return nil, fmt.Errorf("routes client was not created successfully: %w", err)
+	}
+
+	if options.Options.LoadBalancerType == ciliumLBType {
+		klog.Warningf("--load-balancer-type=%s is deprecated and has no effect; using %s", ciliumLBType, nodeBalancerLBType)
+		options.Options.LoadBalancerType = nodeBalancerLBType
+	}
+
+	if options.Options.BGPNodeSelector != "" {
+		klog.Warning("--bgp-node-selector is deprecated and has no effect; it is retained for backwards compatibility")
+	}
+
+	if options.Options.IpHolderSuffix != "" {
+		klog.Warning("--ip-holder-suffix is deprecated and has no effect; it is retained for backwards compatibility")
 	}
 
 	if options.Options.LoadBalancerType != "" && !slices.Contains(supportedLoadBalancerTypes, options.Options.LoadBalancerType) {

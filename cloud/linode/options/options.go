@@ -10,15 +10,18 @@ import (
 // We expect it to be initialized with flags external to this package, likely in
 // main.go
 var Options struct {
-	KubeconfigFlag                    *pflag.Flag
-	LinodeGoDebug                     bool
-	EnableRouteController             bool
-	EnableTokenHealthChecker          bool
-	VPCNames                          []string
-	VPCIDs                            []int
-	SubnetNames                       []string
-	SubnetIDs                         []int
-	LoadBalancerType                  string
+	KubeconfigFlag           *pflag.Flag
+	LinodeGoDebug            bool
+	EnableRouteController    bool
+	EnableTokenHealthChecker bool
+	VPCNames                 []string
+	VPCIDs                   []int
+	SubnetNames              []string
+	SubnetIDs                []int
+	LoadBalancerType         string
+	// Deprecated no-op options retained so existing deployments continue to start.
+	BGPNodeSelector                   string
+	IpHolderSuffix                    string
 	LinodeExternalNetwork             *net.IPNet
 	NodeBalancerTags                  []string
 	DefaultNBType                     string

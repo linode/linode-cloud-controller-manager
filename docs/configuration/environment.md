@@ -41,7 +41,9 @@ The CCM supports the following flags:
 | `--subnet-names` | String (comma separated) | `"default"` | Comma separated subnet names whose routes will be managed by route-controller (requires vpc-names flag) |
 | `--vpc-ids` | Int (comma separated) | | Comma separated VPC ids whose routes will be managed by route-controller |
 | `--subnet-ids` | Int (comma separated) | | Comma separated subnet ids whose routes will be managed by route-controller (requires vpc-ids flag) |
-| `--load-balancer-type` | String | `nodebalancer` | Configures the load-balancing type for LoadBalancer Services (nodebalancer) |
+| `--load-balancer-type` | String | `nodebalancer` | Configures the load-balancing type for LoadBalancer Services. `cilium-bgp` is deprecated and treated as `nodebalancer`. |
+| `--bgp-node-selector` | String | `""` | Deprecated no-op retained for Helm chart compatibility. |
+| `--ip-holder-suffix` | String | `""` | Deprecated no-op retained for Helm chart compatibility. |
 | `--default-nodebalancer-type` | String | `common` | Default type of NodeBalancer to create (options: common, premium, premium_40gb). Note: NodeBalancer types should always be specified in lowercase. |
 | `--nodebalancer-tags` | String (comma separated) | | Linode tags to apply to all NodeBalancers |
 | `--nodebalancer-backend-ipv4-subnet` | String | `""` | ipv4 subnet to use for NodeBalancer backends |

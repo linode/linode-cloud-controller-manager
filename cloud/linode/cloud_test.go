@@ -209,6 +209,27 @@ func TestNewCloud(t *testing.T) {
 		assert.Error(t, err, "expected error if incorrect loadbalancertype is set")
 	})
 
+	t.Run("should accept deprecated cilium-bgp loadbalancer type as nodebalancer", func(t *testing.T) {
+		loadBalancerType := options.Options.LoadBalancerType
+		routeControllerEnabled := options.Options.EnableRouteController
+		bgpNodeSelector := options.Options.BGPNodeSelector
+		ipHolderSuffix := options.Options.IpHolderSuffix
+		options.Options.LoadBalancerType = ciliumLBType
+		options.Options.EnableRouteController = false
+		options.Options.BGPNodeSelector = "cilium-bgp-peering=true"
+		options.Options.IpHolderSuffix = "legacy-cluster"
+		defer func() {
+			options.Options.LoadBalancerType = loadBalancerType
+			options.Options.EnableRouteController = routeControllerEnabled
+			options.Options.BGPNodeSelector = bgpNodeSelector
+			options.Options.IpHolderSuffix = ipHolderSuffix
+		}()
+
+		_, err := newCloud()
+		require.NoError(t, err)
+		assert.Equal(t, nodeBalancerLBType, options.Options.LoadBalancerType)
+	})
+
 	t.Run("should fail if nodebalancer-prefix is longer than 19 chars", func(t *testing.T) {
 		prefix := options.Options.NodeBalancerPrefix
 		rtEnabled := options.Options.EnableRouteController
