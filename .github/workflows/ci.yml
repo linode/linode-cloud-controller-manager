@@ -103,6 +103,7 @@ jobs:
       LINODE_CONTROL_PLANE_MACHINE_TYPE: g6-standard-2
       LINODE_MACHINE_TYPE: g6-standard-2
       WORKER_NODES: '2'
+      E2E_RESERVED_IP_TAG: ccm-e2e-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
