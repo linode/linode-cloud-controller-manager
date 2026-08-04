@@ -38,6 +38,7 @@ LINODE_FIREWALL_ENABLED ?= true
 LINODE_REGION           ?= us-lax
 LINODE_OS               ?= linode/ubuntu22.04
 LINODE_URL              ?= https://api.linode.com
+E2E_RESERVED_IP_TAG     ?= ccm-e2e-$(shell git rev-parse --short HEAD)
 KUBECONFIG_PATH         ?= $(CURDIR)/test-cluster-kubeconfig.yaml
 SUBNET_KUBECONFIG_PATH	?= $(CURDIR)/subnet-testing-kubeconfig.yaml
 MGMT_KUBECONFIG_PATH    ?= $(CURDIR)/mgmt-cluster-kubeconfig.yaml
@@ -202,11 +203,12 @@ mgmt-cluster:
 
 .PHONY: cleanup-cluster
 cleanup-cluster:
-	KUBECONFIG=$(KUBECONFIG_PATH) kubectl delete svc -A --field-selector spec.type=LoadBalancer
-	kubectl delete cluster -A --all --timeout=180s
-	kubectl delete linodefirewalls -A --all --timeout=180s
-	kubectl delete lvpc -A --all --timeout=180s
-	kind delete cluster -n caplccm
+	-KUBECONFIG=$(KUBECONFIG_PATH) kubectl delete svc -A --field-selector spec.type=LoadBalancer
+	-kubectl delete cluster -A --all --timeout=180s
+	-kubectl delete linodefirewalls -A --all --timeout=180s
+	-kubectl delete lvpc -A --all --timeout=180s
+	-kind delete cluster -n caplccm
+	E2E_RESERVED_IP_TAG=$(E2E_RESERVED_IP_TAG) LINODE_TOKEN=$(LINODE_TOKEN) LINODE_URL=$(LINODE_URL) ./e2e/test/scripts/cleanup-reserved-ips.sh sweep
 
 .PHONY: e2e-test
 e2e-test:
@@ -218,6 +220,7 @@ e2e-test:
 	REGION=$(LINODE_REGION) \
 	LINODE_TOKEN=$(LINODE_TOKEN) \
 	LINODE_URL=$(LINODE_URL) \
+	E2E_RESERVED_IP_TAG=$(E2E_RESERVED_IP_TAG) \
 	chainsaw test e2e/test --parallel 2 --selector all $(E2E_FLAGS)
 
 .PHONY: e2e-test-ipv6-backends
