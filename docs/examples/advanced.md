@@ -73,42 +73,6 @@ spec:
       targetPort: 8080
 ```
 
-## Shared IP Load-Balancing
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: shared-ip-service
-spec:
-  type: LoadBalancer
-  selector:
-    app: web
-  ports:
-    - port: 80
-      targetPort: 8080
----
-# Required DaemonSet configuration for shared IP
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  name: ccm-linode
-  namespace: kube-system
-spec:
-  template:
-    spec:
-      containers:
-        - image: linode/linode-cloud-controller-manager:latest
-          name: ccm-linode
-          env:
-            - name: LINODE_URL
-              value: https://api.linode.com/v4
-          args:
-            - --bgp-node-selector=cilium-bgp-peering=true
-            - --load-balancer-type=cilium-bgp
-            - --ip-holder-suffix=myclustername1
-```
-
 ## Custom Node Selection
 
 ```yaml
@@ -135,6 +99,7 @@ metadata:
 ```
 
 For more examples, see:
+
 - [Service Annotations](../configuration/annotations.md)
 - [Firewall Configuration](../configuration/firewall.md)
 - [LoadBalancer Configuration](../configuration/loadbalancer.md)

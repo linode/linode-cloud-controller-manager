@@ -233,18 +233,6 @@ e2e-test-ipv6-backends:
 	LINODE_URL=$(LINODE_URL) \
 	chainsaw test e2e/test --selector ipv6-backends $(E2E_FLAGS)
 
-.PHONY: e2e-test-bgp
-e2e-test-bgp:
-	KUBECONFIG=$(KUBECONFIG_PATH) CLUSTER_SUFFIX=$(CLUSTER_NAME) ./e2e/setup/cilium-setup.sh
-	KUBECONFIG=$(KUBECONFIG_PATH) kubectl -n kube-system rollout status daemonset/ccm-linode --timeout=300s
-	CLUSTER_NAME=$(CLUSTER_NAME) \
-		MGMT_KUBECONFIG=$(MGMT_KUBECONFIG_PATH) \
-		KUBECONFIG=$(KUBECONFIG_PATH) \
-		REGION=$(LINODE_REGION) \
-		LINODE_TOKEN=$(LINODE_TOKEN) \
-		LINODE_URL=$(LINODE_URL) \
-		chainsaw test e2e/bgp-test/lb-cilium-bgp $(E2E_FLAGS)
-
 .PHONY: e2e-test-subnet
 e2e-test-subnet: 
 	# Generate cluster manifests for second cluster

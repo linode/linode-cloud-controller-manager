@@ -9,7 +9,7 @@ The CCM can be configured using environment variables and flags. Environment var
 ### Cache Configuration
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `LINODE_INSTANCE_CACHE_TTL` | `15` | Default timeout of instance cache in seconds |
 | `LINODE_ROUTES_CACHE_TTL_SECONDS` | `60` | Default timeout of route cache in seconds |
 | `LINODE_METADATA_TTL` | `300` | Default linode metadata timeout in seconds |
@@ -27,27 +27,25 @@ The CCM can be configured using environment variables and flags. Environment var
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `LINODE_EXTERNAL_SUBNET` | "" | Mark private network as external. Example - `172.24.0.0/16` |
-| `BGP_CUSTOM_ID_MAP` | "" | Use your own map instead of default region map for BGP |
-| `BGP_PEER_PREFIX` | `2600:3c0f` | Use your own BGP peer prefix instead of default one |
 
 ## Flags
 
 The CCM supports the following flags:
 
 | Flag | Type | Default | Description |
-|------|------|---------|-------------|
+| ------ | ------ | --------- | ------------- |
 | `--linodego-debug` | Boolean | `false` | Enables debug output for the LinodeAPI wrapper |
 | `--enable-route-controller` | Boolean | `false` | Enables route_controller for CCM |
 | `--enable-token-health-checker` | Boolean | `false` | Enables Linode API token health checker |
-| `--vpc-names` | String (comma separated) |  | Comma separated VPC names whose routes will be managed by route-controller |
+| `--vpc-names` | String (comma separated) | | Comma separated VPC names whose routes will be managed by route-controller |
 | `--subnet-names` | String (comma separated) | `"default"` | Comma separated subnet names whose routes will be managed by route-controller (requires vpc-names flag) |
-| `--vpc-ids` | Int (comma separated) |  | Comma separated VPC ids whose routes will be managed by route-controller |
-| `--subnet-ids` | Int (comma separated) |  | Comma separated subnet ids whose routes will be managed by route-controller (requires vpc-ids flag) |
-| `--load-balancer-type` | String | `nodebalancer` | Configures which type of load-balancing to use (options: nodebalancer, cilium-bgp) |
-| `--bgp-node-selector` | String | `""` | Node selector to use to perform shared IP fail-over with BGP |
-| `--ip-holder-suffix` | String | `""` | Suffix to append to the IP holder name when using shared IP fail-over with BGP |
+| `--vpc-ids` | Int (comma separated) | | Comma separated VPC ids whose routes will be managed by route-controller |
+| `--subnet-ids` | Int (comma separated) | | Comma separated subnet ids whose routes will be managed by route-controller (requires vpc-ids flag) |
+| `--load-balancer-type` | String | `nodebalancer` | Configures the load-balancing type for LoadBalancer Services. `cilium-bgp` is deprecated and treated as `nodebalancer`. |
+| `--bgp-node-selector` | String | `""` | Deprecated no-op retained for Helm chart compatibility. |
+| `--ip-holder-suffix` | String | `""` | Deprecated no-op retained for Helm chart compatibility. |
 | `--default-nodebalancer-type` | String | `common` | Default type of NodeBalancer to create (options: common, premium, premium_40gb). Note: NodeBalancer types should always be specified in lowercase. |
-| `--nodebalancer-tags` | String (comma separated) |  | Linode tags to apply to all NodeBalancers |
+| `--nodebalancer-tags` | String (comma separated) | | Linode tags to apply to all NodeBalancers |
 | `--nodebalancer-backend-ipv4-subnet` | String | `""` | ipv4 subnet to use for NodeBalancer backends |
 | `--nodebalancer-backend-ipv4-subnet-id` | Int | `""` | ipv4 subnet id to use for NodeBalancer backends |
 | `--nodebalancer-backend-ipv4-subnet-name` | String | `""` | ipv4 subnet name to use for NodeBalancer backends |
@@ -62,7 +60,9 @@ The CCM supports the following flags:
 ## Configuration Methods
 
 ### Helm Chart
+
 Configure via `values.yaml`:
+
 ```yaml
 env:
   - name: LINODE_INSTANCE_CACHE_TTL
@@ -73,7 +73,9 @@ args:
 ```
 
 ### Manual Deployment
+
 Add to the CCM DaemonSet:
+
 ```yaml
 spec:
   template:
@@ -91,22 +93,26 @@ spec:
 ## Usage Guidelines
 
 ### Cache Settings
+
 - Adjust cache TTL based on cluster size and update frequency
 - Monitor memory usage when modifying cache settings
 - Consider API rate limits when decreasing TTL (see [Linode API Rate Limits](@https://techdocs.akamai.com/linode-api/reference/rate-limits))
 
 ### API Settings
+
 - Increase timeout for slower network conditions
 - Use default API URL unless testing/development required
 - Consider regional latency when adjusting timeouts
 
 ### Network Settings
+
 - Configure external subnet for custom networking needs
-- Use BGP settings only when implementing IP sharing
 - Document any custom network configurations
 
 ### Nodebalancer backend settings when running within VPC
+
 To use dedicated subnet within VPC for nodebalancer backend ips, one can use one of the following flags:
+
 - `--nodebalancer-backend-ipv4-subnet-id` specifying subnet id
 - `--nodebalancer-backend-ipv4-subnet-name` specifying subnet name
 
@@ -117,6 +123,7 @@ If no specific subnet is specified, by default, CCM will use the `default` subne
 `--nodebalancer-backend-ipv4-subnet` can be used to make sure if nodebalancer backend ips are manually specified in service annotation, they lie within the specified subnet range.
 
 If CCM is started with multiple flags for nodebalancer backend subnet, following order of precedence is used for backend ip addresses:
+
  1. NodeBalancerBackendIPv4Range annotation on service
  2. NodeBalancerBackendVPCName and NodeBalancerBackendSubnetName annotation on service
  3. NodeBalancerBackendIPv4SubnetID/NodeBalancerBackendIPv4SubnetName flag set when starting CCM
@@ -138,5 +145,6 @@ If CCM is started with multiple flags for nodebalancer backend subnet, following
    - Check for stale data
 
 For more details, see:
+
 - [Installation Guide](../getting-started/installation.md)
 - [Troubleshooting Guide](../getting-started/troubleshooting.md)

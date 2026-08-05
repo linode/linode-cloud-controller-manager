@@ -35,7 +35,7 @@ const (
 	tokenHealthCheckPeriod   = 5 * time.Minute
 )
 
-var supportedLoadBalancerTypes = []string{ciliumLBType, nodeBalancerLBType}
+var supportedLoadBalancerTypes = []string{nodeBalancerLBType}
 
 type linodeCloud struct {
 	client                   client.Client
@@ -47,7 +47,6 @@ type linodeCloud struct {
 
 var (
 	instanceCache               *services.Instances
-	ipHolderCharLimit           int = 23
 	NodeBalancerPrefixCharLimit int = 19
 )
 
@@ -244,22 +243,25 @@ func newCloud() (cloudprovider.Interface, error) {
 		return nil, fmt.Errorf("routes client was not created successfully: %w", err)
 	}
 
+	if options.Options.LoadBalancerType == ciliumLBType {
+		klog.Warningf("--load-balancer-type=%s is deprecated and has no effect; using %s", ciliumLBType, nodeBalancerLBType)
+		options.Options.LoadBalancerType = nodeBalancerLBType
+	}
+
+	if options.Options.BGPNodeSelector != "" {
+		klog.Warning("--bgp-node-selector is deprecated and has no effect; it is retained for backwards compatibility")
+	}
+
+	if options.Options.IpHolderSuffix != "" {
+		klog.Warning("--ip-holder-suffix is deprecated and has no effect; it is retained for backwards compatibility")
+	}
+
 	if options.Options.LoadBalancerType != "" && !slices.Contains(supportedLoadBalancerTypes, options.Options.LoadBalancerType) {
 		return nil, fmt.Errorf(
 			"unsupported default load-balancer type %s. options.Options are %v",
 			options.Options.LoadBalancerType,
 			supportedLoadBalancerTypes,
 		)
-	}
-
-	if options.Options.IpHolderSuffix != "" {
-		klog.Infof("Using IP holder suffix '%s'\n", options.Options.IpHolderSuffix)
-	}
-
-	if len(options.Options.IpHolderSuffix) > ipHolderCharLimit {
-		msg := fmt.Sprintf("ip-holder-suffix must be %d characters or less: %s is %d characters\n", ipHolderCharLimit, options.Options.IpHolderSuffix, len(options.Options.IpHolderSuffix))
-		klog.Error(msg)
-		return nil, fmt.Errorf("%s", msg)
 	}
 
 	if len(options.Options.NodeBalancerPrefix) > NodeBalancerPrefixCharLimit {

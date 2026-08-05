@@ -14,11 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2alpha1"
-	ciliumclient "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/typed/cilium.io/v2alpha1"
 	"github.com/linode/linodego/v2"
 	v1 "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -104,11 +101,9 @@ func (e lbNotFoundError) Error() string {
 }
 
 type loadbalancers struct {
-	client           client.Client
-	zone             string
-	kubeClient       kubernetes.Interface
-	ciliumClient     ciliumclient.CiliumV2alpha1Interface
-	loadBalancerType string
+	client     client.Client
+	zone       string
+	kubeClient kubernetes.Interface
 }
 
 type portConfigAnnotation struct {
@@ -132,7 +127,7 @@ type portConfig struct {
 
 // newLoadbalancers returns a cloudprovider.LoadBalancer whose concrete type is a *loadbalancer.
 func newLoadbalancers(client client.Client, zone string) cloudprovider.LoadBalancer {
-	return &loadbalancers{client: client, zone: zone, loadBalancerType: options.Options.LoadBalancerType}
+	return &loadbalancers{client: client, zone: zone}
 }
 
 func (l *loadbalancers) getNodeBalancerForService(ctx context.Context, service *v1.Service) (*linodego.NodeBalancer, error) {
@@ -241,13 +236,6 @@ func (l *loadbalancers) GetLoadBalancer(ctx context.Context, clusterName string,
 	sentry.SetTag(ctx, "cluster_name", clusterName)
 	sentry.SetTag(ctx, "service", service.Name)
 
-	// Handle LoadBalancers backed by Cilium
-	if l.loadBalancerType == ciliumLBType {
-		return &v1.LoadBalancerStatus{
-			Ingress: service.Status.LoadBalancer.Ingress,
-		}, true, nil
-	}
-
 	nb, err := l.getNodeBalancerForService(ctx, service)
 	if err != nil {
 		var targetError lbNotFoundError
@@ -272,56 +260,6 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	sentry.SetTag(ctx, "service", service.Name)
 	serviceNn := getServiceNn(service)
 
-	// Handle LoadBalancers backed by Cilium
-	if l.loadBalancerType == ciliumLBType {
-		klog.Infof("handling LoadBalancer Service %s as %s", serviceNn, ciliumLBClass)
-
-		if err = l.ensureCiliumBGPPeeringPolicy(ctx); err != nil {
-			klog.Infof("Failed to ensure CiliumBGPPeeringPolicy: %v", err)
-			return nil, err
-		}
-
-		// check for existing CiliumLoadBalancerIPPool for service
-		var pool *v2alpha1.CiliumLoadBalancerIPPool
-		pool, err = l.getCiliumLBIPPool(ctx, service)
-		if err != nil && !k8serrors.IsNotFound(err) {
-			klog.Infof("Failed to get CiliumLoadBalancerIPPool: %s", err.Error())
-			return nil, err
-		}
-		// if the CiliumLoadBalancerIPPool doesn't exist, it's not nil, instead an empty struct
-		// gets returned, so we check if this is so via the Name being empty
-		if pool != nil && pool.Name != "" {
-			klog.Infof("Cilium LB IP pool %s for Service %s ensured", pool.Name, serviceNn)
-			// ingress will be set by Cilium
-			return &v1.LoadBalancerStatus{
-				Ingress: service.Status.LoadBalancer.Ingress,
-			}, nil
-		}
-
-		var ipHolderSuffix string
-		if options.Options.IpHolderSuffix != "" {
-			ipHolderSuffix = options.Options.IpHolderSuffix
-			klog.Infof("using parameter-based IP Holder suffix %s for Service %s", ipHolderSuffix, serviceNn)
-		}
-
-		// CiliumLoadBalancerIPPool does not yet exist for the service
-		var sharedIP string
-		if sharedIP, err = l.createSharedIP(ctx, nodes, ipHolderSuffix); err != nil {
-			klog.Errorf("Failed to request shared instance IP: %s", err.Error())
-			return nil, err
-		}
-		if _, err = l.createCiliumLBIPPool(ctx, service, sharedIP); err != nil {
-			klog.Infof("Failed to create CiliumLoadBalancerIPPool: %s", err.Error())
-			return nil, err
-		}
-
-		// ingress will be set by Cilium
-		return &v1.LoadBalancerStatus{
-			Ingress: service.Status.LoadBalancer.Ingress,
-		}, nil
-	}
-
-	// Handle LoadBalancers backed by NodeBalancers
 	var nb *linodego.NodeBalancer
 
 	nb, err = l.getNodeBalancerForService(ctx, service)
@@ -536,25 +474,6 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 	sentry.SetTag(ctx, "cluster_name", clusterName)
 	sentry.SetTag(ctx, "service", service.Name)
 
-	// handle LoadBalancers backed by Cilium
-	if l.loadBalancerType == ciliumLBType {
-		klog.Infof("handling update for LoadBalancer Service %s/%s as %s", service.Namespace, service.Name, ciliumLBClass)
-		serviceNn := getServiceNn(service)
-		var ipHolderSuffix string
-		if options.Options.IpHolderSuffix != "" {
-			ipHolderSuffix = options.Options.IpHolderSuffix
-			klog.V(3).Infof("using parameter-based IP Holder suffix %s for Service %s", ipHolderSuffix, serviceNn)
-		}
-
-		// make sure that IPs are shared properly on the Node if using load-balancers not backed by NodeBalancers
-		for _, node := range nodes {
-			if err = l.handleIPSharing(ctx, node, ipHolderSuffix); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
 	// UpdateLoadBalancer is invoked with a nil LoadBalancerStatus; we must fetch the latest
 	// status for NodeBalancer discovery.
 	serviceWithStatus := service.DeepCopy()
@@ -622,23 +541,6 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 	ctx = sentry.SetHubOnContext(ctx)
 	sentry.SetTag(ctx, "cluster_name", clusterName)
 	sentry.SetTag(ctx, "service", service.Name)
-
-	// Handle LoadBalancers backed by Cilium
-	if l.loadBalancerType == ciliumLBType {
-		klog.Infof("handling LoadBalancer Service %s/%s as %s", service.Namespace, service.Name, ciliumLBClass)
-		if err := l.deleteSharedIP(ctx, service); err != nil {
-			return err
-		}
-		// delete CiliumLoadBalancerIPPool for service
-		if err := l.deleteCiliumLBIPPool(ctx, service); err != nil && !k8serrors.IsNotFound(err) {
-			klog.Infof("Failed to delete CiliumLoadBalancerIPPool")
-			return err
-		}
-
-		return nil
-	}
-
-	// Handle LoadBalancers backed by NodeBalancers
 
 	serviceNn := getServiceNn(service)
 

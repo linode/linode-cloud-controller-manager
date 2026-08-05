@@ -18,7 +18,6 @@ import (
 	"strings"
 	"testing"
 
-	ciliumclient "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/typed/cilium.io/v2alpha1"
 	"github.com/golang/mock/gomock"
 	"github.com/linode/linodego/v2"
 	v1 "k8s.io/api/core/v1"
@@ -5777,11 +5776,9 @@ func Test_LoadbalNodeNameCoercion(t *testing.T) {
 
 func Test_loadbalancers_GetLinodeNBType(t *testing.T) {
 	type fields struct {
-		client           client.Client
-		zone             string
-		kubeClient       kubernetes.Interface
-		ciliumClient     ciliumclient.CiliumV2alpha1Interface
-		loadBalancerType string
+		client     client.Client
+		zone       string
+		kubeClient kubernetes.Interface
 	}
 	type args struct {
 		service *v1.Service
@@ -5796,11 +5793,9 @@ func Test_loadbalancers_GetLinodeNBType(t *testing.T) {
 		{
 			name: "No annotation in service and common as default",
 			fields: fields{
-				client:           nil,
-				zone:             "",
-				kubeClient:       nil,
-				ciliumClient:     nil,
-				loadBalancerType: "nodebalancer",
+				client:     nil,
+				zone:       "",
+				kubeClient: nil,
 			},
 			args: args{
 				service: &v1.Service{
@@ -5816,11 +5811,9 @@ func Test_loadbalancers_GetLinodeNBType(t *testing.T) {
 		{
 			name: "No annotation in service and premium as default",
 			fields: fields{
-				client:           nil,
-				zone:             "",
-				kubeClient:       nil,
-				ciliumClient:     nil,
-				loadBalancerType: "nodebalancer",
+				client:     nil,
+				zone:       "",
+				kubeClient: nil,
 			},
 			args: args{
 				service: &v1.Service{
@@ -5836,11 +5829,9 @@ func Test_loadbalancers_GetLinodeNBType(t *testing.T) {
 		{
 			name: "Nodebalancer type annotation in service",
 			fields: fields{
-				client:           nil,
-				zone:             "",
-				kubeClient:       nil,
-				ciliumClient:     nil,
-				loadBalancerType: "nodebalancer",
+				client:     nil,
+				zone:       "",
+				kubeClient: nil,
 			},
 			args: args{
 				service: &v1.Service{
@@ -5859,11 +5850,9 @@ func Test_loadbalancers_GetLinodeNBType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &loadbalancers{
-				client:           tt.fields.client,
-				zone:             tt.fields.zone,
-				kubeClient:       tt.fields.kubeClient,
-				ciliumClient:     tt.fields.ciliumClient,
-				loadBalancerType: tt.fields.loadBalancerType,
+				client:     tt.fields.client,
+				zone:       tt.fields.zone,
+				kubeClient: tt.fields.kubeClient,
 			}
 			options.Options.DefaultNBType = string(tt.defaultNB)
 			if got := l.GetLinodeNBType(tt.args.service); !reflect.DeepEqual(got, tt.want) {

@@ -77,10 +77,6 @@ run = "make e2e-test"
 description = "Run the IPv6 backend e2e slice"
 run = "make e2e-test-ipv6-backends"
 
-[tasks.e2e-test-bgp]
-description = "Run the Cilium BGP e2e test"
-run = "make e2e-test-bgp"
-
 [tasks.e2e-test-subnet]
 description = "Run the subnet filtering e2e test"
 run = "make e2e-test-subnet"

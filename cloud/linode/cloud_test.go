@@ -209,17 +209,25 @@ func TestNewCloud(t *testing.T) {
 		assert.Error(t, err, "expected error if incorrect loadbalancertype is set")
 	})
 
-	t.Run("should fail if ipholdersuffix is longer than 23 chars", func(t *testing.T) {
-		suffix := options.Options.IpHolderSuffix
-		options.Options.IpHolderSuffix = strings.Repeat("a", 24)
-		rtEnabled := options.Options.EnableRouteController
+	t.Run("should accept deprecated cilium-bgp loadbalancer type as nodebalancer", func(t *testing.T) {
+		loadBalancerType := options.Options.LoadBalancerType
+		routeControllerEnabled := options.Options.EnableRouteController
+		bgpNodeSelector := options.Options.BGPNodeSelector
+		ipHolderSuffix := options.Options.IpHolderSuffix
+		options.Options.LoadBalancerType = ciliumLBType
 		options.Options.EnableRouteController = false
+		options.Options.BGPNodeSelector = "cilium-bgp-peering=true"
+		options.Options.IpHolderSuffix = "legacy-cluster"
 		defer func() {
-			options.Options.IpHolderSuffix = suffix
-			options.Options.EnableRouteController = rtEnabled
+			options.Options.LoadBalancerType = loadBalancerType
+			options.Options.EnableRouteController = routeControllerEnabled
+			options.Options.BGPNodeSelector = bgpNodeSelector
+			options.Options.IpHolderSuffix = ipHolderSuffix
 		}()
+
 		_, err := newCloud()
-		assert.Error(t, err, "expected error if ipholdersuffix is longer than 23 chars")
+		require.NoError(t, err)
+		assert.Equal(t, nodeBalancerLBType, options.Options.LoadBalancerType)
 	})
 
 	t.Run("should fail if nodebalancer-prefix is longer than 19 chars", func(t *testing.T) {

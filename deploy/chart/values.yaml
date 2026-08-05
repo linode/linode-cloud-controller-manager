@@ -77,7 +77,8 @@ tolerations:
     operator: Exists
     effect: NoSchedule
 
-# Options for LoadBalancers backed by shared IPs instead of NodeBalancers
+# DEPRECATED: retained as no-ops so upgrades from chart versions that configured
+# Cilium BGP do not fail. CCM always uses NodeBalancers.
 # sharedIPLoadBalancing:
 #   loadBalancerType: cilium-bgp
 #   bgpNodeSelector: <node label (e.g. cilium-bgp-peering=true)>
