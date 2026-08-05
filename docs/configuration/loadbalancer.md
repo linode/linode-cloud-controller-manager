@@ -2,10 +2,7 @@
 
 ## Overview
 
-The CCM supports two types of LoadBalancer implementations:
-
-1. Linode NodeBalancers (default)
-2. BGP-based IP sharing
+The CCM supports Linode NodeBalancers for LoadBalancer Services.
 
 For implementation examples, see [Basic Service Examples](../examples/basic.md#loadbalancer-services).
 
@@ -220,42 +217,6 @@ metadata:
     service.beta.kubernetes.io/linode-loadbalancer-default-proxy-protocol: "v2"
 ```
 
-## BGP-based IP Sharing Implementation
-
-BGP-based IP sharing provides a more cost-effective solution for multiple LoadBalancer services. For detailed setup instructions, see [Cilium BGP Documentation](https://docs.cilium.io/en/stable/network/bgp-control-plane/bgp-control-plane/).
-
-### Prerequisites
-
-- [Cilium CNI](https://docs.cilium.io/en/stable/network/bgp-control-plane/bgp-control-plane/) with BGP control plane enabled
-- Additional IP provisioning enabled on your account (contact [Linode Support](https://www.linode.com/support/))
-- Nodes labeled for BGP peering
-
-### Configuration
-
-1. Enable BGP in CCM deployment:
-
-```yaml
-args:
-  - --load-balancer-type=cilium-bgp
-  - --bgp-node-selector=cilium-bgp-peering=true
-  - --ip-holder-suffix=mycluster
-```
-
-1. Label nodes that should participate in BGP peering:
-
-```bash
-kubectl label node my-node cilium-bgp-peering=true
-```
-
-1. Create LoadBalancer services as normal - the CCM will automatically use BGP-based IP sharing instead of creating NodeBalancers.
-
-### Environment Variables
-
-- `BGP_CUSTOM_ID_MAP`: Use your own map instead of default region map for BGP
-- `BGP_PEER_PREFIX`: Use your own BGP peer prefix instead of default one
-
-For more details, see [Environment Variables](environment.md#network-configuration).
-
 ## Configuring NodeBalancers directly with VPC
 
 NodeBalancers can be configured to have VPC specific ips configured as backend nodes. It requires:
@@ -410,6 +371,5 @@ metadata:
 - [Environment Variables and Flags](environment.md)
 - [Route Configuration](routes.md)
 - [Linode NodeBalancer Documentation](https://www.linode.com/docs/products/networking/nodebalancers/)
-- [Cilium BGP Documentation](https://docs.cilium.io/en/stable/network/bgp-control-plane/bgp-control-plane/)
 - [Basic Service Examples](../examples/basic.md)
 - [Advanced Configuration Examples](../examples/advanced.md)

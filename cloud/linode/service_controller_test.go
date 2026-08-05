@@ -7,14 +7,30 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/util/workqueue"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
 )
+
+func createTestService() *v1.Service {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      randString(),
+			Namespace: "test-ns",
+			UID:       "foobar123",
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{Name: randString(), Protocol: "TCP", Port: 80, NodePort: 30000},
+				{Name: randString(), Protocol: "TCP", Port: 8080, NodePort: 30001},
+			},
+		},
+	}
+}
 
 func Test_serviceController_Run(t *testing.T) {
 	// Mock dependencies
@@ -71,7 +87,7 @@ func Test_serviceController_processNextDeletion(t *testing.T) {
 				loadbalancers: nil,
 			},
 			Setup: func(f *fields) {
-				f.loadbalancers = &loadbalancers{client: f.Client, zone: "test", loadBalancerType: options.Options.LoadBalancerType}
+				f.loadbalancers = &loadbalancers{client: f.Client, zone: "test"}
 				f.queue = workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[any]{Name: "testQueue"})
 				f.queue.Add("test")
 			},
@@ -84,7 +100,7 @@ func Test_serviceController_processNextDeletion(t *testing.T) {
 				loadbalancers: nil,
 			},
 			Setup: func(f *fields) {
-				f.loadbalancers = &loadbalancers{client: f.Client, zone: "test", loadBalancerType: options.Options.LoadBalancerType}
+				f.loadbalancers = &loadbalancers{client: f.Client, zone: "test"}
 				f.queue = workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[any]{Name: "testQueue"})
 				svc := createTestService()
 				f.queue.Add(svc)
