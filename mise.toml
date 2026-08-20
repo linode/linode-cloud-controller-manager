@@ -117,3 +117,11 @@ run = "make run-debug"
 [tasks.test]
 description = "Run unit tests"
 run = "make test"
+
+[tasks.serve-docs]
+description = "Serve the documentation site locally with live reload"
+run = "make serve-docs"
+
+[tasks.build-docs]
+description = "Build the documentation site the way GitHub Pages does"
+run = "make build-docs"

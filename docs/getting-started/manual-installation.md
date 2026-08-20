@@ -1,6 +1,14 @@
+---
+layout: default
+title: Manual Installation
+parent: Installation
+nav_order: 2
+---
+
 # Manual Installation
 
 ## Prerequisites
+
 - kubectl configured to access your cluster
 - Linode API token
 - Target region identified
@@ -8,18 +16,22 @@
 ## Installation Steps
 
 1. Generate the manifest:
+
 ```bash
 ./deploy/generate-manifest.sh $LINODE_API_TOKEN $REGION
 ```
 
 2. Review the generated manifest:
+
 The script creates `ccm-linode.yaml` containing:
+
 - ServiceAccount
 - ClusterRole and ClusterRoleBinding
 - Secret with API token
 - DaemonSet for the CCM
 
 3. Apply the manifest:
+
 ```bash
 kubectl apply -f ccm-linode.yaml
 ```
@@ -27,7 +39,9 @@ kubectl apply -f ccm-linode.yaml
 ## Customization
 
 ### Environment Variables
+
 You can modify the DaemonSet to include custom environment variables:
+
 ```yaml
 env:
   - name: LINODE_INSTANCE_CACHE_TTL
@@ -37,7 +51,9 @@ env:
 ```
 
 ### Resource Limits
+
 Adjust compute resources as needed:
+
 ```yaml
 resources:
   requests:
@@ -61,6 +77,7 @@ Linode API calls can be monitored using `ccm_linode_client_requests_total` metri
 ## Uninstalling
 
 To remove the CCM:
+
 ```bash
 kubectl delete -f ccm-linode.yaml
 ```

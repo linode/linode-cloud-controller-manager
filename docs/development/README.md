@@ -1,3 +1,9 @@
+---
+layout: default
+title: Development Guide
+nav_order: 5
+---
+
 # Development Guide
 
 ## Prerequisites

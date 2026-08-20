@@ -1,3 +1,9 @@
+---
+layout: default
+title: Session Affinity
+parent: Configuration Guide
+nav_order: 7
+---
 # Session Affinity
 
 ## Overview
@@ -9,6 +15,7 @@ Session affinity (also known as sticky sessions) ensures that requests from the 
 ### Basic Setup
 
 Enable session affinity by setting `service.spec.sessionAffinity` to `ClientIP`:
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -27,6 +34,7 @@ spec:
 ### Setting Timeout
 
 Configure the maximum session sticky time using `sessionAffinityConfig`:
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -43,10 +51,12 @@ spec:
 ## Configuration Options
 
 ### Session Affinity Types
+
 - `None`: No session affinity (default)
 - `ClientIP`: Route based on client's IP address. All requests from the same client IP will be directed to the same pod.
 
 ### Timeout Configuration
+
 - `timeoutSeconds`: Duration to maintain affinity
 - Default: 10800 seconds (3 hours)
 - Valid range: 1 to 86400 seconds (24 hours)

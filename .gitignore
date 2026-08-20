@@ -47,3 +47,7 @@ junit.xml
 
 # Local dev setup
 .envrc
+
+# Jekyll local preview
+_site/
+.sass-cache/

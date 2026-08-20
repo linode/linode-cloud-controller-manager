@@ -1,0 +1,100 @@
+{%- comment -%}
+  Color scheme preference: light, dark, or follow the OS ("system"). The script
+  runs in the document head so the stored choice is applied before the page
+  paints. The toggle button itself is in header_custom.html.
+
+  Two constraints on the script below:
+
+  1. Block comments only. The theme renders pages through
+     _layouts/vendor/compress.html, which strips newlines, so a `//` comment
+     would swallow the rest of the script.
+  2. Never write a literal `head` element tag in it. Jekyll's `--livereload`
+     server injects its reload snippet at that string, and the snippet's closing
+     script tag would end the script early, dumping the rest of the code onto
+     the page as text.
+
+  Long notes like this one belong in a Liquid comment: Jekyll strips it at build
+  time, so it never ships to the browser with every page.
+{%- endcomment -%}
+<script>
+  window.jtdTheme = (function () {
+    var STORAGE_KEY = 'jtd-color-scheme';
+    var prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+    /* The scheme compiled into just-the-docs-default.css. */
+    var applied = {% if site.color_scheme and site.color_scheme != "nil" %}'{{ site.color_scheme }}'{% else %}'light'{% endif %};
+    /* The link element carrying it, once swapStylesheet has replaced it. */
+    var sheet = null;
+
+    /* localStorage throws when cookies are blocked, so never let it break the page. */
+    function preference() {
+      try {
+        return localStorage.getItem(STORAGE_KEY) || 'system';
+      } catch (e) {
+        return 'system';
+      }
+    }
+
+    function resolved() {
+      var pref = preference();
+      if (pref === 'light' || pref === 'dark') {
+        return pref;
+      }
+      return prefersDark.matches ? 'dark' : 'light';
+    }
+
+    /* Insert the new sheet after the current one, where it wins the cascade,
+       then retire the current one once the new one has loaded. Mutating the live
+       sheet's href instead (what jtd.setTheme() does) drops the rules the page
+       is showing and paints raw HTML until the replacement arrives. */
+    function swapStylesheet(scheme) {
+      /* Tracked rather than re-queried, so a second click before the first
+         sheet loads still inserts the newest sheet last. */
+      var current = sheet || document.querySelector('link[rel="stylesheet"]');
+      var next = document.createElement('link');
+      next.rel = 'stylesheet';
+      /* Derived from the current href, so this holds under a site.baseurl. */
+      next.href = current.getAttribute('href').replace(/just-the-docs-[\w-]+\.css$/, 'just-the-docs-' + scheme + '.css');
+      next.addEventListener('load', function () {
+        if (current.parentNode) {
+          current.parentNode.removeChild(current);
+        }
+      });
+      current.parentNode.insertBefore(next, current.nextSibling);
+      sheet = next;
+      applied = scheme;
+    }
+
+    function applyTheme() {
+      var scheme = resolved();
+      /* Nothing to replace when the page already loaded this scheme. */
+      if (scheme !== applied) {
+        swapStylesheet(scheme);
+      }
+      /* Keeps native controls and scrollbars in step with the page. */
+      document.documentElement.style.colorScheme = scheme;
+    }
+
+    function set(pref) {
+      try {
+        localStorage.setItem(STORAGE_KEY, pref);
+      } catch (e) { /* not persisted, but the page still switches */ }
+      applyTheme();
+    }
+
+    /* Track the OS only while the preference is "system". MediaQueryList did not
+       inherit from EventTarget until Safari 14, and this listener is the one
+       optional part of the module: without the guard its TypeError would abort
+       everything below, leaving the toggle dead rather than just untracked. */
+    if (prefersDark.addEventListener) {
+      prefersDark.addEventListener('change', function () {
+        if (preference() === 'system') {
+          applyTheme();
+        }
+      });
+    }
+
+    applyTheme();
+
+    return { preference: preference, set: set };
+  })();
+</script>

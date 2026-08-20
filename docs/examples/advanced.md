@@ -1,3 +1,9 @@
+---
+layout: default
+title: Advanced Configuration
+parent: Examples
+nav_order: 2
+---
 # Advanced Configuration
 
 ## Custom Health Checks
