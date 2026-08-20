@@ -1,3 +1,10 @@
+---
+layout: default
+title: Overview
+parent: Getting Started
+nav_order: 1
+---
+
 # Overview
 
 The Linode Cloud Controller Manager provides several key features that enable a fully supported Kubernetes experience on Linode infrastructure.

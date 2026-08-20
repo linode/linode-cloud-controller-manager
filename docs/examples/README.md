@@ -1,3 +1,8 @@
+---
+layout: default
+title: Examples
+nav_order: 4
+---
 # Examples
 
 This section provides working examples of common CCM configurations. Each example includes a complete service and deployment configuration.

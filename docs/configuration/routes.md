@@ -1,3 +1,10 @@
+---
+layout: default
+title: Route Configuration
+parent: Configuration Guide
+nav_order: 6
+---
+
 # Route Configuration
 
 ## Overview
@@ -15,6 +22,7 @@ The Route Controller manages network routes for pod communication in VPC environ
 ### Enable Route Controller
 
 1. Via Helm chart in `values.yaml`:
+
 ```yaml
 routeController:
   vpcNames: "vpc-prod,vpc-staging"  # Comma separated names of VPCs managed by CCM
@@ -23,6 +31,7 @@ routeController:
 ```
 
 2. Via command line flags in CCM deployment:
+
 ```yaml
 spec:
   template:
@@ -46,6 +55,7 @@ spec:
 ### Automatic Operations
 
 The Route Controller:
+
 - Creates routes for pod CIDR ranges assigned to nodes
 - Updates routes when nodes are added/removed
 - Manages route tables in specified VPCs
@@ -67,11 +77,13 @@ The Route Controller:
 ## Best Practices
 
 ### CIDR Planning
+
 - Ensure pod CIDR range doesn't overlap with node's VPC ip-address
 - Plan for future cluster growth
 - Document CIDR allocations
 
 ### VPC Configuration
+
 - Use clear, descriptive VPC names
 - Configure proper VPC security settings
 - Ensure proper API permissions

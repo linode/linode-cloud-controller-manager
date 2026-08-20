@@ -1,3 +1,10 @@
+---
+layout: default
+title: Service Annotations
+parent: Configuration Guide
+nav_order: 2
+---
+
 # Service Annotations
 
 ## Overview
@@ -18,7 +25,7 @@ The keys and the values in [annotations must be strings](https://kubernetes.io/d
 ### Basic Configuration
 
 | Annotation (Suffix) | Values | Default | Description |
-|--------------------|--------|---------|-------------|
+| -------------------- | -------- | --------- | ------------- |
 | `throttle` | `0`-`20` (`0` to disable) | `0` | Client Connection Throttle, which limits the number of subsequent new connections per second from the same client IP |
 | `default-protocol` | `tcp`, `udp`, `http`, `https` | `tcp` | This annotation is used to specify the default protocol for Linode NodeBalancer |
 | `default-proxy-protocol` | `none`, `v1`, `v2` | `none` | Specifies whether to use a version of Proxy Protocol on the underlying NodeBalancer |

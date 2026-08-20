@@ -1,8 +1,16 @@
+---
+layout: default
+title: Firewall Setup
+parent: Configuration Guide
+nav_order: 5
+---
+
 # Firewall Setup
 
 ## Overview
 
 The CCM provides two methods for securing NodeBalancers with firewalls:
+
 1. CCM-managed Cloud Firewalls (using `firewall-acl` annotation)
 2. User-managed Cloud Firewalls (using `firewall-id` annotation)
 
@@ -13,6 +21,7 @@ The CCM provides two methods for securing NodeBalancers with firewalls:
 Use the `firewall-acl` annotation to specify firewall rules. The rules should be provided as a JSON object with either an `allowList` or `denyList` (but not both).
 
 #### Allow List Configuration
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -29,6 +38,7 @@ metadata:
 ```
 
 #### Deny List Configuration
+
 ```yaml
 metadata:
   annotations:
@@ -42,6 +52,7 @@ metadata:
 ```
 
 ### Behavior
+
 - Only one type of list (allow or deny) can be used per service
 - Rules are automatically created and managed by the CCM
 - Rules are updated when the annotation changes
@@ -61,6 +72,7 @@ metadata:
 ```
 
 ### Management
+
 - User maintains full control over firewall rules
 - Firewall persists after service deletion
 - Manual updates required for rule changes
@@ -78,6 +90,7 @@ metadata:
    - Consider future expansion
 
 For more information:
+
 - [Service Annotations](annotations.md#firewall-configuration)
 - [LoadBalancer Configuration](loadbalancer.md)
 - [Linode Cloud Firewall Documentation](https://www.linode.com/docs/products/networking/cloud-firewall/)

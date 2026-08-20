@@ -1,3 +1,10 @@
+---
+layout: default
+title: Environment Variables and Flags
+parent: Configuration Guide
+nav_order: 4
+---
+
 # Environment Variables and Flags
 
 ## Overview
@@ -96,7 +103,7 @@ spec:
 
 - Adjust cache TTL based on cluster size and update frequency
 - Monitor memory usage when modifying cache settings
-- Consider API rate limits when decreasing TTL (see [Linode API Rate Limits](@https://techdocs.akamai.com/linode-api/reference/rate-limits))
+- Consider API rate limits when decreasing TTL (see [Linode API Rate Limits](https://techdocs.akamai.com/linode-api/reference/rate-limits))
 
 ### API Settings
 

@@ -1,3 +1,9 @@
+---
+layout: default
+title: Basic Services
+parent: Examples
+nav_order: 1
+---
 # Basic Services
 
 ## HTTP LoadBalancer
@@ -144,5 +150,6 @@ spec:
 ```
 
 For more configuration options, see:
+
 - [Service Annotations](../configuration/annotations.md)
 - [LoadBalancer Configuration](../configuration/loadbalancer.md)

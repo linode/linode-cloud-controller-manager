@@ -1,3 +1,9 @@
+---
+layout: default
+title: Configuration Guide
+nav_order: 3
+---
+
 # Configuration Guide
 
 The Linode Cloud Controller Manager (CCM) offers extensive configuration options to customize its behavior. This section covers all available configuration methods and options.
