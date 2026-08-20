@@ -1,0 +1,62 @@
+// Overrides just-the-docs' (empty) custom stylesheet. Imported last by the
+// theme, so these rules win over the theme's own and are compiled into every
+// color scheme.
+
+// The theme pins the sidebar header to a fixed height and centers the title in
+// it, so a site title long enough to wrap (this one takes three lines) is
+// clipped and spills out of the sidebar. Let the header grow to fit instead:
+// .site-nav below it is `flex: 1 1 auto` with its own scrollbar, so it simply
+// starts lower. The theme's own min-height still applies.
+.site-header {
+  height: auto;
+  max-height: none;
+}
+
+// Color scheme toggle, rendered by _includes/header_custom.html. An icon-only
+// button styled from the theme's color variables, so it follows whichever
+// scheme is active.
+.theme-switcher {
+  display: flex;
+  align-items: center;
+  padding: $sp-2 $sp-4;
+}
+
+.theme-switcher-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  color: $body-text-color;
+  cursor: pointer;
+  border-radius: $border-radius;
+  transition: color 150ms ease, background-color 150ms ease;
+
+  &:hover {
+    // $feedback-color is what the theme uses for its own hover surfaces.
+    color: $link-color;
+    background-color: $feedback-color;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $link-color;
+    outline-offset: 1px;
+  }
+}
+
+.theme-switcher-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+
+  // SVG elements are not HTML elements, so spell out what `hidden` means here
+  // rather than relying on the browser's rule for it.
+  &[hidden] {
+    display: none;
+  }
+}

@@ -44,6 +44,15 @@ SUBNET_KUBECONFIG_PATH	?= $(CURDIR)/subnet-testing-kubeconfig.yaml
 MGMT_KUBECONFIG_PATH    ?= $(CURDIR)/mgmt-cluster-kubeconfig.yaml
 IPV6_KUBECONFIG_PATH    ?= $(CURDIR)/ipv6-kubeconfig.yaml
 
+#####################################################################
+# Local Docs Preview Setup
+#####################################################################
+
+DOCS_IMAGE       := jekyll/jekyll:pages
+DOCS_CONTAINER   := lccm-docs
+DOCS_PORT        := 4000
+DOCS_LIVERELOAD_PORT := 35729
+
 export GO111MODULE=on
 
 .PHONY: all
@@ -259,4 +268,20 @@ helm-template:
 #Verify template works when region and apiToken are passed, and when it is passed as reference.
 	@helm template foo deploy/chart --set apiToken="apiToken",region="us-east" > /dev/null
 	@helm template foo deploy/chart --set secretRef.apiTokenRef="apiToken",secretRef.name="api",secretRef.regionRef="us-east" > /dev/null
+
+.PHONY: serve-docs
+serve-docs:
+# Serve the documentation site locally with live reload
+	echo "Serving the docs on http://localhost:$(DOCS_PORT), press ctrl-c to stop"
+	docker run --rm --interactive --tty --name $(DOCS_CONTAINER) \
+		--publish $(DOCS_PORT):4000 \
+		--publish $(DOCS_LIVERELOAD_PORT):35729 \
+		--volume "$(shell pwd):/srv/jekyll" \
+		$(DOCS_IMAGE) \
+		jekyll serve --host 0.0.0.0 --livereload --force-polling
+
+.PHONY: build-docs
+build-docs:
+# Build the documentation site the way GitHub Pages does
+	docker run --rm --volume "$(shell pwd):/srv/jekyll" $(DOCS_IMAGE) jekyll build
 

@@ -1,3 +1,10 @@
+---
+layout: default
+title: LoadBalancer Services
+parent: Configuration Guide
+nav_order: 1
+---
+
 # LoadBalancer Services Configuration
 
 ## Overview

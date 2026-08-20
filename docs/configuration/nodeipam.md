@@ -1,3 +1,10 @@
+---
+layout: default
+title: Node IPAM using CCM
+parent: Configuration Guide
+nav_order: 8
+---
+
 # Node IPAM using CCM
 
 ## Overview
@@ -21,6 +28,7 @@ Note:
 Make sure node IPAM allocation is disabled in kube-controller-manager to avoid both controllers competing to assign CIDRs to nodes. To make sure its disabled, check and make sure kube-controller-manager is not started with `--allocate-node-cidrs` flag.
 
 ## Allocated subnet size
+
 By default, CCM allocates /24 subnet for IPv4 addresses and /112 for IPv6 addresses to nodes. For IPv6, CCM derives /112 PodCIDRs from the node's /64 IPv6 range using the stable mnemonic subprefix `:0:c::/112`. For IPv6 CIDR allocation using CCM, Linodes should have IPv6 ranges configured on their interfaces. If one wants different subnet range, it can be configured by using `--node-cidr-mask-size-ipv4` and `--node-cidr-mask-size-ipv6` flags.
 
 ```yaml
@@ -37,4 +45,5 @@ spec:
 ```
 
 ## Disabling ipv6 ipam allocation
+
 If one wants to just use ipv4 node ipam allocation for their nodes, they can start CCM with `--disable-ipv6-node-cidr-allocation=true` which disables ipv6 range allocation to nodes.

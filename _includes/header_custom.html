@@ -1,0 +1,66 @@
+<div class="theme-switcher">
+  <!-- aria-label is refined by the script below; this default covers a failed or disabled script. -->
+  <button type="button" id="theme-toggle" class="theme-switcher-btn btn-reset" aria-label="Color scheme">
+    <!-- Feather icons, matching the set the theme already uses. MIT License: https://github.com/feathericons/feather/blob/master/LICENSE -->
+    <svg class="theme-switcher-icon" data-scheme="system" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+      <line x1="8" y1="21" x2="16" y2="21"></line>
+      <line x1="12" y1="17" x2="12" y2="21"></line>
+    </svg>
+    <svg class="theme-switcher-icon" data-scheme="light" viewBox="0 0 24 24" aria-hidden="true" hidden>
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+    <svg class="theme-switcher-icon" data-scheme="dark" viewBox="0 0 24 24" aria-hidden="true" hidden>
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+    </svg>
+  </button>
+</div>
+
+{%- comment -%}
+  Cycles the color scheme preference (System, Light, Dark) and shows the matching
+  icon. Block comments only in the script below, and no literal element tags: see
+  the notes in head_custom.html.
+{%- endcomment -%}
+<script>
+  (function () {
+    var ORDER = ['system', 'light', 'dark'];
+    var LABELS = { system: 'follow system', light: 'light', dark: 'dark' };
+    var button = document.getElementById('theme-toggle');
+    var icons = button.querySelectorAll('.theme-switcher-icon');
+
+    function render() {
+      var pref = window.jtdTheme.preference();
+      if (ORDER.indexOf(pref) < 0) {
+        pref = 'system';
+      }
+      for (var i = 0; i < icons.length; i++) {
+        /* setAttribute, not .hidden: the hidden IDL property is on
+           HTMLElement, so assigning it to an SVG element does nothing. */
+        if (icons[i].getAttribute('data-scheme') === pref) {
+          icons[i].removeAttribute('hidden');
+        } else {
+          icons[i].setAttribute('hidden', '');
+        }
+      }
+      var label = 'Color scheme: ' + LABELS[pref] + ' (click to change)';
+      button.setAttribute('title', label);
+      button.setAttribute('aria-label', label);
+    }
+
+    button.addEventListener('click', function () {
+      /* indexOf returns -1 for an unknown stored value, which lands on 'system'. */
+      window.jtdTheme.set(ORDER[(ORDER.indexOf(window.jtdTheme.preference()) + 1) % ORDER.length]);
+      render();
+    });
+
+    render();
+  })();
+</script>
