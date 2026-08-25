@@ -1,6 +1,8 @@
 module github.com/linode/linode-cloud-controller-manager
 
-go 1.26.7
+go 1.26.0
+
+toolchain go1.26.7
 
 require (
 	github.com/appscode/go v0.0.0-20201105063637-5613f3b8169f

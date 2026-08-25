@@ -6,7 +6,7 @@ EXP_CLUSTER_RESOURCE_SET = "true"
 GOTOOLCHAIN = "auto"
 
 [tools]
-go = "1.26.4"
+go = "1.26.7"
 golangci-lint = "2.11.4"
 helm = "3.16.3"
 kubectl = "1.36.2"
@@ -16,7 +16,9 @@ ctlptl = "0.9.0"
 clusterctl = "1.13.3"
 ko = "0.19.1"
 "go:github.com/kyverno/chainsaw" = "0.2.15"
+"go:golang.org/x/vuln/cmd/govulncheck" = "1.1.4"
 "go:github.com/golang/mock/mockgen" = "1.6.0"
+"aqua:securego/gosec" = "2.28.0"
 yq = "4.52.2"
 jq = "1.8.1"
 envsubst = "1.4.3"
@@ -93,6 +95,10 @@ run = "make vet"
 description = "Run golangci-lint"
 run = "make lint"
 
+[tasks.lint-fix]
+description = "Run golangci-lint --fix"
+run = "make lint-fix"
+
 [tasks.build-nilaway]
 description = "Build the custom NilAway-enabled golangci-lint binary"
 hide = true
@@ -101,6 +107,10 @@ run = "mkdir -p ./bin && golangci-lint custom"
 [tasks.nilcheck]
 description = "Run nilaway lint checks"
 run = "mise run build-nilaway && ./bin/golangci-lint-nilaway run -c .golangci-nilaway.yml"
+
+[tasks.vulncheck]
+description = "Run go vulncheck"
+run = "make vulncheck"
 
 [tasks.release]
 description = "Create the release chart artifact"

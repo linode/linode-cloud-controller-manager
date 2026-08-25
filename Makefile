@@ -76,12 +76,19 @@ vet: fmt
 
 .PHONY: lint
 lint:
+	golangci-lint run -c .golangci.yml
+
+.PHONY: lint-fix
+lint-fix:
 	golangci-lint run -c .golangci.yml --fix
 
 .PHONY: gosec
 gosec: ## Run gosec against code.
-	docker run --rm -v "$(PWD):/var/work:ro" -w /var/work securego/gosec:2.19.0 \
-		-exclude-dir=bin -exclude-generated ./...
+	gosec -exclude-dir=bin -confidence medium -terse -exclude-generated ./...
+
+.PHONY: vulncheck
+vulncheck: ## Run vulnerability check against code.
+	./hack/vulncheck.sh
 
 .PHONY: fmt
 fmt:
