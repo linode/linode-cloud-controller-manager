@@ -1,0 +1,89 @@
+name: Go Analyze
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - "*"
+  workflow_dispatch:
+
+concurrency:
+  group: analyze-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      # Expose matched filters as job 'src' output variable
+      src: ${{ steps.filter.outputs.src }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.19.1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        id: filter
+        with:
+          predicate-quantifier: 'every'
+          filters: .github/filters.yml
+  go-analyze:
+    needs: changes
+    runs-on: ubuntu-latest
+    if: ${{ needs.changes.outputs.src == 'true' }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.19.1
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            proxy.golang.org:443
+            sum.golang.org:443
+            golang.org:443
+            go.dev:443
+            *.githubusercontent.com:443
+            auth.docker.io:443
+            production.cloudflare.docker.com:443
+            production.cloudfront.docker.com:443
+            vuln.go.dev:443
+            storage.googleapis.com:443
+            golangci-lint.run:443
+            dl.k8s.io:443
+            cdn.dl.k8s.io:443
+            registry-1.docker.io:443
+            auth.docker.io:443
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Mise
+        uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925 # v4.1.0
+
+      - name: lint
+        run: mise run lint
+
+      - name: Nilcheck
+        run: mise run nilcheck
+
+      - name: Vulncheck
+        run: mise run vulncheck
+
+      - name: Gosec
+        run: mise run gosec
