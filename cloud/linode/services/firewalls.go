@@ -85,22 +85,43 @@ func (l *LinodeClient) DeleteNodeBalancerFirewall(
 	return nil
 }
 
+// collectRuleIPs flattens the IPv4 and IPv6 addresses across all inbound
+// firewall rules.
+func collectRuleIPs(rules []linodego.FirewallRuleInbound) (ipv4s, ipv6s []string) {
+	for _, rule := range rules {
+		if rule.Addresses.IPv4 != nil {
+			ipv4s = append(ipv4s, rule.Addresses.IPv4...)
+		}
+		if rule.Addresses.IPv6 != nil {
+			ipv6s = append(ipv6s, rule.Addresses.IPv6...)
+		}
+	}
+	return ipv4s, ipv6s
+}
+
+// ipListChanged reports whether ips differs from the ruleIPs collected from
+// firewall rules.
+func ipListChanged(ips []string, ruleIPs []string) bool {
+	if ips == nil {
+		return false
+	}
+	if len(ips) != len(ruleIPs) {
+		return true
+	}
+	for _, ip := range ips {
+		if !slices.Contains(ruleIPs, ip) {
+			return true
+		}
+	}
+	return false
+}
+
 func ipsChanged(ips *linodego.NetworkAddresses, rules []linodego.FirewallRuleInbound) bool {
 	if ips == nil {
 		return false
 	}
 
-	var ruleIPv4s []string
-	var ruleIPv6s []string
-
-	for _, rule := range rules {
-		if rule.Addresses.IPv4 != nil {
-			ruleIPv4s = append(ruleIPv4s, rule.Addresses.IPv4...)
-		}
-		if rule.Addresses.IPv6 != nil {
-			ruleIPv6s = append(ruleIPv6s, rule.Addresses.IPv6...)
-		}
-	}
+	ruleIPv4s, ruleIPv6s := collectRuleIPs(rules)
 
 	if len(ruleIPv4s) > 0 && ips.IPv4 == nil {
 		return true
@@ -110,26 +131,12 @@ func ipsChanged(ips *linodego.NetworkAddresses, rules []linodego.FirewallRuleInb
 		return true
 	}
 
-	if ips.IPv4 != nil {
-		if len(ips.IPv4) != len(ruleIPv4s) {
-			return true
-		}
-		for _, ipv4 := range ips.IPv4 {
-			if !slices.Contains(ruleIPv4s, ipv4) {
-				return true
-			}
-		}
+	if ipListChanged(ips.IPv4, ruleIPv4s) {
+		return true
 	}
 
-	if ips.IPv6 != nil {
-		if len(ips.IPv6) != len(ruleIPv6s) {
-			return true
-		}
-		for _, ipv6 := range ips.IPv6 {
-			if !slices.Contains(ruleIPv6s, ipv6) {
-				return true
-			}
-		}
+	if ipListChanged(ips.IPv6, ruleIPv6s) {
+		return true
 	}
 
 	return false

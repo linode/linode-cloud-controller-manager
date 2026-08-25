@@ -176,73 +176,64 @@ func tokenProviderFromFileOrEnv() (client.TokenProvider, string, error) {
 	return nil, "", fmt.Errorf("failed to load linode api token from %s=%q: %w; fallback %s is not set", tokenFilePathEnv, tokenFilePath, fileErr, accessTokenEnv)
 }
 
-func newCloud() (cloudprovider.Interface, error) {
-	region := os.Getenv(regionEnv)
-	if region == "" {
-		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", regionEnv)
-	}
-
-	tokenProvider, tokenSourceDescription, err := tokenProviderFromFileOrEnv()
-	if err != nil {
-		return nil, err
-	}
-
-	// set timeout used by linodeclient for API calls
+// requestTimeoutFromEnv resolves the client timeout used for Linode API calls,
+// honoring LINODE_REQUEST_TIMEOUT_SECONDS if set to a valid positive integer.
+func requestTimeoutFromEnv() time.Duration {
 	timeout := client.DefaultClientTimeout
 	if raw, ok := os.LookupEnv("LINODE_REQUEST_TIMEOUT_SECONDS"); ok {
 		if t, atoiErr := strconv.Atoi(raw); atoiErr == nil && t > 0 {
 			timeout = time.Duration(t) * time.Second
 		}
 	}
+	return timeout
+}
 
-	linodeClient, err := newLinodeClientWithPrometheus(timeout, tokenProvider)
+// setupTokenHealthChecker validates the Linode API token (when enabled) and
+// returns a healthChecker to be run by the cloud provider, if applicable.
+func setupTokenHealthChecker(linodeClient client.Client, tokenSourceDescription string) (*healthChecker, error) {
+	if !options.Options.EnableTokenHealthChecker {
+		return nil, nil //nolint:nilnil // nil, nil indicates the health checker is disabled, not an error
+	}
+
+	authenticated, err := client.CheckClientAuthenticated(context.TODO(), linodeClient)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("linode client authenticated connection error: %w", err)
 	}
 
-	var healthChecker *healthChecker
-
-	if options.Options.EnableTokenHealthChecker {
-		var authenticated bool
-		authenticated, err = client.CheckClientAuthenticated(context.TODO(), linodeClient)
-		if err != nil {
-			return nil, fmt.Errorf("linode client authenticated connection error: %w", err)
-		}
-
-		if !authenticated {
-			return nil, fmt.Errorf("linode api token from %s is invalid", tokenSourceDescription)
-		}
-
-		healthChecker = newHealthChecker(linodeClient, tokenHealthCheckPeriod, options.Options.GlobalStopChannel)
+	if !authenticated {
+		return nil, fmt.Errorf("linode api token from %s is invalid", tokenSourceDescription)
 	}
 
-	err = services.ValidateAndSetVPCSubnetFlags(linodeClient)
-	if err != nil {
-		return nil, fmt.Errorf("failed to validate VPC and subnet flags: %w", err)
-	}
+	return newHealthChecker(linodeClient, tokenHealthCheckPeriod, options.Options.GlobalStopChannel), nil
+}
 
+// setupNodeBalancerBackendSubnet resolves and validates the NodeBalancer
+// backend IPv4 subnet options, mutating options.Options as needed.
+func setupNodeBalancerBackendSubnet(linodeClient client.Client) error {
 	if options.Options.NodeBalancerBackendIPv4SubnetID != 0 && options.Options.NodeBalancerBackendIPv4SubnetName != "" {
-		return nil, fmt.Errorf("cannot have both --nodebalancer-backend-ipv4-subnet-id and --nodebalancer-backend-ipv4-subnet-name set")
+		return fmt.Errorf("cannot have both --nodebalancer-backend-ipv4-subnet-id and --nodebalancer-backend-ipv4-subnet-name set")
 	}
 
-	if options.Options.DisableNodeBalancerVPCBackends {
+	switch {
+	case options.Options.DisableNodeBalancerVPCBackends:
 		klog.Infof("NodeBalancer VPC backends are disabled, no VPC backends will be created for NodeBalancers")
 		options.Options.NodeBalancerBackendIPv4SubnetID = 0
 		options.Options.NodeBalancerBackendIPv4SubnetName = ""
-	} else if options.Options.NodeBalancerBackendIPv4SubnetName != "" {
-		options.Options.NodeBalancerBackendIPv4SubnetID, err = services.GetNodeBalancerBackendIPv4SubnetID(linodeClient)
+	case options.Options.NodeBalancerBackendIPv4SubnetName != "":
+		subnetID, err := services.GetNodeBalancerBackendIPv4SubnetID(linodeClient)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get backend IPv4 subnet ID for subnet name %s: %w", options.Options.NodeBalancerBackendIPv4SubnetName, err)
+			return fmt.Errorf("failed to get backend IPv4 subnet ID for subnet name %s: %w", options.Options.NodeBalancerBackendIPv4SubnetName, err)
 		}
+		options.Options.NodeBalancerBackendIPv4SubnetID = subnetID
 		klog.Infof("Using NodeBalancer backend IPv4 subnet ID %d for subnet name %s", options.Options.NodeBalancerBackendIPv4SubnetID, options.Options.NodeBalancerBackendIPv4SubnetName)
 	}
 
-	instanceCache = services.NewInstances(linodeClient)
-	routes, err := newRoutes(linodeClient, instanceCache)
-	if err != nil {
-		return nil, fmt.Errorf("routes client was not created successfully: %w", err)
-	}
+	return nil
+}
 
+// applyDeprecatedOptionWarnings logs warnings for, and normalizes, deprecated
+// CLI options that are retained only for backwards compatibility.
+func applyDeprecatedOptionWarnings() {
 	if options.Options.LoadBalancerType == ciliumLBType {
 		klog.Warningf("--load-balancer-type=%s is deprecated and has no effect; using %s", ciliumLBType, nodeBalancerLBType)
 		options.Options.LoadBalancerType = nodeBalancerLBType
@@ -255,9 +246,13 @@ func newCloud() (cloudprovider.Interface, error) {
 	if options.Options.IpHolderSuffix != "" {
 		klog.Warning("--ip-holder-suffix is deprecated and has no effect; it is retained for backwards compatibility")
 	}
+}
 
+// validateNodeBalancerOptions validates the configured load-balancer type and
+// NodeBalancer prefix options.
+func validateNodeBalancerOptions() error {
 	if options.Options.LoadBalancerType != "" && !slices.Contains(supportedLoadBalancerTypes, options.Options.LoadBalancerType) {
-		return nil, fmt.Errorf(
+		return fmt.Errorf(
 			"unsupported default load-balancer type %s. options.Options are %v",
 			options.Options.LoadBalancerType,
 			supportedLoadBalancerTypes,
@@ -267,14 +262,58 @@ func newCloud() (cloudprovider.Interface, error) {
 	if len(options.Options.NodeBalancerPrefix) > NodeBalancerPrefixCharLimit {
 		msg := fmt.Sprintf("nodebalancer-prefix must be %d characters or less: %s is %d characters\n", NodeBalancerPrefixCharLimit, options.Options.NodeBalancerPrefix, len(options.Options.NodeBalancerPrefix))
 		klog.Error(msg)
-		return nil, fmt.Errorf("%s", msg)
+		return fmt.Errorf("%s", msg)
 	}
 
 	validPrefix := regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 	if !validPrefix.MatchString(options.Options.NodeBalancerPrefix) {
 		msg := fmt.Sprintf("nodebalancer-prefix must be no empty and use only letters, numbers, underscores, and dashes: %s\n", options.Options.NodeBalancerPrefix)
 		klog.Error(msg)
-		return nil, fmt.Errorf("%s", msg)
+		return fmt.Errorf("%s", msg)
+	}
+
+	return nil
+}
+
+func newCloud() (cloudprovider.Interface, error) {
+	region := os.Getenv(regionEnv)
+	if region == "" {
+		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", regionEnv)
+	}
+
+	tokenProvider, tokenSourceDescription, err := tokenProviderFromFileOrEnv()
+	if err != nil {
+		return nil, err
+	}
+
+	linodeClient, err := newLinodeClientWithPrometheus(requestTimeoutFromEnv(), tokenProvider)
+	if err != nil {
+		return nil, err
+	}
+
+	healthChecker, err := setupTokenHealthChecker(linodeClient, tokenSourceDescription)
+	if err != nil {
+		return nil, err
+	}
+
+	if vpcErr := services.ValidateAndSetVPCSubnetFlags(linodeClient); vpcErr != nil {
+		return nil, fmt.Errorf("failed to validate VPC and subnet flags: %w", vpcErr)
+	}
+
+	if subnetErr := setupNodeBalancerBackendSubnet(linodeClient); subnetErr != nil {
+		return nil, subnetErr
+	}
+
+	instanceCache = services.NewInstances(linodeClient)
+	routes, err := newRoutes(linodeClient, instanceCache)
+	if err != nil {
+		return nil, fmt.Errorf("routes client was not created successfully: %w", err)
+	}
+
+	applyDeprecatedOptionWarnings()
+
+	if err := validateNodeBalancerOptions(); err != nil {
+		return nil, err
 	}
 
 	// create struct that satisfies cloudprovider.Interface

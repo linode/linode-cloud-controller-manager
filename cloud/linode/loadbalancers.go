@@ -955,6 +955,76 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 	return l.client.CreateNodeBalancer(ctx, createOpts)
 }
 
+// applyHealthCheckBody sets the config's health check path/body based on the
+// configured health check type, returning an error if a required annotation
+// is missing.
+func applyHealthCheckBody(service *v1.Service, health linodego.ConfigCheck, config *linodego.NodeBalancerConfig) error {
+	if health == linodego.CheckHTTP || health == linodego.CheckHTTPBody {
+		path := service.GetAnnotations()[annotations.AnnLinodeCheckPath]
+		if path == "" {
+			path = "/"
+		}
+		config.CheckPath = path
+	}
+
+	if health == linodego.CheckHTTPBody {
+		body := service.GetAnnotations()[annotations.AnnLinodeCheckBody]
+		if body == "" {
+			return fmt.Errorf("for health check type http_body need body regex annotation %v", annotations.AnnLinodeCheckBody)
+		}
+		config.CheckBody = body
+	}
+
+	return nil
+}
+
+// applyHealthCheckTuning sets the config's check interval, timeout, attempts,
+// and passive-check settings from the service annotations, falling back to
+// defaults when annotations are absent.
+func applyHealthCheckTuning(service *v1.Service, config *linodego.NodeBalancerConfig) error {
+	annotationsMap := service.GetAnnotations()
+
+	checkInterval := 5
+	if ci, ok := annotationsMap[annotations.AnnLinodeHealthCheckInterval]; ok {
+		var err error
+		if checkInterval, err = strconv.Atoi(ci); err != nil {
+			return err
+		}
+	}
+	config.CheckInterval = checkInterval
+
+	checkTimeout := 3
+	if ct, ok := annotationsMap[annotations.AnnLinodeHealthCheckTimeout]; ok {
+		var err error
+		if checkTimeout, err = strconv.Atoi(ct); err != nil {
+			return err
+		}
+	}
+	config.CheckTimeout = checkTimeout
+
+	checkAttempts := 2
+	if ca, ok := annotationsMap[annotations.AnnLinodeHealthCheckAttempts]; ok {
+		var err error
+		if checkAttempts, err = strconv.Atoi(ca); err != nil {
+			return err
+		}
+	}
+	config.CheckAttempts = checkAttempts
+
+	checkPassive := true
+	if config.Protocol == linodego.ProtocolUDP {
+		checkPassive = false
+	} else if cp, ok := annotationsMap[annotations.AnnLinodeHealthCheckPassive]; ok {
+		var err error
+		if checkPassive, err = strconv.ParseBool(cp); err != nil {
+			return err
+		}
+	}
+	config.CheckPassive = checkPassive
+
+	return nil
+}
+
 func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1.Service, port v1.ServicePort) (linodego.NodeBalancerConfig, error) {
 	portConfigResult, err := getPortConfig(service, port)
 	if err != nil {
@@ -982,54 +1052,13 @@ func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1
 		config.UDPCheckPort = portConfigResult.UDPCheckPort
 	}
 
-	if health == linodego.CheckHTTP || health == linodego.CheckHTTPBody {
-		path := service.GetAnnotations()[annotations.AnnLinodeCheckPath]
-		if path == "" {
-			path = "/"
-		}
-		config.CheckPath = path
+	if bodyErr := applyHealthCheckBody(service, health, &config); bodyErr != nil {
+		return config, bodyErr
 	}
 
-	if health == linodego.CheckHTTPBody {
-		body := service.GetAnnotations()[annotations.AnnLinodeCheckBody]
-		if body == "" {
-			return config, fmt.Errorf("for health check type http_body need body regex annotation %v", annotations.AnnLinodeCheckBody)
-		}
-		config.CheckBody = body
+	if tuningErr := applyHealthCheckTuning(service, &config); tuningErr != nil {
+		return config, tuningErr
 	}
-	checkInterval := 5
-	if ci, ok := service.GetAnnotations()[annotations.AnnLinodeHealthCheckInterval]; ok {
-		if checkInterval, err = strconv.Atoi(ci); err != nil {
-			return config, err
-		}
-	}
-	config.CheckInterval = checkInterval
-
-	checkTimeout := 3
-	if ct, ok := service.GetAnnotations()[annotations.AnnLinodeHealthCheckTimeout]; ok {
-		if checkTimeout, err = strconv.Atoi(ct); err != nil {
-			return config, err
-		}
-	}
-	config.CheckTimeout = checkTimeout
-
-	checkAttempts := 2
-	if ca, ok := service.GetAnnotations()[annotations.AnnLinodeHealthCheckAttempts]; ok {
-		if checkAttempts, err = strconv.Atoi(ca); err != nil {
-			return config, err
-		}
-	}
-	config.CheckAttempts = checkAttempts
-
-	checkPassive := true
-	if config.Protocol == linodego.ProtocolUDP {
-		checkPassive = false
-	} else if cp, ok := service.GetAnnotations()[annotations.AnnLinodeHealthCheckPassive]; ok {
-		if checkPassive, err = strconv.ParseBool(cp); err != nil {
-			return config, err
-		}
-	}
-	config.CheckPassive = checkPassive
 
 	if portConfigResult.Protocol == linodego.ProtocolHTTPS {
 		if err = l.addTLSCert(ctx, service, &config, portConfigResult); err != nil {
