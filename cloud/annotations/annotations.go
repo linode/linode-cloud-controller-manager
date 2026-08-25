@@ -16,7 +16,7 @@ const (
 	AnnLinodeHealthCheckInterval = "service.beta.kubernetes.io/linode-loadbalancer-check-interval"
 	AnnLinodeHealthCheckTimeout  = "service.beta.kubernetes.io/linode-loadbalancer-check-timeout"
 	AnnLinodeHealthCheckAttempts = "service.beta.kubernetes.io/linode-loadbalancer-check-attempts"
-	AnnLinodeHealthCheckPassive  = "service.beta.kubernetes.io/linode-loadbalancer-check-passive"
+	AnnLinodeHealthCheckPassive  = "service.beta.kubernetes.io/linode-loadbalancer-check-passive" //gosec:disable G101 -- These are not hardcoded credentials.
 
 	AnnLinodeUDPCheckPort = "service.beta.kubernetes.io/linode-loadbalancer-udp-check-port"
 

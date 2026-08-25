@@ -156,7 +156,7 @@ func parsePorts(ports string) ([]int32, error) {
 			}
 
 			for i := start; i <= end; i++ {
-				result = append(result, int32(i))
+				result = append(result, int32(i)) // #nosec G115: Integer overflow conversion is safe for port numbers
 			}
 		} else {
 			port, err := strconv.ParseInt(part, 10, 32)

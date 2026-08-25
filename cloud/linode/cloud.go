@@ -24,11 +24,11 @@ import (
 const (
 	// The name of this cloudprovider
 	ProviderName             = "linode"
-	accessTokenEnv           = "LINODE_API_TOKEN"
+	accessTokenEnv           = "LINODE_API_TOKEN" //gosec:disable G101 -- These are not hardcoded credentials.
 	regionEnv                = "LINODE_REGION"
-	tokenFilePathEnv         = "LINODE_API_TOKEN_FILE"
-	defaultTokenFilePath     = "/var/run/secrets/linode/api-token"
-	tokenCacheTTLEnv         = "LINODE_API_TOKEN_CACHE_TTL_SECONDS"
+	tokenFilePathEnv         = "LINODE_API_TOKEN_FILE"              //gosec:disable G101 -- These are not hardcoded credentials.
+	defaultTokenFilePath     = "/var/run/secrets/linode/api-token"  //gosec:disable G101 -- These are not hardcoded credentials.
+	tokenCacheTTLEnv         = "LINODE_API_TOKEN_CACHE_TTL_SECONDS" //gosec:disable G101 -- These are not hardcoded credentials.
 	defaultTokenFileCacheTTL = time.Minute
 	ciliumLBType             = "cilium-bgp"
 	nodeBalancerLBType       = "nodebalancer"
