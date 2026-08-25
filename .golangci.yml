@@ -15,6 +15,7 @@ linters:
     - containedctx
     - contextcheck
     - copyloopvar
+    - cyclop
     - decorder
     - depguard
     - dogsled
@@ -133,6 +134,7 @@ linters:
     rules:
       - linters:
           - copyloopvar
+          - cyclop
           - dupl
           - errcheck
           - gocognit
