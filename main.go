@@ -163,15 +163,15 @@ func main() {
 	}
 }
 
-func cloudInitializer(config *config.CompletedConfig) cloudprovider.Interface {
+func cloudInitializer(completedConfig *config.CompletedConfig) cloudprovider.Interface {
 	// initialize cloud provider with the cloud provider name and config file provided
-	if config.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs {
+	if completedConfig.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs {
 		ccmOptions.Options.AllocateNodeCIDRs = true
-		if config.ComponentConfig.KubeCloudShared.ClusterCIDR == "" {
+		if completedConfig.ComponentConfig.KubeCloudShared.ClusterCIDR == "" {
 			fmt.Fprintf(os.Stderr, "--cluster-cidr is not set. This is required if --allocate-node-cidrs is set.\n")
 			os.Exit(1)
 		}
-		ccmOptions.Options.ClusterCIDRIPv4 = config.ComponentConfig.KubeCloudShared.ClusterCIDR
+		ccmOptions.Options.ClusterCIDRIPv4 = completedConfig.ComponentConfig.KubeCloudShared.ClusterCIDR
 	}
 	cloud, err := cloudprovider.InitCloudProvider(linode.ProviderName, "")
 	if err != nil {
@@ -179,13 +179,11 @@ func cloudInitializer(config *config.CompletedConfig) cloudprovider.Interface {
 	}
 	if cloud == nil {
 		klog.Fatalf("Cloud provider is nil")
-	} else { // this is in an else to appease nilaway
-		if !cloud.HasClusterID() {
-			if config.ComponentConfig.KubeCloudShared.AllowUntaggedCloud {
-				klog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
-			} else {
-				klog.Fatalf("no ClusterID found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
-			}
+	} else if !cloud.HasClusterID() { // this is in an else to appease nilaway
+		if completedConfig.ComponentConfig.KubeCloudShared.AllowUntaggedCloud {
+			klog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
+		} else {
+			klog.Fatalf("no ClusterID found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
 		}
 	}
 

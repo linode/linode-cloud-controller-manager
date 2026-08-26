@@ -71,7 +71,7 @@ func TestRuleChanged(t *testing.T) {
 				}
 				return ps
 			}()}}
-			got := ruleChanged(old, tc.newACL, svc)
+			got := ruleChanged(&old, tc.newACL, svc)
 			if got != tc.wantChange {
 				t.Errorf("ruleChanged() = %v, want %v", got, tc.wantChange)
 			}

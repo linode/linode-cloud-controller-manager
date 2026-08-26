@@ -1995,7 +1995,7 @@ func testUpdateLoadBalancerAddNewFirewall(t *testing.T, client *linodego.Client,
 	}
 	stubServiceUpdate(fakeClientset, svc)
 	fwClient := services.LinodeClient{Client: client}
-	fw, err := fwClient.CreateFirewall(t.Context(), linodego.FirewallCreateOptions{
+	fw, err := fwClient.CreateFirewall(t.Context(), &linodego.FirewallCreateOptions{
 		Label: "test",
 		Rules: linodego.FirewallRulesCreateOptions{
 			Inbound: []linodego.FirewallRuleInbound{{
@@ -2369,7 +2369,7 @@ func testUpdateLoadBalancerUpdateFirewallRemoveACLaddID(t *testing.T, client *li
 	}
 
 	fwClient := services.LinodeClient{Client: client}
-	fw, err := fwClient.CreateFirewall(t.Context(), linodego.FirewallCreateOptions{
+	fw, err := fwClient.CreateFirewall(t.Context(), &linodego.FirewallCreateOptions{
 		Label: "test",
 		Rules: linodego.FirewallRulesCreateOptions{
 			Inbound: []linodego.FirewallRuleInbound{{
@@ -2472,7 +2472,7 @@ func testUpdateLoadBalancerUpdateFirewallRemoveIDaddACL(t *testing.T, client *li
 	lb.kubeClient = fakeClientset
 
 	fwClient := services.LinodeClient{Client: client}
-	fw, err := fwClient.CreateFirewall(t.Context(), linodego.FirewallCreateOptions{
+	fw, err := fwClient.CreateFirewall(t.Context(), &linodego.FirewallCreateOptions{
 		Label: "test",
 		Rules: linodego.FirewallRulesCreateOptions{
 			Inbound: []linodego.FirewallRuleInbound{{
@@ -2873,7 +2873,7 @@ func testUpdateLoadBalancerUpdateFirewall(t *testing.T, client *linodego.Client,
 	}()
 
 	fwClient := services.LinodeClient{Client: client}
-	fw, err := fwClient.CreateFirewall(t.Context(), firewallCreateOpts)
+	fw, err := fwClient.CreateFirewall(t.Context(), &firewallCreateOpts)
 	if err != nil {
 		t.Errorf("Error creating firewall %s", err)
 	}
@@ -2913,7 +2913,7 @@ func testUpdateLoadBalancerUpdateFirewall(t *testing.T, client *linodego.Client,
 	}
 
 	firewallCreateOpts.Label = "test2"
-	firewallNew, err := fwClient.CreateFirewall(t.Context(), firewallCreateOpts)
+	firewallNew, err := fwClient.CreateFirewall(t.Context(), &firewallCreateOpts)
 	if err != nil {
 		t.Fatalf("Error in creating firewall %s", err)
 	}
@@ -3013,7 +3013,7 @@ func testUpdateLoadBalancerDeleteFirewallRemoveID(t *testing.T, client *linodego
 	}()
 
 	fwClient := services.LinodeClient{Client: client}
-	fw, err := fwClient.CreateFirewall(t.Context(), firewallCreateOpts)
+	fw, err := fwClient.CreateFirewall(t.Context(), &firewallCreateOpts)
 	if err != nil {
 		t.Errorf("Error in creating firewall %s", err)
 	}
@@ -3923,7 +3923,7 @@ func Test_getPortConfig(t *testing.T) {
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
-			portConfigResult, err := getPortConfig(test.service, test.port)
+			portConfigResult, err := getPortConfig(test.service, &test.port)
 
 			if !reflect.DeepEqual(portConfigResult, test.expectedPortConfig) {
 				t.Error("unexpected port config")
@@ -3996,7 +3996,7 @@ func Test_getHealthCheckType(t *testing.T) {
 				Protocol: v1.ProtocolTCP,
 				Port:     int32(443),
 			}
-			hType, err := getHealthCheckType(test.service, port)
+			hType, err := getHealthCheckType(test.service, &port)
 			if !reflect.DeepEqual(hType, test.healthType) {
 				t.Error("unexpected health check type")
 				t.Logf("expected: %v", test.healthType)
@@ -5694,7 +5694,7 @@ func Test_getTLSCertInfo(t *testing.T) {
 
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
-			cert, key, err := getTLSCertInfo(t.Context(), kubeClient, "", test.portConfig)
+			cert, key, err := getTLSCertInfo(t.Context(), kubeClient, "", &test.portConfig)
 			if cert != test.cert {
 				t.Error("unexpected error")
 				t.Logf("expected: %v", test.cert)

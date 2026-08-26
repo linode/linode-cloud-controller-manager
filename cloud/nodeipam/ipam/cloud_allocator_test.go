@@ -280,8 +280,8 @@ func TestGetIPv6RangeFromLinodeInterface(t *testing.T) {
 			},
 		}, "2001:db8::/64"},
 	} {
-		if getIPv6RangeFromLinodeInterface(tc.iface) != tc.expectedRange {
-			t.Errorf("getIPv6RangeFromLinodeInterface(%+v) = %s, want %s", tc.iface, getIPv6RangeFromLinodeInterface(tc.iface), tc.expectedRange)
+		if getIPv6RangeFromLinodeInterface(&tc.iface) != tc.expectedRange {
+			t.Errorf("getIPv6RangeFromLinodeInterface(%+v) = %s, want %s", tc.iface, getIPv6RangeFromLinodeInterface(&tc.iface), tc.expectedRange)
 		}
 	}
 }

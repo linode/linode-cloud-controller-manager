@@ -35,13 +35,13 @@ type linodeInstance struct {
 
 type nodeCache struct {
 	sync.RWMutex
-	nodes      map[int]linodeInstance
+	nodes      map[int]*linodeInstance
 	lastUpdate time.Time
 	ttl        time.Duration
 }
 
 // getInstanceAddresses returns all addresses configured on a linode.
-func (nc *nodeCache) getInstanceAddresses(instance linodego.Instance, vpcips []string, vpcIPv6AddrTypes map[string]v1.NodeAddressType) []nodeIP {
+func (nc *nodeCache) getInstanceAddresses(instance *linodego.Instance, vpcips []string, vpcIPv6AddrTypes map[string]v1.NodeAddressType) []nodeIP {
 	ips := []nodeIP{}
 
 	// We store vpc IPv6 addrs separately so that we can list them after IPv4 addresses.
@@ -85,11 +85,11 @@ func addVPCIPv4Addresses(ctx context.Context, client linodeClient.Client, vpcNam
 	if err != nil {
 		return fmt.Errorf("failed updating instances cache for VPC %s: %w", vpcName, err)
 	}
-	for _, vpcip := range resp {
-		if vpcip.Address == nil {
+	for i := range resp {
+		if resp[i].Address == nil {
 			continue
 		}
-		vpcNodes[vpcip.LinodeID] = append(vpcNodes[vpcip.LinodeID], *vpcip.Address)
+		vpcNodes[resp[i].LinodeID] = append(vpcNodes[resp[i].LinodeID], *resp[i].Address)
 	}
 	return nil
 }
@@ -101,7 +101,8 @@ func addVPCIPv6Addresses(ctx context.Context, client linodeClient.Client, vpcNam
 	if err != nil {
 		return fmt.Errorf("failed updating instances cache for VPC %s: %w", vpcName, err)
 	}
-	for _, vpcip := range resp {
+	for i := range resp {
+		vpcip := &resp[i]
 		if len(vpcip.IPv6Addresses) == 0 {
 			continue
 		}
@@ -119,9 +120,9 @@ func addVPCIPv6Addresses(ctx context.Context, client linodeClient.Client, vpcNam
 
 // getVPCNodeIPs returns, for every configured VPC, a map of Linode instance ID to VPC IP
 // addresses (IPv4 and IPv6), along with the address type of each VPC IPv6 address.
-func getVPCNodeIPs(ctx context.Context, client linodeClient.Client) (map[int][]string, map[string]v1.NodeAddressType, error) {
-	vpcNodes := map[int][]string{}
-	vpcIPv6AddrTypes := map[string]v1.NodeAddressType{}
+func getVPCNodeIPs(ctx context.Context, client linodeClient.Client) (vpcNodes map[int][]string, vpcIPv6AddrTypes map[string]v1.NodeAddressType, err error) {
+	vpcNodes = map[int][]string{}
+	vpcIPv6AddrTypes = map[string]v1.NodeAddressType{}
 
 	for _, name := range options.Options.VPCNames {
 		vpcName := strings.TrimSpace(name)
@@ -174,14 +175,15 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client linodeClient.C
 		return err
 	}
 
-	newNodes := make(map[int]linodeInstance, len(instances))
-	for index, instance := range instances {
+	newNodes := make(map[int]*linodeInstance, len(instances))
+	for index := range instances {
+		instance := &instances[index]
 		// if running within VPC, only store instances in cache which are part of VPC
 		if len(options.Options.VPCNames) > 0 && len(vpcNodes[instance.ID]) == 0 {
 			continue
 		}
-		node := linodeInstance{
-			instance: &instances[index],
+		node := &linodeInstance{
+			instance: instance,
 			ips:      nc.getInstanceAddresses(instance, vpcNodes[instance.ID], vpcIPv6AddrTypes),
 		}
 		newNodes[instance.ID] = node
@@ -209,7 +211,7 @@ func NewInstances(client linodeClient.Client) *Instances {
 	klog.V(3).Infof("TTL for nodeCache set to %d", timeout)
 
 	return &Instances{client, &nodeCache{
-		nodes: make(map[int]linodeInstance, 0),
+		nodes: make(map[int]*linodeInstance, 0),
 		ttl:   time.Duration(timeout) * time.Second,
 	}}
 }
@@ -226,7 +228,8 @@ func (i *Instances) linodeByIP(kNode *v1.Node) (*linodego.Instance, error) {
 	i.nodeCache.RLock()
 	defer i.nodeCache.RUnlock()
 	var kNodeAddresses []string
-	for _, address := range kNode.Status.Addresses {
+	for i := range kNode.Status.Addresses {
+		address := &kNode.Status.Addresses[i]
 		if address.Type == v1.NodeExternalIP || address.Type == v1.NodeInternalIP {
 			kNodeAddresses = append(kNodeAddresses, address.Address)
 		}
@@ -362,21 +365,22 @@ func (i *Instances) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloud
 	}
 
 	addresses := []v1.NodeAddress{{Type: v1.NodeHostName, Address: linode.Label}}
-	for _, ip := range ips {
-		addresses = append(addresses, v1.NodeAddress{Type: ip.ipType, Address: ip.ip})
+	for i := range ips {
+		addresses = append(addresses, v1.NodeAddress{Type: ips[i].ipType, Address: ips[i].ip})
 	}
 
 	// create temporary uniqueAddrs cache just for reference
 	uniqueAddrs := make(map[string]v1.NodeAddressType, len(node.Status.Addresses)+len(ips))
-	for _, ip := range addresses {
-		if _, ok := uniqueAddrs[ip.Address]; ok {
+	for i := range addresses {
+		if _, ok := uniqueAddrs[addresses[i].Address]; ok {
 			continue
 		}
-		uniqueAddrs[ip.Address] = ip.Type
+		uniqueAddrs[addresses[i].Address] = addresses[i].Type
 	}
 
 	// include IPs set by kubelet for internal node IP
-	for _, addr := range node.Status.Addresses {
+	for i := range node.Status.Addresses {
+		addr := &node.Status.Addresses[i]
 		if _, ok := uniqueAddrs[addr.Address]; ok {
 			continue
 		}
