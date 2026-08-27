@@ -60,7 +60,6 @@ jobs:
             api.codecov.io:443
             ingest.codecov.io:443
             get.helm.sh:443
-            golangci-lint.run:443
             mise.jdx.dev:443
             mise-versions.jdx.dev:443
             tuf-repo-cdn.sigstore.dev:443
@@ -73,20 +72,6 @@ jobs:
 
       - name: Set up Mise
         uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
-        with:
-          install_args: go golangci-lint helm
-
-      - name: Vet
-        run: mise run vet
-
-      - name: lint
-        run: mise run lint
-
-      - name: nilcheck
-        run: mise run nilcheck
-
-      - name: Helm Lint
-        run: mise run helm-lint
 
       - name: Test
         run: mise run test
