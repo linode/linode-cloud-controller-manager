@@ -470,11 +470,6 @@ func getIPv6PodCIDR(ip net.IP, desiredMask int) (*net.IPNet, bool) {
 	return podCIDR, true
 }
 
-// allocateIPv6CIDR allocates an IPv6 CIDR for the given node.
-// It retrieves the instance configuration for the node and extracts the IPv6 range.
-// It then creates a new net.IPNet with the IPv6 address and mask size defined
-// by nodeCIDRMaskSizeIPv6. The function returns an error if it fails to retrieve
-// the instance configuration or parse the IPv6 range.
 // parseLinodeIDFromProviderID extracts the numeric Linode instance ID from a node's ProviderID
 // (expected format "linode://<id>").
 func parseLinodeIDFromProviderID(node *v1.Node) (int, error) {
@@ -555,6 +550,11 @@ func (c *cloudAllocator) buildIPv6PodCIDR(logger klog.Logger, ip net.IP, base *n
 	return fallbackPodCIDR, nil
 }
 
+// allocateIPv6CIDR allocates an IPv6 CIDR for the given node.
+// It retrieves the instance configuration for the node and extracts the IPv6 range.
+// It then creates a new net.IPNet with the IPv6 address and mask size defined
+// by nodeCIDRMaskSizeIPv6. The function returns an error if it fails to retrieve
+// the instance configuration or parse the IPv6 range.
 func (c *cloudAllocator) allocateIPv6CIDR(ctx context.Context, node *v1.Node) (*net.IPNet, error) {
 	logger := klog.FromContext(ctx)
 
