@@ -326,6 +326,154 @@ func (l *loadbalancers) createIPChangeWarningEvent(ctx context.Context, service 
 	}
 }
 
+// warnIfIPv4AnnotationChanged logs and emits a k8s event if the service's requested IPv4
+// annotation differs from the NodeBalancer's actual IP, since the IP cannot be changed
+// after creation.
+func (l *loadbalancers) warnIfIPv4AnnotationChanged(ctx context.Context, service *v1.Service, nb *linodego.NodeBalancer) {
+	ipv4, ok := service.GetAnnotations()[annotations.AnnLinodeLoadBalancerReservedIPv4]
+	if !ok || ipv4 == *nb.IPv4 {
+		return
+	}
+
+	// Log the error in the CCM's logfile
+	klog.Warningf("IPv4 annotation has changed for service (%s) from %s to %s, but NodeBalancer (%d) IP cannot be updated after creation",
+		getServiceNn(service), *nb.IPv4, ipv4, nb.ID)
+
+	// Issue a k8s cluster event warning
+	l.createIPChangeWarningEvent(ctx, service, nb, ipv4)
+}
+
+// updateNodeBalancerThrottleAndTags updates the NodeBalancer's client connection throttle and
+// tags if they differ from the desired state, returning the (possibly refreshed) NodeBalancer.
+func (l *loadbalancers) updateNodeBalancerThrottleAndTags(ctx context.Context, clusterName string, service *v1.Service, nb *linodego.NodeBalancer) (*linodego.NodeBalancer, []string, error) {
+	connThrottle := getConnectionThrottle(service)
+	if connThrottle != nb.ClientConnThrottle {
+		update := nb.GetUpdateOptions()
+		update.ClientConnThrottle = &connThrottle
+		updated, err := l.client.UpdateNodeBalancer(ctx, nb.ID, update)
+		if err != nil {
+			sentry.CaptureError(ctx, err)
+			return nb, nil, err
+		}
+		nb = updated
+	}
+
+	tags := l.GetLoadBalancerTags(ctx, clusterName, service)
+	if !reflect.DeepEqual(nb.Tags, tags) {
+		update := nb.GetUpdateOptions()
+		update.Tags = tags
+		updated, err := l.client.UpdateNodeBalancer(ctx, nb.ID, update)
+		if err != nil {
+			sentry.CaptureError(ctx, err)
+			return nb, tags, err
+		}
+		nb = updated
+	}
+
+	return nb, tags, nil
+}
+
+// findNodeBalancerConfigForPort returns a pointer to the existing NodeBalancer config matching
+// the given port, or nil if none exists.
+func findNodeBalancerConfigForPort(nbCfgs []linodego.NodeBalancerConfig, port int) *linodego.NodeBalancerConfig {
+	for i := range nbCfgs {
+		if nbCfgs[i].Port == port {
+			return &nbCfgs[i]
+		}
+	}
+	return nil
+}
+
+// getOldNodeBalancerNodeIDs looks up the existing nodes attached to a NodeBalancer config, and
+// returns a map of node address to node ID so that IDs can be reused on rebuild.
+func (l *loadbalancers) getOldNodeBalancerNodeIDs(ctx context.Context, nb *linodego.NodeBalancer, currentNBCfg *linodego.NodeBalancerConfig) map[string]int {
+	oldNBNodeIDs := make(map[string]int)
+	if currentNBCfg == nil {
+		return oldNBNodeIDs
+	}
+
+	// Obtain list of current NB nodes and convert it to map of node IDs
+	currentNBNodes, err := l.client.ListNodeBalancerNodes(ctx, nb.ID, currentNBCfg.ID, nil)
+	if err != nil {
+		// This error can be ignored, because if we fail to get nodes we can anyway rebuild the config from scratch,
+		// it would just cause the NB to reload config even if the node list did not change, so we prefer to send IDs when it is possible.
+		klog.Warningf("Unable to list existing nodebalancer nodes for NB %d config %d, error: %s", nb.ID, currentNBCfg.ID, err)
+	}
+	for _, node := range currentNBNodes {
+		oldNBNodeIDs[node.Address] = node.ID
+	}
+	klog.Infof("Nodebalancer %d had nodes %v", nb.ID, oldNBNodeIDs)
+
+	return oldNBNodeIDs
+}
+
+// updateNodeBalancerConfigForPort creates or rebuilds the NodeBalancer config for a single
+// Service port, attaching the given nodes as backends.
+func (l *loadbalancers) updateNodeBalancerConfigForPort(
+	ctx context.Context,
+	service *v1.Service,
+	nodes []*v1.Node,
+	nb *linodego.NodeBalancer,
+	nbCfgs []linodego.NodeBalancerConfig,
+	port v1.ServicePort,
+) error {
+	// Construct a new config for this port
+	newNBCfg, err := l.buildNodeBalancerConfig(ctx, service, port)
+	if err != nil {
+		sentry.CaptureError(ctx, err)
+		return err
+	}
+
+	// Look for an existing config for this port
+	currentNBCfg := findNodeBalancerConfigForPort(nbCfgs, int(port.Port))
+	if currentNBCfg == nil {
+		klog.Infof("No preexisting nodebalancer for port %v found.", port.Port)
+	}
+	oldNBNodeIDs := l.getOldNodeBalancerNodeIDs(ctx, nb, currentNBCfg)
+
+	useIPv6Backends := resolveIPv6NodeBalancerBackendState(service)
+	// Add all of the Nodes to the config
+	subnetID, err := l.getBackendSubnetID(ctx, service, useIPv6Backends)
+	if err != nil {
+		sentry.CaptureError(ctx, err)
+		return fmt.Errorf("Error getting subnet ID for service %s: %w", service.Name, err)
+	}
+	newNBNodes, err := l.buildNodeBalancerConfigNodes(service, nodes, port.NodePort, subnetID, useIPv6Backends, newNBCfg.Protocol, oldNBNodeIDs)
+	if err != nil {
+		sentry.CaptureError(ctx, err)
+		return fmt.Errorf("[port %d] error building NodeBalancer backend node configs: %w", int(port.Port), err)
+	}
+
+	// If there's no existing config, create it
+	var rebuildOpts linodego.NodeBalancerConfigRebuildOptions
+	if currentNBCfg == nil {
+		createOpts := newNBCfg.GetCreateOptions()
+
+		currentNBCfg, err = l.client.CreateNodeBalancerConfig(ctx, nb.ID, createOpts)
+		if err != nil {
+			sentry.CaptureError(ctx, err)
+			return fmt.Errorf("[port %d] error creating NodeBalancer config: %w", int(port.Port), err)
+		}
+		rebuildOpts = currentNBCfg.GetRebuildOptions()
+
+		// SSLCert and SSLKey return <REDACTED> from the API, so copy the
+		// value that we sent in create for the rebuild
+		rebuildOpts.SSLCert = newNBCfg.SSLCert
+		rebuildOpts.SSLKey = newNBCfg.SSLKey
+	} else {
+		rebuildOpts = newNBCfg.GetRebuildOptions()
+	}
+
+	rebuildOpts.Nodes = newNBNodes
+
+	if _, err = l.client.RebuildNodeBalancerConfig(ctx, nb.ID, currentNBCfg.ID, rebuildOpts); err != nil {
+		sentry.CaptureError(ctx, err)
+		return fmt.Errorf("[port %d] error rebuilding NodeBalancer config: %w", int(port.Port), err)
+	}
+
+	return nil
+}
+
 func (l *loadbalancers) updateNodeBalancer(
 	ctx context.Context,
 	clusterName string,
@@ -337,36 +485,11 @@ func (l *loadbalancers) updateNodeBalancer(
 		return fmt.Errorf("%w: service %s", errNoNodesAvailable, getServiceNn(service))
 	}
 
-	// Check for IPv4 annotation change
-	if ipv4, ok := service.GetAnnotations()[annotations.AnnLinodeLoadBalancerReservedIPv4]; ok && ipv4 != *nb.IPv4 {
-		// Log the error in the CCM's logfile
-		klog.Warningf("IPv4 annotation has changed for service (%s) from %s to %s, but NodeBalancer (%d) IP cannot be updated after creation",
-			getServiceNn(service), *nb.IPv4, ipv4, nb.ID)
+	l.warnIfIPv4AnnotationChanged(ctx, service, nb)
 
-		// Issue a k8s cluster event warning
-		l.createIPChangeWarningEvent(ctx, service, nb, ipv4)
-	}
-
-	connThrottle := getConnectionThrottle(service)
-	if connThrottle != nb.ClientConnThrottle {
-		update := nb.GetUpdateOptions()
-		update.ClientConnThrottle = &connThrottle
-		nb, err = l.client.UpdateNodeBalancer(ctx, nb.ID, update)
-		if err != nil {
-			sentry.CaptureError(ctx, err)
-			return err
-		}
-	}
-
-	tags := l.GetLoadBalancerTags(ctx, clusterName, service)
-	if !reflect.DeepEqual(nb.Tags, tags) {
-		update := nb.GetUpdateOptions()
-		update.Tags = tags
-		nb, err = l.client.UpdateNodeBalancer(ctx, nb.ID, update)
-		if err != nil {
-			sentry.CaptureError(ctx, err)
-			return err
-		}
+	nb, tags, err := l.updateNodeBalancerThrottleAndTags(ctx, clusterName, service, nb)
+	if err != nil {
+		return err
 	}
 
 	fwClient := services.LinodeClient{Client: l.client}
@@ -390,78 +513,8 @@ func (l *loadbalancers) updateNodeBalancer(
 
 	// Add or overwrite configs for each of the Service's ports
 	for _, port := range service.Spec.Ports {
-		// Construct a new config for this port
-		newNBCfg, err := l.buildNodeBalancerConfig(ctx, service, port)
-		if err != nil {
-			sentry.CaptureError(ctx, err)
+		if err := l.updateNodeBalancerConfigForPort(ctx, service, nodes, nb, nbCfgs, port); err != nil {
 			return err
-		}
-
-		// Look for an existing config for this port
-		var currentNBCfg *linodego.NodeBalancerConfig
-		for i := range nbCfgs {
-			nbc := nbCfgs[i]
-			if nbc.Port == int(port.Port) {
-				currentNBCfg = &nbc
-				break
-			}
-		}
-		oldNBNodeIDs := make(map[string]int)
-		var currentNBNodes []linodego.NodeBalancerNode
-		if currentNBCfg != nil {
-			// Obtain list of current NB nodes and convert it to map of node IDs
-			currentNBNodes, err = l.client.ListNodeBalancerNodes(ctx, nb.ID, currentNBCfg.ID, nil)
-			if err != nil {
-				// This error can be ignored, because if we fail to get nodes we can anyway rebuild the config from scratch,
-				// it would just cause the NB to reload config even if the node list did not change, so we prefer to send IDs when it is possible.
-				klog.Warningf("Unable to list existing nodebalancer nodes for NB %d config %d, error: %s", nb.ID, newNBCfg.ID, err)
-			}
-			for _, node := range currentNBNodes {
-				oldNBNodeIDs[node.Address] = node.ID
-			}
-			klog.Infof("Nodebalancer %d had nodes %v", nb.ID, oldNBNodeIDs)
-		} else {
-			klog.Infof("No preexisting nodebalancer for port %v found.", port.Port)
-		}
-
-		useIPv6Backends := resolveIPv6NodeBalancerBackendState(service)
-		// Add all of the Nodes to the config
-		subnetID, err := l.getBackendSubnetID(ctx, service, useIPv6Backends)
-		if err != nil {
-			sentry.CaptureError(ctx, err)
-			return fmt.Errorf("Error getting subnet ID for service %s: %w", service.Name, err)
-		}
-		newNBNodes, err := l.buildNodeBalancerConfigNodes(service, nodes, port.NodePort, subnetID, useIPv6Backends, newNBCfg.Protocol, oldNBNodeIDs)
-		if err != nil {
-			sentry.CaptureError(ctx, err)
-			return fmt.Errorf("[port %d] error building NodeBalancer backend node configs: %w", int(port.Port), err)
-		}
-
-		// If there's no existing config, create it
-		var rebuildOpts linodego.NodeBalancerConfigRebuildOptions
-		if currentNBCfg == nil {
-			createOpts := newNBCfg.GetCreateOptions()
-
-			currentNBCfg, err = l.client.CreateNodeBalancerConfig(ctx, nb.ID, createOpts)
-			if err != nil {
-				sentry.CaptureError(ctx, err)
-				return fmt.Errorf("[port %d] error creating NodeBalancer config: %w", int(port.Port), err)
-			}
-			rebuildOpts = currentNBCfg.GetRebuildOptions()
-
-			// SSLCert and SSLKey return <REDACTED> from the API, so copy the
-			// value that we sent in create for the rebuild
-			rebuildOpts.SSLCert = newNBCfg.SSLCert
-			rebuildOpts.SSLKey = newNBCfg.SSLKey
-		} else {
-			rebuildOpts = newNBCfg.GetRebuildOptions()
-		}
-
-		rebuildOpts.Nodes = newNBNodes
-
-		if _, err = l.client.RebuildNodeBalancerConfig(ctx, nb.ID, currentNBCfg.ID, rebuildOpts); err != nil {
-			sentry.CaptureError(ctx, err)
-			return fmt.Errorf("[port %d] error rebuilding NodeBalancer config: %w", int(port.Port), err)
 		}
 	}
 

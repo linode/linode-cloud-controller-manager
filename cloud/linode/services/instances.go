@@ -78,6 +78,81 @@ func (nc *nodeCache) getInstanceAddresses(instance linodego.Instance, vpcips []s
 	return ips
 }
 
+// addVPCIPv4Addresses looks up the IPv4 addresses for a VPC and appends them to vpcNodes, keyed
+// by Linode instance ID.
+func addVPCIPv4Addresses(ctx context.Context, client linodeClient.Client, vpcName string, vpcNodes map[int][]string) error {
+	resp, err := GetVPCIPAddresses(ctx, client, vpcName)
+	if err != nil {
+		return fmt.Errorf("failed updating instances cache for VPC %s: %w", vpcName, err)
+	}
+	for _, vpcip := range resp {
+		if vpcip.Address == nil {
+			continue
+		}
+		vpcNodes[vpcip.LinodeID] = append(vpcNodes[vpcip.LinodeID], *vpcip.Address)
+	}
+	return nil
+}
+
+// addVPCIPv6Addresses looks up the IPv6 addresses for a VPC and appends them to vpcNodes, also
+// recording the address type (internal/external) for each address in vpcIPv6AddrTypes.
+func addVPCIPv6Addresses(ctx context.Context, client linodeClient.Client, vpcName string, vpcNodes map[int][]string, vpcIPv6AddrTypes map[string]v1.NodeAddressType) error {
+	resp, err := GetVPCIPv6Addresses(ctx, client, vpcName)
+	if err != nil {
+		return fmt.Errorf("failed updating instances cache for VPC %s: %w", vpcName, err)
+	}
+	for _, vpcip := range resp {
+		if len(vpcip.IPv6Addresses) == 0 {
+			continue
+		}
+		vpcIPv6AddrType := v1.NodeInternalIP
+		if vpcip.IPv6IsPublic != nil && *vpcip.IPv6IsPublic {
+			vpcIPv6AddrType = v1.NodeExternalIP
+		}
+		for _, ipv6 := range vpcip.IPv6Addresses {
+			vpcNodes[vpcip.LinodeID] = append(vpcNodes[vpcip.LinodeID], ipv6.SLAACAddress)
+			vpcIPv6AddrTypes[ipv6.SLAACAddress] = vpcIPv6AddrType
+		}
+	}
+	return nil
+}
+
+// getVPCNodeIPs returns, for every configured VPC, a map of Linode instance ID to VPC IP
+// addresses (IPv4 and IPv6), along with the address type of each VPC IPv6 address.
+func getVPCNodeIPs(ctx context.Context, client linodeClient.Client) (map[int][]string, map[string]v1.NodeAddressType, error) {
+	vpcNodes := map[int][]string{}
+	vpcIPv6AddrTypes := map[string]v1.NodeAddressType{}
+
+	for _, name := range options.Options.VPCNames {
+		vpcName := strings.TrimSpace(name)
+		if vpcName == "" {
+			continue
+		}
+		if err := addVPCIPv4Addresses(ctx, client, vpcName, vpcNodes); err != nil {
+			return nil, nil, err
+		}
+		if err := addVPCIPv6Addresses(ctx, client, vpcName, vpcNodes, vpcIPv6AddrTypes); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return vpcNodes, vpcIPv6AddrTypes, nil
+}
+
+// listFilteredInstances lists all Linode instances, applying the configured tag filter if set.
+func listFilteredInstances(ctx context.Context, client linodeClient.Client) ([]linodego.Instance, error) {
+	filter := linodego.Filter{}
+	if options.Options.LinodeTagFilter != "" {
+		filter.AddField(linodego.Contains, "tags", options.Options.LinodeTagFilter)
+	}
+	filterJSON, err := filter.MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal filter: %w", err)
+	}
+
+	return client.ListInstances(ctx, &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: string(filterJSON)})
+}
+
 // refreshInstances conditionally loads all instances from the Linode API and caches them.
 // It does not refresh if the last update happened less than `nodeCache.ttl` ago.
 func (nc *nodeCache) refreshInstances(ctx context.Context, client linodeClient.Client) error {
@@ -88,56 +163,15 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client linodeClient.C
 		return nil
 	}
 
-	filter := linodego.Filter{}
-	if options.Options.LinodeTagFilter != "" {
-		filter.AddField(linodego.Contains, "tags", options.Options.LinodeTagFilter)
-	}
-	filterJSON, err := filter.MarshalJSON()
-	if err != nil {
-		return fmt.Errorf("failed to marshal filter: %w", err)
-	}
-
-	instances, err := client.ListInstances(ctx, &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: string(filterJSON)})
+	instances, err := listFilteredInstances(ctx, client)
 	if err != nil {
 		return err
 	}
 
 	// If running within VPC, find instances and store their ips
-	vpcNodes := map[int][]string{}
-	vpcIPv6AddrTypes := map[string]v1.NodeAddressType{}
-	for _, name := range options.Options.VPCNames {
-		vpcName := strings.TrimSpace(name)
-		if vpcName == "" {
-			continue
-		}
-		resp, err := GetVPCIPAddresses(ctx, client, vpcName)
-		if err != nil {
-			return fmt.Errorf("failed updating instances cache for VPC %s: %w", vpcName, err)
-		}
-		for _, vpcip := range resp {
-			if vpcip.Address == nil {
-				continue
-			}
-			vpcNodes[vpcip.LinodeID] = append(vpcNodes[vpcip.LinodeID], *vpcip.Address)
-		}
-
-		resp, err = GetVPCIPv6Addresses(ctx, client, vpcName)
-		if err != nil {
-			return fmt.Errorf("failed updating instances cache for VPC %s: %w", vpcName, err)
-		}
-		for _, vpcip := range resp {
-			if len(vpcip.IPv6Addresses) == 0 {
-				continue
-			}
-			vpcIPv6AddrType := v1.NodeInternalIP
-			if vpcip.IPv6IsPublic != nil && *vpcip.IPv6IsPublic {
-				vpcIPv6AddrType = v1.NodeExternalIP
-			}
-			for _, ipv6 := range vpcip.IPv6Addresses {
-				vpcNodes[vpcip.LinodeID] = append(vpcNodes[vpcip.LinodeID], ipv6.SLAACAddress)
-				vpcIPv6AddrTypes[ipv6.SLAACAddress] = vpcIPv6AddrType
-			}
-		}
+	vpcNodes, vpcIPv6AddrTypes, err := getVPCNodeIPs(ctx, client)
+	if err != nil {
+		return err
 	}
 
 	newNodes := make(map[int]linodeInstance, len(instances))

@@ -82,89 +82,54 @@ const (
 
 var _ CIDRAllocator = &cloudAllocator{}
 
-// NewLinodeCIDRAllocator returns a CIDRAllocator to allocate CIDRs for node
-// Caller must ensure subNetMaskSize is not less than cluster CIDR mask size.
-// Caller must always pass in a list of existing nodes so the new allocator.
-// Caller must ensure that ClusterCIDR is semantically correct
-// can initialize its CIDR map. NodeList is only nil in testing.
-func NewLinodeCIDRAllocator(ctx context.Context, linodeClient linode.Client, client clientset.Interface, nodeInformer informers.NodeInformer, allocatorParams CIDRAllocatorParams, nodeList *v1.NodeList) (CIDRAllocator, error) {
-	logger := klog.FromContext(ctx)
-	if client == nil {
-		logger.Error(nil, "kubeClient is nil when starting CIDRAllocator")
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-	}
-
-	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cidrAllocator"})
-
-	// create a cidrSet for ipv4 cidr we operate on
-	cidrSet, err := cidrset.NewCIDRSet(allocatorParams.ClusterCIDRs[0], allocatorParams.NodeCIDRMaskSizes[0])
+// reserveFinalIPv4BlockIfNeeded checks whether the final block in the cluster CIDR must be
+// reserved (because it collides with the VPC subnet's reserved last IP), and if so occupies it
+// in the given cidrSet.
+func reserveFinalIPv4BlockIfNeeded(ctx context.Context, linodeClient linode.Client, clusterCIDR *net.IPNet, cidrSet *cidrset.CidrSet) error {
+	reserveFinalIPv4Block, err := shouldReserveFinalIPv4Block(ctx, linodeClient, clusterCIDR)
 	if err != nil {
-		return nil, err
+		return err
+	}
+	if !reserveFinalIPv4Block {
+		return nil
 	}
 
-	// Using Linode API, check if we need to reserve the final block in the cluster CIDR.
-	// Reserve when cluster CIDR last IP is the same as the VPC subnet last IP.
-	// We cannot reserve that block since the last IP is a reserved IP for VPC functionality.
-	reserveFinalIPv4Block, err := shouldReserveFinalIPv4Block(ctx, linodeClient, allocatorParams.ClusterCIDRs[0])
+	// Reserve the last block in the cluster range by occupying its last IP.
+	lastIP, err := lastIPForCIDR(clusterCIDR)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if reserveFinalIPv4Block {
-		// Reserve the last block in the cluster range by occupying its last IP.
-		lastIP, err := lastIPForCIDR(allocatorParams.ClusterCIDRs[0])
-		if err != nil {
-			return nil, err
+	return cidrSet.Occupy(&net.IPNet{IP: lastIP.To4(), Mask: net.CIDRMask(32, 32)})
+}
+
+// occupyExistingNodeCIDRs marks the CIDRs of any pre-existing nodes as occupied in the
+// allocator's CIDR maps, so that they are not handed out again.
+func (ca *cloudAllocator) occupyExistingNodeCIDRs(ctx context.Context, logger klog.Logger, nodeList *v1.NodeList) error {
+	if nodeList == nil {
+		return nil
+	}
+
+	for _, node := range nodeList.Items {
+		if len(node.Spec.PodCIDRs) == 0 {
+			logger.V(4).Info("Node has no CIDR, ignoring", "node", klog.KObj(&node))
+			continue
 		}
-		if err := cidrSet.Occupy(&net.IPNet{IP: lastIP.To4(), Mask: net.CIDRMask(32, 32)}); err != nil {
-			return nil, err
-		}
-	}
-
-	ca := &cloudAllocator{
-		client:                        client,
-		linodeClient:                  linodeClient,
-		clusterCIDR:                   allocatorParams.ClusterCIDRs[0],
-		cidrSet:                       cidrSet,
-		nodeLister:                    nodeInformer.Lister(),
-		nodesSynced:                   nodeInformer.Informer().HasSynced,
-		broadcaster:                   eventBroadcaster,
-		recorder:                      recorder,
-		queue:                         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[any](), "cidrallocator_node"),
-		nodeCIDRMaskSizeIPv6:          allocatorParams.NodeCIDRMaskSizes[1],
-		disableIPv6NodeCIDRAllocation: allocatorParams.DisableIPv6NodeCIDRAllocation,
-	}
-
-	if allocatorParams.ServiceCIDR != nil {
-		ca.filterOutServiceRange(logger, allocatorParams.ServiceCIDR)
-	} else {
-		logger.Info("No Service CIDR provided. Skipping filtering out service addresses")
-	}
-
-	if allocatorParams.SecondaryServiceCIDR != nil {
-		ca.filterOutServiceRange(logger, allocatorParams.SecondaryServiceCIDR)
-	} else {
-		logger.Info("No Secondary Service CIDR provided. Skipping filtering out secondary service addresses")
-	}
-
-	if nodeList != nil {
-		for _, node := range nodeList.Items {
-			if len(node.Spec.PodCIDRs) == 0 {
-				logger.V(4).Info("Node has no CIDR, ignoring", "node", klog.KObj(&node))
-				continue
-			}
-			logger.V(4).Info("Node has CIDR, occupying it in CIDR map", "node", klog.KObj(&node), "podCIDR", node.Spec.PodCIDR)
-			if err := ca.occupyCIDRs(ctx, &node); err != nil {
-				// This will happen if:
-				// 1. We find garbage in the podCIDRs field. Retrying is useless.
-				// 2. CIDR out of range: This means a node CIDR has changed.
-				// This error will keep crashing controller-manager.
-				return nil, err
-			}
+		logger.V(4).Info("Node has CIDR, occupying it in CIDR map", "node", klog.KObj(&node), "podCIDR", node.Spec.PodCIDR)
+		if err := ca.occupyCIDRs(ctx, &node); err != nil {
+			// This will happen if:
+			// 1. We find garbage in the podCIDRs field. Retrying is useless.
+			// 2. CIDR out of range: This means a node CIDR has changed.
+			// This error will keep crashing controller-manager.
+			return err
 		}
 	}
+	return nil
+}
 
-	if _, err := nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+// nodeEventHandlerFuncs builds the informer event handler that queues nodes for CIDR
+// allocation/release on add, update, and delete events.
+func (ca *cloudAllocator) nodeEventHandlerFuncs(logger klog.Logger) cache.ResourceEventHandlerFuncs {
+	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
 			if err == nil {
@@ -197,7 +162,68 @@ func NewLinodeCIDRAllocator(ctx context.Context, linodeClient linode.Client, cli
 				utilruntime.HandleError(fmt.Errorf("error while processing CIDR Release: %w", err))
 			}
 		},
-	}); err != nil {
+	}
+}
+
+// NewLinodeCIDRAllocator returns a CIDRAllocator to allocate CIDRs for node
+// Caller must ensure subNetMaskSize is not less than cluster CIDR mask size.
+// Caller must always pass in a list of existing nodes so the new allocator.
+// Caller must ensure that ClusterCIDR is semantically correct
+// can initialize its CIDR map. NodeList is only nil in testing.
+func NewLinodeCIDRAllocator(ctx context.Context, linodeClient linode.Client, client clientset.Interface, nodeInformer informers.NodeInformer, allocatorParams CIDRAllocatorParams, nodeList *v1.NodeList) (CIDRAllocator, error) {
+	logger := klog.FromContext(ctx)
+	if client == nil {
+		logger.Error(nil, "kubeClient is nil when starting CIDRAllocator")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+	}
+
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cidrAllocator"})
+
+	// create a cidrSet for ipv4 cidr we operate on
+	cidrSet, err := cidrset.NewCIDRSet(allocatorParams.ClusterCIDRs[0], allocatorParams.NodeCIDRMaskSizes[0])
+	if err != nil {
+		return nil, err
+	}
+
+	// Using Linode API, check if we need to reserve the final block in the cluster CIDR.
+	// Reserve when cluster CIDR last IP is the same as the VPC subnet last IP.
+	// We cannot reserve that block since the last IP is a reserved IP for VPC functionality.
+	if err := reserveFinalIPv4BlockIfNeeded(ctx, linodeClient, allocatorParams.ClusterCIDRs[0], cidrSet); err != nil {
+		return nil, err
+	}
+
+	ca := &cloudAllocator{
+		client:                        client,
+		linodeClient:                  linodeClient,
+		clusterCIDR:                   allocatorParams.ClusterCIDRs[0],
+		cidrSet:                       cidrSet,
+		nodeLister:                    nodeInformer.Lister(),
+		nodesSynced:                   nodeInformer.Informer().HasSynced,
+		broadcaster:                   eventBroadcaster,
+		recorder:                      recorder,
+		queue:                         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[any](), "cidrallocator_node"),
+		nodeCIDRMaskSizeIPv6:          allocatorParams.NodeCIDRMaskSizes[1],
+		disableIPv6NodeCIDRAllocation: allocatorParams.DisableIPv6NodeCIDRAllocation,
+	}
+
+	if allocatorParams.ServiceCIDR != nil {
+		ca.filterOutServiceRange(logger, allocatorParams.ServiceCIDR)
+	} else {
+		logger.Info("No Service CIDR provided. Skipping filtering out service addresses")
+	}
+
+	if allocatorParams.SecondaryServiceCIDR != nil {
+		ca.filterOutServiceRange(logger, allocatorParams.SecondaryServiceCIDR)
+	} else {
+		logger.Info("No Secondary Service CIDR provided. Skipping filtering out secondary service addresses")
+	}
+
+	if err := ca.occupyExistingNodeCIDRs(ctx, logger, nodeList); err != nil {
+		return nil, err
+	}
+
+	if _, err := nodeInformer.Informer().AddEventHandler(ca.nodeEventHandlerFuncs(logger)); err != nil {
 		logger.Error(err, "Failed to add event handler to node informer")
 		return nil, err
 	}
@@ -444,76 +470,69 @@ func getIPv6PodCIDR(ip net.IP, desiredMask int) (*net.IPNet, bool) {
 	return podCIDR, true
 }
 
-// allocateIPv6CIDR allocates an IPv6 CIDR for the given node.
-// It retrieves the instance configuration for the node and extracts the IPv6 range.
-// It then creates a new net.IPNet with the IPv6 address and mask size defined
-// by nodeCIDRMaskSizeIPv6. The function returns an error if it fails to retrieve
-// the instance configuration or parse the IPv6 range.
-func (c *cloudAllocator) allocateIPv6CIDR(ctx context.Context, node *v1.Node) (*net.IPNet, error) {
-	logger := klog.FromContext(ctx)
-
+// parseLinodeIDFromProviderID extracts the numeric Linode instance ID from a node's ProviderID
+// (expected format "linode://<id>").
+func parseLinodeIDFromProviderID(node *v1.Node) (int, error) {
 	if node.Spec.ProviderID == "" {
-		return nil, fmt.Errorf("node %s has no ProviderID set, cannot calculate ipv6 range for it", node.Name)
+		return 0, fmt.Errorf("node %s has no ProviderID set, cannot calculate ipv6 range for it", node.Name)
 	}
-	// Extract the Linode ID from the ProviderID
 	if !strings.HasPrefix(node.Spec.ProviderID, providerIDPrefix) {
-		return nil, fmt.Errorf("node %s has invalid ProviderID %s, expected prefix '%s'", node.Name, node.Spec.ProviderID, providerIDPrefix)
+		return 0, fmt.Errorf("node %s has invalid ProviderID %s, expected prefix '%s'", node.Name, node.Spec.ProviderID, providerIDPrefix)
 	}
-	// Parse the Linode ID from the ProviderID
 	id, err := strconv.Atoi(strings.TrimPrefix(node.Spec.ProviderID, providerIDPrefix))
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse Linode ID from ProviderID %s: %w", node.Spec.ProviderID, err)
+		return 0, fmt.Errorf("failed to parse Linode ID from ProviderID %s: %w", node.Spec.ProviderID, err)
+	}
+	return id, nil
+}
+
+// ipv6RangeFromLinodeInterfaces finds the VPC IPv6 range among a Linode instance's (new
+// generation) interfaces.
+func (c *cloudAllocator) ipv6RangeFromLinodeInterfaces(ctx context.Context, id int) (string, error) {
+	ifaces, listErr := c.linodeClient.ListInterfaces(ctx, id, &linodego.ListOptions{})
+	if listErr != nil || len(ifaces) == 0 {
+		return "", fmt.Errorf("failed to list interfaces: %w", listErr)
+	}
+	for _, iface := range ifaces {
+		if iface.VPC != nil {
+			if ipv6Range := getIPv6RangeFromLinodeInterface(iface); ipv6Range != "" {
+				return ipv6Range, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("failed to find ipv6 range in Linode interfaces: %v", ifaces)
+}
+
+// ipv6RangeFromInstanceConfig finds the VPC IPv6 range among a Linode instance's (legacy
+// generation) config interfaces.
+func (c *cloudAllocator) ipv6RangeFromInstanceConfig(ctx context.Context, id int) (string, error) {
+	configs, listErr := c.linodeClient.ListInstanceConfigs(ctx, id, &linodego.ListOptions{})
+	if listErr != nil || len(configs) == 0 {
+		return "", fmt.Errorf("failed to list instance configs: %w", listErr)
 	}
 
-	// fetch the instance so we can determine which interface generation to use
-	instance, err := c.linodeClient.GetInstance(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("failed get linode with id %d: %w", id, err)
+	for _, iface := range configs[0].Interfaces {
+		if iface.Purpose == linodego.InterfacePurposeVPC {
+			if ipv6Range := getIPv6RangeFromInterface(iface); ipv6Range != "" {
+				return ipv6Range, nil
+			}
+		}
 	}
-	ipv6Range := ""
+	return "", fmt.Errorf("failed to find ipv6 range in instance config: %v", configs[0])
+}
+
+// getIPv6RangeForInstance returns the VPC IPv6 range configured for a Linode instance, using the
+// appropriate lookup method (Linode interfaces vs instance configs) based on interface generation.
+func (c *cloudAllocator) getIPv6RangeForInstance(ctx context.Context, id int, instance *linodego.Instance) (string, error) {
 	if instance.InterfaceGeneration == linodego.GenerationLinode {
-		ifaces, listErr := c.linodeClient.ListInterfaces(ctx, id, &linodego.ListOptions{})
-		if listErr != nil || len(ifaces) == 0 {
-			return nil, fmt.Errorf("failed to list interfaces: %w", listErr)
-		}
-		for _, iface := range ifaces {
-			if iface.VPC != nil {
-				ipv6Range = getIPv6RangeFromLinodeInterface(iface)
-				if ipv6Range != "" {
-					break
-				}
-			}
-		}
-
-		if ipv6Range == "" {
-			return nil, fmt.Errorf("failed to find ipv6 range in Linode interfaces: %v", ifaces)
-		}
-	} else {
-		// Retrieve the instance configuration for the Linode ID
-		configs, listErr := c.linodeClient.ListInstanceConfigs(ctx, id, &linodego.ListOptions{})
-		if listErr != nil || len(configs) == 0 {
-			return nil, fmt.Errorf("failed to list instance configs: %w", listErr)
-		}
-
-		for _, iface := range configs[0].Interfaces {
-			if iface.Purpose == linodego.InterfacePurposeVPC {
-				ipv6Range = getIPv6RangeFromInterface(iface)
-				if ipv6Range != "" {
-					break
-				}
-			}
-		}
-
-		if ipv6Range == "" {
-			return nil, fmt.Errorf("failed to find ipv6 range in instance config: %v", configs[0])
-		}
+		return c.ipv6RangeFromLinodeInterfaces(ctx, id)
 	}
+	return c.ipv6RangeFromInstanceConfig(ctx, id)
+}
 
-	ip, base, err := net.ParseCIDR(ipv6Range)
-	if err != nil {
-		return nil, fmt.Errorf("failed parsing ipv6 range %s: %w", ipv6Range, err)
-	}
-
+// buildIPv6PodCIDR derives the pod CIDR for a node from its VPC IPv6 base range, preferring the
+// stable mnemonic subprefix and falling back to masking the start of the range.
+func (c *cloudAllocator) buildIPv6PodCIDR(logger klog.Logger, ip net.IP, base *net.IPNet) (*net.IPNet, error) {
 	// get pod cidr using stable mnemonic subprefix :0:c::/112
 	if podCIDR, ok := getIPv6PodCIDR(ip, c.nodeCIDRMaskSizeIPv6); ok {
 		logger.V(4).Info("Using stable IPv6 PodCIDR subprefix :0:c::/112", "ip", ip, "podCIDR", podCIDR)
@@ -529,6 +548,38 @@ func (c *cloudAllocator) allocateIPv6CIDR(ctx context.Context, node *v1.Node) (*
 	fallbackPodCIDR := &net.IPNet{IP: ip.Mask(podMask), Mask: podMask}
 	logger.V(4).Info("Falling back to start-of-range IPv6 PodCIDR", "ip", ip, "podCIDR", fallbackPodCIDR)
 	return fallbackPodCIDR, nil
+}
+
+// allocateIPv6CIDR allocates an IPv6 CIDR for the given node.
+// It retrieves the instance configuration for the node and extracts the IPv6 range.
+// It then creates a new net.IPNet with the IPv6 address and mask size defined
+// by nodeCIDRMaskSizeIPv6. The function returns an error if it fails to retrieve
+// the instance configuration or parse the IPv6 range.
+func (c *cloudAllocator) allocateIPv6CIDR(ctx context.Context, node *v1.Node) (*net.IPNet, error) {
+	logger := klog.FromContext(ctx)
+
+	id, err := parseLinodeIDFromProviderID(node)
+	if err != nil {
+		return nil, err
+	}
+
+	// fetch the instance so we can determine which interface generation to use
+	instance, err := c.linodeClient.GetInstance(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed get linode with id %d: %w", id, err)
+	}
+
+	ipv6Range, err := c.getIPv6RangeForInstance(ctx, id, instance)
+	if err != nil {
+		return nil, err
+	}
+
+	ip, base, err := net.ParseCIDR(ipv6Range)
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing ipv6 range %s: %w", ipv6Range, err)
+	}
+
+	return c.buildIPv6PodCIDR(logger, ip, base)
 }
 
 // WARNING: If you're adding any return calls or defer any more work from this
