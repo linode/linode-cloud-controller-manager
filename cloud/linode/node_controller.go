@@ -266,15 +266,14 @@ func (s *nodeController) SetLastMetadataUpdate(nodeName string) {
 	s.metadataLastUpdate[nodeName] = time.Now()
 }
 
-func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
-	klog.V(3).InfoS("NodeController handling node metadata",
-		"node", klog.KObj(node))
-
+// metadataNeedsRefresh reports whether the node's cached metadata (UUID,
+// private IP, public IPv6 annotations) is stale and should be refreshed.
+func (s *nodeController) metadataNeedsRefresh(node *v1.Node) bool {
 	lastUpdate := s.LastMetadataUpdate(node.Name)
 
-	uuid, foundLabel := node.Labels[annotations.AnnLinodeHostUUID]
-	configuredPrivateIP, foundPrivateIPAnnotation := node.Annotations[annotations.AnnLinodeNodePrivateIP]
-	configuredPublicIPv6, foundIPv6Annotation := node.Annotations[annotations.AnnLinodeNodePublicIPv6]
+	_, foundLabel := node.Labels[annotations.AnnLinodeHostUUID]
+	_, foundPrivateIPAnnotation := node.Annotations[annotations.AnnLinodeNodePrivateIP]
+	_, foundIPv6Annotation := node.Annotations[annotations.AnnLinodeNodePublicIPv6]
 
 	metaAge := time.Since(lastUpdate)
 	if foundLabel && foundPrivateIPAnnotation && foundIPv6Annotation && metaAge < s.ttl {
@@ -283,33 +282,29 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 			"ttl", s.ttl,
 			"metadata_age", metaAge,
 		)
-		return nil
+		return false
 	}
 
-	linode, err := s.instances.LookupLinode(ctx, node)
-	if err != nil {
-		klog.V(1).ErrorS(err, "Instance lookup error")
-		return err
-	}
+	return true
+}
 
-	expectedPrivateIP := ""
-	// linode API response for linode will contain only one private ip
-	// if any private ip is configured.
+// expectedPrivateIP returns the private IPv4 address for the linode, if any.
+// The Linode API response for an instance will contain only one private IP
+// if any private IP is configured.
+func expectedPrivateIP(linode *linodego.Instance) string {
 	for _, addr := range linode.IPv4 {
 		if ccmUtils.IsPrivate(addr, options.Options.LinodeExternalNetwork) {
-			expectedPrivateIP = addr.String()
-			break
+			return addr.String()
 		}
 	}
+	return ""
+}
 
-	expectedPublicIPv6 := linode.IPv6
-	if uuid == linode.HostUUID && node.Spec.ProviderID != "" && configuredPrivateIP == expectedPrivateIP && configuredPublicIPv6 == expectedPublicIPv6 {
-		s.SetLastMetadataUpdate(node.Name)
-		return nil
-	}
-
+// updateNodeMetadata persists the linode's UUID, provider ID, private IP, and
+// public IPv6 onto the node, retrying on update conflicts.
+func (s *nodeController) updateNodeMetadata(ctx context.Context, node *v1.Node, linode *linodego.Instance, privateIP, publicIPv6 string) (*v1.Node, error) {
 	var updatedNode *v1.Node
-	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Get a fresh copy of the node so the resource version is up-to-date
 		nodeResult, err := s.kubeclient.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
 		if err != nil {
@@ -327,15 +322,45 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 		}
 
 		// Try to update the expectedPrivateIP if its not set or doesn't match
-		if nodeResult.Annotations[annotations.AnnLinodeNodePrivateIP] != expectedPrivateIP && expectedPrivateIP != "" {
-			nodeResult.Annotations[annotations.AnnLinodeNodePrivateIP] = expectedPrivateIP
+		if nodeResult.Annotations[annotations.AnnLinodeNodePrivateIP] != privateIP && privateIP != "" {
+			nodeResult.Annotations[annotations.AnnLinodeNodePrivateIP] = privateIP
 		}
-		if nodeResult.Annotations[annotations.AnnLinodeNodePublicIPv6] != expectedPublicIPv6 && expectedPublicIPv6 != "" {
-			nodeResult.Annotations[annotations.AnnLinodeNodePublicIPv6] = expectedPublicIPv6
+		if nodeResult.Annotations[annotations.AnnLinodeNodePublicIPv6] != publicIPv6 && publicIPv6 != "" {
+			nodeResult.Annotations[annotations.AnnLinodeNodePublicIPv6] = publicIPv6
 		}
 		updatedNode, err = s.kubeclient.CoreV1().Nodes().Update(ctx, nodeResult, metav1.UpdateOptions{})
 		return err
-	}); err != nil {
+	})
+	return updatedNode, err
+}
+
+func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
+	klog.V(3).InfoS("NodeController handling node metadata",
+		"node", klog.KObj(node))
+
+	if !s.metadataNeedsRefresh(node) {
+		return nil
+	}
+
+	linode, err := s.instances.LookupLinode(ctx, node)
+	if err != nil {
+		klog.V(1).ErrorS(err, "Instance lookup error")
+		return err
+	}
+
+	uuid := node.Labels[annotations.AnnLinodeHostUUID]
+	configuredPrivateIP := node.Annotations[annotations.AnnLinodeNodePrivateIP]
+	configuredPublicIPv6 := node.Annotations[annotations.AnnLinodeNodePublicIPv6]
+
+	privateIP := expectedPrivateIP(linode)
+	publicIPv6 := linode.IPv6
+	if uuid == linode.HostUUID && node.Spec.ProviderID != "" && configuredPrivateIP == privateIP && configuredPublicIPv6 == publicIPv6 {
+		s.SetLastMetadataUpdate(node.Name)
+		return nil
+	}
+
+	updatedNode, err := s.updateNodeMetadata(ctx, node, linode, privateIP, publicIPv6)
+	if err != nil {
 		klog.V(1).ErrorS(err, "Node update error")
 		return err
 	}
