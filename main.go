@@ -154,13 +154,15 @@ func main() {
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 
 	logs.InitLogs()
-	defer logs.FlushLogs()
 
 	if err := command.Execute(); err != nil {
 		sentry.CaptureError(ctx, err)
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		logs.FlushLogs()
 		os.Exit(1)
 	}
+
+	logs.FlushLogs()
 }
 
 func cloudInitializer(completedConfig *config.CompletedConfig) cloudprovider.Interface {
