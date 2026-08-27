@@ -109,13 +109,14 @@ func (ca *cloudAllocator) occupyExistingNodeCIDRs(ctx context.Context, logger kl
 		return nil
 	}
 
-	for _, node := range nodeList.Items {
+	for i := range nodeList.Items {
+		node := &nodeList.Items[i]
 		if len(node.Spec.PodCIDRs) == 0 {
-			logger.V(4).Info("Node has no CIDR, ignoring", "node", klog.KObj(&node))
+			logger.V(4).Info("Node has no CIDR, ignoring", "node", klog.KObj(node))
 			continue
 		}
-		logger.V(4).Info("Node has CIDR, occupying it in CIDR map", "node", klog.KObj(&node), "podCIDR", node.Spec.PodCIDR)
-		if err := ca.occupyCIDRs(ctx, &node); err != nil {
+		logger.V(4).Info("Node has CIDR, occupying it in CIDR map", "node", klog.KObj(node), "podCIDR", node.Spec.PodCIDR)
+		if err := ca.occupyCIDRs(ctx, node); err != nil {
 			// This will happen if:
 			// 1. We find garbage in the podCIDRs field. Retrying is useless.
 			// 2. CIDR out of range: This means a node CIDR has changed.
@@ -413,7 +414,7 @@ func (c *cloudAllocator) occupyCIDRs(ctx context.Context, node *v1.Node) error {
 }
 
 // getIPv6RangeFromInterface extracts the IPv6 range from a Linode instance configuration interface.
-func getIPv6RangeFromInterface(iface linodego.InstanceConfigInterface) string {
+func getIPv6RangeFromInterface(iface *linodego.InstanceConfigInterface) string {
 	if ipv6 := iface.IPv6; ipv6 != nil {
 		if len(ipv6.SLAAC) > 0 {
 			return ipv6.SLAAC[0].Range
@@ -425,7 +426,7 @@ func getIPv6RangeFromInterface(iface linodego.InstanceConfigInterface) string {
 	return ""
 }
 
-func getIPv6RangeFromLinodeInterface(iface linodego.LinodeInterface) string {
+func getIPv6RangeFromLinodeInterface(iface *linodego.LinodeInterface) string {
 	if len(iface.VPC.IPv6.SLAAC) > 0 {
 		return iface.VPC.IPv6.SLAAC[0].Range
 	}
@@ -493,9 +494,9 @@ func (c *cloudAllocator) ipv6RangeFromLinodeInterfaces(ctx context.Context, id i
 	if listErr != nil || len(ifaces) == 0 {
 		return "", fmt.Errorf("failed to list interfaces: %w", listErr)
 	}
-	for _, iface := range ifaces {
-		if iface.VPC != nil {
-			if ipv6Range := getIPv6RangeFromLinodeInterface(iface); ipv6Range != "" {
+	for i := range ifaces {
+		if ifaces[i].VPC != nil {
+			if ipv6Range := getIPv6RangeFromLinodeInterface(&ifaces[i]); ipv6Range != "" {
 				return ipv6Range, nil
 			}
 		}
@@ -511,7 +512,8 @@ func (c *cloudAllocator) ipv6RangeFromInstanceConfig(ctx context.Context, id int
 		return "", fmt.Errorf("failed to list instance configs: %w", listErr)
 	}
 
-	for _, iface := range configs[0].Interfaces {
+	for i := range configs[0].Interfaces {
+		iface := &configs[0].Interfaces[i]
 		if iface.Purpose == linodego.InterfacePurposeVPC {
 			if ipv6Range := getIPv6RangeFromInterface(iface); ipv6Range != "" {
 				return ipv6Range, nil

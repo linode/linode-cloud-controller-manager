@@ -33,7 +33,7 @@ type routeCache struct {
 }
 
 // RefreshCache checks if cache has expired and updates it accordingly
-func (rc *routeCache) refreshRoutes(ctx context.Context, client client.Client) {
+func (rc *routeCache) refreshRoutes(ctx context.Context, linodeClient client.Client) {
 	rc.Mu.Lock()
 	defer rc.Mu.Unlock()
 
@@ -47,13 +47,13 @@ func (rc *routeCache) refreshRoutes(ctx context.Context, client client.Client) {
 		if vpcName == "" {
 			continue
 		}
-		resp, err := services.GetVPCIPAddresses(ctx, client, vpcName)
+		resp, err := services.GetVPCIPAddresses(ctx, linodeClient, vpcName)
 		if err != nil {
 			klog.Errorf("failed updating cache for VPC %s. Error: %s", vpcName, err.Error())
 			continue
 		}
-		for _, r := range resp {
-			vpcNodes[r.LinodeID] = append(vpcNodes[r.LinodeID], r)
+		for i := range resp {
+			vpcNodes[resp[i].LinodeID] = append(vpcNodes[resp[i].LinodeID], resp[i])
 		}
 	}
 
@@ -67,7 +67,7 @@ type routes struct {
 	routeCache *routeCache
 }
 
-func newRoutes(client client.Client, instanceCache *services.Instances) (cloudprovider.Routes, error) {
+func newRoutes(linodeClient client.Client, instanceCache *services.Instances) (cloudprovider.Routes, error) {
 	timeout := 60
 	if raw, ok := os.LookupEnv("LINODE_ROUTES_CACHE_TTL_SECONDS"); ok {
 		if t, err := strconv.Atoi(raw); t > 0 && err == nil {
@@ -81,7 +81,7 @@ func newRoutes(client client.Client, instanceCache *services.Instances) (cloudpr
 	}
 
 	return &routes{
-		client:    client,
+		client:    linodeClient,
 		instances: instanceCache,
 		routeCache: &routeCache{
 			routes: make(map[int][]linodego.VPCIP, 0),
@@ -132,7 +132,7 @@ func (r *routes) getInstanceFromName(ctx context.Context, name string) (*linodeg
 }
 
 // CreateRoute adds route's subnet to ip_ranges of target node's VPC interface
-func (r *routes) CreateRoute(ctx context.Context, clusterName string, nameHint string, route *cloudprovider.Route) error {
+func (r *routes) CreateRoute(ctx context.Context, clusterName, nameHint string, route *cloudprovider.Route) error {
 	// ignore IPv6 CIDRs but make sure something gets assigned to them to avoid errors
 	ipAddr, _, err := net.ParseCIDR(route.DestinationCIDR)
 	if err != nil {
@@ -161,13 +161,14 @@ func (r *routes) CreateRoute(ctx context.Context, clusterName string, nameHint s
 	intfVPCIP := linodego.VPCIP{}
 
 	for _, vpcid := range services.GetAllVPCIDs() {
-		for _, ir := range instanceRoutes {
+		for i := range instanceRoutes {
+			ir := &instanceRoutes[i]
 			if ir.VPCID != vpcid {
 				continue
 			}
 
 			if ir.Address != nil {
-				intfVPCIP = ir
+				intfVPCIP = *ir
 				continue
 			}
 
@@ -192,7 +193,7 @@ func (r *routes) CreateRoute(ctx context.Context, clusterName string, nameHint s
 		Range: route.DestinationCIDR,
 	})
 
-	return r.handleInterfaces(ctx, intfRoutes, linodeInterfaceRoutes, instance, intfVPCIP, route)
+	return r.handleInterfaces(ctx, intfRoutes, linodeInterfaceRoutes, instance, &intfVPCIP, route)
 }
 
 // DeleteRoute removes route's subnet from ip_ranges of target node's VPC interface
@@ -213,13 +214,14 @@ func (r *routes) DeleteRoute(ctx context.Context, clusterName string, route *clo
 	intfVPCIP := linodego.VPCIP{}
 
 	for _, vpcid := range services.GetAllVPCIDs() {
-		for _, ir := range instanceRoutes {
+		for i := range instanceRoutes {
+			ir := &instanceRoutes[i]
 			if ir.VPCID != vpcid {
 				continue
 			}
 
 			if ir.Address != nil {
-				intfVPCIP = ir
+				intfVPCIP = *ir
 				continue
 			}
 
@@ -238,11 +240,11 @@ func (r *routes) DeleteRoute(ctx context.Context, clusterName string, route *clo
 		return fmt.Errorf("unable to remove route %s for node %s. no valid interface found", route.DestinationCIDR, route.TargetNode)
 	}
 
-	return r.handleInterfaces(ctx, intfRoutes, linodeInterfaceRoutes, instance, intfVPCIP, route)
+	return r.handleInterfaces(ctx, intfRoutes, linodeInterfaceRoutes, instance, &intfVPCIP, route)
 }
 
 // handleInterfaces updates the VPC interface with adding or deleting routes
-func (r *routes) handleInterfaces(ctx context.Context, intfRoutes []string, linodeInterfaceRoutes []linodego.VPCInterfaceIPv4RangeCreateOptions, instance *linodego.Instance, intfVPCIP linodego.VPCIP, route *cloudprovider.Route) error {
+func (r *routes) handleInterfaces(ctx context.Context, intfRoutes []string, linodeInterfaceRoutes []linodego.VPCInterfaceIPv4RangeCreateOptions, instance *linodego.Instance, intfVPCIP *linodego.VPCIP, route *cloudprovider.Route) error {
 	if instance.InterfaceGeneration == linodego.GenerationLinode {
 		interfaceUpdateOptions := linodego.LinodeInterfaceUpdateOptions{
 			VPC: &linodego.VPCInterfaceUpdateOptions{
@@ -283,7 +285,8 @@ func (r *routes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpr
 	}
 
 	var configuredRoutes []*cloudprovider.Route
-	for _, instance := range instances {
+	for i := range instances {
+		instance := &instances[i]
 		providerID := ccmUtils.ProviderIDPrefix + strconv.Itoa(instance.ID)
 		label, found := registeredK8sNodeCache.getNodeLabel(providerID, instance.Label)
 		if !found {
@@ -301,7 +304,8 @@ func (r *routes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpr
 
 		// check for configured routes
 		for _, vpcid := range services.GetAllVPCIDs() {
-			for _, ir := range instanceRoutes {
+			for j := range instanceRoutes {
+				ir := &instanceRoutes[j]
 				if ir.Address != nil || ir.VPCID != vpcid {
 					continue
 				}

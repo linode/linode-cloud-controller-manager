@@ -42,8 +42,8 @@ type aclConfig struct {
 	DenyList  *linodego.NetworkAddresses `json:"denyList"`
 }
 
-func (l *LinodeClient) CreateFirewall(ctx context.Context, opts linodego.FirewallCreateOptions) (fw *linodego.Firewall, err error) {
-	return l.Client.CreateFirewall(ctx, opts)
+func (l *LinodeClient) CreateFirewall(ctx context.Context, opts *linodego.FirewallCreateOptions) (fw *linodego.Firewall, err error) {
+	return l.Client.CreateFirewall(ctx, *opts)
 }
 
 func (l *LinodeClient) DeleteFirewall(ctx context.Context, firewall *linodego.Firewall) error {
@@ -88,12 +88,12 @@ func (l *LinodeClient) DeleteNodeBalancerFirewall(
 // collectRuleIPs flattens the IPv4 and IPv6 addresses across all inbound
 // firewall rules.
 func collectRuleIPs(rules []linodego.FirewallRuleInbound) (ipv4s, ipv6s []string) {
-	for _, rule := range rules {
-		if rule.Addresses.IPv4 != nil {
-			ipv4s = append(ipv4s, rule.Addresses.IPv4...)
+	for i := range rules {
+		if rules[i].Addresses.IPv4 != nil {
+			ipv4s = append(ipv4s, rules[i].Addresses.IPv4...)
 		}
-		if rule.Addresses.IPv6 != nil {
-			ipv6s = append(ipv6s, rule.Addresses.IPv6...)
+		if rules[i].Addresses.IPv6 != nil {
+			ipv6s = append(ipv6s, rules[i].Addresses.IPv6...)
 		}
 	}
 	return ipv4s, ipv6s
@@ -101,7 +101,7 @@ func collectRuleIPs(rules []linodego.FirewallRuleInbound) (ipv4s, ipv6s []string
 
 // ipListChanged reports whether ips differs from the ruleIPs collected from
 // firewall rules.
-func ipListChanged(ips []string, ruleIPs []string) bool {
+func ipListChanged(ips, ruleIPs []string) bool {
 	if ips == nil {
 		return false
 	}
@@ -199,13 +199,13 @@ func isPortsChanged(rules []linodego.FirewallRuleInbound, service *v1.Service) b
 		oldPortsMap[port] = struct{}{}
 	}
 	svcPortsMap := make(map[int32]struct{}, len(service.Spec.Ports))
-	for _, port := range service.Spec.Ports {
-		svcPortsMap[port.Port] = struct{}{}
+	for i := range service.Spec.Ports {
+		svcPortsMap[service.Spec.Ports[i].Port] = struct{}{}
 	}
 
 	// Check if the ports in the service are different from the old ports
-	for _, port := range service.Spec.Ports {
-		if _, ok := oldPortsMap[port.Port]; !ok {
+	for i := range service.Spec.Ports {
+		if _, ok := oldPortsMap[service.Spec.Ports[i].Port]; !ok {
 			return true
 		}
 	}
@@ -223,7 +223,7 @@ func isPortsChanged(rules []linodego.FirewallRuleInbound, service *v1.Service) b
 
 // ruleChanged takes an old FirewallRuleSet and new aclConfig and returns if
 // the IPs of the FirewallRuleSet would be changed with the new ACL Config
-func ruleChanged(old linodego.FirewallRules, newACL aclConfig, service *v1.Service) bool {
+func ruleChanged(old *linodego.FirewallRules, newACL aclConfig, service *v1.Service) bool {
 	var ips *linodego.NetworkAddresses
 	if newACL.AllowList != nil {
 		// this is a allowList, this means that the rules should have `DROP` as inboundpolicy
@@ -435,7 +435,7 @@ func (l *LinodeClient) UpdateNodeBalancerFirewall(
 }
 
 // getNodeBalancerDeviceID gets the deviceID of the nodeBalancer that is attached to the firewall.
-func (l *LinodeClient) getNodeBalancerDeviceID(ctx context.Context, firewallID, nbID int) (int, bool, error) {
+func (l *LinodeClient) getNodeBalancerDeviceID(ctx context.Context, firewallID, nbID int) (deviceID int, exists bool, err error) {
 	devices, err := l.Client.ListFirewallDevices(ctx, firewallID, &linodego.ListOptions{})
 	if err != nil {
 		return 0, false, err
@@ -445,9 +445,9 @@ func (l *LinodeClient) getNodeBalancerDeviceID(ctx context.Context, firewallID, 
 		return 0, false, nil
 	}
 
-	for _, device := range devices {
-		if device.Entity.ID == nbID {
-			return device.ID, true, nil
+	for i := range devices {
+		if devices[i].Entity.ID == nbID {
+			return devices[i].ID, true, nil
 		}
 	}
 
@@ -504,8 +504,8 @@ func (l *LinodeClient) updateServiceFirewall(ctx context.Context, service *v1.Se
 				return fmt.Errorf("error in fetching attached nodeBalancer device")
 			}
 
-			if err = l.Client.DeleteFirewallDevice(ctx, existingFirewallID, deviceID); err != nil {
-				return err
+			if deleteErr := l.Client.DeleteFirewallDevice(ctx, existingFirewallID, deviceID); deleteErr != nil {
+				return deleteErr
 			}
 		}
 	}
@@ -527,51 +527,47 @@ func (l *LinodeClient) updateNodeBalancerFirewallWithACL(
 
 	switch len(firewalls) {
 	case 0:
-		{
-			// need to create a fw and attach it to our nb
-			fwcreateOpts, err := CreateFirewallOptsForSvc(loadBalancerName, loadBalancerTags, service)
-			if err != nil {
-				return err
-			}
+		// need to create a fw and attach it to our nb
+		fwcreateOpts, err := CreateFirewallOptsForSvc(loadBalancerName, loadBalancerTags, service)
+		if err != nil {
+			return err
+		}
 
-			fw, err := l.Client.CreateFirewall(ctx, *fwcreateOpts)
-			if err != nil {
-				return err
-			}
-			// attach new firewall.
-			if _, err = l.Client.CreateFirewallDevice(ctx, fw.ID, linodego.FirewallDeviceCreateOptions{
-				ID:   nb.ID,
-				Type: "nodebalancer",
-			}); err != nil {
-				return err
-			}
+		fw, err := l.Client.CreateFirewall(ctx, *fwcreateOpts)
+		if err != nil {
+			return err
+		}
+		// attach new firewall.
+		if _, err = l.Client.CreateFirewallDevice(ctx, fw.ID, linodego.FirewallDeviceCreateOptions{
+			ID:   nb.ID,
+			Type: "nodebalancer",
+		}); err != nil {
+			return err
 		}
 	case 1:
-		{
-			// We do not want to get into the complexity of reconciling differences, might as well just pull what's in the svc annotation now and update the fw.
-			var acl aclConfig
-			err := json.Unmarshal([]byte(service.GetAnnotations()[annotations.AnnLinodeCloudFirewallACL]), &acl)
-			if err != nil {
-				return err
-			}
+		// We do not want to get into the complexity of reconciling differences, might as well just pull what's in the svc annotation now and update the fw.
+		var acl aclConfig
+		err := json.Unmarshal([]byte(service.GetAnnotations()[annotations.AnnLinodeCloudFirewallACL]), &acl)
+		if err != nil {
+			return err
+		}
 
-			changed := ruleChanged(firewalls[0].Rules, acl, service)
-			if !changed {
-				return nil
-			}
+		changed := ruleChanged(&firewalls[0].Rules, acl, service)
+		if !changed {
+			return nil
+		}
 
-			fwCreateOpts, err := CreateFirewallOptsForSvc(firewalls[0].Label, []string{""}, service)
-			if err != nil {
-				return err
-			}
-			if _, err = l.Client.UpdateFirewallRules(ctx, firewalls[0].ID, linodego.FirewallRulesUpdateOptions{
-				Inbound:        fwCreateOpts.Rules.Inbound,
-				InboundPolicy:  fwCreateOpts.Rules.InboundPolicy,
-				Outbound:       fwCreateOpts.Rules.Outbound,
-				OutboundPolicy: fwCreateOpts.Rules.OutboundPolicy,
-			}); err != nil {
-				return err
-			}
+		fwCreateOpts, err := CreateFirewallOptsForSvc(firewalls[0].Label, []string{""}, service)
+		if err != nil {
+			return err
+		}
+		if _, err = l.Client.UpdateFirewallRules(ctx, firewalls[0].ID, linodego.FirewallRulesUpdateOptions{
+			Inbound:        fwCreateOpts.Rules.Inbound,
+			InboundPolicy:  fwCreateOpts.Rules.InboundPolicy,
+			Outbound:       fwCreateOpts.Rules.Outbound,
+			OutboundPolicy: fwCreateOpts.Rules.OutboundPolicy,
+		}); err != nil {
+			return err
 		}
 	default:
 		klog.Errorf("Found more than one firewall attached to nodebalancer: %d, firewall IDs: %v", nb.ID, firewalls)
@@ -588,8 +584,8 @@ func CreateFirewallOptsForSvc(label string, tags []string, svc *v1.Service) (*li
 		Tags:  tags,
 	}
 	servicePorts := make([]string, 0, len(svc.Spec.Ports))
-	for _, port := range svc.Spec.Ports {
-		servicePorts = append(servicePorts, strconv.Itoa(int(port.Port)))
+	for i := range svc.Spec.Ports {
+		servicePorts = append(servicePorts, strconv.Itoa(int(svc.Spec.Ports[i].Port)))
 	}
 
 	portsString := strings.Join(servicePorts, ",")

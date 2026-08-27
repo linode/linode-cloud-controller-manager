@@ -21,7 +21,7 @@ const (
 // It checks the portConfigAnnotationResult for a specific port.
 // If not found, it checks the service annotations for the service.
 // It also validates the protocol against a list of valid protocols.
-func getPortProtocol(portConfigAnnotationResult portConfigAnnotation, service *v1.Service, port v1.ServicePort) (string, error) {
+func getPortProtocol(portConfigAnnotationResult *portConfigAnnotation, service *v1.Service, port *v1.ServicePort) (string, error) {
 	protocol := portConfigAnnotationResult.Protocol
 	if protocol == "" {
 		protocol = string(port.Protocol)
@@ -43,7 +43,7 @@ func getPortProtocol(portConfigAnnotationResult portConfigAnnotation, service *v
 // If the protocol is UDP, it checks if the proxy protocol is set to none.
 // It also checks if a TLS secret name is specified for UDP, which is not allowed.
 // It returns the proxy protocol as a string.
-func getPortProxyProtocol(portConfigAnnotationResult portConfigAnnotation, service *v1.Service, protocol linodego.ConfigProtocol) (string, error) {
+func getPortProxyProtocol(portConfigAnnotationResult *portConfigAnnotation, service *v1.Service, protocol linodego.ConfigProtocol) (string, error) {
 	proxyProtocol := portConfigAnnotationResult.ProxyProtocol
 	if proxyProtocol == "" {
 		proxyProtocol = string(linodego.ProxyProtocolNone)
@@ -73,7 +73,7 @@ func getPortProxyProtocol(portConfigAnnotationResult portConfigAnnotation, servi
 // If not found, it checks the service annotations for the service.
 // It also validates the algorithm against a list of valid algorithms.
 // If the protocol is UDP, it checks if the algorithm is valid for UDP.
-func getPortAlgorithm(portConfigAnnotationResult portConfigAnnotation, service *v1.Service, protocol linodego.ConfigProtocol) (string, error) {
+func getPortAlgorithm(portConfigAnnotationResult *portConfigAnnotation, service *v1.Service, protocol linodego.ConfigProtocol) (string, error) {
 	algorithm := portConfigAnnotationResult.Algorithm
 	if algorithm == "" {
 		algorithm = string(linodego.AlgorithmRoundRobin)
@@ -99,7 +99,7 @@ func getPortAlgorithm(portConfigAnnotationResult portConfigAnnotation, service *
 // It checks the portConfigAnnotationResult for a specific port.
 // If not found, it checks the service annotations for the service.
 // It also validates the UDP check port against a range of valid ports (1-65535).
-func getPortUDPCheckPort(portConfigAnnotationResult portConfigAnnotation, service *v1.Service, protocol linodego.ConfigProtocol) (int, error) {
+func getPortUDPCheckPort(portConfigAnnotationResult *portConfigAnnotation, service *v1.Service, protocol linodego.ConfigProtocol) (int, error) {
 	udpCheckPort := udpCheckPortDefault
 	if protocol != linodego.ProtocolUDP {
 		return udpCheckPort, nil
@@ -140,7 +140,7 @@ func getDefaultStickiness(protocol string) linodego.ConfigStickiness {
 // It checks the portConfigAnnotationResult for a specific port.
 // If not found, it checks the service annotations for the service.
 // It also validates the stickiness against a list of valid stickiness options.
-func getPortStickiness(portConfigAnnotationResult portConfigAnnotation, service *v1.Service, protocol linodego.ConfigProtocol) (string, error) {
+func getPortStickiness(portConfigAnnotationResult *portConfigAnnotation, service *v1.Service, protocol linodego.ConfigProtocol) (string, error) {
 	stickiness := portConfigAnnotationResult.Stickiness
 	if stickiness == "" {
 		stickiness = string(getDefaultStickiness(string(protocol)))
