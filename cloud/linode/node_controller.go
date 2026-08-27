@@ -84,12 +84,13 @@ func (c *k8sNodeCache) updateCache(kubeclient kubernetes.Interface) {
 
 	nodes := make(map[string]*v1.Node, len(nodeList.Items))
 	providerIDs := make(map[string]string, len(nodeList.Items))
-	for _, node := range nodeList.Items {
+	for i := range nodeList.Items {
+		node := &nodeList.Items[i]
 		if node.Spec.ProviderID == "" {
 			klog.Errorf("Empty providerID [%s] for node %s, skipping it", node.Spec.ProviderID, node.Name)
 			continue
 		}
-		nodes[node.Name] = &node
+		nodes[node.Name] = node
 		providerIDs[node.Spec.ProviderID] = node.Name
 	}
 
@@ -112,7 +113,7 @@ func (c *k8sNodeCache) addNodeToCache(node *v1.Node) {
 
 // getNodeLabel returns the k8s node label for the given provider ID or instance label.
 // If the provider ID or label is not found in the cache, it returns an empty string and false.
-func (c *k8sNodeCache) getNodeLabel(providerID string, instanceLabel string) (string, bool) {
+func (c *k8sNodeCache) getNodeLabel(providerID, instanceLabel string) (string, bool) {
 	c.RLock()
 	defer c.RUnlock()
 
@@ -157,7 +158,7 @@ func newK8sNodeCache() *k8sNodeCache {
 	}
 }
 
-func newNodeController(kubeclient kubernetes.Interface, client client.Client, informer v1informers.NodeInformer, instanceCache *services.Instances) *nodeController {
+func newNodeController(kubeclient kubernetes.Interface, linodeClient client.Client, informer v1informers.NodeInformer, instanceCache *services.Instances) *nodeController {
 	timeout := defaultMetadataTTL
 	if raw, ok := os.LookupEnv("LINODE_METADATA_TTL"); ok {
 		if t, err := strconv.Atoi(raw); t > 0 && err == nil {
@@ -166,7 +167,7 @@ func newNodeController(kubeclient kubernetes.Interface, client client.Client, in
 	}
 
 	return &nodeController{
-		client:             client,
+		client:             linodeClient,
 		instances:          instanceCache,
 		kubeclient:         kubeclient,
 		informer:           informer,

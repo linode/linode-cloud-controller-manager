@@ -126,8 +126,8 @@ type portConfig struct {
 }
 
 // newLoadbalancers returns a cloudprovider.LoadBalancer whose concrete type is a *loadbalancer.
-func newLoadbalancers(client client.Client, zone string) cloudprovider.LoadBalancer {
-	return &loadbalancers{client: client, zone: zone}
+func newLoadbalancers(linodeClient client.Client, zone string) cloudprovider.LoadBalancer {
+	return &loadbalancers{client: linodeClient, zone: zone}
 }
 
 func (l *loadbalancers) getNodeBalancerForService(ctx context.Context, service *v1.Service) (*linodego.NodeBalancer, error) {
@@ -165,7 +165,8 @@ func (l *loadbalancers) getNodeBalancerByStatus(ctx context.Context, service *v1
 	} else {
 		lb = updatedLb
 	}
-	for _, ingress := range lb.Ingress {
+	for i := range lb.Ingress {
+		ingress := &lb.Ingress[i]
 		if ingress.IP != "" {
 			address, err := netip.ParseAddr(ingress.IP)
 			if err != nil {
@@ -399,8 +400,8 @@ func (l *loadbalancers) getOldNodeBalancerNodeIDs(ctx context.Context, nb *linod
 		// it would just cause the NB to reload config even if the node list did not change, so we prefer to send IDs when it is possible.
 		klog.Warningf("Unable to list existing nodebalancer nodes for NB %d config %d, error: %s", nb.ID, currentNBCfg.ID, err)
 	}
-	for _, node := range currentNBNodes {
-		oldNBNodeIDs[node.Address] = node.ID
+	for i := range currentNBNodes {
+		oldNBNodeIDs[currentNBNodes[i].Address] = currentNBNodes[i].ID
 	}
 	klog.Infof("Nodebalancer %d had nodes %v", nb.ID, oldNBNodeIDs)
 
@@ -415,7 +416,7 @@ func (l *loadbalancers) updateNodeBalancerConfigForPort(
 	nodes []*v1.Node,
 	nb *linodego.NodeBalancer,
 	nbCfgs []linodego.NodeBalancerConfig,
-	port v1.ServicePort,
+	port *v1.ServicePort,
 ) error {
 	// Construct a new config for this port
 	newNBCfg, err := l.buildNodeBalancerConfig(ctx, service, port)
@@ -512,8 +513,8 @@ func (l *loadbalancers) updateNodeBalancer(
 	}
 
 	// Add or overwrite configs for each of the Service's ports
-	for _, port := range service.Spec.Ports {
-		if err := l.updateNodeBalancerConfigForPort(ctx, service, nodes, nb, nbCfgs, port); err != nil {
+	for i := range service.Spec.Ports {
+		if err := l.updateNodeBalancerConfigForPort(ctx, service, nodes, nb, nbCfgs, &service.Spec.Ports[i]); err != nil {
 			return err
 		}
 	}
@@ -555,10 +556,11 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 // Delete any NodeBalancer configs for ports that no longer exist on the Service
 // Note: Don't build a map or other lookup structure here, it is not worth the overhead
 func (l *loadbalancers) deleteUnusedConfigs(ctx context.Context, nbConfigs []linodego.NodeBalancerConfig, servicePorts []v1.ServicePort) error {
-	for _, nbc := range nbConfigs {
+	for i := range nbConfigs {
+		nbc := &nbConfigs[i]
 		found := false
-		for _, sp := range servicePorts {
-			if nbc.Port == int(sp.Port) {
+		for j := range servicePorts {
+			if nbc.Port == int(servicePorts[j].Port) {
 				found = true
 			}
 		}
@@ -626,8 +628,8 @@ func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 	}
 
 	fwClient := services.LinodeClient{Client: l.client}
-	if err = fwClient.DeleteNodeBalancerFirewall(ctx, service, nb); err != nil {
-		return err
+	if fwErr := fwClient.DeleteNodeBalancerFirewall(ctx, service, nb); fwErr != nil {
+		return fwErr
 	}
 
 	if !l.shouldRetainReservedIP(service) {
@@ -654,10 +656,11 @@ func (l *loadbalancers) getNodeBalancerByHostname(ctx context.Context, service *
 	if err != nil {
 		return nil, err
 	}
-	for _, lb := range lbs {
+	for i := range lbs {
+		lb := &lbs[i]
 		if *lb.Hostname == hostname {
 			klog.V(2).Infof("found NodeBalancer (%d) for service (%s) via hostname (%s)", lb.ID, getServiceNn(service), hostname)
-			return &lb, nil
+			return lb, nil
 		}
 	}
 	return nil, lbNotFoundError{serviceNn: getServiceNn(service)}
@@ -682,9 +685,10 @@ func (l *loadbalancers) getNodeBalancerByIP(ctx context.Context, service *v1.Ser
 	// filter by subnet ID if specified for frontend vpc ip
 	frontendSubnetID := service.GetAnnotations()[annotations.NodeBalancerFrontendSubnetID]
 	if frontendSubnetID != "" {
-		for _, lb := range lbs {
+		for i := range lbs {
+			lb := &lbs[i]
 			if lb.FrontendAddressType == "vpc" && lb.FrontendVPCSubnetID != nil && strconv.Itoa(*lb.FrontendVPCSubnetID) == frontendSubnetID {
-				return &lb, nil
+				return lb, nil
 			}
 		}
 		return nil, lbNotFoundError{serviceNn: getServiceNn(service)}
@@ -1025,7 +1029,7 @@ func applyHealthCheckTuning(service *v1.Service, config *linodego.NodeBalancerCo
 	return nil
 }
 
-func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1.Service, port v1.ServicePort) (linodego.NodeBalancerConfig, error) {
+func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1.Service, port *v1.ServicePort) (linodego.NodeBalancerConfig, error) {
 	portConfigResult, err := getPortConfig(service, port)
 	if err != nil {
 		return linodego.NodeBalancerConfig{}, err
@@ -1061,7 +1065,7 @@ func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1
 	}
 
 	if portConfigResult.Protocol == linodego.ProtocolHTTPS {
-		if err = l.addTLSCert(ctx, service, &config, portConfigResult); err != nil {
+		if err := l.addTLSCert(ctx, service, &config, &portConfigResult); err != nil {
 			return config, err
 		}
 	}
@@ -1069,7 +1073,7 @@ func (l *loadbalancers) buildNodeBalancerConfig(ctx context.Context, service *v1
 	return config, nil
 }
 
-func (l *loadbalancers) addTLSCert(ctx context.Context, service *v1.Service, nbConfig *linodego.NodeBalancerConfig, config portConfig) error {
+func (l *loadbalancers) addTLSCert(ctx context.Context, service *v1.Service, nbConfig *linodego.NodeBalancerConfig, config *portConfig) error {
 	err := l.retrieveKubeClient()
 	if err != nil {
 		return err
@@ -1143,7 +1147,8 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 		return nil, err
 	}
 
-	for _, port := range ports {
+	for i := range ports {
+		port := &ports[i]
 		config, err := l.buildNodeBalancerConfig(ctx, service, port)
 		if err != nil {
 			return nil, err
@@ -1165,7 +1170,7 @@ func (l *loadbalancers) buildLoadBalancerRequest(ctx context.Context, clusterNam
 }
 
 func coerceString(str string, minLen, maxLen int, padding string) string {
-	if len(padding) == 0 {
+	if padding == "" {
 		padding = "x"
 	}
 	if len(str) > maxLen {
@@ -1299,7 +1304,7 @@ func (l *loadbalancers) retrieveKubeClient() error {
 	return nil
 }
 
-func getPortConfig(service *v1.Service, port v1.ServicePort) (portConfig, error) {
+func getPortConfig(service *v1.Service, port *v1.ServicePort) (portConfig, error) {
 	portConfigResult := portConfig{}
 	portConfigResult.Port = int(port.Port)
 
@@ -1309,21 +1314,21 @@ func getPortConfig(service *v1.Service, port v1.ServicePort) (portConfig, error)
 	}
 
 	// validate and set protocol
-	protocol, err := getPortProtocol(portConfigAnnotationResult, service, port)
+	protocol, err := getPortProtocol(&portConfigAnnotationResult, service, port)
 	if err != nil {
 		return portConfigResult, err
 	}
 	portConfigResult.Protocol = linodego.ConfigProtocol(protocol)
 
 	// validate and set proxy protocol
-	proxyProtocol, err := getPortProxyProtocol(portConfigAnnotationResult, service, portConfigResult.Protocol)
+	proxyProtocol, err := getPortProxyProtocol(&portConfigAnnotationResult, service, portConfigResult.Protocol)
 	if err != nil {
 		return portConfigResult, err
 	}
 	portConfigResult.ProxyProtocol = linodego.ConfigProxyProtocol(proxyProtocol)
 
 	// validate and set algorithm
-	algorithm, err := getPortAlgorithm(portConfigAnnotationResult, service, portConfigResult.Protocol)
+	algorithm, err := getPortAlgorithm(&portConfigAnnotationResult, service, portConfigResult.Protocol)
 	if err != nil {
 		return portConfigResult, err
 	}
@@ -1336,7 +1341,7 @@ func getPortConfig(service *v1.Service, port v1.ServicePort) (portConfig, error)
 	portConfigResult.TLSSecretName = portConfigAnnotationResult.TLSSecretName
 
 	// validate and set udp check port
-	udpCheckPort, err := getPortUDPCheckPort(portConfigAnnotationResult, service, portConfigResult.Protocol)
+	udpCheckPort, err := getPortUDPCheckPort(&portConfigAnnotationResult, service, portConfigResult.Protocol)
 	if err != nil {
 		return portConfigResult, err
 	}
@@ -1345,7 +1350,7 @@ func getPortConfig(service *v1.Service, port v1.ServicePort) (portConfig, error)
 	}
 
 	// validate and set stickiness
-	stickiness, err := getPortStickiness(portConfigAnnotationResult, service, portConfigResult.Protocol)
+	stickiness, err := getPortStickiness(&portConfigAnnotationResult, service, portConfigResult.Protocol)
 	if err != nil {
 		return portConfigResult, err
 	}
@@ -1357,7 +1362,7 @@ func getPortConfig(service *v1.Service, port v1.ServicePort) (portConfig, error)
 	return portConfigResult, nil
 }
 
-func getHealthCheckType(service *v1.Service, port v1.ServicePort) (linodego.ConfigCheck, error) {
+func getHealthCheckType(service *v1.Service, port *v1.ServicePort) (linodego.ConfigCheck, error) {
 	hType, ok := service.GetAnnotations()[annotations.AnnLinodeHealthCheckType]
 	if !ok {
 		if port.Protocol == v1.ProtocolUDP {
@@ -1402,9 +1407,9 @@ func getNodePrivateIP(node *v1.Node, subnetID int) (string, error) {
 	}
 
 	klog.Infof("Node %s, assigned IP addresses: %v", node.Name, node.Status.Addresses)
-	for _, addr := range node.Status.Addresses {
-		if addr.Type == v1.NodeInternalIP {
-			return addr.Address, nil
+	for i := range node.Status.Addresses {
+		if node.Status.Addresses[i].Type == v1.NodeInternalIP {
+			return node.Status.Addresses[i].Address, nil
 		}
 	}
 
@@ -1430,7 +1435,7 @@ func getNodeBackendIP(service *v1.Service, node *v1.Node, subnetID int, useIPv6B
 	return "", fmt.Errorf("service %s requested IPv6 backends but node %s does not have a public IPv6 address", getServiceNn(service), node.Name)
 }
 
-func getTLSCertInfo(ctx context.Context, kubeClient kubernetes.Interface, namespace string, config portConfig) (string, string, error) {
+func getTLSCertInfo(ctx context.Context, kubeClient kubernetes.Interface, namespace string, config *portConfig) (cert, key string, err error) {
 	if config.TLSSecretName == "" {
 		return "", "", fmt.Errorf("TLS secret name for port %v is not specified", config.Port)
 	}
@@ -1440,10 +1445,10 @@ func getTLSCertInfo(ctx context.Context, kubeClient kubernetes.Interface, namesp
 		return "", "", err
 	}
 
-	cert := string(secret.Data[v1.TLSCertKey])
+	cert = string(secret.Data[v1.TLSCertKey])
 	cert = strings.TrimSpace(cert)
 
-	key := string(secret.Data[v1.TLSPrivateKeyKey])
+	key = string(secret.Data[v1.TLSPrivateKeyKey])
 
 	key = strings.TrimSpace(key)
 
