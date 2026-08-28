@@ -264,30 +264,20 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	var nb *linodego.NodeBalancer
 
 	nb, err = l.getNodeBalancerForService(ctx, service)
-	if err == nil {
+	var targetError lbNotFoundError
+	switch {
+	case err == nil:
 		if err = l.updateNodeBalancer(ctx, clusterName, service, nodes, nb); err != nil {
 			sentry.CaptureError(ctx, err)
 			return nil, err
 		}
-	} else {
-		var targetError lbNotFoundError
-		if errors.As(err, &targetError) {
-			if service.GetAnnotations()[annotations.AnnLinodeNodeBalancerID] != "" {
-				// a load balancer annotation has been created so a NodeBalancer is coming, error out and retry later
-				klog.Infof("NodeBalancer created but not available yet, waiting...")
-				sentry.CaptureError(ctx, err)
-				return nil, err
-			}
-
-			if nb, err = l.buildLoadBalancerRequest(ctx, clusterName, service, nodes); err != nil {
-				sentry.CaptureError(ctx, err)
-				return nil, err
-			}
-			klog.Infof("created new NodeBalancer (%d) for service (%s)", nb.ID, serviceNn)
-		} else {
-			sentry.CaptureError(ctx, err)
+	case errors.As(err, &targetError):
+		if nb, err = l.createNodeBalancerForMissingService(ctx, clusterName, service, nodes, err); err != nil {
 			return nil, err
 		}
+	default:
+		sentry.CaptureError(ctx, err)
+		return nil, err
 	}
 
 	klog.Infof("NodeBalancer (%d) has been ensured for service (%s)", nb.ID, serviceNn)
@@ -301,6 +291,26 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	}
 
 	return lbStatus, nil
+}
+
+// createNodeBalancerForMissingService handles the case where getNodeBalancerForService returned
+// an lbNotFoundError: either a NodeBalancer is still being created (annotation already set) or a
+// brand new NodeBalancer needs to be built for the service.
+func (l *loadbalancers) createNodeBalancerForMissingService(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node, notFoundErr error) (*linodego.NodeBalancer, error) {
+	if service.GetAnnotations()[annotations.AnnLinodeNodeBalancerID] != "" {
+		// a load balancer annotation has been created so a NodeBalancer is coming, error out and retry later
+		klog.Infof("NodeBalancer created but not available yet, waiting...")
+		sentry.CaptureError(ctx, notFoundErr)
+		return nil, notFoundErr
+	}
+
+	nb, err := l.buildLoadBalancerRequest(ctx, clusterName, service, nodes)
+	if err != nil {
+		sentry.CaptureError(ctx, err)
+		return nil, err
+	}
+	klog.Infof("created new NodeBalancer (%d) for service (%s)", nb.ID, getServiceNn(service))
+	return nb, nil
 }
 
 func (l *loadbalancers) createIPChangeWarningEvent(ctx context.Context, service *v1.Service, nb *linodego.NodeBalancer, newIP string) {
@@ -931,32 +941,38 @@ func (l *loadbalancers) createNodeBalancer(ctx context.Context, clusterName stri
 		createOpts.IPv4 = &ipv4
 	}
 
-	fwid, ok := service.GetAnnotations()[annotations.AnnLinodeCloudFirewallID]
-	if ok {
+	if fwid, ok := service.GetAnnotations()[annotations.AnnLinodeCloudFirewallID]; ok {
 		firewallID, err := strconv.Atoi(fwid)
 		if err != nil {
 			return nil, err
 		}
 		createOpts.FirewallID = firewallID
-	} else {
+	} else if _, ok := service.GetAnnotations()[annotations.AnnLinodeCloudFirewallACL]; ok {
 		// There's no firewallID already set, see if we need to create a new fw, look for the acl annotation.
-		_, ok := service.GetAnnotations()[annotations.AnnLinodeCloudFirewallACL]
-		if ok {
-			fwcreateOpts, err := services.CreateFirewallOptsForSvc(label, tags, service)
-			if err != nil {
-				return nil, err
-			}
-
-			fw, err := l.client.CreateFirewall(ctx, *fwcreateOpts)
-			if err != nil {
-				return nil, err
-			}
-			createOpts.FirewallID = fw.ID
+		firewallID, err := l.createFirewallForNodeBalancer(ctx, label, tags, service)
+		if err != nil {
+			return nil, err
 		}
-		// no need to deal with firewalls, continue creating nb's
+		createOpts.FirewallID = firewallID
 	}
+	// no need to deal with firewalls, continue creating nb's
 
 	return l.client.CreateNodeBalancer(ctx, createOpts)
+}
+
+// createFirewallForNodeBalancer creates a new Cloud Firewall from the service's ACL annotation
+// and returns its ID, for use as the NodeBalancer's FirewallID.
+func (l *loadbalancers) createFirewallForNodeBalancer(ctx context.Context, label string, tags []string, service *v1.Service) (int, error) {
+	fwcreateOpts, err := services.CreateFirewallOptsForSvc(label, tags, service)
+	if err != nil {
+		return 0, err
+	}
+
+	fw, err := l.client.CreateFirewall(ctx, *fwcreateOpts)
+	if err != nil {
+		return 0, err
+	}
+	return fw.ID, nil
 }
 
 // applyHealthCheckBody sets the config's health check path/body based on the
@@ -1456,23 +1472,28 @@ func getTLSCertInfo(ctx context.Context, kubeClient kubernetes.Interface, namesp
 }
 
 func getConnectionThrottle(service *v1.Service) int {
-	connThrottle := 0 // disable throttle if nothing is specified
-
-	if connThrottleString := service.GetAnnotations()[annotations.AnnLinodeThrottle]; connThrottleString != "" {
-		parsed, err := strconv.Atoi(connThrottleString)
-		if err == nil {
-			if parsed < 0 {
-				parsed = 0
-			}
-
-			if parsed > maxConnThrottleStringLen {
-				parsed = maxConnThrottleStringLen
-			}
-			connThrottle = parsed
-		}
+	connThrottleString := service.GetAnnotations()[annotations.AnnLinodeThrottle]
+	if connThrottleString == "" {
+		return 0 // disable throttle if nothing is specified
 	}
 
-	return connThrottle
+	parsed, err := strconv.Atoi(connThrottleString)
+	if err != nil {
+		return 0
+	}
+
+	return clampConnThrottle(parsed)
+}
+
+func clampConnThrottle(parsed int) int {
+	switch {
+	case parsed < 0:
+		return 0
+	case parsed > maxConnThrottleStringLen:
+		return maxConnThrottleStringLen
+	default:
+		return parsed
+	}
 }
 
 func makeLoadBalancerStatus(service *v1.Service, nb *linodego.NodeBalancer) *v1.LoadBalancerStatus {
