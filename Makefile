@@ -82,10 +82,6 @@ lint:
 lint-fix:
 	golangci-lint run -c .golangci.yml --fix
 
-.PHONY: gosec
-gosec: ## Run gosec against code.
-	gosec -exclude-dir=bin -confidence medium -terse -exclude-generated ./...
-
 .PHONY: vulncheck
 vulncheck: ## Run vulnerability check against code.
 	./hack/vulncheck.sh
