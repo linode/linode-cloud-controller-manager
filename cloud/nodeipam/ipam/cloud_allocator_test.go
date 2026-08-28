@@ -1024,6 +1024,31 @@ type releaseTestCase struct {
 	instance                         *linodego.Instance
 }
 
+// checkFirstRoundAllocation verifies the outcome of the first AllocateOrOccupyCIDR call for tc,
+// asserting either a successful allocation with node update, or an expected failure with no update.
+func checkFirstRoundAllocation(t *testing.T, tc releaseTestCase, err error) {
+	t.Helper()
+
+	if len(tc.expectedAllocatedCIDRFirstRound) == 0 {
+		if err == nil {
+			t.Fatalf("%v: unexpected success in AllocateOrOccupyCIDR: %v", tc.description, err)
+		}
+		// We don't expect any updates here
+		time.Sleep(time.Second)
+		if len(tc.fakeNodeHandler.GetUpdatedNodesCopy()) != 0 {
+			t.Fatalf("%v: unexpected update of nodes: %v", tc.description, tc.fakeNodeHandler.GetUpdatedNodesCopy())
+		}
+		return
+	}
+
+	if err != nil {
+		t.Fatalf("%v: unexpected error in AllocateOrOccupyCIDR: %v", tc.description, err)
+	}
+	if err = test.WaitForUpdatedNodeWithTimeout(tc.fakeNodeHandler, 1, wait.ForeverTestTimeout); err != nil {
+		t.Fatalf("%v: timeout while waiting for Node update: %v", tc.description, err)
+	}
+}
+
 func TestReleaseCIDRSuccess(t *testing.T) {
 	// Non-parallel test (overrides global var)
 	oldNodePollInterval := nodePollInterval
@@ -1279,23 +1304,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 		}
 
 		err := allocator.AllocateOrOccupyCIDR(tCtx, tc.fakeNodeHandler.Existing[0])
-		if len(tc.expectedAllocatedCIDRFirstRound) != 0 {
-			if err != nil {
-				t.Fatalf("%v: unexpected error in AllocateOrOccupyCIDR: %v", tc.description, err)
-			}
-			if err = test.WaitForUpdatedNodeWithTimeout(tc.fakeNodeHandler, 1, wait.ForeverTestTimeout); err != nil {
-				t.Fatalf("%v: timeout while waiting for Node update: %v", tc.description, err)
-			}
-		} else {
-			if err == nil {
-				t.Fatalf("%v: unexpected success in AllocateOrOccupyCIDR: %v", tc.description, err)
-			}
-			// We don't expect any updates here
-			time.Sleep(time.Second)
-			if len(tc.fakeNodeHandler.GetUpdatedNodesCopy()) != 0 {
-				t.Fatalf("%v: unexpected update of nodes: %v", tc.description, tc.fakeNodeHandler.GetUpdatedNodesCopy())
-			}
-		}
+		checkFirstRoundAllocation(t, tc, err)
 		for _, cidrToRelease := range tc.cidrsToRelease {
 			nodeToRelease := v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
