@@ -1,10 +1,32 @@
 # Kubernetes Cloud Controller Manager for Linode
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/linode/linode-cloud-controller-manager)](https://goreportcard.com/report/github.com/linode/linode-cloud-controller-manager)
-[![Continuous Integration](https://github.com/linode/linode-cloud-controller-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/linode/linode-cloud-controller-manager/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/linode/linode-cloud-controller-manager/graph/badge.svg?token=GSRnqHUmCk)](https://codecov.io/gh/linode/linode-cloud-controller-manager)
-[![Docker Pulls](https://img.shields.io/docker/pulls/linode/linode-cloud-controller-manager.svg)](https://hub.docker.com/r/linode/linode-cloud-controller-manager/)
-[![Twitter](https://img.shields.io/twitter/follow/linode.svg?style=social&logo=twitter&label=Follow)](https://twitter.com/intent/follow?screen_name=linode)
+<p align="center">
+<!-- go doc / reference card -->
+<a href="https://pkg.go.dev/github.com/linode/linode-cloud-controller-manager">
+<img src="https://pkg.go.dev/badge/github.com/linode/linode-cloud-controller-manager.svg"></a>
+<!-- codecov badge -->
+<a href="https://codecov.io/github/linode/linode-cloud-controller-manager" > 
+<img src="https://codecov.io/github/linode/linode-cloud-controller-manager/graph/badge.svg?token=YQFKF86KJ6"/> 
+</a>
+<!-- docker pulls badge -->
+<a href="https://hub.docker.com/r/linode/linode-cloud-controller-manager/" > 
+<img src="https://img.shields.io/docker/pulls/linode/linode-cloud-controller-manager.svg"/> 
+</a>
+<!-- join kubernetes slack channel for linode -->
+<a href="https://kubernetes.slack.com/messages/CD4B15LUR">
+<img src="https://img.shields.io/badge/join%20slack-%23linode-brightgreen"></a>
+<!-- PRs welcome -->
+<a href="http://makeapullrequest.com">
+<img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg"></a>
+</p>
+<p align="center">
+<!-- go build / test CI -->
+<a href="https://github.com/linode/linode-cloud-controller-manager/actions/workflows/ci.yml">
+<img src="https://github.com/linode/linode-cloud-controller-manager/actions/workflows/ci.yml/badge.svg"></a>
+<!-- image build CI -->
+<a href="https://github.com/linode/linode-cloud-controller-manager/actions/workflows/release.yml">
+<img src="https://github.com/linode/linode-cloud-controller-manager/actions/workflows/release.yml/badge.svg"></a>
+</p>
 
 ## Overview
 
