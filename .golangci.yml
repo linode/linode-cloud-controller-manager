@@ -47,6 +47,7 @@ linters:
     - misspell
     - mnd
     - musttag
+    - nestif
     - nilerr
     - nilnesserr
     - nilnil

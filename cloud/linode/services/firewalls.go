@@ -142,29 +142,39 @@ func ipsChanged(ips *linodego.NetworkAddresses, rules []linodego.FirewallRuleInb
 	return false
 }
 
+func parsePortRange(part string) ([]int32, error) {
+	rangeParts := strings.Split(part, "-")
+	if len(rangeParts) != portRangeParts {
+		return nil, fmt.Errorf("invalid range format: %s", part)
+	}
+
+	start, err1 := strconv.ParseInt(rangeParts[0], 10, 32)
+	end, err2 := strconv.ParseInt(rangeParts[1], 10, 32)
+	if err1 != nil || err2 != nil {
+		return nil, fmt.Errorf("invalid number in range: %s", part)
+	}
+	if start > end {
+		return nil, fmt.Errorf("start greater than end in range: %s", part)
+	}
+
+	result := make([]int32, 0, end-start+1)
+	for i := start; i <= end; i++ {
+		result = append(result, int32(i)) // #nosec G115: Integer overflow conversion is safe for port numbers
+	}
+	return result, nil
+}
+
 func parsePorts(ports string) ([]int32, error) {
 	var result []int32
 	portParts := strings.Split(ports, ",")
 	for _, part := range portParts {
 		part = strings.TrimSpace(part)
 		if strings.Contains(part, "-") {
-			rangeParts := strings.Split(part, "-")
-			if len(rangeParts) != portRangeParts {
-				return nil, fmt.Errorf("invalid range format: %s", part)
+			rangePorts, err := parsePortRange(part)
+			if err != nil {
+				return nil, err
 			}
-
-			start, err1 := strconv.ParseInt(rangeParts[0], 10, 32)
-			end, err2 := strconv.ParseInt(rangeParts[1], 10, 32)
-			if err1 != nil || err2 != nil {
-				return nil, fmt.Errorf("invalid number in range: %s", part)
-			}
-			if start > end {
-				return nil, fmt.Errorf("start greater than end in range: %s", part)
-			}
-
-			for i := start; i <= end; i++ {
-				result = append(result, int32(i)) // #nosec G115: Integer overflow conversion is safe for port numbers
-			}
+			result = append(result, rangePorts...)
 		} else {
 			port, err := strconv.ParseInt(part, 10, 32)
 			if err != nil {
@@ -485,31 +495,39 @@ func (l *LinodeClient) updateServiceFirewall(ctx context.Context, service *v1.Se
 	}
 	// if existing firewall and new firewall differs, attach the new firewall and remove the old.
 	if existingFirewallID != newFirewallID {
-		// attach new firewall.
-		_, err = l.Client.CreateFirewallDevice(ctx, newFirewallID, linodego.FirewallDeviceCreateOptions{
-			ID:   nb.ID,
-			Type: "nodebalancer",
-		})
-		if err != nil {
+		if err := l.attachAndReplaceNBFirewall(ctx, nb.ID, existingFirewallID, newFirewallID); err != nil {
 			return err
-		}
-		// remove the existing firewall if it exists
-		if existingFirewallID != 0 {
-			deviceID, deviceExists, err := l.getNodeBalancerDeviceID(ctx, existingFirewallID, nb.ID)
-			if err != nil {
-				return err
-			}
-
-			if !deviceExists {
-				return fmt.Errorf("error in fetching attached nodeBalancer device")
-			}
-
-			if deleteErr := l.Client.DeleteFirewallDevice(ctx, existingFirewallID, deviceID); deleteErr != nil {
-				return deleteErr
-			}
 		}
 	}
 	return nil
+}
+
+// attachAndReplaceNBFirewall attaches newFirewallID to the NodeBalancer and, if an existing
+// firewall was previously attached, detaches and removes it.
+func (l *LinodeClient) attachAndReplaceNBFirewall(ctx context.Context, nbID, existingFirewallID, newFirewallID int) error {
+	// attach new firewall.
+	if _, err := l.Client.CreateFirewallDevice(ctx, newFirewallID, linodego.FirewallDeviceCreateOptions{
+		ID:   nbID,
+		Type: "nodebalancer",
+	}); err != nil {
+		return err
+	}
+
+	// remove the existing firewall if it exists
+	if existingFirewallID == 0 {
+		return nil
+	}
+
+	deviceID, deviceExists, err := l.getNodeBalancerDeviceID(ctx, existingFirewallID, nbID)
+	if err != nil {
+		return err
+	}
+
+	if !deviceExists {
+		return fmt.Errorf("error in fetching attached nodeBalancer device")
+	}
+
+	return l.Client.DeleteFirewallDevice(ctx, existingFirewallID, deviceID)
 }
 
 func (l *LinodeClient) updateNodeBalancerFirewallWithACL(
