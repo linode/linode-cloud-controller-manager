@@ -67,6 +67,38 @@
       "matchPackageNames": [
         "go.opentelemetry.io/**"
       ]
+    },
+    {
+      "groupName": "github actions ci",
+      "groupSlug": "github-actions-ci",
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": [
+        "dorny/paths-filter",
+        "codecov/codecov-action",
+        "actions/upload-artifact",
+      ]
+    },
+    {
+      "groupName": "github actions core",
+      "groupSlug": "github-actions-core",
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": [
+        "actions/checkout",
+        "actions/setup-go",
+        "step-security/harden-runner",
+      ]
+    },
+    {
+      "description": "Group development toolchain bumps from mise.toml.",
+      "matchManagers": ["mise"],
+      "groupName": "mise tools",
+    },
+    {
+      "description": "Keep the Go version in sync between go.mod and mise.toml.",
+      "matchManagers": ["mise", "gomod"],
+      "matchDepNames": ["go"],
+      "groupName": "go version",
+      "groupSlug": "go-version",
     }
   ]
 }
