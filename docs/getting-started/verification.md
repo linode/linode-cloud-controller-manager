@@ -1,6 +1,5 @@
 ---
 layout: default
-title: Verification
 parent: Getting Started
 nav_order: 4
 ---

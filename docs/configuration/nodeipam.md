@@ -1,6 +1,5 @@
 ---
 layout: default
-title: Node IPAM using CCM
 parent: Configuration Guide
 nav_order: 8
 ---

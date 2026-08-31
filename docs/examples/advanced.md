@@ -1,6 +1,5 @@
 ---
 layout: default
-title: Advanced Configuration
 parent: Examples
 nav_order: 2
 ---

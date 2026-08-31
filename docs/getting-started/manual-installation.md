@@ -1,6 +1,5 @@
 ---
 layout: default
-title: Manual Installation
 parent: Installation
 nav_order: 2
 ---
