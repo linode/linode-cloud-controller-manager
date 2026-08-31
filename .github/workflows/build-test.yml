@@ -66,6 +66,11 @@ jobs:
             dl.k8s.io:443
             get.helm.sh:443
             githubapp.com:443
+            pypi.org:443
+            files.pythonhosted.org:443
+            *.githubusercontent.com:443
+            *.githubapp.com:443
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -115,6 +120,8 @@ jobs:
             *.githubusercontent.com:443
             *.githubapp.com:443
             gcr.io:443
+            pypi.org:443
+            files.pythonhosted.org:443
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
