@@ -1,6 +1,5 @@
 ---
 layout: default
-title: Environment Variables and Flags
 parent: Configuration Guide
 nav_order: 4
 ---

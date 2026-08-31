@@ -1,6 +1,5 @@
 ---
 layout: default
-title: Requirements
 parent: Getting Started
 nav_order: 2
 ---
