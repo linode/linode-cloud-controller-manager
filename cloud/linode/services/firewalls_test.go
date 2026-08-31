@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -76,6 +77,25 @@ func TestRuleChanged(t *testing.T) {
 				t.Errorf("ruleChanged() = %v, want %v", got, tc.wantChange)
 			}
 		})
+	}
+}
+
+func TestProcessACLNoEmptyRuleForMissingFamily(t *testing.T) {
+	ipv4s := make([]string, 256)
+	for i := range ipv4s {
+		ipv4s[i] = fmt.Sprintf("10.0.%d.1/32", i)
+	}
+
+	fwcreateOpts := &linodego.FirewallCreateOptions{}
+	err := processACL(fwcreateOpts, accept, "test", "svc", "80", linodego.NetworkAddresses{IPv4: ipv4s})
+	if err != nil {
+		t.Fatalf("processACL() error = %v", err)
+	}
+
+	for _, rule := range fwcreateOpts.Rules.Inbound {
+		if len(rule.Addresses.IPv4) == 0 && len(rule.Addresses.IPv6) == 0 {
+			t.Errorf("processACL() created an inbound rule with no addresses: %+v", rule)
+		}
 	}
 }
 
