@@ -1,6 +1,5 @@
 ---
 layout: default
-title: Configuration Guide
 nav_order: 3
 ---
 

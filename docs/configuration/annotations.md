@@ -1,6 +1,5 @@
 ---
 layout: default
-title: Service Annotations
 parent: Configuration Guide
 nav_order: 2
 ---
