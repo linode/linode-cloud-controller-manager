@@ -5,12 +5,12 @@
 <a href="https://pkg.go.dev/github.com/linode/linode-cloud-controller-manager">
 <img src="https://pkg.go.dev/badge/github.com/linode/linode-cloud-controller-manager.svg"></a>
 <!-- codecov badge -->
-<a href="https://codecov.io/github/linode/linode-cloud-controller-manager" > 
-<img src="https://codecov.io/github/linode/linode-cloud-controller-manager/graph/badge.svg?token=YQFKF86KJ6"/> 
+<a href="https://codecov.io/github/linode/linode-cloud-controller-manager" >
+<img src="https://codecov.io/github/linode/linode-cloud-controller-manager/graph/badge.svg?token=YQFKF86KJ6"/>
 </a>
 <!-- docker pulls badge -->
-<a href="https://hub.docker.com/r/linode/linode-cloud-controller-manager/" > 
-<img src="https://img.shields.io/docker/pulls/linode/linode-cloud-controller-manager.svg"/> 
+<a href="https://hub.docker.com/r/linode/linode-cloud-controller-manager/" >
+<img src="https://img.shields.io/docker/pulls/linode/linode-cloud-controller-manager.svg"/>
 </a>
 <!-- join kubernetes slack channel for linode -->
 <a href="https://kubernetes.slack.com/messages/CD4B15LUR">
@@ -111,6 +111,7 @@ A Cloud Controller Manager (CCM) is a Kubernetes control plane component that em
   - [Basic Services](docs/examples/basic.md)
   - [Advanced Configuration](docs/examples/advanced.md)
 - [Development Guide](docs/development/README.md) - Contributing to CCM
+  - [Testing](docs/development/testing.md) - Run unit and end-to-end test suites
 
 ## Getting Help
 

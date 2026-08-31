@@ -5,6 +5,8 @@ nav_order: 5
 
 # Development Guide
 
+For local, CAPL-provisioned, and LKE-based test workflows, see [Testing](testing.md).
+
 ## Prerequisites
 
 The Linode Cloud Controller Manager development requires:
