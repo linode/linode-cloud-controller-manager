@@ -94,6 +94,10 @@ tolerations:
 #   clusterCIDR: 10.192.0.0/10
 #   configureCloudRoutes: true
 
+# Set the generic cloud-provider route configuration flag without enabling the
+# Linode route controller.
+# configureCloudRoutes: false
+
 # This section adds ability to enable nodeipam-controller for ccm
 # enableNodeIPAM: false
 # clusterCIDR: 10.192.0.0/10
@@ -132,6 +136,10 @@ tolerations:
 
 # nodeBalancerBackendIPv4Subnet is the subnet to use for the backend ips of the NodeBalancer
 # nodeBalancerBackendIPv4Subnet: ""
+
+# nodeBalancerBackendIPv4ReservedRange is a /30 within nodeBalancerBackendIPv4Subnet
+# that must never be allocated to a NodeBalancer.
+# nodeBalancerBackendIPv4ReservedRange: ""
 
 # nodeBalancerBackendIPv4SubnetID is the subnet id to use for the backend ips of the NodeBalancer
 # nodeBalancerBackendIPv4SubnetID: ""

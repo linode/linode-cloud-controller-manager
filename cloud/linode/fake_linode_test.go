@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
 	"github.com/linode/linodego/v2"
 )
 
@@ -43,6 +44,10 @@ type fakeRequest struct {
 
 func newFake(t *testing.T) *fakeAPI {
 	t.Helper()
+	services.Mu.Lock()
+	services.VpcIDs = make(map[string]int)
+	services.SubnetIDs = make(map[string]int)
+	services.Mu.Unlock()
 
 	fake := &fakeAPI{
 		t:        t,
@@ -125,6 +130,24 @@ func (f *fakeAPI) setupRoutes() {
 		}
 		rr, _ := json.Marshal(resp)
 		_, _ = w.Write(rr)
+	})
+
+	f.mux.HandleFunc("GET /v4/vpcs/{vpcId}/subnets/{subnetId}", func(w http.ResponseWriter, r *http.Request) {
+		subnetID, err := strconv.Atoi(r.PathValue("subnetId"))
+		if err != nil {
+			f.t.Fatal(err)
+		}
+		subnet, ok := f.subnet[subnetID]
+		if !ok {
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"errors":[{"reason":"Not Found"}]}`))
+			return
+		}
+		resp, err := json.Marshal(subnet)
+		if err != nil {
+			f.t.Fatal(err)
+		}
+		_, _ = w.Write(resp)
 	})
 
 	f.mux.HandleFunc("GET /v4/vpcs", func(w http.ResponseWriter, r *http.Request) {
@@ -366,6 +389,20 @@ func (f *fakeAPI) setupRoutes() {
 			nb.ClientConnThrottle = *nbco.ClientConnThrottle
 		}
 		f.nb[strconv.Itoa(nb.ID)] = &nb
+
+		for _, backendVPC := range nbco.BackendVPCs {
+			if backendVPC.IPv4Range == "" {
+				continue
+			}
+			subnet, ok := f.subnet[backendVPC.SubnetID]
+			if !ok {
+				f.t.Fatalf("subnet %d not found", backendVPC.SubnetID)
+			}
+			subnet.Nodebalancers = append(subnet.Nodebalancers, linodego.VPCSubnetNodebalancers{
+				ID:        nb.ID,
+				Ipv4Range: backendVPC.IPv4Range,
+			})
+		}
 
 		for _, nbcco := range nbco.Configs {
 			if nbcco.Protocol == "https" {
@@ -648,6 +685,15 @@ func (f *fakeAPI) setupRoutes() {
 			if n.NodeBalancerID == nid {
 				delete(f.nbn, k)
 			}
+		}
+		for _, subnet := range f.subnet {
+			nodebalancers := subnet.Nodebalancers[:0]
+			for _, nodeBalancer := range subnet.Nodebalancers {
+				if nodeBalancer.ID != nid {
+					nodebalancers = append(nodebalancers, nodeBalancer)
+				}
+			}
+			subnet.Nodebalancers = nodebalancers
 		}
 	})
 

@@ -20,23 +20,24 @@ var Options struct {
 	SubnetIDs                []int
 	LoadBalancerType         string
 	// Deprecated no-op options retained so existing deployments continue to start.
-	BGPNodeSelector                   string
-	IpHolderSuffix                    string
-	LinodeExternalNetwork             *net.IPNet
-	NodeBalancerTags                  []string
-	DefaultNBType                     string
-	NodeBalancerBackendIPv4Subnet     string
-	NodeBalancerBackendIPv4SubnetID   int
-	NodeBalancerBackendIPv4SubnetName string
-	DisableNodeBalancerVPCBackends    bool
-	GlobalStopChannel                 chan<- struct{}
-	EnableIPv6ForLoadBalancers        bool
-	EnableIPv6ForNodeBalancerBackends bool
-	AllocateNodeCIDRs                 bool
-	DisableIPv6NodeCIDRAllocation     bool
-	ClusterCIDRIPv4                   string
-	NodeCIDRMaskSizeIPv4              int
-	NodeCIDRMaskSizeIPv6              int
-	NodeBalancerPrefix                string
-	LinodeTagFilter                   string
+	BGPNodeSelector                      string
+	IpHolderSuffix                       string
+	LinodeExternalNetwork                *net.IPNet
+	NodeBalancerTags                     []string
+	DefaultNBType                        string
+	NodeBalancerBackendIPv4Subnet        string
+	NodeBalancerBackendIPv4ReservedRange string
+	NodeBalancerBackendIPv4SubnetID      int
+	NodeBalancerBackendIPv4SubnetName    string
+	DisableNodeBalancerVPCBackends       bool
+	GlobalStopChannel                    chan<- struct{}
+	EnableIPv6ForLoadBalancers           bool
+	EnableIPv6ForNodeBalancerBackends    bool
+	AllocateNodeCIDRs                    bool
+	DisableIPv6NodeCIDRAllocation        bool
+	ClusterCIDRIPv4                      string
+	NodeCIDRMaskSizeIPv4                 int
+	NodeCIDRMaskSizeIPv6                 int
+	NodeBalancerPrefix                   string
+	LinodeTagFilter                      string
 }

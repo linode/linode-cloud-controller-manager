@@ -790,6 +790,31 @@ func (l *loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Ser
 		}
 	}
 
+	if options.Options.NodeBalancerBackendIPv4ReservedRange != "" {
+		vpcID, err := l.getVPCIDForSVC(ctx, service)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve VPC for NodeBalancer backend allocation: %w", err)
+		}
+		subnet, err := l.client.GetVPCSubnet(ctx, vpcID, subnetID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get VPC subnet %d for NodeBalancer backend allocation: %w", subnetID, err)
+		}
+		backendIPv4Range, err := allocateNodeBalancerBackendIPv4Range(
+			options.Options.NodeBalancerBackendIPv4Subnet,
+			options.Options.NodeBalancerBackendIPv4ReservedRange,
+			subnet,
+		)
+		if err != nil {
+			return nil, err
+		}
+		return []linodego.NodeBalancerBackendVPCOptions{
+			{
+				SubnetID:  subnetID,
+				IPv4Range: backendIPv4Range,
+			},
+		}, nil
+	}
+
 	// Precedence 2: If the user wants to overwrite the default VPC name or subnet name
 	// and have specified it in the annotations, use it to set subnetID
 	// and auto-allocate subnets from it for the NodeBalancer
@@ -816,7 +841,7 @@ func (l *loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Ser
 	}
 
 	// Precedence 4: If the user has specified a NodeBalancerBackendIPv4Subnet, use that
-	// and auto-allocate subnets from it for the NodeBalancer
+	// and auto-allocate subnets from it for the NodeBalancer.
 	if options.Options.NodeBalancerBackendIPv4Subnet != "" {
 		vpcCreateOpts := []linodego.NodeBalancerBackendVPCOptions{
 			{
@@ -1120,7 +1145,7 @@ func (l *loadbalancers) getSubnetIDForSVC(ctx context.Context, service *v1.Servi
 		return subnetID, nil
 	}
 
-	specifiedVPCName, vpcOk := service.GetAnnotations()[annotations.NodeBalancerBackendVPCName]
+	_, vpcOk := service.GetAnnotations()[annotations.NodeBalancerBackendVPCName]
 	specifiedSubnetName, subnetOk := service.GetAnnotations()[annotations.NodeBalancerBackendSubnetName]
 
 	// If no VPCName or SubnetName is specified in annotations, but NodeBalancerBackendIPv4SubnetID is set,
@@ -1129,11 +1154,7 @@ func (l *loadbalancers) getSubnetIDForSVC(ctx context.Context, service *v1.Servi
 		return options.Options.NodeBalancerBackendIPv4SubnetID, nil
 	}
 
-	vpcName := options.Options.VPCNames[0]
-	if vpcOk {
-		vpcName = specifiedVPCName
-	}
-	vpcID, err := services.GetVPCID(ctx, l.client, vpcName)
+	vpcID, err := l.getVPCIDForSVC(ctx, service)
 	if err != nil {
 		return 0, err
 	}
@@ -1145,6 +1166,18 @@ func (l *loadbalancers) getSubnetIDForSVC(ctx context.Context, service *v1.Servi
 
 	// Use the VPC ID and Subnet Name to get the subnet ID
 	return services.GetSubnetID(ctx, l.client, vpcID, subnetName)
+}
+
+func (l *loadbalancers) getVPCIDForSVC(ctx context.Context, service *v1.Service) (int, error) {
+	if len(options.Options.VPCNames) == 0 {
+		return 0, fmt.Errorf("CCM not configured with VPC, cannot create NodeBalancer with specified annotation")
+	}
+
+	vpcName := options.Options.VPCNames[0]
+	if specifiedVPCName, ok := service.GetAnnotations()[annotations.NodeBalancerBackendVPCName]; ok {
+		vpcName = specifiedVPCName
+	}
+	return services.GetVPCID(ctx, l.client, vpcName)
 }
 
 // buildLoadBalancerRequest returns a linodego.NodeBalancer
@@ -1584,6 +1617,19 @@ func validateNodeBalancerBackendIPv4Range(backendIPv4Range string) error {
 	if !withinCIDR {
 		return fmt.Errorf("IPv4 range %s is not within the subnet %s", backendIPv4Range, options.Options.NodeBalancerBackendIPv4Subnet)
 	}
+	if options.Options.NodeBalancerBackendIPv4ReservedRange != "" {
+		reserved, err := parseIPv4Prefix(options.Options.NodeBalancerBackendIPv4ReservedRange)
+		if err != nil {
+			return fmt.Errorf("invalid reserved NodeBalancer backend range: %w", err)
+		}
+		backend, err := parseIPv4Prefix(backendIPv4Range)
+		if err != nil {
+			return fmt.Errorf("invalid IPv4 range: %w", err)
+		}
+		if prefixesOverlap(backend, reserved) {
+			return fmt.Errorf("IPv4 range %s overlaps the reserved NodeBalancer backend range %s", backend, reserved)
+		}
+	}
 	return nil
 }
 
@@ -1608,5 +1654,7 @@ func isCIDRWithinCIDR(outer, inner string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("invalid CIDR: %w", err)
 	}
-	return ipNet1.Contains(ipNet2.IP), nil
+	outerOnes, outerBits := ipNet1.Mask.Size()
+	innerOnes, innerBits := ipNet2.Mask.Size()
+	return outerBits == innerBits && outerOnes <= innerOnes && ipNet1.Contains(ipNet2.IP), nil
 }

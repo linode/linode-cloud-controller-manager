@@ -93,6 +93,7 @@ func main() {
 	command.Flags().StringVar(&ccmOptions.Options.IpHolderSuffix, "ip-holder-suffix", "", "DEPRECATED: no effect; retained for backwards compatibility")
 	command.Flags().StringVar(&ccmOptions.Options.DefaultNBType, "default-nodebalancer-type", string(linodego.NBTypeCommon), "default type of NodeBalancer to create (options: common, premium, premium_40GB)")
 	command.Flags().StringVar(&ccmOptions.Options.NodeBalancerBackendIPv4Subnet, "nodebalancer-backend-ipv4-subnet", "", "ipv4 subnet to use for NodeBalancer backends")
+	command.Flags().StringVar(&ccmOptions.Options.NodeBalancerBackendIPv4ReservedRange, "nodebalancer-backend-ipv4-reserved-range", "", "ipv4 range within the NodeBalancer backend subnet that must never be allocated")
 	command.Flags().StringSliceVar(&ccmOptions.Options.NodeBalancerTags, "nodebalancer-tags", []string{}, "Linode tags to apply to all NodeBalancers")
 	command.Flags().BoolVar(&ccmOptions.Options.EnableIPv6ForLoadBalancers, "enable-ipv6-for-loadbalancers", false, "set both IPv4 and IPv6 addresses for all LoadBalancer services (when disabled, only IPv4 is used)")
 	command.Flags().BoolVar(&ccmOptions.Options.EnableIPv6ForNodeBalancerBackends, "enable-ipv6-for-nodebalancer-backends", false, "use public IPv6 addresses for NodeBalancer service backends, including VPC-backed NodeBalancers (when enabled, may update existing services during reconciliation and all selected backend nodes must have public IPv6)")

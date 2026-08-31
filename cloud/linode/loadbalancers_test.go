@@ -5881,13 +5881,26 @@ func Test_validateNodeBalancerBackendIPv4Range(t *testing.T) {
 			args:    args{backendIPv4Range: "10.100.0.0"},
 			wantErr: true,
 		},
+		{
+			name:    "Reserved IPv4 range",
+			args:    args{backendIPv4Range: "10.100.0.252/30"},
+			wantErr: true,
+		},
+		{
+			name:    "Range extends outside backend subnet",
+			args:    args{backendIPv4Range: "10.100.0.0/23"},
+			wantErr: true,
+		},
 	}
 
 	nbBackendSubnet := options.Options.NodeBalancerBackendIPv4Subnet
+	nbBackendReservedRange := options.Options.NodeBalancerBackendIPv4ReservedRange
 	defer func() {
 		options.Options.NodeBalancerBackendIPv4Subnet = nbBackendSubnet
+		options.Options.NodeBalancerBackendIPv4ReservedRange = nbBackendReservedRange
 	}()
 	options.Options.NodeBalancerBackendIPv4Subnet = "10.100.0.0/24"
+	options.Options.NodeBalancerBackendIPv4ReservedRange = "10.100.0.252/30"
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
