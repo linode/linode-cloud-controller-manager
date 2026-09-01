@@ -1,6 +1,5 @@
 ---
 layout: default
-title: Firewall Setup
 parent: Configuration Guide
 nav_order: 5
 ---

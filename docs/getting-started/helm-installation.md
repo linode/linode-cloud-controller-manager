@@ -1,6 +1,5 @@
 ---
 layout: default
-title: Helm Installation
 parent: Installation
 nav_order: 1
 ---

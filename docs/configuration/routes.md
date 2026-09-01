@@ -1,6 +1,5 @@
 ---
 layout: default
-title: Route Configuration
 parent: Configuration Guide
 nav_order: 6
 ---
