@@ -1,6 +1,5 @@
 ---
 layout: default
-title: Session Affinity
 parent: Configuration Guide
 nav_order: 7
 ---

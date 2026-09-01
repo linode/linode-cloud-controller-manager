@@ -1,6 +1,5 @@
 ---
 layout: default
-title: Troubleshooting
 parent: Getting Started
 nav_order: 5
 ---

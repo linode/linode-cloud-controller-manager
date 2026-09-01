@@ -1,6 +1,5 @@
 ---
 layout: default
-title: Basic Services
 parent: Examples
 nav_order: 1
 ---

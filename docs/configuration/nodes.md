@@ -1,6 +1,5 @@
 ---
 layout: default
-title: Node Configuration
 parent: Configuration Guide
 nav_order: 3
 ---
