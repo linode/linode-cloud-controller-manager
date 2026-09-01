@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -74,6 +75,76 @@ func TestRuleChanged(t *testing.T) {
 			got := ruleChanged(&old, tc.newACL, svc)
 			if got != tc.wantChange {
 				t.Errorf("ruleChanged() = %v, want %v", got, tc.wantChange)
+			}
+		})
+	}
+}
+
+// generateCIDRs builds count distinct CIDRs using the given per-index formatter,
+// e.g. an IPv4 /32 or an IPv6 /128 formatter.
+func generateCIDRs(count int, format func(i int) string) []string {
+	ips := make([]string, count)
+	for i := range ips {
+		ips[i] = format(i)
+	}
+	return ips
+}
+
+// TestProcessACLNoEmptyRuleForMissingFamily is a regression test for a bug where
+// processACL created an empty inbound rule for the IP family with no addresses
+// when the other family exceeded maxIPsPerFirewall (255), because chunkIPs
+// returns a single chunk for an empty slice. It exercises both single-family
+// cases (IPv4-only and the symmetric IPv6-only case) with 256 addresses, which
+// must be split into exactly two chunks: 255 and 1.
+func TestProcessACLNoEmptyRuleForMissingFamily(t *testing.T) {
+	const addrCount = 256
+	wantChunkSizes := []int{255, 1}
+
+	tests := []struct {
+		name string
+		ips  linodego.NetworkAddresses
+	}{
+		{
+			name: "IPv4Only",
+			ips: linodego.NetworkAddresses{
+				IPv4: generateCIDRs(addrCount, func(i int) string { return fmt.Sprintf("10.0.%d.1/32", i) }),
+			},
+		},
+		{
+			name: "IPv6Only",
+			ips: linodego.NetworkAddresses{
+				IPv6: generateCIDRs(addrCount, func(i int) string { return fmt.Sprintf("2001:db8::%x/128", i) }),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fwcreateOpts := &linodego.FirewallCreateOptions{}
+			err := processACL(fwcreateOpts, accept, "test", "svc", "80", tt.ips)
+			if err != nil {
+				t.Fatalf("processACL() error = %v", err)
+			}
+
+			if len(fwcreateOpts.Rules.Inbound) != len(wantChunkSizes) {
+				t.Fatalf("processACL() created %d inbound rules, want %d", len(fwcreateOpts.Rules.Inbound), len(wantChunkSizes))
+			}
+
+			for i, rule := range fwcreateOpts.Rules.Inbound {
+				if len(rule.Addresses.IPv4) == 0 && len(rule.Addresses.IPv6) == 0 {
+					t.Errorf("processACL() created an inbound rule with no addresses: %+v", rule)
+				}
+
+				if gotSize := len(rule.Addresses.IPv4) + len(rule.Addresses.IPv6); gotSize != wantChunkSizes[i] {
+					t.Errorf("rule %d has %d addresses, want %d", i, gotSize, wantChunkSizes[i])
+				}
+
+				if len(tt.ips.IPv4) > 0 && len(rule.Addresses.IPv6) != 0 {
+					t.Errorf("rule %d unexpectedly has IPv6 addresses for an IPv4-only ACL: %+v", i, rule)
+				}
+				if len(tt.ips.IPv6) > 0 && len(rule.Addresses.IPv4) != 0 {
+					t.Errorf("rule %d unexpectedly has IPv4 addresses for an IPv6-only ACL: %+v", i, rule)
+				}
 			}
 		})
 	}
