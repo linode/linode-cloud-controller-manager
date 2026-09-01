@@ -13,7 +13,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/utils/ptr"
 
 	linodeClient "github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
@@ -362,7 +361,7 @@ func TestCreateRoute(t *testing.T) {
 	}
 
 	instanceConfigIntfWithVPCAndRoute := linodego.InstanceConfigInterface{
-		VPCID:    ptr.To(services.VpcIDs["dummy"]),
+		VPCID:    new(services.VpcIDs["dummy"]),
 		IPv4:     &linodego.VPCIPv4{VPC: vpcIP},
 		IPRanges: []string{"10.10.10.0/24"},
 	}
@@ -564,7 +563,7 @@ func TestDeleteRoute(t *testing.T) {
 	}
 
 	instanceConfigIntfWithVPCAndNoRoute := linodego.InstanceConfigInterface{
-		VPCID:    ptr.To(services.VpcIDs["dummy"]),
+		VPCID:    new(services.VpcIDs["dummy"]),
 		IPv4:     &linodego.VPCIPv4{VPC: vpcIP},
 		IPRanges: []string{},
 	}
