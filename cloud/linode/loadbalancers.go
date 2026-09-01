@@ -22,7 +22,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/ptr"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
@@ -1506,7 +1505,7 @@ func makeLoadBalancerStatus(service *v1.Service, nb *linodego.NodeBalancer) *v1.
 	if useHostnameOnly == nil {
 		val := envBoolOptions("LINODE_HOSTNAME_ONLY_INGRESS")
 		klog.Infof("LINODE_HOSTNAME_ONLY_INGRESS:  (%v)", val)
-		useHostnameOnly = ptr.To(envBoolOptions("LINODE_HOSTNAME_ONLY_INGRESS"))
+		useHostnameOnly = new(envBoolOptions("LINODE_HOSTNAME_ONLY_INGRESS"))
 	}
 	if *useHostnameOnly {
 		return &v1.LoadBalancerStatus{
@@ -1521,7 +1520,7 @@ func makeLoadBalancerStatus(service *v1.Service, nb *linodego.NodeBalancer) *v1.
 	// Check for per-service IPv6 annotation first, then fall back to global setting if not set
 	useIPv6 := getServiceBoolAnnotation(service, annotations.AnnLinodeEnableIPv6Ingress)
 	if useIPv6 == nil {
-		useIPv6 = ptr.To(options.Options.EnableIPv6ForLoadBalancers)
+		useIPv6 = new(options.Options.EnableIPv6ForLoadBalancers)
 	}
 
 	// When IPv6 is enabled (either per-service or globally), include both IPv4 and IPv6
@@ -1569,7 +1568,7 @@ func getServiceBoolAnnotation(service *v1.Service, name string) *bool {
 		return nil
 	}
 	boolValue, err := strconv.ParseBool(value)
-	return ptr.To(err == nil && boolValue)
+	return new(err == nil && boolValue)
 }
 
 // validateNodeBalancerBackendIPv4Range validates the NodeBalancerBackendIPv4Range

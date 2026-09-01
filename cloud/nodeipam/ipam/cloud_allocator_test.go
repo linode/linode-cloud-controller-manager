@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
-	"k8s.io/utils/ptr"
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
@@ -839,7 +838,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 				{
 					Interfaces: []linodego.InstanceConfigInterface{
 						{
-							VPCID:   ptr.To(12345),
+							VPCID:   new(12345),
 							Purpose: linodego.InterfacePurposeVPC,
 							IPv6: &linodego.InstanceConfigInterfaceIPv6{
 								Ranges: []linodego.InstanceConfigInterfaceIPv6Range{
@@ -1265,7 +1264,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 				{
 					Interfaces: []linodego.InstanceConfigInterface{
 						{
-							VPCID:   ptr.To(12345),
+							VPCID:   new(12345),
 							Purpose: linodego.InterfacePurposeVPC,
 							IPv6: &linodego.InstanceConfigInterfaceIPv6{
 								Ranges: []linodego.InstanceConfigInterfaceIPv6Range{
