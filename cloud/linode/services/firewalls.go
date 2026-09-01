@@ -265,8 +265,11 @@ func chunkIPs(ips []string) [][]string {
 	ipCount := len(ips)
 
 	// If the number of IPs is less than or equal to maxIPsPerFirewall,
-	// return a single chunk containing all IPs.
+	// return a single chunk containing all IPs, or nil if chunking an empty slice.
 	if ipCount <= maxIPsPerFirewall {
+		if ipCount == 0 {
+			return nil
+		}
 		return [][]string{ips}
 	}
 
