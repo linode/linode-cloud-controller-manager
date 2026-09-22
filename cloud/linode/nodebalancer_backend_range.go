@@ -39,7 +39,8 @@ func allocateNodeBalancerBackendIPv4Range(backendCIDR, reservedCIDR string, subn
 	rangeCount := uint64(1) << uint(nodeBalancerBackendRangePrefix-backend.Bits())
 
 	assigned := make([]netip.Prefix, 0, len(subnet.Nodebalancers))
-	for _, nodeBalancer := range subnet.Nodebalancers {
+	for index := range subnet.Nodebalancers {
+		nodeBalancer := &subnet.Nodebalancers[index]
 		if nodeBalancer.Ipv4Range == "" {
 			continue
 		}
@@ -144,8 +145,8 @@ func prefixesOverlap(first, second netip.Prefix) bool {
 }
 
 func overlapsAnyPrefix(candidate netip.Prefix, prefixes []netip.Prefix) bool {
-	for _, prefix := range prefixes {
-		if prefixesOverlap(candidate, prefix) {
+	for index := range prefixes {
+		if prefixesOverlap(candidate, prefixes[index]) {
 			return true
 		}
 	}

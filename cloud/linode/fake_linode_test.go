@@ -13,8 +13,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
 	"github.com/linode/linodego/v2"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
 )
 
 const apiVersion = "v4"

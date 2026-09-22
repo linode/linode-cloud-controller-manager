@@ -5,15 +5,16 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
 	"github.com/linode/linodego/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
+	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
 )
 
 func TestAllocateNodeBalancerBackendIPv4Range(t *testing.T) {
