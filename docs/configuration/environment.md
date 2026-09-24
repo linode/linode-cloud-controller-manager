@@ -53,6 +53,7 @@ The CCM supports the following flags:
 | `--default-nodebalancer-type` | String | `common` | Default type of NodeBalancer to create (options: common, premium, premium_40gb). Note: NodeBalancer types should always be specified in lowercase. |
 | `--nodebalancer-tags` | String (comma separated) | | Linode tags to apply to all NodeBalancers |
 | `--nodebalancer-backend-ipv4-subnet` | String | `""` | ipv4 subnet to use for NodeBalancer backends |
+| `--nodebalancer-backend-ipv4-reserved-range` | String | `""` | /30 within `--nodebalancer-backend-ipv4-subnet` that must never be allocated to a NodeBalancer. Must be the highest /30 of that subnet. |
 | `--nodebalancer-backend-ipv4-subnet-id` | Int | `""` | ipv4 subnet id to use for NodeBalancer backends |
 | `--nodebalancer-backend-ipv4-subnet-name` | String | `""` | ipv4 subnet name to use for NodeBalancer backends |
 | `--disable-nodebalancer-vpc-backends` | Boolean | `false` | don't use VPC specific ip-addresses for nodebalancer backend ips when running in VPC (set to `true` for backward compatibility if needed) |
@@ -128,13 +129,16 @@ If no specific subnet is specified, by default, CCM will use the `default` subne
 
 `--nodebalancer-backend-ipv4-subnet` can be used to make sure if nodebalancer backend ips are manually specified in service annotation, they lie within the specified subnet range.
 
+`--nodebalancer-backend-ipv4-reserved-range` keeps one /30 of `--nodebalancer-backend-ipv4-subnet` free so it is never handed to a NodeBalancer. It requires `--nodebalancer-backend-ipv4-subnet` to be set and must be the highest /30 of that subnet, otherwise CCM fails to start. When it is set, CCM allocates backend ranges itself instead of letting the Linode API auto-assign them. See [Reserving a NodeBalancer backend IPv4 range](loadbalancer.md#reserving-a-nodebalancer-backend-ipv4-range).
+
 If CCM is started with multiple flags for nodebalancer backend subnet, following order of precedence is used for backend ip addresses:
 
  1. NodeBalancerBackendIPv4Range annotation on service
- 2. NodeBalancerBackendVPCName and NodeBalancerBackendSubnetName annotation on service
- 3. NodeBalancerBackendIPv4SubnetID/NodeBalancerBackendIPv4SubnetName flag set when starting CCM
- 4. NodeBalancerBackendIPv4Subnet flag when starting CCM
- 5. Default to using the subnet ID of the service's VPC
+ 2. NodeBalancerBackendIPv4ReservedRange flag set when starting CCM (CCM picks the /30 itself)
+ 3. NodeBalancerBackendVPCName and NodeBalancerBackendSubnetName annotation on service
+ 4. NodeBalancerBackendIPv4SubnetID/NodeBalancerBackendIPv4SubnetName flag set when starting CCM
+ 5. NodeBalancerBackendIPv4Subnet flag when starting CCM
+ 6. Default to using the subnet ID of the service's VPC
 
 ## Troubleshooting
 
