@@ -75,6 +75,8 @@ mise run cleanup-cluster
 
 `mise run e2e-test` includes the IPv6 backend test slice. It is intended for the CAPL-provisioned clusters; do not use it against an existing LKE cluster.
 
+The `lb-with-reserved-backend-ipv4-range` scenario is the one exception to the "a test only touches its own namespace" rule. It adds `--nodebalancer-backend-ipv4-subnet` and `--nodebalancer-backend-ipv4-reserved-range` to the `ccm-linode` DaemonSet, waits for the rollout, and removes both flags again when the test finishes. It is marked `concurrent: false` so Chainsaw runs it on its own, and it carries no `lke` label because it expects VPC-backed NodeBalancers and a DaemonSet it is allowed to edit. If the run is interrupted between the patch and the cleanup, remove the two flags by hand before running other scenarios.
+
 ## End-to-End Tests with LKE
 
 The scenarios labelled `lke` can run against an existing LKE cluster. Use a disposable LKE cluster that already runs the CCM image you want to validate. These tests create namespaces and LoadBalancer Services, and some scenarios create or modify NodeBalancers, Cloud Firewalls, and reserved IPs in the cluster's region.
