@@ -6093,7 +6093,7 @@ func Test_getFrontendVPCCreateOptions(t *testing.T) {
 			want: []linodego.NodeBalancerFrontendVPCOptions{
 				{
 					SubnetID:  123,
-					IPv4Range: "10.100.5.0/24",
+					IPv4Range: new("10.100.5.0/24"),
 				},
 			},
 			wantErr: false,
@@ -6113,7 +6113,7 @@ func Test_getFrontendVPCCreateOptions(t *testing.T) {
 			want: []linodego.NodeBalancerFrontendVPCOptions{
 				{
 					SubnetID:  123,
-					IPv6Range: "2001:db80:1005::/48",
+					IPv6Range: new("2001:db80:1005::/48"),
 				},
 			},
 			wantErr: false,
