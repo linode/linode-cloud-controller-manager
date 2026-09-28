@@ -213,6 +213,14 @@ func setupNodeBalancerBackendSubnet(linodeClient client.Client) error {
 	if options.Options.NodeBalancerBackendIPv4SubnetID != 0 && options.Options.NodeBalancerBackendIPv4SubnetName != "" {
 		return fmt.Errorf("cannot have both --nodebalancer-backend-ipv4-subnet-id and --nodebalancer-backend-ipv4-subnet-name set")
 	}
+	if options.Options.NodeBalancerBackendIPv4ReservedRange != "" {
+		if err := validateNodeBalancerBackendIPv4Reservation(
+			options.Options.NodeBalancerBackendIPv4Subnet,
+			options.Options.NodeBalancerBackendIPv4ReservedRange,
+		); err != nil {
+			return err
+		}
+	}
 
 	switch {
 	case options.Options.DisableNodeBalancerVPCBackends:

@@ -1,0 +1,281 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: lb-with-reserved-backend-ipv4-range
+  labels:
+    all:
+spec:
+  namespace: "lb-with-reserved-backend-ipv4-range"
+  # This test reconfigures the cluster-wide CCM daemonset with
+  # --nodebalancer-backend-ipv4-subnet and --nodebalancer-backend-ipv4-reserved-range,
+  # which changes how every NodeBalancer gets its backend range. It must not run
+  # while another test is provisioning NodeBalancers.
+  concurrent: false
+  bindings:
+    # A /24 inside the 10.0.0.0/8 VPC subnet the test cluster runs in. Nodes take
+    # their VPC addresses from the bottom of that subnet and pod CIDRs come out of
+    # 10.192.0.0/10, so this block is free for NodeBalancer backends.
+    - name: backendSubnet
+      value: 10.100.0.0/24
+    # The highest /30 of backendSubnet, which is the only value the CCM accepts.
+    - name: reservedRange
+      value: 10.100.0.252/30
+  catch:
+    - script:
+        shell: bash
+        shellArgs:
+          - -c
+        content: |
+          set -euo pipefail
+          echo "Test failed. Fetching CCM logs..."
+          kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-with-reserved-backend-ipv4-range" | tail -100
+  steps:
+    - name: Configure CCM with a reserved NodeBalancer backend range
+      try:
+        - script:
+            shell: bash
+            shellArgs:
+              - -c
+            env:
+              - name: BACKEND_SUBNET
+                value: ($backendSubnet)
+              - name: RESERVED_RANGE
+                value: ($reservedRange)
+            content: |
+              set -euo pipefail
+
+              # Rebuild the arg list so re-running the step is idempotent.
+              args=$(kubectl -n kube-system get daemonset ccm-linode -o json | jq -c \
+                --arg subnet "--nodebalancer-backend-ipv4-subnet=$BACKEND_SUBNET" \
+                --arg reserved "--nodebalancer-backend-ipv4-reserved-range=$RESERVED_RANGE" \
+                '[.spec.template.spec.containers[0].args[]
+                  | select(test("^--nodebalancer-backend-ipv4-(subnet|reserved-range)=") | not)]
+                 + [$subnet, $reserved]')
+
+              if ! kubectl -n kube-system patch daemonset ccm-linode --type='json' \
+                -p "[{\"op\": \"replace\", \"path\": \"/spec/template/spec/containers/0/args\", \"value\": $args}]" >/dev/null; then
+                echo "Unable to patch the ccm-linode daemonset"
+              fi
+
+              # CCM rejects an invalid reserved range at startup, so a successful
+              # rollout also covers the startup validation.
+              if ! kubectl -n kube-system rollout status daemonset/ccm-linode --timeout=240s; then
+                echo "CCM did not roll out with the reserved backend range flags"
+              fi
+
+              applied=$(kubectl -n kube-system get daemonset ccm-linode -o json \
+                | jq -r '.spec.template.spec.containers[0].args[]' \
+                | grep -c -- "--nodebalancer-backend-ipv4-reserved-range=$RESERVED_RANGE" || true)
+              if [[ "$applied" != "1" ]]; then
+                echo "Reserved backend range flag is not set on the ccm-linode daemonset"
+              fi
+            check:
+              ($error == null): true
+              (contains($stdout, 'Unable to patch the ccm-linode daemonset')): false
+              (contains($stdout, 'CCM did not roll out with the reserved backend range flags')): false
+              (contains($stdout, 'Reserved backend range flag is not set on the ccm-linode daemonset')): false
+      cleanup:
+        - script:
+            shell: bash
+            shellArgs:
+              - -c
+            content: |
+              set -euo pipefail
+
+              # Restore the daemonset so the tests that run after this one see the
+              # default backend allocation behaviour.
+              args=$(kubectl -n kube-system get daemonset ccm-linode -o json | jq -c \
+                '[.spec.template.spec.containers[0].args[]
+                  | select(test("^--nodebalancer-backend-ipv4-(subnet|reserved-range)=") | not)]')
+
+              if ! kubectl -n kube-system patch daemonset ccm-linode --type='json' \
+                -p "[{\"op\": \"replace\", \"path\": \"/spec/template/spec/containers/0/args\", \"value\": $args}]" >/dev/null; then
+                echo "Unable to restore the ccm-linode daemonset"
+              fi
+
+              if ! kubectl -n kube-system rollout status daemonset/ccm-linode --timeout=240s; then
+                echo "CCM did not roll out after restoring its flags"
+              fi
+            check:
+              ($error == null): true
+              (contains($stdout, 'Unable to restore the ccm-linode daemonset')): false
+              (contains($stdout, 'CCM did not roll out after restoring its flags')): false
+    - name: Create pods and service
+      try:
+        - apply:
+            file: create-pods-services.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check endpoints exist and loadbalancer ip is assigned
+      try:
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Endpoints
+              metadata:
+                name: svc-test
+              (subsets[0].addresses != null): true
+              (subsets[0].ports != null): true
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: svc-test
+              status:
+                (loadBalancer.ingress[0].ip != null): true
+    - name: Create a second service once the first NodeBalancer exists
+      try:
+        - apply:
+            file: create-second-service.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Service
+    - name: Check that the second loadbalancer ip is assigned
+      try:
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: svc-test-2
+              status:
+                (loadBalancer.ingress[0].ip != null): true
+    - name: Check the allocated backend ranges avoid the reserved range
+      try:
+        - script:
+            shell: bash
+            shellArgs:
+              - -c
+            env:
+              - name: BACKEND_SUBNET
+                value: ($backendSubnet)
+              - name: RESERVED_RANGE
+                value: ($reservedRange)
+            content: |
+              set -euo pipefail
+
+              # BACKEND_SUBNET is a /24, so every valid allocation out of it looks
+              # like <first three octets>.<multiple of 4>/30.
+              subnet_base=${BACKEND_SUBNET%/*}
+              subnet_base=${subnet_base%.*}
+
+              check_range() {
+                local svcname=$1
+                local range=$2
+
+                if [[ -z "$range" || "$range" == "null" ]]; then
+                  echo "Error: no backend ipv4 range found for $svcname"
+                  return 0
+                fi
+
+                if [[ "${range#*/}" != "30" || "${range%/*}" != "$subnet_base".* ]]; then
+                  echo "Error: backend range $range of $svcname is not a /30 within $BACKEND_SUBNET"
+                  return 0
+                fi
+
+                local last_octet=${range%/*}
+                last_octet=${last_octet##*.}
+                if (( last_octet % 4 != 0 )); then
+                  echo "Error: backend range $range of $svcname is not aligned on a /30 boundary"
+                fi
+
+                if [[ "$range" == "$RESERVED_RANGE" ]]; then
+                  echo "Error: backend range $range of $svcname is the reserved range"
+                fi
+
+                return 0
+              }
+
+              vpcconfig=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN \
+                LINODE_URL=$LINODE_URL ../scripts/get-nb-vpc-config.sh svc-test)
+              vpcconfig2=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN \
+                LINODE_URL=$LINODE_URL ../scripts/get-nb-vpc-config.sh svc-test-2)
+
+              range=$(echo "$vpcconfig" | jq -r '.ipv4_range')
+              range2=$(echo "$vpcconfig2" | jq -r '.ipv4_range')
+              echo "svc-test backend range: $range"
+              echo "svc-test-2 backend range: $range2"
+
+              check_range svc-test "$range"
+              check_range svc-test-2 "$range2"
+
+              if [[ "$range" == "$range2" ]]; then
+                echo "Error: both NodeBalancers were given the same backend range $range"
+              fi
+
+              # No NodeBalancer in the VPC subnet may hold the reserved range.
+              vpc_id=$(echo "$vpcconfig" | jq -r '.vpc_id')
+              subnet_id=$(echo "$vpcconfig" | jq -r '.subnet_id')
+              subnet=$(curl -s \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Content-Type: application/json" --fail-early --retry 3 \
+                "$LINODE_URL/v4beta/vpcs/$vpc_id/subnets/$subnet_id")
+
+              echo "NodeBalancers in subnet $subnet_id: $(echo "$subnet" | jq -c '[.nodebalancers[]? | {id, ipv4_range}]')"
+
+              if echo "$subnet" | jq -e --arg reserved "$RESERVED_RANGE" \
+                '.nodebalancers[]? | select(.ipv4_range == $reserved)' >/dev/null; then
+                echo "Error: the reserved range $RESERVED_RANGE is assigned to a NodeBalancer"
+              fi
+            check:
+              ($error == null): true
+              (contains($stdout, 'Error:')): false
+    - name: Reject a service asking for the reserved range
+      try:
+        - apply:
+            file: create-reserved-range-service.yaml
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: svc-test-reserved
+              status:
+                (loadBalancer.ingress[0].ip == null): true
+        - script:
+            shell: bash
+            shellArgs:
+              - -c
+            env:
+              - name: RESERVED_RANGE
+                value: ($reservedRange)
+            content: |
+              set -euo pipefail
+
+              message=""
+              for i in {1..10}; do
+                events=$(kubectl get events -n $NAMESPACE --field-selector reason=SyncLoadBalancerFailed \
+                  --sort-by='.lastTimestamp' -o json)
+                message=$(echo "$events" | jq -r '.items[].message' \
+                  | grep "overlaps the reserved NodeBalancer backend range" || true)
+                if [[ -n "$message" ]]; then
+                  echo "Warning event found: $message"
+                  break
+                fi
+                sleep 10
+              done
+
+              if [[ -z "$message" ]]; then
+                echo "Error: no SyncLoadBalancerFailed event rejecting the reserved range"
+              fi
+
+              service_ip=$(kubectl get svc svc-test-reserved -n $NAMESPACE \
+                -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+              if [[ -n "$service_ip" ]]; then
+                echo "Error: svc-test-reserved was given the ip $service_ip"
+              fi
+            check:
+              ($error == null): true
+              (contains($stdout, 'Error:')): false
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Service

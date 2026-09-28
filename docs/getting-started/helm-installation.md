@@ -32,7 +32,6 @@ region: "us-east"
 routeController:
   vpcNames: ""  # Comma separated VPC names
   clusterCIDR: "10.0.0.0/8"
-  configureCloudRoutes: true
 
 # Optional: Assign node internal IPs from VPCs without enabling route controller
 # Not required if specified in routeController

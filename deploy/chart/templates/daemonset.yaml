@@ -135,10 +135,14 @@ spec:
             {{- if not $clusterCIDR }}
             {{- fail "clusterCIDR is required if route-controller is enabled" }}
             {{- end }}
-            - --configure-cloud-routes={{ default true .Values.routeController.configureCloudRoutes }}
             {{- with .Values.routeController.routeReconciliationPeriod }}
             - --route-reconciliation-period={{ . }}
             {{- end }}
+            {{- end }}
+            {{- if and .Values.nodeBalancerBackendIPv4ReservedRange (not .Values.routeController) }}
+            - --configure-cloud-routes=false
+            {{- else }}
+            - --configure-cloud-routes=true
             {{- end }}
             {{- with $vpcNames }}
             - --vpc-names={{ . }}
@@ -184,6 +188,9 @@ spec:
             {{- end }}
             {{- if .Values.nodeBalancerBackendIPv4Subnet }}
             - --nodebalancer-backend-ipv4-subnet={{ .Values.nodeBalancerBackendIPv4Subnet }}
+            {{- end }}
+            {{- if .Values.nodeBalancerBackendIPv4ReservedRange }}
+            - --nodebalancer-backend-ipv4-reserved-range={{ .Values.nodeBalancerBackendIPv4ReservedRange }}
             {{- end }}
             {{- if .Values.nodeBalancerPrefix }}
             - --nodebalancer-prefix={{ .Values.nodeBalancerPrefix }}
