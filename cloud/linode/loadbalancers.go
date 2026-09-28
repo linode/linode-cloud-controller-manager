@@ -810,7 +810,7 @@ func (l *loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Ser
 		return []linodego.NodeBalancerBackendVPCOptions{
 			{
 				SubnetID:  subnetID,
-				IPv4Range: backendIPv4Range,
+				IPv4Range: &backendIPv4Range,
 			},
 		}, nil
 	}
