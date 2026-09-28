@@ -9,7 +9,7 @@ require (
 	github.com/getsentry/sentry-go v0.48.0
 	github.com/golang/mock v1.6.0
 	github.com/hexdigest/gowrap v1.4.3
-	github.com/linode/linodego/v2 v2.0.0
+	github.com/linode/linodego/v2 v2.7.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.12.1
@@ -144,7 +144,7 @@ require (
 )
 
 replace (
-	github.com/linode/linodego/v2 => github.com/linode/linodego/v2 v2.0.0-20260601073839-52f201e73a60
+	github.com/linode/linodego/v2 => github.com/linode/linodego/v2 v2.7.0
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.36.4
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.36.4
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.35.4
