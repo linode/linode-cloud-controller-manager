@@ -783,7 +783,7 @@ func (l *loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Ser
 			vpcCreateOpts := []linodego.NodeBalancerBackendVPCOptions{
 				{
 					SubnetID:  subnetID,
-					IPv4Range: backendIPv4Range,
+					IPv4Range: &backendIPv4Range,
 				},
 			}
 			return vpcCreateOpts, nil
@@ -821,8 +821,8 @@ func (l *loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Ser
 		vpcCreateOpts := []linodego.NodeBalancerBackendVPCOptions{
 			{
 				SubnetID:            subnetID,
-				IPv4Range:           options.Options.NodeBalancerBackendIPv4Subnet,
-				IPv4RangeAutoAssign: true,
+				IPv4Range:           &options.Options.NodeBalancerBackendIPv4Subnet,
+				IPv4RangeAutoAssign: new(true),
 			},
 		}
 		return vpcCreateOpts, nil
@@ -882,10 +882,14 @@ func (l *loadbalancers) getFrontendVPCCreateOptions(ctx context.Context, service
 
 	vpcCreateOpts := []linodego.NodeBalancerFrontendVPCOptions{
 		{
-			SubnetID:  subnetID,
-			IPv4Range: frontendIPv4Range,
-			IPv6Range: frontendIPv6Range,
+			SubnetID: subnetID,
 		},
+	}
+	if frontendIPv4Range != "" {
+		vpcCreateOpts[0].IPv4Range = &frontendIPv4Range
+	}
+	if frontendIPv6Range != "" {
+		vpcCreateOpts[0].IPv6Range = &frontendIPv6Range
 	}
 	return vpcCreateOpts, nil
 }
