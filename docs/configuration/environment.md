@@ -129,7 +129,7 @@ If no specific subnet is specified, by default, CCM will use the `default` subne
 
 `--nodebalancer-backend-ipv4-subnet` can be used to make sure if nodebalancer backend ips are manually specified in service annotation, they lie within the specified subnet range.
 
-`--nodebalancer-backend-ipv4-reserved-range` keeps one /30 of `--nodebalancer-backend-ipv4-subnet` free so it is never handed to a NodeBalancer. It requires `--nodebalancer-backend-ipv4-subnet` to be set and must be the highest /30 of that subnet, otherwise CCM fails to start. When it is set, CCM allocates backend ranges itself instead of letting the Linode API auto-assign them. See [Reserving a NodeBalancer backend IPv4 range](loadbalancer.md#reserving-a-nodebalancer-backend-ipv4-range).
+`--nodebalancer-backend-ipv4-reserved-range` keeps one /30 of `--nodebalancer-backend-ipv4-subnet` free so it is never handed to a NodeBalancer. It requires `--nodebalancer-backend-ipv4-subnet` to be set and must be the highest /30 of that subnet, otherwise CCM fails to start. When it is set, CCM allocates backend ranges itself instead of letting the Linode API auto-assign them. When it is set through the Helm chart without `routeController`, the chart also passes `--configure-cloud-routes=false`: this is a deliberate proxy for an overlay pod network, not a requirement of the reserved range. `routeController` takes precedence, and `extraArgs` can override the derived value. See [Reserving a NodeBalancer backend IPv4 range](loadbalancer.md#reserving-a-nodebalancer-backend-ipv4-range).
 
 If CCM is started with multiple flags for nodebalancer backend subnet, following order of precedence is used for backend ip addresses:
 

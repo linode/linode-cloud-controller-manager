@@ -302,6 +302,8 @@ spec:
 
 The equivalent Helm values are `nodeBalancerBackendIPv4Subnet` and `nodeBalancerBackendIPv4ReservedRange`.
 
+When `nodeBalancerBackendIPv4ReservedRange` is set and `routeController` is not, the Helm chart also passes `--configure-cloud-routes=false`. The reserved range itself does not require cloud routes to be disabled; the chart treats it as a signal that pods run on an overlay network, where there are no VPC routes to program. If `routeController` is set, it takes precedence and the chart passes `--configure-cloud-routes=true`. To override the derived value, pass `--configure-cloud-routes` in `extraArgs`, which the chart appends after its own arguments.
+
 CCM validates the reserved range at startup and exits with an error unless:
 
 - `--nodebalancer-backend-ipv4-subnet` is also set
