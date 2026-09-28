@@ -271,6 +271,7 @@ helm-template:
 #Verify template works when region and apiToken are passed, and when it is passed as reference.
 	@helm template foo deploy/chart --set apiToken="apiToken",region="us-east" > /dev/null
 	@helm template foo deploy/chart --set secretRef.apiTokenRef="apiToken",secretRef.name="api",secretRef.regionRef="us-east" > /dev/null
+	@bash hack/test-helm-networking.sh
 
 .PHONY: serve-docs
 serve-docs:
@@ -287,4 +288,3 @@ serve-docs:
 build-docs:
 # Build the documentation site the way GitHub Pages does
 	docker run --rm --volume "$(shell pwd):/srv/jekyll" $(DOCS_IMAGE) jekyll build
-

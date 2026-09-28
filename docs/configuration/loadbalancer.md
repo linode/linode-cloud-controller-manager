@@ -285,6 +285,46 @@ For a complete working example, see `examples/vpc-frontend-example.yaml`.
 
 If CCM is started with `--nodebalancer-backend-ipv4-subnet` flag, then it will not allow provisioning of nodebalancer unless subnet specified in service annotation lie within the subnet specified using the flag. This is to prevent accidental overlap between nodebalancer backend ips and pod CIDRs.
 
+### Reserving a NodeBalancer backend IPv4 range
+
+`--nodebalancer-backend-ipv4-reserved-range` marks one /30 inside `--nodebalancer-backend-ipv4-subnet` as off-limits, so CCM never assigns it to a NodeBalancer. Use it to keep a backend range available for an address block managed outside the cluster.
+
+```yaml
+spec:
+  template:
+    spec:
+      containers:
+        - name: ccm-linode
+          args:
+            - --nodebalancer-backend-ipv4-subnet=10.100.0.0/24
+            - --nodebalancer-backend-ipv4-reserved-range=10.100.0.252/30
+```
+
+The equivalent Helm values are `nodeBalancerBackendIPv4Subnet` and `nodeBalancerBackendIPv4ReservedRange`.
+
+When `nodeBalancerBackendIPv4ReservedRange` is set and `routeController` is not, the Helm chart also passes `--configure-cloud-routes=false`. The reserved range itself does not require cloud routes to be disabled; the chart treats it as a signal that pods run on an overlay network, where there are no VPC routes to program. If `routeController` is set, it takes precedence and the chart passes `--configure-cloud-routes=true`. To override the derived value, pass `--configure-cloud-routes` in `extraArgs`, which the chart appends after its own arguments.
+
+CCM validates the reserved range at startup and exits with an error unless:
+
+- `--nodebalancer-backend-ipv4-subnet` is also set
+- the reserved range is a /30
+- the reserved range is the highest /30 of the backend subnet (`10.100.0.252/30` for `10.100.0.0/24`)
+
+When a reserved range is configured, CCM allocates backend ranges itself instead of letting the Linode API auto-assign them. For each new NodeBalancer it picks the lowest /30 in the backend subnet that is not already assigned to a NodeBalancer in the VPC subnet, and never the reserved one. Provisioning fails if:
+
+- the backend subnet is not within the service's VPC subnet
+- every /30 other than the reserved one is already assigned
+- the reserved /30 is already assigned to an existing NodeBalancer
+
+The `linode-loadbalancer-backend-ipv4-range` annotation still takes precedence over this allocation, but a range that overlaps the reserved /30 is rejected:
+
+```yaml
+metadata:
+  annotations:
+    # rejected when --nodebalancer-backend-ipv4-reserved-range=10.100.0.252/30
+    service.beta.kubernetes.io/linode-loadbalancer-backend-ipv4-range: "10.100.0.252/30"
+```
+
 ## Advanced Configuration
 
 ### Using Existing NodeBalancers

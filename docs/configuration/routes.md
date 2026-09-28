@@ -26,7 +26,6 @@ The Route Controller manages network routes for pod communication in VPC environ
 routeController:
   vpcNames: "vpc-prod,vpc-staging"  # Comma separated names of VPCs managed by CCM
   clusterCIDR: "10.0.0.0/8"         # Pod CIDR range
-  configureCloudRoutes: true        # Enable route controller
 ```
 
 2. Via command line flags in CCM deployment:
