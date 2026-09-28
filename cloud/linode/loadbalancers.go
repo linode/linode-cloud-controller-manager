@@ -842,6 +842,8 @@ func (l *loadbalancers) getVPCCreateOptions(ctx context.Context, service *v1.Ser
 // 1. Frontend Subnet ID Annotation - Direct subnet ID
 // 2. Frontend VPC/Subnet Name Annotations - Resolve by name
 // 3. Frontend IPv4/IPv6 Range Annotations - Optional CIDR ranges
+//
+//nolint:cyclop // already as simple as we can make it
 func (l *loadbalancers) getFrontendVPCCreateOptions(ctx context.Context, service *v1.Service) ([]linodego.NodeBalancerFrontendVPCOptions, error) {
 	frontendIPv4Range, hasIPv4Range := service.GetAnnotations()[annotations.NodeBalancerFrontendIPv4Range]
 	frontendIPv6Range, hasIPv6Range := service.GetAnnotations()[annotations.NodeBalancerFrontendIPv6Range]
