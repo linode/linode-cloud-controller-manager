@@ -187,8 +187,8 @@ func TestGetVPCCreateOptionsWithReservedBackendRange(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, got, 1)
 			assert.Equal(t, 456, got[0].SubnetID)
-			assert.Equal(t, new("10.63.88.4/30"), got[0].IPv4Range)
-			assert.Nil(t, got[0].IPv4RangeAutoAssign)
+			assert.Equal(t, "10.63.88.4/30", got[0].IPv4Range)
+			assert.False(t, got[0].IPv4RangeAutoAssign)
 		})
 	}
 }
