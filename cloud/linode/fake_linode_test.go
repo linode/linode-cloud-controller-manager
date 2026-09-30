@@ -391,8 +391,8 @@ func (f *fakeAPI) setupRoutes() {
 		}
 		f.nb[strconv.Itoa(nb.ID)] = &nb
 
-		for _, backendVPC := range nbco.BackendVPCs {
-			if backendVPC.IPv4Range == nil || *backendVPC.IPv4Range == "" {
+		for _, backendVPC := range nbco.VPCs {
+			if backendVPC.IPv4Range == "" {
 				continue
 			}
 			subnet, ok := f.subnet[backendVPC.SubnetID]
@@ -401,7 +401,7 @@ func (f *fakeAPI) setupRoutes() {
 			}
 			subnet.Nodebalancers = append(subnet.Nodebalancers, linodego.VPCSubnetNodebalancers{
 				ID:        nb.ID,
-				Ipv4Range: *backendVPC.IPv4Range,
+				Ipv4Range: backendVPC.IPv4Range,
 			})
 		}
 

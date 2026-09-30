@@ -104,6 +104,8 @@ linters:
         - opinionated
         - performance
         - style
+      disabled-checks:
+        - commentedOutCode
       settings:
         captLocal:
           paramsOnly: true
