@@ -51,7 +51,7 @@ When IPv6 is enabled (either globally or per-service), both IPv4 and IPv6 addres
 
 ### IPv6 Backend Support
 
-IPv6 frontends and IPv6 backends are configured independently. Frontend IPv6 controls what the Service publishes in `status.loadBalancer.ingress`, while backend IPv6 controls which node addresses a NodeBalancer targets.
+Backend IPv6 controls which node addresses a NodeBalancer targets.
 
 IPv6 backends require a dual-stack workload cluster. In practice, the cluster networking stack must support IPv6 NodePort traffic, and the Service itself should be created as dual-stack. A single-stack IPv4 `LoadBalancer` Service can still be annotated for IPv6 backends, but the NodeBalancer health checks and traffic path may fail because the backend NodePort is not exposed over IPv6.
 
@@ -247,43 +247,6 @@ metadata:
     service.beta.kubernetes.io/linode-loadbalancer-backend-vpc-name: "vpc1"
     service.beta.kubernetes.io/linode-loadbalancer-backend-subnet-name: "subnet1"
 ```
-
-### Configuring NodeBalancer frontend with VPC
-
-NodeBalancers can optionally be configured with a VPC-based frontend address.
-
-Frontend VPC configuration supports the following annotations:
-
-1. Choose the frontend subnet:
-
-   - `service.beta.kubernetes.io/linode-loadbalancer-frontend-subnet-id` (preferred)
-   - OR `service.beta.kubernetes.io/linode-loadbalancer-frontend-vpc-name` and `service.beta.kubernetes.io/linode-loadbalancer-frontend-subnet-name`
-
-2. Optionally constrain the frontend address assignment within the subnet:
-
-   - `service.beta.kubernetes.io/linode-loadbalancer-frontend-ipv4-range` (CIDR)
-   - `service.beta.kubernetes.io/linode-loadbalancer-frontend-ipv6-range` (CIDR)
-
-Order of precedence:
-
-- If `frontend-subnet-id` is set, it is used.
-- Otherwise, `frontend-vpc-name` + `frontend-subnet-name` are used.
-- IPv4/IPv6 range annotations are optional add-ons and require one of the subnet selectors above.
-
-Example:
-
-```yaml
-metadata:
-  annotations:
-    service.beta.kubernetes.io/linode-loadbalancer-frontend-subnet-id: "169341"
-    # Optional:
-    # service.beta.kubernetes.io/linode-loadbalancer-frontend-ipv4-range: "10.0.0.0/24"
-    # service.beta.kubernetes.io/linode-loadbalancer-frontend-ipv6-range: "2001:db8::/64"
-```
-
-For a complete working example, see `examples/vpc-frontend-example.yaml`.
-
-If CCM is started with `--nodebalancer-backend-ipv4-subnet` flag, then it will not allow provisioning of nodebalancer unless subnet specified in service annotation lie within the subnet specified using the flag. This is to prevent accidental overlap between nodebalancer backend ips and pod CIDRs.
 
 ### Reserving a NodeBalancer backend IPv4 range
 
