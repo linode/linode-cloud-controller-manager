@@ -18,7 +18,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/linode/linodego/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -30,7 +29,6 @@ import (
 
 	"github.com/linode/linode-cloud-controller-manager/cloud/annotations"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client"
-	"github.com/linode/linode-cloud-controller-manager/cloud/linode/client/mocks"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/options"
 	"github.com/linode/linode-cloud-controller-manager/cloud/linode/services"
 )
@@ -4434,8 +4432,8 @@ func Test_buildLoadBalancerRequestOmitsVPCConfigForIPv6Backends(t *testing.T) {
 			if err := json.Unmarshal([]byte(req.Body), &createOpts); err != nil {
 				t.Fatalf("unable to unmarshal create request body %#v, error: %#v", req.Body, err)
 			}
-			if len(createOpts.BackendVPCs) != 0 {
-				t.Fatalf("expected nodebalancer create request to omit VPC config for IPv6 backends, got %#v", createOpts.BackendVPCs)
+			if len(createOpts.VPCs) != 0 {
+				t.Fatalf("expected nodebalancer create request to omit VPC config for IPv6 backends, got %#v", createOpts.VPCs)
 			}
 			if len(createOpts.Configs) != 1 || len(createOpts.Configs[0].Nodes) != 1 {
 				t.Fatalf("expected a single nodebalancer config with one backend node, got %#v", createOpts.Configs)
@@ -5972,7 +5970,9 @@ func Test_validateNodeBalancerFrontendIPRange(t *testing.T) {
 	}
 }
 
-func Test_makeLoadBalancerStatus_FrontendVPC(t *testing.T) {
+// Uncomment once https://github.com/linode/linodego/pull/978 is merged and a release is cut
+//nolint:dupword // The commented-out test repeats args in its table data.
+/* func Test_makeLoadBalancerStatus_FrontendVPC(t *testing.T) {
 	type args struct {
 		service *v1.Service
 		nb      *linodego.NodeBalancer
@@ -6254,4 +6254,4 @@ func Test_getFrontendVPCCreateOptions(t *testing.T) {
 			}
 		})
 	}
-}
+} */

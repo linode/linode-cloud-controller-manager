@@ -60,9 +60,12 @@ const (
 	NodeBalancerBackendSubnetName = "service.beta.kubernetes.io/linode-loadbalancer-backend-subnet-name"
 	NodeBalancerBackendSubnetID   = "service.beta.kubernetes.io/linode-loadbalancer-backend-subnet-id"
 
-	NodeBalancerFrontendIPv4Range  = "service.beta.kubernetes.io/linode-loadbalancer-frontend-ipv4-range"
-	NodeBalancerFrontendIPv6Range  = "service.beta.kubernetes.io/linode-loadbalancer-frontend-ipv6-range"
-	NodeBalancerFrontendVPCName    = "service.beta.kubernetes.io/linode-loadbalancer-frontend-vpc-name"
-	NodeBalancerFrontendSubnetName = "service.beta.kubernetes.io/linode-loadbalancer-frontend-subnet-name"
-	NodeBalancerFrontendSubnetID   = "service.beta.kubernetes.io/linode-loadbalancer-frontend-subnet-id"
+	// Uncomment once https://github.com/linode/linodego/pull/978 is merged and a release is cut
+	/*
+		NodeBalancerFrontendIPv4Range  = "service.beta.kubernetes.io/linode-loadbalancer-frontend-ipv4-range"
+		NodeBalancerFrontendIPv6Range  = "service.beta.kubernetes.io/linode-loadbalancer-frontend-ipv6-range"
+		NodeBalancerFrontendVPCName    = "service.beta.kubernetes.io/linode-loadbalancer-frontend-vpc-name"
+		NodeBalancerFrontendSubnetName = "service.beta.kubernetes.io/linode-loadbalancer-frontend-subnet-name"
+		NodeBalancerFrontendSubnetID   = "service.beta.kubernetes.io/linode-loadbalancer-frontend-subnet-id"
+	*/
 )
