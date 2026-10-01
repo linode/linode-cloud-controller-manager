@@ -52,10 +52,12 @@ spec:
 
               # Node Ready does not guarantee that CCM has populated interface routes.
               # Share one deadline across all nodes, within the suite's 5-minute exec timeout.
+              # SECONDS is Bash's built-in elapsed timer; it advances automatically.
               deadline=$((SECONDS + 180))
               while true; do
                 observations=()
                 while IFS=$'\t' read -r node pod_cidr provider_id foreign_cidrs; do
+                  # Stop starting API requests after the deadline, even partway through a node scan.
                   (( SECONDS < deadline )) || exit 1
                   state=$(curl --fail --silent --show-error --max-time 15 \
                     -H "Authorization: Bearer $LINODE_TOKEN" \
