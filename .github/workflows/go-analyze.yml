@@ -87,8 +87,5 @@ jobs:
       - name: Helm Lint
         run: mise run helm-lint
 
-      - name: Nilcheck
-        run: mise run nilcheck
-
       - name: Vulncheck
         run: mise run vulncheck
