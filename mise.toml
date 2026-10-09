@@ -6,7 +6,7 @@ EXP_CLUSTER_RESOURCE_SET = "true"
 GOTOOLCHAIN = "auto"
 
 [tools]
-go = "1.26.7"
+go = "1.27.2"
 golangci-lint = "2.11.4"
 helm = "3.16.3"
 kubectl = "1.36.2"
