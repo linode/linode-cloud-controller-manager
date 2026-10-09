@@ -142,6 +142,7 @@ linters:
           - dupl
           - errcheck
           - gocognit
+          - goconst
           - gocritic
           - gocyclo
           - gosec
@@ -159,6 +160,9 @@ linters:
       - linters:
           - gosec
         text: 'G104:'
+      - linters:
+          - govet
+        text: "cannot inline"
     paths:
       - zz_generated\..+\.go$
       - third_party$
