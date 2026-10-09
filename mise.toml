@@ -98,7 +98,7 @@ run = "make lint-fix"
 [tasks.build-nilaway]
 description = "Build the custom NilAway-enabled golangci-lint binary"
 hide = true
-run = "mkdir -p ./bin && golangci-lint custom"
+run = "mkdir -p ./bin && golangci-lint custom --version v$(mise current golangci-lint)"
 
 [tasks.nilcheck]
 description = "Run nilaway lint checks"
