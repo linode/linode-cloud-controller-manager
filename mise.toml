@@ -6,8 +6,8 @@ EXP_CLUSTER_RESOURCE_SET = "true"
 GOTOOLCHAIN = "auto"
 
 [tools]
-go = "1.26.7"
-golangci-lint = "2.11.4"
+go = "1.27.2"
+golangci-lint = "2.14.0"
 helm = "3.16.3"
 kubectl = "1.36.2"
 kustomize = "5.8.1"
@@ -98,7 +98,7 @@ run = "make lint-fix"
 [tasks.build-nilaway]
 description = "Build the custom NilAway-enabled golangci-lint binary"
 hide = true
-run = "mkdir -p ./bin && golangci-lint custom"
+run = "mkdir -p ./bin && golangci-lint custom --version v$(mise current golangci-lint)"
 
 [tasks.nilcheck]
 description = "Run nilaway lint checks"
