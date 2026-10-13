@@ -108,12 +108,7 @@ spec:
                   data="{\"label\": \"$LABEL\", \"region\": \"$REGION\"}"
               fi
 
-              nbid=$(curl -s --request POST \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                -H "accept: application/json" \
-                "$LINODE_URL/v4beta/nodebalancers" \
-                --data "$data" | jq .id)
+              nbid=$(retry 3 5 linode_api POST /v4beta/nodebalancers --data "$data" | jq -er '.id')
 
               if ! [[ $nbid =~ $re ]]; then
                   fail "Nodebalancer id [$nbid] is incorrect, failed to create nodebalancer"

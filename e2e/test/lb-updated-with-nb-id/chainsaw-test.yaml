@@ -75,12 +75,7 @@ spec:
               # Get data to use for new nodebalancer
               data=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN LABEL=$LABEL REGION=$REGION ../scripts/get-nb-create-data.sh svc-test)
 
-              nbid=$(curl -s --request POST \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                -H "accept: application/json" \
-                "$LINODE_URL/v4beta/nodebalancers" \
-                --data "$data" | jq .id)
+              nbid=$(retry 3 5 linode_api POST /v4beta/nodebalancers --data "$data" | jq -er '.id')
 
               if ! [[ $nbid =~ $re ]]; then
                   fail "Nodebalancer id [$nbid] for label [$LABEL] is incorrect, failed to create nodebalancer"
