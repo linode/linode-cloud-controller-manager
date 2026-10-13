@@ -48,7 +48,9 @@ spec:
             content: |
               set -euo pipefail
 
-              for i in {1..10}; do
+              source ../scripts/lib.sh
+              matched=false
+              for _ in {1..10}; do
                   nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
                   fw=$(curl -s --request GET \
@@ -61,13 +63,16 @@ spec:
                   ips=$(echo $fw | jq '.data[].rules.inbound[].addresses.ipv4[]')
                   if [[ $fwCount -eq 1 && -n $ips && $ips == *"7.7.7.7/32"* ]]; then
                       echo "firewall attached and rule has specified ip"
+                      matched=true
                       break
                   fi
                   sleep 10
               done
+                if [[ "$matched" != true ]]; then
+                    fail "Firewall was not attached with the expected 7.7.7.7/32 rule after 10 attempts"
+                fi
             check:
                 ($error == null): true
-                (contains($stdout, 'firewall attached and rule has specified ip')): true
     - name: Delete ACL and check that firewall no longer exists
       try:
         - script:
@@ -77,6 +82,7 @@ spec:
             timeout: 5m
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
@@ -91,7 +97,8 @@ spec:
               # Patch service to remove ACL annotation
               kubectl patch service svc-test -n $NAMESPACE --type=json -p='[{"op": "remove", "path": "/metadata/annotations/service.beta.kubernetes.io~1linode-loadbalancer-firewall-acl"}]'
 
-              for i in {1..30}; do
+              matched=false
+              for _ in {1..30}; do
                 # Check that firewall is no longer attached to nb
                 fw=$(curl -s --request GET \
                   -H "Authorization: Bearer $LINODE_TOKEN" \
@@ -110,13 +117,16 @@ spec:
 
                 if [[ $fwCount -eq 0 && $fwRespCode -eq "404" ]]; then
                     echo "firewall detatched and deleted"
+                    matched=true
                     break
                 fi
                 sleep 10
               done
+                if [[ "$matched" != true ]]; then
+                fail "Firewall $fwid remained attached or undeleted after 30 attempts"
+                fi
             check:
                 ($error == null): true
-                (contains($stdout, 'firewall detatched and deleted')): true
     - name: Refresh service by adding the ACL again
       try:
         - apply:
@@ -133,11 +143,13 @@ spec:
               - -c
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
               nbid=0
               fwid=0
 
-              for i in {1..10}; do
+              matched=false
+              for _ in {1..10}; do
                   nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
                   fw=$(curl -s --request GET \
@@ -159,7 +171,7 @@ spec:
                   exit 1
               fi
 
-              for i in {1..10}; do
+              for _ in {1..10}; do
                   # Remove service
                   kubectl delete service svc-test -n $NAMESPACE --ignore-not-found
                   sleep 5
@@ -180,10 +192,13 @@ spec:
 
                   if [[ $nbRespCode == "404" && $fwRespCode == "404" ]]; then
                       echo "nb and fw deleted"
+                      matched=true
                       break
                   fi
                   sleep 10
               done
+                if [[ "$matched" != true ]]; then
+                    fail "NodeBalancer $nbid and firewall $fwid were not deleted after 10 attempts"
+                fi
             check:
                 ($error == null): true
-                (contains($stdout, 'nb and fw deleted')): true

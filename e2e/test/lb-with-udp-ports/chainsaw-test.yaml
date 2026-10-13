@@ -48,12 +48,14 @@ spec:
             timeout: 10m
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
               echo "Nodebalancer ID: $nbid"
 
-              for i in {1..20}; do
+              matched=false
+              for _ in {1..20}; do
                   nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
                   
                   if [[ -z $nbconfig ]]; then
@@ -71,6 +73,7 @@ spec:
 
                   if [[ $port_7070_check == "true" && $port_7070_interval == "true" && $port_7070_timeout == "true" && $port_7070_attempts == "true" && $port_7070_protocol == "true" && $port_7070_up_nodes == "true" ]]; then
                       echo "All conditions met"
+                      matched=true
                       break
                   fi
                   echo "Conditions not met, retrying in 20 seconds..."
@@ -82,6 +85,8 @@ spec:
                   echo "up_nodes: $port_7070_up_nodes"
                   sleep 20
               done
+              if [[ "$matched" != true ]]; then
+                  fail "NodeBalancer config for port 7070 did not satisfy the UDP health check after 20 attempts"
+              fi
             check:
               ($error == null): true
-              (contains($stdout, 'All conditions met')): true

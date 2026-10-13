@@ -68,10 +68,12 @@ spec:
               - -c
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
-              for i in {1..20}; do
+              matched=false
+              for _ in {1..20}; do
                 nbconfig=$(curl -s \
                   -H "Authorization: Bearer $LINODE_TOKEN" \
                   -H "Content-Type: application/json" --fail-early --retry 3 \
@@ -82,15 +84,18 @@ spec:
 
                 if [[ $port_80_v2 == "true" && $port_8080_v2 == "true" ]]; then
                     echo "Conditions met"
+                    matched=true
                     break
                 else
                     echo "Conditions not met"
                     sleep 10
                 fi
               done
+              if [[ "$matched" != true ]]; then
+                fail "Expected ProxyProtocol v2 on ports 80 and 8080 after 20 attempts"
+              fi
             check:
               ($error): ~
-              (contains($stdout, 'Conditions met')): true
     - name: Add default annotation for ProxyProtocol v1
       try:
         - script:
@@ -110,10 +115,12 @@ spec:
               - -c
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
-              for i in {1..10}; do
+              matched=false
+              for _ in {1..10}; do
                 nbconfig=$(curl -s \
                   -H "Authorization: Bearer $LINODE_TOKEN" \
                   -H "Content-Type: application/json" --fail-early --retry 3 \
@@ -124,12 +131,15 @@ spec:
 
                 if [[ $port_80_v1 == "true" && $port_8080_v1 == "true" ]]; then
                     echo "Conditions met"
+                    matched=true
                     break
                 else
                     echo "Conditions not met"
                 fi
                 sleep 10
               done
+              if [[ "$matched" != true ]]; then
+                fail "Expected ProxyProtocol v1 on ports 80 and 8080 after 10 attempts"
+              fi
             check:
               ($error): ~
-              (contains($stdout, 'Conditions met')): true

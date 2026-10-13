@@ -68,10 +68,12 @@ spec:
               - -c
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
-              for i in {1..10}; do
+              matched=false
+              for _ in {1..10}; do
                 nbconfig=$(curl -s \
                   -H "Authorization: Bearer $LINODE_TOKEN" \
                   -H "Content-Type: application/json" --fail-early --retry 3 \
@@ -82,12 +84,15 @@ spec:
 
                 if [[ $port_80_none == "true" && $port_8080_v2 == "true" ]]; then
                     echo "Conditions met"
+                    matched=true
                     break
                 else
                     echo "Conditions not met"
                 fi
                 sleep 10
               done
+              if [[ "$matched" != true ]]; then
+                fail "Expected ProxyProtocol none on port 80 and v2 on port 8080 after 10 attempts"
+              fi
             check:
               ($error): ~
-              (contains($stdout, 'Conditions met')): true

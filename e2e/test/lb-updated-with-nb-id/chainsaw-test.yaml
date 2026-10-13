@@ -67,6 +67,7 @@ spec:
             timeout: 10m
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
               re='^[0-9]+$'
               LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
@@ -82,7 +83,7 @@ spec:
                 --data "$data" | jq .id)
 
               if ! [[ $nbid =~ $re ]]; then
-                  echo "Nodebalancer id [$nbid] for label [$lABEL] is incorrect, failed to create nodebalancer"
+                  fail "Nodebalancer id [$nbid] for label [$LABEL] is incorrect, failed to create nodebalancer"
               else
                   # Record the NodeBalancer id so the test-level catch can delete it
                   # if a later step fails before the Service adopts it (chainsaw does
@@ -92,11 +93,13 @@ spec:
                   kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id=$nbid
                   sleep 5
 
-                  for i in {1..20}; do
+                  matched=false
+                  for _ in {1..20}; do
                       nbid2=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
-                      if [[ $nbid == $nbid2 ]]; then
+                      if [[ "$nbid" == "$nbid2" ]]; then
                           echo "Condition met"
+                          matched=true
                           break
                       fi
                       echo "Condition not met, waiting for 20 seconds and retrying..."
@@ -104,7 +107,9 @@ spec:
                       echo "nbid2: $nbid2"
                       sleep 20
                   done
+                  if [[ "$matched" != true ]]; then
+                      fail "Service did not adopt new NodeBalancer $nbid after 20 attempts"
+                  fi
               fi
             check:
               ($error == null): true
-              (contains($stdout, 'Condition met')): true

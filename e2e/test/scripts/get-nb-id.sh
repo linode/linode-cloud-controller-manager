@@ -1,24 +1,26 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
-re='^[0-9]+$'
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=e2e/test/scripts/lib.sh
+source "$SCRIPT_DIR/lib.sh"
 
-svcname="svc-test"
-if [[ -n "$1" ]]; then
-    svcname="$1"
-fi
+svcname=${1:-svc-test}
+: "${NAMESPACE:?NAMESPACE must be set}"
 
 ip=$(kubectl get svc "$svcname" -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-nbid=$(curl -s \
-    -H "Authorization: Bearer $LINODE_TOKEN" \
-    -H "Content-Type: application/json" --fail-early --retry 3 \
-    -H "X-Filter: {\"ipv4\": \"$ip\"}" \
-    "$LINODE_URL/v4/nodebalancers" | jq .data[].id)
 
-if ! [[ $nbid =~ $re ]]; then
-    echo "Nodebalancer id [$nbid] is incorrect"
-    exit 1
+if [[ -z $ip ]]; then
+  fail "Service $svcname has no load balancer ingress IP"
+  exit 1
 fi
 
-echo $nbid
+nbid=$(retry 3 2 linode_api GET "/v4/nodebalancers" -H "X-Filter: {\"ipv4\": \"$ip\"}" | jq -r '.data[]?.id // empty')
+
+if [[ ! $nbid =~ ^[0-9]+$ ]]; then
+  fail "NodeBalancer id [$nbid] for service $svcname is incorrect"
+  exit 1
+fi
+
+printf '%s\n' "$nbid"

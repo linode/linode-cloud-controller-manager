@@ -1,23 +1,17 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
-SCRIPT_DIR=$(dirname "$0")
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=e2e/test/scripts/lib.sh
+source "$SCRIPT_DIR/lib.sh"
 
-svcname="svc-test"
-if [[ -n "$1" ]]; then
-    svcname="$1"
-fi
+svcname=${1:-svc-test}
+: "${NAMESPACE:?NAMESPACE must be set}"
+: "${LINODE_TOKEN:?LINODE_TOKEN must be set}"
 
-# Get existing dummy nodebalancer id to get VPC config
-nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN $SCRIPT_DIR/get-nb-id.sh $svcname)
+nbid=$(NAMESPACE="$NAMESPACE" LINODE_TOKEN="$LINODE_TOKEN" "$SCRIPT_DIR/get-nb-id.sh" "$svcname")
+vpcconfig=$(retry 3 2 linode_api GET "/v4beta/nodebalancers/$nbid/vpcs")
+subnet_id=$(jq -r --argjson nbid "$nbid" '.data[]? | select(.nodebalancer_id == $nbid) | .subnet_id // empty' <<<"$vpcconfig")
 
-# Get VPC config if it exists
-vpcconfig=$(curl -s \
-    -H "Authorization: Bearer $LINODE_TOKEN" \
-    -H "Content-Type: application/json" --fail-early --retry 3 \
-    "$LINODE_URL/v4beta/nodebalancers/$nbid/vpcs")
-
-SUBNET_ID=$(echo $vpcconfig | jq -r ".data[] | select(.nodebalancer_id == $nbid) | .subnet_id")
-
-echo $SUBNET_ID
+printf '%s\n' "$subnet_id"

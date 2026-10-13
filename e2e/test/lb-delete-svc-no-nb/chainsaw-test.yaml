@@ -120,16 +120,17 @@ spec:
               - -c
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
-              expectedId=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .metadata.annotations[])
+              expectedId=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r '.metadata.annotations."service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"')
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
-              if [[ $nbid == $expectedId ]]; then
-                  echo "Condition met"
+              if [[ -z "$expectedId" || "$nbid" != "$expectedId" ]]; then
+                  fail "NodeBalancer ID mismatch: annotation=$expectedId, NodeBalancer=$nbid"
               fi
+              echo "Condition met"
             check:
               ($error == null): true
-              (contains($stdout, 'Condition met')): true
     - name: Delete nodebalancer, delete service and make sure its deleted
       try:
         - script:
@@ -138,13 +139,13 @@ spec:
               - -c
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
               re='^[0-9]+$'
-              nbid=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .metadata.annotations[])
+              nbid=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r '.metadata.annotations."service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"')
 
               if ! [[ $nbid =~ $re ]]; then
-                  echo "Nodebalancer id [$nbid] is incorrect"
-                  exit 1
+                  fail "Nodebalancer id [$nbid] is incorrect"
               fi
 
               # Delete nodebalancer
@@ -157,7 +158,7 @@ spec:
               if [[ $delete_resp == "200" ]]; then
                   echo "nodebalancer deleted"
               else
-                  echo "Failed to delete nodebalancer, response code: $delete_resp"
+                  fail "Failed to delete nodebalancer, response code: $delete_resp"
               fi
 
               # Check to make sure nodebalancer is deleted
@@ -168,21 +169,25 @@ spec:
 
               if [[ $old_nb_resp == "404" ]]; then
                   echo "old nodebalancer not found"
+              else
+                  fail "Expected NodeBalancer $nbid to be deleted, got HTTP $old_nb_resp"
               fi
 
               # Delete service and make sure its deleted
               kubectl --timeout=60s delete svc svc-test -n $NAMESPACE
 
-              for i in {1..10}; do
+              deleted=false
+              for _ in {1..10}; do
                   if kubectl get svc svc-test -n $NAMESPACE > /dev/null 2>&1; then
                       sleep 5
                   else
                       echo "service is deleted"
+                      deleted=true
                       break
                   fi
               done
+              if [[ "$deleted" != true ]]; then
+                  fail "Service svc-test still exists after 10 deletion checks"
+              fi
             check:
               ($error == null): true
-              (contains($stdout, 'nodebalancer deleted')): true
-              (contains($stdout, 'old nodebalancer not found')): true
-              (contains($stdout, 'service is deleted')): true

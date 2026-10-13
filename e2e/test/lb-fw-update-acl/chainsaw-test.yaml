@@ -48,7 +48,9 @@ spec:
             content: |
               set -euo pipefail
 
-              for i in {1..10}; do
+              source ../scripts/lib.sh
+              matched=false
+              for _ in {1..10}; do
                   nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
                   fw=$(curl -s --request GET \
@@ -61,13 +63,16 @@ spec:
                   ips=$(echo $fw | jq '.data[].rules.inbound[].addresses.ipv4[]')
                   if [[ $fwCount -eq 1 && -n $ips && $ips == *"7.7.7.7/32"* ]]; then
                       echo "firewall attached and rule has specified ip"
+                      matched=true
                       break
                   fi
                   sleep 10
               done
+                if [[ "$matched" != true ]]; then
+                    fail "Firewall was not attached with the expected 7.7.7.7/32 rule after 10 attempts"
+                fi
             check:
                 ($error == null): true
-                (contains($stdout, 'firewall attached and rule has specified ip')): true
     - name: Update service with new ACL
       try:
         - apply:
@@ -85,7 +90,9 @@ spec:
             content: |
               set -euo pipefail
 
-              for i in {1..10}; do
+              source ../scripts/lib.sh
+              matched=false
+              for _ in {1..10}; do
                   nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
                   fw=$(curl -s --request GET \
@@ -98,10 +105,13 @@ spec:
                   ips=$(echo $fw | jq -r '.data[].rules.inbound[].addresses.ipv4[]')
                   if [[ $fwCount -eq 1 && -n $ips && ! $ips == *"7.7.7.7/32"* ]]; then
                       echo "firewall attached and rule updated"
+                      matched=true
                       break
                   fi
                   sleep 10
               done
+                if [[ "$matched" != true ]]; then
+                    fail "Firewall rule did not update away from 7.7.7.7/32 after 10 attempts"
+                fi
             check:
                 ($error == null): true
-                (contains($stdout, 'firewall attached and rule updated')): true

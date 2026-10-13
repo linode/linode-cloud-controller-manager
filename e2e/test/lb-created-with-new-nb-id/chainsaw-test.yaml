@@ -120,16 +120,17 @@ spec:
               - -c
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
-              expectedId=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .metadata.annotations[])
+              expectedId=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r '.metadata.annotations."service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"')
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
-              if [[ $nbid == $expectedId ]]; then
-                  echo "Condition met"
+              if [[ -z "$expectedId" || "$nbid" != "$expectedId" ]]; then
+                  fail "NodeBalancer ID mismatch: annotation=$expectedId, NodeBalancer=$nbid"
               fi
+              echo "Condition met"
             check:
               ($error == null): true
-              (contains($stdout, 'Condition met')): true
     - name: Create new nodebalancer and update service to use it
       try:
         - script:
@@ -138,10 +139,11 @@ spec:
               - -c
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
               re='^[0-9]+$'
 
-              old_nbid=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .metadata.annotations[])
+              old_nbid=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r '.metadata.annotations."service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"')
 
               LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
 
@@ -170,7 +172,7 @@ spec:
                 --data "$data" | jq .id)
 
               if ! [[ $nbid =~ $re ]]; then
-                  echo "Nodebalancer id [$nbid] is incorrect, failed to create nodebalancer"
+                  fail "Nodebalancer id [$nbid] is incorrect, failed to create nodebalancer"
               else
                   # Record both NodeBalancer ids so the test-level catch can clean
                   # up either one if a later step fails (chainsaw does not track
@@ -179,15 +181,20 @@ spec:
 
                   kubectl annotate --overwrite svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id=$nbid
 
-                  for i in {1..10}; do
+                  matched=false
+                  for _ in {1..10}; do
                       nbid2=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
-                      if [[ $nbid == $nbid2 ]]; then
+                      if [[ "$nbid" == "$nbid2" ]]; then
                           echo "Condition met"
+                          matched=true
                           break
                       fi
                       sleep 5
                   done
+                  if [[ "$matched" != true ]]; then
+                      fail "Service did not adopt new NodeBalancer $nbid after 10 attempts"
+                  fi
               fi
 
               old_nb_resp=$(curl --write-out "%{http_code}\n" \
@@ -197,8 +204,8 @@ spec:
 
               if [[ $old_nb_resp == "404" ]]; then
                   echo "old nodebalancer not found"
+              else
+                  fail "Expected old NodeBalancer $old_nbid to be deleted, got HTTP $old_nb_resp"
               fi
             check:
               ($error == null): true
-              (contains($stdout, 'Condition met')): true
-              (contains($stdout, 'old nodebalancer not found')): true

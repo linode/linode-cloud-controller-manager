@@ -120,13 +120,14 @@ spec:
               - -c
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
-              expectedId=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .metadata.annotations[])
+              expectedId=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r '.metadata.annotations."service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"')
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
-              if [[ $nbid == $expectedId ]]; then
-                  echo "Condition met"
+              if [[ -z "$expectedId" || "$nbid" != "$expectedId" ]]; then
+                  fail "NodeBalancer ID mismatch: annotation=$expectedId, NodeBalancer=$nbid"
               fi
+              echo "Condition met"
             check:
               ($error == null): true
-              (contains($stdout, 'Condition met')): true
