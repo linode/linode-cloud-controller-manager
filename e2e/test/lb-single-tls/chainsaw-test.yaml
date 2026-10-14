@@ -26,7 +26,7 @@ spec:
               - -c
             content: |
               set -euo pipefail
-              kubectl -n $NAMESPACE create secret tls tls-secret --cert=../certificates/server.crt --key=../certificates/server.key
+              kubectl -n "$NAMESPACE" create secret tls tls-secret --cert=../certificates/server.crt --key=../certificates/server.key
             check:
               ($error == null): true
     - name: Create pods and services
@@ -58,37 +58,40 @@ spec:
               - -c
             content: |
               set -euo pipefail
-              IP=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].ip)
+              source ../scripts/lib.sh
+              IP=$(kubectl get svc svc-test -n "$NAMESPACE" -o json | jq -r .status.loadBalancer.ingress[0].ip)
 
               podnames=()
 
-              for i in {1..10}; do
-                  if [[ ${#podnames[@]} -lt 1 ]]; then
-                      output=$(curl --resolve linode.test:80:$IP --cacert ../certificates/ca.crt -s https://linode.test:80 | jq -e .podName || true)
-
-                      if [[ "$output" == *"test-"* ]]; then
-                          unique=true
-                          for i in "${array[@]}"; do
-                              if [[ "$i" == "$output" ]]; then
-                                  unique=false
-                                  break
-                              fi
-                          done
-                          if [[ "$unique" == true ]]; then
-                              podnames+=($output)
-                          fi
-                      fi
-                  else
+              for attempt in {1..10}; do
+                  if [[ ${#podnames[@]} -ge 1 ]]; then
                       break
                   fi
-                  sleep 10
+
+                  output=$(curl --fail --silent --max-time 10 \
+                    --resolve "linode.test:80:$IP" \
+                    --cacert ../certificates/ca.crt \
+                    https://linode.test:80 | jq -er '.podName') || output=""
+                  if [[ "$output" == test-* ]]; then
+                      unique=true
+                      for existing in "${podnames[@]}"; do
+                          if [[ "$existing" == "$output" ]]; then
+                              unique=false
+                              break
+                          fi
+                      done
+                      if [[ "$unique" == true ]]; then
+                          podnames+=("$output")
+                      fi
+                  fi
+
+                  if ((attempt < 10)); then
+                      sleep 10
+                  fi
               done
 
               if [[ ${#podnames[@]} -lt 1 ]]; then
-                  echo "all pods failed to respond"
-              else
-                  echo "all pods responded"
+                  fail "No pod responded through the TLS load balancer"
               fi
             check:
               ($error == null): true
-              (contains($stdout, 'all pods responded')): true

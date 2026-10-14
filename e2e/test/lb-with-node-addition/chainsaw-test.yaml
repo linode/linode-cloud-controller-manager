@@ -47,12 +47,14 @@ spec:
             timeout: 10m
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
               echo "Nodebalancer ID: $nbid"
 
-              for i in {1..20}; do
+              node_count_reached=false
+              for attempt in {1..20}; do
                   response=$(curl -sf \
                     -H "Authorization: Bearer $LINODE_TOKEN" \
                     -H "Content-Type: application/json" --fail-early --retry 3 \
@@ -61,22 +63,27 @@ spec:
                   nbconfig=$(echo "$response" | jq '.data[]? | select(.port == 80)' || true)
 
                   if [[ -z $nbconfig ]]; then
-                      echo "Failed fetching nodebalancer config for port 80"
+                      printf 'Failed fetching NodeBalancer config for port 80; retrying\n' >&2
+                      if ((attempt < 20)); then
+                          sleep 20
+                      fi
+                      continue
                   fi
 
                   port_80_up_nodes=$(echo $nbconfig | jq '(.nodes_status.up)|tonumber >= 2')
 
                   if [[ $port_80_up_nodes == "true" ]]; then
-                      echo "all nodes up"
+                      node_count_reached=true
                       break
                   fi
-                  echo "Condition not met, waiting for all nodes to be ready"
-                  echo "port_80_up_nodes: $port_80_up_nodes"
-                  sleep 20
+                  printf 'NodeBalancer does not have two nodes up yet (up=%s)\n' "$port_80_up_nodes" >&2
+                  if ((attempt < 20)); then
+                      sleep 20
+                  fi
               done
+              [[ "$node_count_reached" == true ]] || fail "NodeBalancer did not have two nodes up after 20 attempts"
             check:
               ($error == null): true
-              (contains($stdout, 'all nodes up')): true
     - name: Add new node and check nodebalancer gets updated
       try:
         - script:
@@ -86,6 +93,7 @@ spec:
             timeout: 10m
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
               current_replicas=$(KUBECONFIG=$MGMT_KUBECONFIG kubectl get machinedeployment ${CLUSTER_NAME} -o=jsonpath='{.spec.replicas}')
               required_replicas=$((current_replicas + 1))
@@ -96,7 +104,8 @@ spec:
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
               echo "Nodebalancer ID: $nbid"
 
-              for i in {1..30}; do
+              node_count_reached=false
+              for attempt in {1..30}; do
                   response=$(curl -sf \
                     -H "Authorization: Bearer $LINODE_TOKEN" \
                     -H "Content-Type: application/json" --fail-early --retry 3 \
@@ -105,22 +114,22 @@ spec:
                   nbconfig=$(echo "$response" | jq '.data[]? | select(.port == 80)' || true)
 
                   if [[ -z $nbconfig ]]; then
-                      echo "Failed fetching nodebalancer config for port 80"
+                      printf 'Failed fetching NodeBalancer config for port 80; retrying\n' >&2
                   else
                       port_80_up_nodes=$(echo $nbconfig | jq '(.nodes_status.up)|tonumber >= 3')
 
                       if [[ $port_80_up_nodes == "true" ]]; then
-                          echo "all nodes up"
+                          node_count_reached=true
                           break
                       fi
-                      echo "Condition not met, waiting for all nodes to be ready"
-                      echo "nbconfig: $nbconfig"
-                      echo "port_80_up_nodes: $port_80_up_nodes"
+                      printf 'NodeBalancer does not have three nodes up yet (up=%s)\n' "$port_80_up_nodes" >&2
+                  fi
+                  if ((attempt < 30)); then
                       sleep 20
                   fi
               done
+              [[ "$node_count_reached" == true ]] || fail "NodeBalancer did not have three nodes up after 30 attempts"
 
               #KUBECONFIG=$MGMT_KUBECONFIG kubectl patch machinedeployment ${CLUSTER_NAME} --type='merge' -p "{\"spec\":{\"replicas\":$current_replicas}}"
             check:
               ($error == null): true
-              (contains($stdout, 'all nodes up')): true

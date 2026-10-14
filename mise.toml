@@ -21,7 +21,8 @@ ko = "0.19.1"
 yq = "4.52.2"
 jq = "1.8.1"
 envsubst = "1.4.3"
-"pipx:linode-cli" = "5.68.0"
+"pipx:linode-cli" = "5.69.0"
+shellcheck = "0.11.0"
 
 [tasks.build]
 description = "Build the CCM binary"

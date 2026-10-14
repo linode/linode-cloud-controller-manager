@@ -15,6 +15,7 @@ spec:
           - -c
         content: |
           set -euo pipefail
+          source ../scripts/lib.sh
           echo "Test failed. Fetching CCM logs..."
           kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-created-with-specified-nb-id-reserved" | tail -100
   steps:
@@ -44,6 +45,7 @@ spec:
               - -c
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
               re='^((25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})$'
 
@@ -55,9 +57,12 @@ spec:
                 --data "{\"region\": \"$LINODE_REGION\", \"tags\": [\"$E2E_RESERVED_IP_TAG\"]}" | jq .address)
 
               reserved_ip=$(echo "$reserved_ip" | tr -d '"')
+              if ! [[ "$reserved_ip" =~ $re ]]; then
+                fail "failed to create a reserved ip: invalid address [$reserved_ip]"
+              fi
               create_cm=$(kubectl -n $NAMESPACE create configmap nb-config --from-literal=Reserved_IP=$reserved_ip -o yaml --dry-run=client | kubectl apply -f -)
               if [[ "$create_cm" != "configmap/nb-config created" ]]; then
-                echo "Unable to create configmap. Error: $create_cm"
+                fail "Unable to create configmap. Error: $create_cm"
               fi
               LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
               data=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN LABEL=$LABEL REGION=$LINODE_REGION ../scripts/get-nb-create-data.sh svc-dummy)
@@ -74,21 +79,17 @@ spec:
                 --data "$payload" | jq .id)
               
               if ! [[ $nb_id =~ $id_re ]]; then
-                  echo "Nodebalancer ID [$nb_id] is incorrect, failed to create nodebalancer"
+                  fail "Nodebalancer ID [$nb_id] is incorrect, failed to create nodebalancer"
               fi
 
               echo "{\"reserved_ip\": \"$reserved_ip\",
                       \"nb_id\": \"$nb_id\"}"
 
               if ! kubectl -n $NAMESPACE patch configmap nb-config --type merge -p "{\"data\":{\"NB_ID\":\"$nb_id\"}}" >/dev/null; then
-                echo "Unable to update configmap"
+                fail "Unable to update configmap"
               fi
             check:
               ($error == null): true
-              (contains($stdout, 'Unable to create configmap')): false
-              (contains($stdout, 'Unable to update configmap')): false
-              (contains($stdout, 'failed to create a reserved ip')): false
-              (contains($stdout, 'failed to create nodebalancer')): false
             outputs:
               - name: nb_conf
                 value: (json_parse($stdout))
@@ -109,12 +110,15 @@ spec:
             content: |
               set -euo pipefail
 
+              source ../scripts/lib.sh
+
 
               # Delete the NodeBalancer created via the API and release the reserved
               # IP if they still exist. On the happy path CCM already did both when
               # svc-test was torn down, so these are best-effort, idempotent no-ops;
               # on failure paths they prevent leaks (chainsaw does not track
               # NodeBalancers or reserved IPs created via the API).
+              cleanup_error=""
               cleanup_nb_id=$(kubectl get configmap nb-config -o=jsonpath='{.data.NB_ID}' -n $NAMESPACE 2>/dev/null || true)
               if [[ "$cleanup_nb_id" =~ ^[0-9]+$ ]]; then
                 echo "Deleting NodeBalancer $cleanup_nb_id (best-effort)"
@@ -123,20 +127,23 @@ spec:
                   "${LINODE_URL}/v4beta/nodebalancers/$cleanup_nb_id" || true
               fi
               primary_ip=$(kubectl get configmap nb-config -o=jsonpath='{.data.Reserved_IP}' -n $NAMESPACE 2>/dev/null || true)
-              if [[ "$primary_ip" =~ ^[0-9.]+$ ]]; then
-                ../scripts/cleanup-reserved-ips.sh release "$primary_ip"
+              if ! [[ "$primary_ip" =~ ^[0-9.]+$ ]]; then
+                cleanup_error="No reserved ip found in configmap"
+              elif ! ../scripts/cleanup-reserved-ips.sh release "$primary_ip"; then
+                cleanup_error="${cleanup_error:+$cleanup_error; }Unable to release reserved IP $primary_ip"
               fi
 
-              delete_cm=$(kubectl delete configmap nb-config -n $NAMESPACE)
+              delete_cm=$(kubectl delete configmap nb-config -n $NAMESPACE 2>&1) || true
               if [[ "$delete_cm" == *'configmap "nb-config" deleted'* ]]; then
                 echo "Configmap deleted successfully"
               else
-                echo "Unable to delete the configmap: $delete_cm. Error: $delete_cm"
+                cleanup_error="${cleanup_error:+$cleanup_error; }Unable to delete the configmap: $delete_cm"
+              fi
+              if [[ -n "$cleanup_error" ]]; then
+                fail "$cleanup_error"
               fi
             check:
               ($error == null): true
-              (contains($stdout, 'No reserved ip found in configmap')): false
-              (contains($stdout, 'Unable to delete the configmap')): false
     - name: Check that loadbalancer ip is assigned
       try:
       - assert:
@@ -155,29 +162,30 @@ spec:
               - -c
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
               reserved_ip=$(kubectl get configmap nb-config -o=jsonpath='{.data.Reserved_IP}' -n $NAMESPACE)
               if [ -z "$reserved_ip" ]; then
-                  echo "Error: No reserved ip found in configmap"
+                  fail "No reserved ip found in configmap"
               fi
 
               nb_id=$(kubectl get configmap nb-config -o=jsonpath='{.data.NB_ID}' -n $NAMESPACE)
               if [ -z "$nb_id" ]; then
-                  echo "Error: No nb_id found in configmap"
+                  fail "No nb id found in configmap"
               fi
 
               service_ip=$(kubectl get svc svc-test -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
               if [ -z "$service_ip" ]; then
-                  echo "Error: No service ip found for service svc-test"
+                  fail "No service ip found for service svc-test"
               fi
 
               expectedId=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r '.metadata.annotations."service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"')
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
-              if [[ $nbid == $expectedId ]]; then
+              if [[ "$nbid" == "$expectedId" ]]; then
                 echo "NB IDs match"
               else
-                echo "NB IDs do not match"
+                fail "NB IDs do not match: annotation=$expectedId, NodeBalancer=$nbid"
               fi
 
               echo "{\"service_ip\": $service_ip}"
@@ -185,12 +193,8 @@ spec:
               if [[ "$service_ip" == "$reserved_ip" ]]; then
                 echo "IPs Match"
               else
-                echo "IPs do not match"
+                fail "IPs do not match: service=$service_ip reserved=$reserved_ip"
               fi
 
             check:
               ($error == null): true
-              (contains($stdout, 'No reserved ip found in configmap')): false
-              (contains($stdout, 'No service ip found for service svc-test')): false
-              (contains($stdout, 'IPs do not match')): false
-              (contains($stdout, 'NB IDs do not match')): false

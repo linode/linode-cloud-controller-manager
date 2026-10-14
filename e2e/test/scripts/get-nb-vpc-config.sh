@@ -1,19 +1,22 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
-SCRIPT_DIR=$(dirname "$0")
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=e2e/test/scripts/lib.sh
+source "$SCRIPT_DIR/lib.sh"
 
-svcname="svc-test"
-if [[ -n "$1" ]]; then
-    svcname="$1"
+svcname=${1:-svc-test}
+: "${NAMESPACE:?NAMESPACE must be set}"
+: "${LINODE_TOKEN:?LINODE_TOKEN must be set}"
+
+nbid=$(NAMESPACE="$NAMESPACE" LINODE_TOKEN="$LINODE_TOKEN" "$SCRIPT_DIR/get-nb-id.sh" "$svcname")
+vpcconfig=$(retry 3 2 linode_api GET "/v4beta/nodebalancers/$nbid/vpcs" \
+  | jq -c --argjson nbid "$nbid" '.data[]? | select(.nodebalancer_id == $nbid)')
+
+if [[ -z $vpcconfig ]]; then
+  fail "No VPC configuration found for NodeBalancer $nbid"
+  exit 1
 fi
 
-# Get the nodebalancer backing the service
-nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN $SCRIPT_DIR/get-nb-id.sh $svcname)
-
-# Print the VPC config of that nodebalancer, which carries the backend ipv4 range
-curl -s \
-    -H "Authorization: Bearer $LINODE_TOKEN" \
-    -H "Content-Type: application/json" --fail-early --retry 3 \
-    "$LINODE_URL/v4beta/nodebalancers/$nbid/vpcs" | jq -c ".data[] | select(.nodebalancer_id == $nbid)"
+printf '%s\n' "$vpcconfig"

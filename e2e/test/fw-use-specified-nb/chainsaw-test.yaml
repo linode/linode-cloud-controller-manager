@@ -52,6 +52,7 @@ spec:
                 value: ($fwname)
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
               create_fw=$(curl -s --write-out "%{http_code}\n" --output /dev/null --request POST \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
@@ -81,10 +82,11 @@ spec:
 
               if [[ $create_fw == "200" ]]; then
                   echo "fw created"
+              else
+                  fail "Failed creating firewall, got HTTP $create_fw"
               fi
             check:
               ($error == null): true
-              (contains($stdout, 'fw created')): true
         - apply:
             file: create-pods-services.yaml
       catch:
@@ -115,6 +117,7 @@ spec:
                 value: ($fwname)
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
               re='^[0-9]+$'
 
               fwid=$(curl -s \
@@ -131,7 +134,8 @@ spec:
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-firewall-id=$fwid
               sleep 5
 
-              for i in {1..10}; do
+              matched=false
+              for _ in {1..10}; do
                   nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
                   fwconfig=$(curl -s \
@@ -143,16 +147,19 @@ spec:
 
                   if [[ $fw_attached_to_nb == "true" ]]; then
                       echo "Conditions met"
+                      matched=true
                       break
                   fi
 
                   sleep 10
               done
+              if [[ "$matched" != true ]]; then
+                  fail "Firewall $fwid was not attached to NodeBalancer $nbid after 10 attempts"
+              fi
 
-              curl -s -X DELETE \
+              curl -s --fail -X DELETE \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 -H "Content-Type: application/json" --fail-early --retry 3 \
                 "$LINODE_URL/v4/networking/firewalls/$fwid"
             check:
               ($error == null): true
-              (contains($stdout, 'Conditions met')): true
