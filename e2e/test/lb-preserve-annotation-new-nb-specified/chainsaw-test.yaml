@@ -76,6 +76,7 @@ spec:
               - -c
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
               re='^[0-9]+$'
 
@@ -107,16 +108,10 @@ spec:
                   data="{\"label\": \"$LABEL\", \"region\": \"$REGION\"}"
               fi
 
-              nbid=$(curl -s --request POST \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                -H "accept: application/json" \
-                "$LINODE_URL/v4beta/nodebalancers" \
-                --data "$data" | jq .id)
+              nbid=$(retry 3 5 linode_api POST /v4beta/nodebalancers --data "$data" | jq -er '.id')
 
               if ! [[ $nbid =~ $re ]]; then
-                  echo "Nodebalancer id [$nbid] is incorrect, failed to create nodebalancer"
-                  exit 1
+                  fail "Nodebalancer id [$nbid] is incorrect, failed to create nodebalancer"
               fi
 
               # Record the newly created NodeBalancer id as well so the catch block
@@ -125,15 +120,20 @@ spec:
 
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id=$nbid
 
-              for i in {1..10}; do
+              matched=false
+              for _ in {1..10}; do
                   nbid2=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
-                  if [[ $nbid == $nbid2 ]]; then
+                  if [[ "$nbid" == "$nbid2" ]]; then
                       echo "updated nodebalancer used"
+                      matched=true
                       break
                   fi
                   sleep 5
               done
+              if [[ "$matched" != true ]]; then
+                  fail "Service did not adopt new NodeBalancer $nbid after 10 attempts"
+              fi
 
               # Check old nodebalancer still exists
               old_nb_resp=$(curl --write-out "%{http_code}\n" \
@@ -143,6 +143,8 @@ spec:
 
               if [[ $old_nb_resp == "200" ]]; then
                   echo "old nodebalancer found"
+              else
+                  fail "Expected old NodeBalancer $old_nbid to remain during service update, got HTTP $old_nb_resp"
               fi
 
               # cleanup old nodebalancer
@@ -153,7 +155,7 @@ spec:
                 "$LINODE_URL/v4/nodebalancers/$old_nbid")
 
               if [[ $delete_resp != "200" ]]; then
-                  echo "failed deleting nodebalancer"
+                  fail "Failed deleting old NodeBalancer $old_nbid, got HTTP $delete_resp"
               fi
 
               # cleanup new nodebalancer
@@ -164,9 +166,7 @@ spec:
                 "$LINODE_URL/v4/nodebalancers/$nbid")
 
               if [[ $delete_resp != "200" ]]; then
-                  echo "failed deleting nodebalancer"
+                  fail "Failed deleting new NodeBalancer $nbid, got HTTP $delete_resp"
               fi
             check:
               ($error == null): true
-              (contains($stdout, 'updated nodebalancer used')): true
-              (contains($stdout, 'old nodebalancer found')): true

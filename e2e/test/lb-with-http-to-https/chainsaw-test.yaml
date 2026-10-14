@@ -37,7 +37,7 @@ spec:
               - -c
             content: |
               set -euo pipefail
-              kubectl -n $NAMESPACE create secret tls tls-secret-1 --cert=../certificates/server.crt --key=../certificates/server.key
+              kubectl -n "$NAMESPACE" create secret tls tls-secret-1 --cert=../certificates/server.crt --key=../certificates/server.key
             check:
               ($error == null): true
     - name: Update service to have another annotation and port
@@ -48,8 +48,8 @@ spec:
               - -c
             content: |
               set -euo pipefail
-              kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-port-443='{"tls-secret-name": "tls-secret-1", "protocol": "https"}'
-              kubectl patch svc svc-test -n $NAMESPACE --type='json' -p='[{"op": "add", "path": "/spec/ports/-", "value": {"name": "https", "port": 443, "targetPort": 8080, "protocol": "TCP"}}]'
+              kubectl annotate svc svc-test -n "$NAMESPACE" service.beta.kubernetes.io/linode-loadbalancer-port-443='{"tls-secret-name": "tls-secret-1", "protocol": "https"}'
+              kubectl patch svc svc-test -n "$NAMESPACE" --type='json' -p='[{"op": "add", "path": "/spec/ports/-", "value": {"name": "https", "port": 443, "targetPort": 8080, "protocol": "TCP"}}]'
             check:
               ($error == null): true
     - name: Check endpoints have addresses
@@ -97,23 +97,30 @@ spec:
             timeout: 10m
             content: |
               set -euo pipefail
-              IP=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].ip)
+              source ../scripts/lib.sh
+              IP=$(kubectl get svc svc-test -n "$NAMESPACE" -o json | jq -r .status.loadBalancer.ingress[0].ip)
               echo "loadbalancer ip: $IP"
 
-              for i in {1..20}; do
-                  port_80=$(curl -s $IP:80 | grep "test-" || true)
-                  port_443=$(curl --resolve linode.test:443:$IP --cacert ../certificates/ca.crt -s https://linode.test:443 | grep "test-" || true)
+              connected=false
+              for attempt in {1..20}; do
+                  port_80=$(curl -fsS --max-time 10 "$IP:80" | grep "test-" || true)
+                  port_443=$(curl --fail --silent --max-time 10 \
+                    --resolve "linode.test:443:$IP" \
+                    --cacert ../certificates/ca.crt \
+                    https://linode.test:443 | grep "test-" || true)
 
                   if [[ -z $port_80 || -z $port_443 ]]; then
                       echo "pod not reachable on port 80 or 443, retrying..."
                       echo "port 80: $port_80"
                       echo "port 443: $port_443"
-                      sleep 20
+                      if ((attempt < 20)); then
+                          sleep 20
+                      fi
                   else
-                      echo "all pods responded"
+                      connected=true
                       break
                   fi
               done
+              [[ "$connected" == true ]] || fail "Pods did not respond on both port 80 and port 443"
             check:
               ($error == null): true
-              (contains($stdout, 'all pods responded')): true

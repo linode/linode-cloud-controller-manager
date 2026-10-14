@@ -26,6 +26,7 @@ spec:
               - -c
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
               re='^((25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})$'
 
@@ -39,12 +40,12 @@ spec:
               reserved_ip=$(echo "$reserved_ip" | tr -d '"')
               
               if ! [[ $reserved_ip =~ $re ]]; then
-                  echo "Reserved ip [$reserved_ip] is incorrect, failed to create a reserved ip"
+                  fail "Reserved ip [$reserved_ip] is incorrect, failed to create a reserved ip"
               fi
 
               create_cm=$(kubectl -n $NAMESPACE create configmap reserved-ip-config --from-literal=ReservedIP=$reserved_ip -o yaml --dry-run=client | kubectl apply -f -)
               if [[ "$create_cm" != "configmap/reserved-ip-config created" ]]; then
-                echo "Unable to create configmap. Error: $create_cm"
+                fail "Unable to create configmap. Error: $create_cm"
               fi
               
               fw_label="ccm-fwtest-$RANDOM"
@@ -75,22 +76,18 @@ spec:
               " | jq .id)
               
               sleep 30
-              if [ $fw_id == null ]; then
-                echo "failed to create firewall : $fw_id"
+              if [[ "$fw_id" == "null" || -z "$fw_id" ]]; then
+                fail "failed to create firewall: $fw_id"
               fi
 
               echo "{\"reserved_ip\": \"$reserved_ip\",
               \"fw_id\": \"$fw_id\"}"
 
               if ! kubectl -n $NAMESPACE patch configmap reserved-ip-config --type merge -p "{\"data\":{\"FW_ID\":\"$fw_id\"}}" >/dev/null; then
-                echo "Unable to update configmap"
+                fail "Unable to update configmap"
               fi
             check:
               ($error == null): true
-              (contains($stdout, 'Unable to create configmap')): false
-              (contains($stdout, 'Unable to update configmap')): false
-              (contains($stdout, 'failed to create a reserved ip')): false
-              (contains($stdout, 'failed to create firewall')): false
             outputs:
               - name: ip
                 value: (json_parse($stdout))
@@ -110,20 +107,24 @@ spec:
               - -c
             content: |
               set -euo pipefail
-              fw_id=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.FW_ID}' -n $NAMESPACE)
+              source ../scripts/lib.sh
+              cleanup_error=""
+              fw_id=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.FW_ID}' -n "$NAMESPACE" 2>/dev/null || true)
               if [ -z "$fw_id" ]; then
-                  echo "Error: No firewall id found in configmap"
+                  cleanup_error="No firewall id found in configmap"
               fi
 
+              if [[ -n "$fw_id" ]]; then
               delete_fw=$(curl -s -X DELETE \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 -H "Content-Type: application/json" --fail-early --retry 3 \
-                "$LINODE_URL/v4/networking/firewalls/$fw_id")
+                "$LINODE_URL/v4/networking/firewalls/$fw_id" || true)
 
               if [[ "$delete_fw" == "{}" || "$delete_fw" == *'"reason": "Not found"'* ]]; then
                 echo "Firewall $fw_id deleted successfully"
               else
-                echo "Unable to delete firewall: $fw_id. Error: $delete_fw"
+                cleanup_error="${cleanup_error:+$cleanup_error; }Unable to delete firewall: $fw_id. Error: $delete_fw"
+              fi
               fi
 
               # Release the primary reserved IP if it still exists. On the happy
@@ -133,20 +134,22 @@ spec:
               # created via the API).
               primary_ip=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.ReservedIP}' -n $NAMESPACE 2>/dev/null || true)
               if [[ "$primary_ip" =~ ^[0-9.]+$ ]]; then
-                ../scripts/cleanup-reserved-ips.sh release "$primary_ip"
+                if ! ../scripts/cleanup-reserved-ips.sh release "$primary_ip"; then
+                  cleanup_error="${cleanup_error:+$cleanup_error; }Unable to release reserved IP $primary_ip"
+                fi
               fi
 
-              delete_cm=$(kubectl delete configmap reserved-ip-config -n $NAMESPACE)
+              delete_cm=$(kubectl delete configmap reserved-ip-config -n "$NAMESPACE" 2>&1) || true
               if [[ "$delete_cm" == *'configmap "reserved-ip-config" deleted'* ]]; then
                 echo "Configmap deleted successfully"
               else
-                echo "Unable to delete the configmap: $delete_cm. Error: $delete_cm"
+                cleanup_error="${cleanup_error:+$cleanup_error; }Unable to delete the configmap: $delete_cm"
+              fi
+              if [[ -n "$cleanup_error" ]]; then
+                fail "$cleanup_error"
               fi
             check:
               ($error == null): true
-              (contains($stdout, 'No firewall id found in configmap')): false
-              (contains($stdout, 'Unable to delete firewall')): false
-              (contains($stdout, 'Unable to delete the configmap')): false
     - name: Check that loadbalancer ip is assigned
       try:
       - assert:
@@ -165,38 +168,40 @@ spec:
               - -c
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
               reserved_ip=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.ReservedIP}' -n $NAMESPACE)
               if [ -z "$reserved_ip" ]; then
-                  echo "Error: No reserved ip found in configmap"
+                  fail "No reserved ip found in configmap"
               fi
 
               service_ip=$(kubectl get svc svc-test -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
               if [ -z "$service_ip" ]; then
-                  echo "Error: No service ip found for service svc-test"
+                  fail "No service ip found for service svc-test"
               fi
               echo "{\"service_ip\": $service_ip}"
               echo "{\"reserved_ip\": $reserved_ip}"
               if [[ "$service_ip" == "$reserved_ip" ]]; then
                 echo "IPs Match"
               else
-                echo "IPs do not match"
+                fail "IPs do not match: service=$service_ip reserved=$reserved_ip"
               fi
 
               #Run a curl command to the service ip
               URL="http://$service_ip:80/"
-              for i in {1..10}; do
+              request_succeeded=false
+              for _ in {1..10}; do
                 HTTP_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
                 if [ "$HTTP_RESPONSE" -eq 200 ]; then
                    echo "Request was successful (HTTP 200)"
+                   request_succeeded=true
                    break
                 fi
                 sleep 10
               done
+              if [[ "$request_succeeded" != true ]]; then
+                fail "Request failed with response code ${HTTP_RESPONSE:-<empty>} after 10 attempts"
+              fi
             check:
               ($error == null): true
-              (contains($stdout, 'No reserved ip found in configmap')): false
-              (contains($stdout, 'No service ip found for service svc-test')): false
-              (contains($stdout, 'IPs do not match')): false
-              (contains($stdout, 'Request failed with response code')): false
      

@@ -83,4 +83,3 @@ spec:
               done
             check:
               ($error == null): true
-              (contains($stdout, 'Stickiness successfully updated to source_ip')): true

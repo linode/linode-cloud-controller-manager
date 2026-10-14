@@ -48,12 +48,14 @@ spec:
             timeout: 10m
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
               echo "Nodebalancer ID: $nbid"
 
-              for i in {1..20}; do
+              matched=false
+              for _ in {1..20}; do
                   nbconfig=$(curl -s \
                     -H "Authorization: Bearer $LINODE_TOKEN" \
                     -H "Content-Type: application/json" --fail-early --retry 3 \
@@ -69,6 +71,7 @@ spec:
 
                   if [[ $port_80_check == "true" && $port_80_passive == "true" && $port_80_up_nodes == "true" ]]; then
                       echo "All conditions met"
+                      matched=true
                       break
                   fi
                   echo "Conditions not met, retrying in 20 seconds..."
@@ -77,6 +80,8 @@ spec:
                   echo "port_80_up_nodes: $port_80_up_nodes"
                   sleep 20
               done
+              if [[ "$matched" != true ]]; then
+                  fail "NodeBalancer config for port 80 did not satisfy the passive health check after 20 attempts"
+              fi
             check:
               ($error == null): true
-              (contains($stdout, 'All conditions met')): true

@@ -1,20 +1,27 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
-SCRIPT_DIR=$(dirname "$0")
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=e2e/test/scripts/lib.sh
+source "$SCRIPT_DIR/lib.sh"
 
-svcname="svc-test"
-if [[ -n "$1" ]]; then
-    svcname="$1"
+svcname=${1:-svc-test}
+: "${LABEL:?LABEL must be set}"
+: "${REGION:?REGION must be set}"
+: "${NAMESPACE:?NAMESPACE must be set}"
+: "${LINODE_TOKEN:?LINODE_TOKEN must be set}"
+
+subnet_id=$(NAMESPACE="$NAMESPACE" LINODE_TOKEN="$LINODE_TOKEN" "$SCRIPT_DIR/get-nb-subnet-id.sh" "$svcname")
+
+if [[ -z $subnet_id ]]; then
+  data=$(jq -cn --arg label "$LABEL" --arg region "$REGION" '{label: $label, region: $region}')
+else
+  data=$(jq -cn \
+    --arg label "$LABEL" \
+    --arg region "$REGION" \
+    --argjson subnet_id "$subnet_id" \
+    '{label: $label, region: $region, vpcs: [{subnet_id: $subnet_id}]}')
 fi
 
-# Get existing service's subnet id
-SUBNET_ID=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN $SCRIPT_DIR/get-nb-subnet-id.sh $svcname)
-
-data="{\"label\": \"$LABEL\", \"region\": \"$REGION\", \"vpcs\": [{\"subnet_id\": $SUBNET_ID}]}"
-if [[ -z $SUBNET_ID ]]; then
-    data="{\"label\": \"$LABEL\", \"region\": \"$REGION\"}"
-fi
-
-echo $data
+printf '%s\n' "$data"
