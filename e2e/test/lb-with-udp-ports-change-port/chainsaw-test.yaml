@@ -47,7 +47,8 @@ spec:
               - -c
             content: |
               set -euo pipefail
-              
+              source ../scripts/lib.sh
+
               echo "Starting e2e test"
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
@@ -61,15 +62,19 @@ spec:
               kubectl annotate --overwrite svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-udp-check-port=4500
 
               echo "Verifying that udp_check_port is set to 4500"
-              for i in {1..10}; do
+              matched=false
+              for _ in {1..10}; do
                 nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
                 udp_check_port=$(echo $nbconfig | jq -r '.udp_check_port')
                 echo "udp_check_port is $udp_check_port"
                 if [[ "$udp_check_port" == "4500" ]]; then
+                  matched=true
                   break
                 fi
                 sleep 10
               done
+              if [[ "$matched" != true ]]; then
+                fail "Expected NodeBalancer udp_check_port 4500 after 10 attempts; found $udp_check_port"
+              fi
             check:
               ($error == null): true
-              (contains($stdout, 'udp_check_port is 4500')): true

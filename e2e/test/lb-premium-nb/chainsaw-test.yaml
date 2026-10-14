@@ -47,43 +47,40 @@ spec:
             timeout: 10m
             content: |
               set -euo pipefail
-              IP=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .status.loadBalancer.ingress[0].ip)
-              echo "LoadBalancer IP: $IP"
+              source ../scripts/lib.sh
+              IP=$(kubectl get svc svc-test -n "$NAMESPACE" -o json | jq -r .status.loadBalancer.ingress[0].ip)
 
               podnames=()
 
-              for i in {1..20}; do
-                  if [[ ${#podnames[@]} -lt 2 ]]; then
-                      response=$(curl -sf $IP:80) || response=""
-                      output=$(echo "$response" | jq -e .podName) || output=""
-
-                      if [[ "$output" == *"test-"* ]]; then
-                          unique=true
-                          for i in "${array[@]}"; do
-                              if [[ "$i" == "$output" ]]; then
-                                  unique=false
-                                  break
-                              fi
-                          done
-                          if [[ "$unique" == true ]]; then
-                              podnames+=($output)
-                          fi
-                      fi
-                  else
+              for attempt in {1..20}; do
+                  if [[ ${#podnames[@]} -ge 2 ]]; then
                       break
                   fi
-                  echo "Attempt $i: Current pods: ${podnames[*]}"
-                  sleep 20
+
+                  output=$(curl -fsS --max-time 10 "$IP:80" | jq -er '.podName') || output=""
+                  if [[ "$output" == test-* ]]; then
+                      unique=true
+                      for existing in "${podnames[@]}"; do
+                          if [[ "$existing" == "$output" ]]; then
+                              unique=false
+                              break
+                          fi
+                      done
+                      if [[ "$unique" == true ]]; then
+                          podnames+=("$output")
+                      fi
+                  fi
+
+                  if ((attempt < 20)); then
+                      sleep 20
+                  fi
               done
 
               if [[ ${#podnames[@]} -lt 2 ]]; then
-                  echo "all pods failed to respond"
-              else
-                  echo "all pods responded"
+                  fail "Expected responses from two distinct pods, observed ${#podnames[@]}"
               fi
             check:
               ($error == null): true
-              (contains($stdout, 'all pods responded')): true
     - name: Check nodebalancer type
       try:
       - script:
@@ -92,9 +89,11 @@ spec:
             - -c
           content: |
             set -euo pipefail
+            source ../scripts/lib.sh
 
-            nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
-            for i in {1..10}; do
+            nbid=$(KUBECONFIG="$KUBECONFIG" NAMESPACE="$NAMESPACE" LINODE_TOKEN="$LINODE_TOKEN" ../scripts/get-nb-id.sh)
+            premium_type_found=false
+            for attempt in {1..10}; do
                 type=$(curl -s --request GET \
                   -H "Authorization: Bearer $LINODE_TOKEN" \
                   -H "Content-Type: application/json" --fail-early --retry 3 \
@@ -102,11 +101,13 @@ spec:
                   "$LINODE_URL/v4/nodebalancers/${nbid}" | jq -r '.type')
 
                 if [[ $type == "premium" ]]; then
-                    echo "nodebalancer type is premium"
+                    premium_type_found=true
                     break
                 fi
-                sleep 5
+                if ((attempt < 10)); then
+                    sleep 5
+                fi
             done
+            [[ "$premium_type_found" == true ]] || fail "NodeBalancer type did not become premium"
           check:
             ($error == null): true
-            (contains($stdout, 'nodebalancer type is premium')): true

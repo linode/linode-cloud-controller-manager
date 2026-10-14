@@ -66,6 +66,7 @@ spec:
                 value: (json_parse($stdout))
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
               re='^[0-9]+$'
               LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
@@ -73,12 +74,7 @@ spec:
               # Get data to use for new nodebalancer
               data=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN LABEL=$LABEL REGION=$REGION ../scripts/get-nb-create-data.sh svc-dummy)
 
-              nbid=$(curl -s --request POST \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                -H "accept: application/json" \
-                "$LINODE_URL/v4beta/nodebalancers" \
-                --data "$data" | jq .id)
+              nbid=$(retry 3 5 linode_api POST /v4beta/nodebalancers --data "$data" | jq -er '.id')
 
               if ! [[ $nbid =~ $re ]]; then
                   echo "Nodebalancer id [$nbid] is incorrect, failed to create nodebalancer"
@@ -120,13 +116,14 @@ spec:
               - -c
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
-              expectedId=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r .metadata.annotations[])
+              expectedId=$(kubectl get svc svc-test -n $NAMESPACE -o json | jq -r '.metadata.annotations."service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id"')
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
-              if [[ $nbid == $expectedId ]]; then
-                  echo "Condition met"
+              if [[ -z "$expectedId" || "$nbid" != "$expectedId" ]]; then
+                  fail "NodeBalancer ID mismatch: annotation=$expectedId, NodeBalancer=$nbid"
               fi
+              echo "Condition met"
             check:
               ($error == null): true
-              (contains($stdout, 'Condition met')): true

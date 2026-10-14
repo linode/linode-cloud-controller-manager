@@ -75,6 +75,7 @@ spec:
               - -c
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
@@ -95,6 +96,8 @@ spec:
 
               if [[ $get_resp == "200" ]]; then
                   echo "nodebalancer exists"
+              else
+                  fail "Expected preserved NodeBalancer $nbid to exist, got HTTP $get_resp"
               fi
 
               # cleanup remaining nodebalancer
@@ -105,8 +108,7 @@ spec:
                 "$LINODE_URL/v4/nodebalancers/$nbid")
 
               if ! [[ $delete_resp == "200" ]]; then
-                  echo "failed deleting nodebalancer"
+                  fail "Failed deleting NodeBalancer $nbid, got HTTP $delete_resp"
               fi
             check:
               ($error == null): true
-              (contains($stdout, 'nodebalancer exists')): true

@@ -26,6 +26,7 @@ spec:
               - -c
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
               #!/bin/bash
 
               re='^((25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})$'
@@ -40,14 +41,12 @@ spec:
               reserved_ip=$(echo "$reserved_ip" | tr -d '"')
               
               if ! [[ $reserved_ip =~ $re ]]; then
-                  echo "Reserved ip [$reserved_ip] is incorrect, failed to create a reserved ip"
-                  exit 1
+                  fail "Reserved ip [$reserved_ip] is incorrect, failed to create a reserved ip"
               fi
 
               create_cm=$(kubectl -n $NAMESPACE create configmap reserved-ip-config --from-literal=ReservedIP=$reserved_ip -o yaml --dry-run=client | kubectl apply -f -)
               if [[ "$create_cm" != "configmap/reserved-ip-config created" ]]; then
-                echo "Unable to create configmap. Error: $create_cm"
-                exit 1
+                fail "Unable to create configmap. Error: $create_cm"
               fi
 
               reserved_ip2=$(curl -s --request POST \
@@ -60,21 +59,17 @@ spec:
               reserved_ip2=$(echo "$reserved_ip2" | tr -d '"')
               
               if ! [[ $reserved_ip2 =~ $re ]]; then
-                  echo "Reserved ip [$reserved_ip2] is incorrect, failed to create a reserved ip"
-                  exit 1
+                  fail "Reserved ip [$reserved_ip2] is incorrect, failed to create a reserved ip"
               fi
               
               if ! kubectl -n $NAMESPACE patch configmap reserved-ip-config --type merge -p "{\"data\":{\"ReservedIP2\":\"$reserved_ip2\"}}" >/dev/null; then
-                echo "Unable to update configmap"
-                exit 1
+                fail "Unable to update configmap"
               fi
 
               echo "{ \"reserved_ip\": \"$reserved_ip\" ,
                 \"reserved_ip2\": \"$reserved_ip2\"}"
             check:
               ($error == null): true
-              (contains($stdout, 'Unable to create configmap')): false
-              (contains($stdout, 'failed to create a reserved ip')): false
             outputs:
               - name: ip
                 value: (json_parse($stdout))
@@ -94,28 +89,35 @@ spec:
               - -c
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
+
+              cleanup_error=""
 
               primary_ip=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.ReservedIP}' -n $NAMESPACE 2>/dev/null || true)
-              if [[ "$primary_ip" =~ ^[0-9.]+$ ]]; then
-                ../scripts/cleanup-reserved-ips.sh release "$primary_ip"
+              if ! [[ "$primary_ip" =~ ^[0-9.]+$ ]]; then
+                cleanup_error="No reserved ip found in configmap"
+              elif ! ../scripts/cleanup-reserved-ips.sh release "$primary_ip"; then
+                cleanup_error="${cleanup_error:+$cleanup_error; }Unable to release reserved IP $primary_ip"
               fi
 
               reserved_ip2=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.ReservedIP2}' -n $NAMESPACE 2>/dev/null || true)
-              if [[ "$reserved_ip2" =~ ^[0-9.]+$ ]]; then
-                ../scripts/cleanup-reserved-ips.sh release "$reserved_ip2"
+              if ! [[ "$reserved_ip2" =~ ^[0-9.]+$ ]]; then
+                cleanup_error="${cleanup_error:+$cleanup_error; }Second reserved ip not found in configmap"
+              elif ! ../scripts/cleanup-reserved-ips.sh release "$reserved_ip2"; then
+                cleanup_error="${cleanup_error:+$cleanup_error; }Unable to release reserved IP $reserved_ip2"
               fi
 
-              delete_cm=$(kubectl delete configmap reserved-ip-config -n $NAMESPACE)
+              delete_cm=$(kubectl delete configmap reserved-ip-config -n $NAMESPACE 2>&1) || true
               if [[ "$delete_cm" == *'configmap "reserved-ip-config" deleted'* ]]; then
                 echo "Configmap deleted successfully"
               else
-                echo "Unable to delete the configmap: $delete_cm. Error: $delete_cm"
+                cleanup_error="${cleanup_error:+$cleanup_error; }Unable to delete the configmap: $delete_cm"
+              fi
+              if [[ -n "$cleanup_error" ]]; then
+                fail "$cleanup_error"
               fi
             check:
               ($error == null): true
-              (contains($stdout, 'No reserved ip found in configmap')): false
-              (contains($stdout, 'Unable to delete the configmap')): false
-              (contains($stdout, 'Unable to update configmap')): false
     - name: Check that loadbalancer ip is assigned
       try:
       - assert:
@@ -134,16 +136,17 @@ spec:
               - -c
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
               #!/bin/bash
 
               reserved_ip=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.ReservedIP}' -n $NAMESPACE)
               if [ -z "$reserved_ip" ]; then
-                  echo "Error: No reserved ip found in configmap"
+                  fail "No reserved ip found in configmap"
               fi
 
               reserved_ip2=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.ReservedIP2}' -n $NAMESPACE)
               if [ -z "$reserved_ip2" ]; then
-                  echo "Error: No reserved ip found in configmap"
+                  fail "Second reserved ip not found in configmap"
               fi
               
               patch=$(kubectl patch service svc-test -n $NAMESPACE --patch "{
@@ -154,6 +157,26 @@ spec:
                 }
               }")
 
+              if [[ "$patch" != "service/svc-test patched" ]]; then
+                fail "Unable to update annotation: $patch"
+              fi
+
+              warning_found=false
+              for _ in {1..10}; do
+                events=$(kubectl get events -n $NAMESPACE --field-selector reason=NodeBalancerIPChangeIgnored --sort-by='.lastTimestamp' -o json)
+                message=$(echo $events | jq .items[0].message)
+
+                if [[ "$message" =~ ^\"IPv4\ annotation\ changed\ to\ $reserved_ip2,\ but\ NodeBalancer\ \([0-9]+\)\ IP\ cannot\ be\ updated\ after\ creation.\ It\ will\ remain\ $reserved_ip\"$ ]]; then
+                  echo "First warning event found"
+                  warning_found=true
+                  break
+                fi
+                sleep 10
+              done
+              if [[ "$warning_found" != true ]]; then
+                fail "First warning event not found after 10 attempts for reserved IP change"
+              fi
+
               patch2=$(kubectl patch service svc-test -n $NAMESPACE --patch "{
                 \"metadata\": {
                   \"annotations\": {
@@ -162,14 +185,12 @@ spec:
                 }
               }")
 
-              if [[ "$patch" != "service/svc-test patched" ]]; then
-                echo "Unable to update annotation"
-              fi
               if [[ "$patch2" != "service/svc-test patched" ]]; then
-                echo "Unable to update annotation"
+                fail "Unable to update annotation: $patch2"
               fi
 
-              for i in {1..10}; do
+              warning_found=false
+              for _ in {1..10}; do
                 events=$(kubectl get events -n $NAMESPACE --field-selector reason=NodeBalancerIPChangeIgnored --sort-by='.lastTimestamp' -o json)
                 message=$(echo $events | jq .items[0].message)
                 message2=$(echo $events | jq .items[1].message)
@@ -177,15 +198,17 @@ spec:
                 if [[ "$message" =~ ^\"IPv4\ annotation\ changed\ to\ $reserved_ip2,\ but\ NodeBalancer\ \([0-9]+\)\ IP\ cannot\ be\ updated\ after\ creation.\ It\ will\ remain\ $reserved_ip\"$ ]] && \
                    [[ "$message2" =~ ^\"IPv4\ annotation\ changed\ to\ 100.10.10.10,\ but\ NodeBalancer\ \([0-9]+\)\ IP\ cannot\ be\ updated\ after\ creation.\ It\ will\ remain\ $reserved_ip\"$ ]]; then
                   echo "Warning event found"
+                  warning_found=true
                   break
                 fi
                 sleep 10
               done
+              if [[ "$warning_found" != true ]]; then
+                fail "Warning event not found after 10 attempts for both reserved IP changes"
+              fi
+
             check:
               ($error == null): true
-              (contains($stdout, 'No reserved ip found in configmap')): false
-              (contains($stdout, 'Unable to update annotation')): false
-              (contains($stdout, 'Warning event not found')): false
     - name: get service ip and compare with reserved ip
       try:
         - script: 
@@ -194,30 +217,28 @@ spec:
               - -c
             content: |
               set -euo pipefail
+              source ../scripts/lib.sh
 
               reserved_ip=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.ReservedIP}' -n $NAMESPACE)
               if [ -z "$reserved_ip" ]; then
-                  echo "Error: No reserved ip found in configmap"
+                  fail "No reserved ip found in configmap"
               fi
 
               reserved_ip2=$(kubectl get configmap reserved-ip-config -o=jsonpath='{.data.ReservedIP2}' -n $NAMESPACE)
               if [ -z "$reserved_ip2" ]; then
-                  echo "Error: No reserved ip found in configmap"
+                  fail "Second reserved ip not found in configmap"
               fi
               
               service_ip=$(kubectl get svc svc-test -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
               if [ -z "$service_ip" ]; then
-                  echo "Error: No service ip found for service svc-test"
+                  fail "No service ip found for service svc-test"
               fi
               echo "{\"service_ip\": $service_ip}"
               echo "{\"reserved_ip\": $reserved_ip}"
               if [[ "$service_ip" == "$reserved_ip" ]]; then
                 echo "IPs Match"
               else
-                echo "IPs do not match"
+                fail "IPs do not match: service=$service_ip reserved=$reserved_ip"
               fi              
             check:
               ($error == null): true
-              (contains($stdout, 'No reserved ip found in configmap')): false
-              (contains($stdout, 'No service ip found for service svc-test')): false
-              (contains($stdout, 'IPs do not match')): false
