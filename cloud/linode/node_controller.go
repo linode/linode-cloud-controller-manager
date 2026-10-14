@@ -41,6 +41,14 @@ type nodeRequest struct {
 	timestamp time.Time
 }
 
+// nodeMetadata is the metadata seen on a node when it was last checked against its linode.
+type nodeMetadata struct {
+	hostUUID   string
+	privateIP  string
+	publicIPv6 string
+	seenAt     time.Time
+}
+
 type nodeController struct {
 	sync.RWMutex
 
@@ -49,8 +57,8 @@ type nodeController struct {
 	kubeclient kubernetes.Interface
 	informer   v1informers.NodeInformer
 
-	metadataLastUpdate map[string]time.Time
-	ttl                time.Duration
+	seenMetadata map[string]nodeMetadata
+	ttl          time.Duration
 
 	queue         workqueue.TypedDelayingInterface[nodeRequest]
 	nodeLastAdded map[string]time.Time
@@ -167,14 +175,14 @@ func newNodeController(kubeclient kubernetes.Interface, linodeClient client.Clie
 	}
 
 	return &nodeController{
-		client:             linodeClient,
-		instances:          instanceCache,
-		kubeclient:         kubeclient,
-		informer:           informer,
-		ttl:                timeout,
-		metadataLastUpdate: make(map[string]time.Time),
-		queue:              workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[nodeRequest]{Name: "ccm_node"}),
-		nodeLastAdded:      make(map[string]time.Time),
+		client:        linodeClient,
+		instances:     instanceCache,
+		kubeclient:    kubeclient,
+		informer:      informer,
+		ttl:           timeout,
+		seenMetadata:  make(map[string]nodeMetadata),
+		queue:         workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[nodeRequest]{Name: "ccm_node"}),
+		nodeLastAdded: make(map[string]time.Time),
 	}
 }
 
@@ -255,29 +263,39 @@ func (s *nodeController) processNext() bool {
 	return true
 }
 
-func (s *nodeController) LastMetadataUpdate(nodeName string) time.Time {
+func (s *nodeController) MetadataSeenAt(nodeName string) time.Time {
 	s.RLock()
 	defer s.RUnlock()
-	return s.metadataLastUpdate[nodeName]
+	return s.seenMetadata[nodeName].seenAt
 }
 
-func (s *nodeController) SetLastMetadataUpdate(nodeName string) {
+// SetMetadataSeen records the node's current metadata as checked against its linode.
+func (s *nodeController) SetMetadataSeen(node *v1.Node) {
 	s.Lock()
 	defer s.Unlock()
-	s.metadataLastUpdate[nodeName] = time.Now()
+	s.seenMetadata[node.Name] = nodeMetadata{
+		hostUUID:   node.Labels[annotations.AnnLinodeHostUUID],
+		privateIP:  node.Annotations[annotations.AnnLinodeNodePrivateIP],
+		publicIPv6: node.Annotations[annotations.AnnLinodeNodePublicIPv6],
+		seenAt:     time.Now(),
+	}
 }
 
 // metadataNeedsRefresh reports whether the node's cached metadata (UUID,
 // private IP, public IPv6 annotations) is stale and should be refreshed.
 func (s *nodeController) metadataNeedsRefresh(node *v1.Node) bool {
-	lastUpdate := s.LastMetadataUpdate(node.Name)
+	s.RLock()
+	seen, found := s.seenMetadata[node.Name]
+	s.RUnlock()
+	if !found {
+		return true
+	}
 
-	_, foundLabel := node.Labels[annotations.AnnLinodeHostUUID]
-	_, foundPrivateIPAnnotation := node.Annotations[annotations.AnnLinodeNodePrivateIP]
-	_, foundIPv6Annotation := node.Annotations[annotations.AnnLinodeNodePublicIPv6]
-
-	metaAge := time.Since(lastUpdate)
-	if foundLabel && foundPrivateIPAnnotation && foundIPv6Annotation && metaAge < s.ttl {
+	metaAge := time.Since(seen.seenAt)
+	if metaAge < s.ttl &&
+		node.Labels[annotations.AnnLinodeHostUUID] == seen.hostUUID &&
+		node.Annotations[annotations.AnnLinodeNodePrivateIP] == seen.privateIP &&
+		node.Annotations[annotations.AnnLinodeNodePublicIPv6] == seen.publicIPv6 {
 		klog.V(3).InfoS("Skipping refresh, ttl not reached",
 			"node", klog.KObj(node),
 			"ttl", s.ttl,
@@ -356,7 +374,7 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 	privateIP := expectedPrivateIP(linode)
 	publicIPv6 := linode.IPv6
 	if uuid == linode.HostUUID && node.Spec.ProviderID != "" && configuredPrivateIP == privateIP && configuredPublicIPv6 == publicIPv6 {
-		s.SetLastMetadataUpdate(node.Name)
+		s.SetMetadataSeen(node)
 		return nil
 	}
 
@@ -368,8 +386,10 @@ func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
 
 	if updatedNode != nil {
 		registeredK8sNodeCache.addNodeToCache(updatedNode)
+		// Record the metadata as written, not as it was on the queued node.
+		node = updatedNode
 	}
-	s.SetLastMetadataUpdate(node.Name)
+	s.SetMetadataSeen(node)
 
 	return nil
 }
