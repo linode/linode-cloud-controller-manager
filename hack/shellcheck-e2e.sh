@@ -26,6 +26,6 @@ while IFS= read -r -d '' test_file; do
       status=1
     fi
   done <<<"$script_blocks"
-done < <(find e2e/test -type f -name chainsaw-test.yaml -print0)
+done < <(find e2e -type f -name chainsaw-test.yaml -print0)
 
 exit "$status"

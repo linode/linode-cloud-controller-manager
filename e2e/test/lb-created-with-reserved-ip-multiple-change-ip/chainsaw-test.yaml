@@ -157,6 +157,26 @@ spec:
                 }
               }")
 
+              if [[ "$patch" != "service/svc-test patched" ]]; then
+                fail "Unable to update annotation: $patch"
+              fi
+
+              warning_found=false
+              for _ in {1..10}; do
+                events=$(kubectl get events -n $NAMESPACE --field-selector reason=NodeBalancerIPChangeIgnored --sort-by='.lastTimestamp' -o json)
+                message=$(echo $events | jq .items[0].message)
+
+                if [[ "$message" =~ ^\"IPv4\ annotation\ changed\ to\ $reserved_ip2,\ but\ NodeBalancer\ \([0-9]+\)\ IP\ cannot\ be\ updated\ after\ creation.\ It\ will\ remain\ $reserved_ip\"$ ]]; then
+                  echo "First warning event found"
+                  warning_found=true
+                  break
+                fi
+                sleep 10
+              done
+              if [[ "$warning_found" != true ]]; then
+                fail "First warning event not found after 10 attempts for reserved IP change"
+              fi
+
               patch2=$(kubectl patch service svc-test -n $NAMESPACE --patch "{
                 \"metadata\": {
                   \"annotations\": {
@@ -165,9 +185,6 @@ spec:
                 }
               }")
 
-              if [[ "$patch" != "service/svc-test patched" ]]; then
-                fail "Unable to update annotation: $patch"
-              fi
               if [[ "$patch2" != "service/svc-test patched" ]]; then
                 fail "Unable to update annotation: $patch2"
               fi
