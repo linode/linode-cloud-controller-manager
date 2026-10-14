@@ -14,6 +14,8 @@ import (
 	"github.com/linode/linodego/v2"
 	"k8s.io/klog/v2"
 
+	"github.com/linode/linode-cloud-controller-manager/version"
+
 	_ "github.com/hexdigest/gowrap"
 )
 
@@ -98,7 +100,6 @@ func (t *tokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 // New creates a new linode client with a given token and default timeout.
 func New(timeout time.Duration, tokenProvider TokenProvider) (*linodego.Client, error) {
 	var client *linodego.Client
-	userAgent := fmt.Sprintf("linode-cloud-controller-manager %s", linodego.DefaultUserAgent)
 	apiURL := os.Getenv("LINODE_URL")
 	if apiURL == "" {
 		apiURL = DefaultLinodeAPIURL
@@ -117,7 +118,7 @@ func New(timeout time.Duration, tokenProvider TokenProvider) (*linodego.Client, 
 	if err != nil {
 		return nil, err
 	}
-	client.SetUserAgent(userAgent)
+	client.SetUserAgent(fmt.Sprintf("linode-CCM/%s", version.GetVersion()))
 
 	klog.V(3).Infof("Linode client created with default timeout of %v", timeout)
 	return client, nil
