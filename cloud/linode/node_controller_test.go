@@ -84,12 +84,12 @@ func TestNodeController_processNext(t *testing.T) {
 	require.NoError(t, err, "expected no error during node creation")
 
 	controller := &nodeController{
-		kubeclient:         kubeClient,
-		instances:          services.NewInstances(client),
-		queue:              queue,
-		metadataLastUpdate: make(map[string]time.Time),
-		ttl:                defaultMetadataTTL,
-		nodeLastAdded:      make(map[string]time.Time),
+		kubeclient:    kubeClient,
+		instances:     services.NewInstances(client),
+		queue:         queue,
+		seenMetadata:  make(map[string]nodeMetadata),
+		ttl:           defaultMetadataTTL,
+		nodeLastAdded: make(map[string]time.Time),
 	}
 
 	t.Run("should return no error on unknown errors", func(t *testing.T) {
@@ -235,10 +235,10 @@ func TestNodeController_handleNode(t *testing.T) {
 	err = nodeCtrl.handleNode(t.Context(), node)
 	require.NoError(t, err, "expected no error during handleNode")
 
-	// Check metadataLastUpdate
-	lastUpdate := nodeCtrl.LastMetadataUpdate("test-node")
-	if time.Since(lastUpdate) > 5*time.Second {
-		t.Errorf("metadataLastUpdate was not updated correctly")
+	// Check seenMetadata
+	lastSeen := nodeCtrl.MetadataSeenAt("test-node")
+	if time.Since(lastSeen) > 5*time.Second {
+		t.Errorf("seenMetadata was not updated correctly")
 	}
 
 	// Annotations set, no update needed as ttl not reached
@@ -251,7 +251,7 @@ func TestNodeController_handleNode(t *testing.T) {
 	// Lookup failure for linode instance
 	client = mocks.NewMockClient(ctrl)
 	nodeCtrl.instances = services.NewInstances(client)
-	nodeCtrl.metadataLastUpdate["test-node"] = time.Now().Add(-2 * nodeCtrl.ttl)
+	nodeCtrl.seenMetadata["test-node"] = nodeMetadata{seenAt: time.Now().Add(-2 * nodeCtrl.ttl)}
 	client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{}, errors.New("lookup failed"))
 	err = nodeCtrl.handleNode(t.Context(), node)
 	require.Error(t, err, "expected error during handleNode, got nil")
@@ -259,12 +259,72 @@ func TestNodeController_handleNode(t *testing.T) {
 	// All fields already set
 	client = mocks.NewMockClient(ctrl)
 	nodeCtrl.instances = services.NewInstances(client)
-	nodeCtrl.metadataLastUpdate["test-node"] = time.Now().Add(-2 * nodeCtrl.ttl)
+	nodeCtrl.seenMetadata["test-node"] = nodeMetadata{seenAt: time.Now().Add(-2 * nodeCtrl.ttl)}
 	client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
 		{ID: 123, Label: "test-node", IPv4: []net.IP{publicIP, privateIP}, IPv6: publicIPv6SLAAC, HostUUID: "123"},
 	}, nil)
 	err = nodeCtrl.handleNode(t.Context(), node)
 	assert.NoError(t, err, "expected no error during handleNode")
+}
+
+func TestNodeController_metadataNeedsRefresh(t *testing.T) {
+	publicIP := net.ParseIP("172.234.31.123")
+	privateIP := net.ParseIP("192.168.159.135")
+	publicIPv6SLAAC := "2001:db8::f03c:91ff:fe2b:1a2b/128"
+	hostUUID := "3f1c0a9e7b2d4c6e8f0a1b2c3d4e5f6a7b8c9d0e"
+
+	tests := []struct {
+		name     string
+		instance linodego.Instance
+	}{
+		{
+			name:     "private IPv4 and public IPv6",
+			instance: linodego.Instance{ID: 123, Label: "test-node", IPv4: []net.IP{publicIP, privateIP}, IPv6: publicIPv6SLAAC, HostUUID: hostUUID},
+		},
+		{
+			name:     "VPC 1:1 NAT without private IPv4",
+			instance: linodego.Instance{ID: 123, Label: "test-node", IPv4: []net.IP{publicIP}, IPv6: publicIPv6SLAAC, HostUUID: hostUUID},
+		},
+		{
+			name:     "no public IPv6",
+			instance: linodego.Instance{ID: 123, Label: "test-node", IPv4: []net.IP{publicIP, privateIP}, HostUUID: hostUUID},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			client := mocks.NewMockClient(ctrl)
+			kubeClient := fake.NewClientset()
+			node := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-node",
+					Labels:      map[string]string{},
+					Annotations: map[string]string{},
+				},
+				Spec: v1.NodeSpec{ProviderID: "linode://123"},
+			}
+			_, err := kubeClient.CoreV1().Nodes().Create(t.Context(), node, metav1.CreateOptions{})
+			require.NoError(t, err, "expected no error during node creation")
+
+			client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{tt.instance}, nil)
+			nodeCtrl := newNodeController(kubeClient, client, nil, services.NewInstances(client))
+
+			assert.True(t, nodeCtrl.metadataNeedsRefresh(node), "expected unhandled node to need refresh")
+			require.NoError(t, nodeCtrl.handleNode(t.Context(), node), "expected no error during handleNode")
+
+			updatedNode, err := kubeClient.CoreV1().Nodes().Get(t.Context(), node.Name, metav1.GetOptions{})
+			require.NoError(t, err, "expected no error getting updated node")
+			assert.False(t, nodeCtrl.metadataNeedsRefresh(updatedNode), "expected no refresh before ttl for an up to date node")
+
+			tampered := updatedNode.DeepCopy()
+			delete(tampered.Labels, annotations.AnnLinodeHostUUID)
+			assert.True(t, nodeCtrl.metadataNeedsRefresh(tampered), "expected refresh when applied metadata is removed")
+
+			nodeCtrl.ttl = 0
+			assert.True(t, nodeCtrl.metadataNeedsRefresh(updatedNode), "expected refresh after ttl")
+		})
+	}
 }
 
 func Test_k8sNodeCache_addNodeToCache(t *testing.T) {
