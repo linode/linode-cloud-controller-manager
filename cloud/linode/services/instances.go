@@ -194,6 +194,20 @@ func (nc *nodeCache) refreshInstances(ctx context.Context, client linodeClient.C
 	return nil
 }
 
+// loadIfNeverPopulated loads the cache only if it has never been populated. Unlike refreshInstances,
+// it does not reload a cache that has data but is past its TTL.
+func (nc *nodeCache) loadIfNeverPopulated(ctx context.Context, client linodeClient.Client) error {
+	nc.RLock()
+	populated := !nc.lastUpdate.IsZero()
+	nc.RUnlock()
+	if populated {
+		return nil
+	}
+
+	// refreshInstances rechecks under the write lock, so concurrent callers do not load twice.
+	return nc.refreshInstances(ctx, client)
+}
+
 type Instances struct {
 	client linodeClient.Client
 
@@ -270,13 +284,18 @@ func (i *Instances) linodeByID(id int) (*linodego.Instance, error) {
 	return linodeInstance.instance, nil
 }
 
-// ListAllInstances returns all instances in nodeCache
-func (i *Instances) ListAllInstances(ctx context.Context) ([]linodego.Instance, error) {
-	if err := i.nodeCache.refreshInstances(ctx, i.client); err != nil {
+// ListCachedInstances returns the instances as of the last cache refresh. It loads the cache only
+// if it has never been loaded and does not check the TTL. The cache is refreshed when LookupLinode
+// finds it expired, which the cloud node controller triggers for every node every
+// --node-status-update-frequency (5 minutes by default).
+func (i *Instances) ListCachedInstances(ctx context.Context) ([]linodego.Instance, error) {
+	if err := i.nodeCache.loadIfNeverPopulated(ctx, i.client); err != nil {
 		return nil, err
 	}
 
-	instances := []linodego.Instance{}
+	i.nodeCache.RLock()
+	defer i.nodeCache.RUnlock()
+	instances := make([]linodego.Instance, 0, len(i.nodeCache.nodes))
 	for _, linodeInstance := range i.nodeCache.nodes {
 		instances = append(instances, *linodeInstance.instance)
 	}

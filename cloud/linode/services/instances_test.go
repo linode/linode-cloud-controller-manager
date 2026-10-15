@@ -6,7 +6,9 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/linode/linodego/v2"
@@ -572,6 +574,85 @@ func TestRefreshInstancesVPCErrors(t *testing.T) {
 		// Cache must not be stamped so the next call retries instead of
 		// serving the empty/stale data that caused the original node-deletion bug.
 		assert.True(t, instances.nodeCache.lastUpdate.IsZero(), "cache lastUpdate should remain zero after a failed refresh")
+	})
+}
+
+func TestListCachedInstances(t *testing.T) {
+	ctx := t.Context()
+	listOpts := &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}
+	cachedInstance := linodego.Instance{ID: 123, Label: "test-instance"}
+
+	t.Run("loads the cache when it has never been populated", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		c := mocks.NewMockClient(ctrl)
+		instances := NewInstances(c)
+		c.EXPECT().ListInstances(gomock.Any(), listOpts).Times(1).Return([]linodego.Instance{cachedInstance}, nil)
+
+		got, err := instances.ListCachedInstances(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, []linodego.Instance{cachedInstance}, got)
+	})
+
+	t.Run("lists only on the first load, even after the TTL expires", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		c := mocks.NewMockClient(ctrl)
+		instances := NewInstances(c)
+		c.EXPECT().ListInstances(gomock.Any(), listOpts).Times(1).Return([]linodego.Instance{cachedInstance}, nil)
+
+		_, err := instances.ListCachedInstances(ctx)
+		require.NoError(t, err)
+
+		instances.nodeCache.lastUpdate = time.Now().Add(-time.Hour)
+
+		got, err := instances.ListCachedInstances(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, []linodego.Instance{cachedInstance}, got)
+	})
+
+	t.Run("retries the initial load when it fails", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		c := mocks.NewMockClient(ctrl)
+		instances := NewInstances(c)
+		apiErr := fmt.Errorf("list instances failed")
+		c.EXPECT().ListInstances(gomock.Any(), listOpts).Times(2).Return(nil, apiErr)
+
+		_, err := instances.ListCachedInstances(ctx)
+		require.ErrorIs(t, err, apiErr)
+		_, err = instances.ListCachedInstances(ctx)
+		require.ErrorIs(t, err, apiErr)
+		assert.True(t, instances.nodeCache.lastUpdate.IsZero(), "cache lastUpdate should remain zero after a failed load")
+	})
+
+	t.Run("concurrent reads and refreshes are race free", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		c := mocks.NewMockClient(ctrl)
+		c.EXPECT().ListInstances(gomock.Any(), listOpts).AnyTimes().Return([]linodego.Instance{cachedInstance}, nil)
+		instances := NewInstances(c)
+		// A zero TTL makes every refresh replace the cache map, so reads overlap the replacement.
+		instances.nodeCache.ttl = 0
+
+		var wg sync.WaitGroup
+		for range 4 {
+			wg.Add(2)
+			go func() {
+				defer wg.Done()
+				for range 20 {
+					_, err := instances.ListCachedInstances(ctx)
+					assert.NoError(t, err)
+				}
+			}()
+			go func() {
+				defer wg.Done()
+				for range 20 {
+					assert.NoError(t, instances.nodeCache.refreshInstances(ctx, c))
+				}
+			}()
+		}
+		wg.Wait()
 	})
 }
 
