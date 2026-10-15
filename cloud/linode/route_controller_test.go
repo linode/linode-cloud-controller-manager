@@ -103,6 +103,12 @@ func TestListRoutes(t *testing.T) {
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
 		instanceCache := services.NewInstances(client)
+		existingK8sCache := registeredK8sNodeCache
+		defer func() {
+			registeredK8sNodeCache = existingK8sCache
+		}()
+		registeredK8sNodeCache = newK8sNodeCache()
+		registeredK8sNodeCache.addNodeToCache(node)
 		routeController, err := newRoutes(client, instanceCache)
 		require.NoError(t, err)
 

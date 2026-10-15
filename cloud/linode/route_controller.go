@@ -276,10 +276,14 @@ func (r *routes) handleInterfaces(ctx context.Context, intfRoutes []string, lino
 	return nil
 }
 
-// ListRoutes fetches routes configured on all instances which have VPC interfaces
+// ListRoutes fetches routes configured on all instances which have VPC interfaces.
+// It reads the instance cache without refreshing it, because only instance IDs and labels are
+// needed and refreshing here would re-list instances on every reconcile. An instance missing from
+// the cache has its routes left out. The route controller then calls CreateRoute, which returns nil
+// if the route already exists and refreshes the cache if it has expired.
 func (r *routes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudprovider.Route, error) {
 	klog.V(4).Infof("Fetching routes configured on the cluster")
-	instances, err := r.instances.ListAllInstances(ctx)
+	instances, err := r.instances.ListCachedInstances(ctx)
 	if err != nil {
 		return nil, err
 	}
