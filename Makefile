@@ -11,6 +11,8 @@ IMAGE_TAGS              ?= $(or $(IMG_TAG_FROM_REF),$(DEFAULT_IMAGE_TAGS))
 IMG                     ?= $(KO_DOCKER_REPO):$(IMAGE_TAGS)
 RELEASE_DIR             ?= release
 PLATFORM                ?= linux/amd64
+VERSION                 ?= $(shell git describe --always --tag --dirty=-dev)
+LDFLAGS                 := -X=github.com/linode/linode-cloud-controller-manager/version.version=$(VERSION)
 
 #####################################################################
 # Dev Setup
@@ -100,13 +102,13 @@ build-linux: codegen
 	echo "cross compiling linode-cloud-controller-manager for linux/amd64" && \
 		GOOS=linux GOARCH=amd64 \
 		CGO_ENABLED=0 \
-		go build -o dist/linode-cloud-controller-manager-linux-amd64 .
+		go build -ldflags="$(LDFLAGS)" -o dist/linode-cloud-controller-manager-linux-amd64 .
 
 .PHONY: build
 build: codegen
 	echo "compiling linode-cloud-controller-manager" && \
 		CGO_ENABLED=0 \
-		go build -o dist/linode-cloud-controller-manager .
+		go build -ldflags="$(LDFLAGS)" -o dist/linode-cloud-controller-manager .
 
 .PHONY: release
 release:
@@ -123,12 +125,12 @@ imgname:
 .PHONY: ko-build
 # build the container image locally without pushing it to a registry
 ko-build:
-	CGO_ENABLED=0 ko build --local --bare --tags "$(IMAGE_TAGS)" --platform=$(PLATFORM) .
+	CGO_ENABLED=0 GOFLAGS="-ldflags=$(LDFLAGS)" ko build --local --bare --tags "$(IMAGE_TAGS)" --platform=$(PLATFORM) .
 
 .PHONY: ko-publish
 # build the container image and publish it to the registry named by IMG
 ko-publish:
-	CGO_ENABLED=0 KO_DOCKER_REPO="$(KO_DOCKER_REPO)" ko build --bare --tags "$(IMAGE_TAGS)" --platform=$(PLATFORM) .
+	CGO_ENABLED=0 KO_DOCKER_REPO="$(KO_DOCKER_REPO)" GOFLAGS="-ldflags=$(LDFLAGS)" ko build --bare --tags "$(IMAGE_TAGS)" --platform=$(PLATFORM) .
 
 .PHONY: run
 # run the ccm locally, really only makes sense on linux anyway
