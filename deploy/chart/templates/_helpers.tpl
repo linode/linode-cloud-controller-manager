@@ -60,3 +60,12 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/* Format numeric IDs as decimal while preserving comma-separated string values. */}}
+{{- define "ccm-linode.idArg" -}}
+{{- if kindIs "string" .value -}}
+{{ printf "%s=%s" .flag .value | quote }}
+{{- else -}}
+{{ printf "%s=%d" .flag (int64 .value) | quote }}
+{{- end -}}
+{{- end -}}
