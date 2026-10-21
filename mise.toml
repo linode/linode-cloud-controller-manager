@@ -6,8 +6,8 @@ EXP_CLUSTER_RESOURCE_SET = "true"
 GOTOOLCHAIN = "auto"
 
 [tools]
-go = "1.27.2"
-golangci-lint = "2.14.0"
+go = "1.27.3"
+golangci-lint = "2.15.0"
 helm = "3.16.3"
 kubectl = "1.36.2"
 kustomize = "5.8.1"
