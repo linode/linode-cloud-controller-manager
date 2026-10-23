@@ -8,5 +8,11 @@ source "$SCRIPT_DIR/lib.sh"
 
 : "${NBID:?NBID must be set}"
 
-nbconfig=$(retry 3 2 linode_api GET "/v4/nodebalancers/$NBID/configs" | jq -c '.data[]? | select(.port == 7070)')
+nodebalancer_config_for_port() {
+  local configs
+  configs=$(linode_cli nodebalancers configs-list "$1" --json) || return 1
+  jq -ce --argjson port "$2" '.[] | select(.port == $port)' <<<"$configs"
+}
+
+nbconfig=$(retry 3 2 nodebalancer_config_for_port "$NBID" 7070)
 printf '%s\n' "$nbconfig"

@@ -53,36 +53,10 @@ spec:
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
               echo "Nodebalancer id: $nbid"
 
-              matched=false
-              for _ in {1..20}; do
-                  nbconfig=$(curl -s \
-                    -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "Content-Type: application/json" --fail-early --retry 3 \
-                    "$LINODE_URL/v4/nodebalancers/$nbid/configs" | jq '.data[] | select(.port == 80)' || true)
-
-                  if [[ -z $nbconfig ]]; then
-                      echo "Failed fetching nodebalancer config for port 80"
-                  fi
-
-                  port_80_check=$(echo $nbconfig | jq '.check == "http"')
-                  port_80_path=$(echo $nbconfig | jq '.check_path == "/"')
-                  port_80_protocol=$(echo $nbconfig | jq '.protocol == "http"')
-                  port_80_up_nodes=$(echo $nbconfig | jq '(.nodes_status.up)|tonumber >= 2')
-
-                  if [[ $port_80_check == "true" && $port_80_path == "true" && $port_80_protocol == "true" && $port_80_up_nodes == "true" ]]; then
-                      echo "All conditions met"
-                      matched=true
-                      break
-                  fi
-                  echo "Conditions not met, retrying in 20 seconds..."
-                  echo "check: $port_80_check"
-                  echo "path: $port_80_path"
-                  echo "protocol: $port_80_protocol"
-                  echo "up_nodes: $port_80_up_nodes"
-                  sleep 20
-              done
-              if [[ "$matched" != true ]]; then
+              if ! retry_jq 20 20 'select(any(.[]; .port == 80 and .check == "http" and .check_path == "/" and .protocol == "http" and (.nodes_status.up | tonumber) >= 2))' \
+                linode_cli nodebalancers configs-list "$nbid" --json >/dev/null; then
                   fail "NodeBalancer config for port 80 did not satisfy the HTTP status health check after 20 attempts"
               fi
+
             check:
               ($error == null): true

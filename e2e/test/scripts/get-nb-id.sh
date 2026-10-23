@@ -16,7 +16,7 @@ if [[ -z $ip ]]; then
   exit 1
 fi
 
-nbid=$(retry 3 2 linode_api GET "/v4/nodebalancers" -H "X-Filter: {\"ipv4\": \"$ip\"}" | jq -r '.data[]?.id // empty')
+nbid=$(retry 3 2 linode_nodebalancer_id_by_ip "$ip")
 
 if [[ ! $nbid =~ ^[0-9]+$ ]]; then
   fail "NodeBalancer id [$nbid] for service $svcname is incorrect"

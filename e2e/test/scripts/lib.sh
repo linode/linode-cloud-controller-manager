@@ -55,77 +55,175 @@ retry() {
   fail "retry: $command failed after $attempts attempts (delay ${delay}s)"
 }
 
-linode_api() {
-  if (($# < 2)); then
-    fail "usage: linode_api METHOD /path [curl args...]"
+retry_jq() {
+  if (($# < 4)); then
+    fail "usage: retry_jq N DELAY JQ_FILTER command [args...]"
     return 1
   fi
 
-  local method=$1
-  local path=$2
-  local api_url=${LINODE_URL:-https://api.linode.com}
-  local response_file
-  local http_status
-  local curl_status
-  shift 2
+  local attempts=$1
+  local delay=$2
+  local filter=$3
+  shift 3
 
-  case "$method" in
-    GET|POST|PUT|PATCH|DELETE) ;;
+  retry "$attempts" "$delay" json_query "$filter" "$@"
+}
+
+json_query() {
+  local filter=$1
+  local response
+  shift
+
+  response=$("$@") || return 1
+  jq -ce "$filter" <<<"$response"
+}
+
+linode_cli() {
+  if (($# == 0)); then
+    fail "usage: linode_cli <linode-cli arguments...>"
+    return 1
+  fi
+
+  : "${LINODE_TOKEN:?LINODE_TOKEN must be set}"
+
+  local api_url=${LINODE_URL:-https://api.linode.com}
+  local api_scheme
+  local api_host
+
+  case "$api_url" in
+    https://*)
+      api_scheme=https
+      api_host=${api_url#https://}
+      ;;
+    http://*)
+      api_scheme=http
+      api_host=${api_url#http://}
+      ;;
     *)
-      fail "linode_api does not support HTTP method $method"
+      fail "LINODE_URL must use http:// or https://"
       return 1
       ;;
   esac
 
-  if [[ $path != /* ]]; then
-    fail "linode_api path must start with /"
+  api_host=${api_host%%/*}
+  if [[ -z $api_host ]]; then
+    fail "LINODE_URL must include an API host"
     return 1
   fi
 
-  if [[ -z ${LINODE_TOKEN:-} ]]; then
-    fail "LINODE_TOKEN must be set"
+  env \
+    "LINODE_CLI_TOKEN=${LINODE_CLI_TOKEN:-$LINODE_TOKEN}" \
+    "LINODE_CLI_API_HOST=${LINODE_CLI_API_HOST:-$api_host}" \
+    "LINODE_CLI_API_SCHEME=${LINODE_CLI_API_SCHEME:-$api_scheme}" \
+    "LINODE_CLI_API_VERSION=${LINODE_CLI_API_VERSION:-v4}" \
+    linode-cli "$@"
+}
+
+create_reserved_ip() {
+  local region=${1:-${REGION:-${LINODE_REGION:-}}}
+  local tag=${2:-${E2E_RESERVED_IP_TAG:-}}
+  local response
+  local address
+
+  if [[ -z $region ]]; then
+    fail "LINODE_REGION or REGION must be set"
+    return 1
+  fi
+  if [[ -z $tag ]]; then
+    fail "E2E_RESERVED_IP_TAG must be set"
     return 1
   fi
 
-  if ! response_file=$(mktemp); then
-    fail "linode_api could not create a temporary response file"
+  response=$(retry 3 5 linode_cli networking reserved-ip-add \
+    --region "$region" --tags "$tag" --json) || return 1
+  address=$(jq -er '.[0].address | strings' <<<"$response") || {
+    fail "linode-cli networking reserved-ip-add returned no address"
+    return 1
+  }
+
+  if ! is_ipv4_address "$address"; then
+    fail "linode-cli networking reserved-ip-add returned an invalid IPv4 address: $address"
     return 1
   fi
 
-  if http_status=$(curl --silent --show-error \
-    --output "$response_file" \
-    --write-out '%{http_code}' \
-    --request "$method" \
-    --header "Authorization: Bearer $LINODE_TOKEN" \
-    --header "Content-Type: application/json" \
-    "$@" "${api_url%/}$path"); then
-    curl_status=0
-  else
-    curl_status=$?
-  fi
+  printf '%s\n' "$address"
+}
 
-  if ((curl_status != 0)); then
-    if [[ -s $response_file ]]; then
-      cat "$response_file" >&2
-    fi
-    rm -f "$response_file"
-    return "$curl_status"
-  fi
+is_ipv4_address() {
+  local ipv4_re='^((25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})$'
+  [[ $1 =~ $ipv4_re ]]
+}
 
-  if [[ $http_status =~ ^2[0-9]{2}$ ]]; then
-    if ! cat "$response_file"; then
-      rm -f "$response_file"
-      fail "linode_api could not write the response to stdout"
-      return 1
-    fi
-    rm -f "$response_file"
-    return 0
-  fi
+create_nodebalancer() {
+  local response
 
-  printf 'linode_api: %s %s returned HTTP %s\n' "$method" "$path" "$http_status" >&2
-  if [[ -s $response_file ]]; then
-    cat "$response_file" >&2
-  fi
-  rm -f "$response_file"
-  return 1
+  response=$(retry 3 5 linode_cli --raw-body "$1" nodebalancers create --json) || return 1
+  jq -er '.[0].id' <<<"$response"
+}
+
+create_firewall() {
+  local response
+
+  response=$(retry 3 5 linode_cli --raw-body "$1" firewalls create --json) || return 1
+  jq -er '.[0].id' <<<"$response"
+}
+
+linode_firewall_id_by_label() {
+  local firewalls
+
+  firewalls=$(linode_cli firewalls list --all-rows --json) || return 1
+  jq -er --arg label "$1" '[.[] | select(.label == $label)][0].id' <<<"$firewalls"
+}
+
+linode_nodebalancer_id_by_ip() {
+  local nodebalancers
+
+  nodebalancers=$(linode_cli nodebalancers list --all-rows --json) || return 1
+  jq -er --arg ip "$1" '[.[] | select(.ipv4 == $ip)][0].id' <<<"$nodebalancers"
+}
+
+linode_nodebalancer_vpc_config() {
+  local configs
+
+  configs=$(linode_cli nodebalancers vpcs-list "$1" --json) || return 1
+  jq -c '.[0] // empty' <<<"$configs"
+}
+
+linode_nodebalancer_absent() {
+  local nodebalancers
+
+  nodebalancers=$(linode_cli nodebalancers list --all-rows --json) || return 1
+  jq -e --argjson id "$1" 'all(.[]; .id != $id)' <<<"$nodebalancers" >/dev/null
+}
+
+linode_firewall_absent() {
+  local firewalls
+
+  firewalls=$(linode_cli firewalls list --all-rows --json) || return 1
+  jq -e --argjson id "$1" 'all(.[]; .id != $id)' <<<"$firewalls" >/dev/null
+}
+
+linode_firewalls_for_nodebalancer() {
+  local firewalls
+
+  firewalls=$(linode_cli firewalls list --all-rows --json) || return 1
+  jq -c --argjson id "$1" \
+    '[.[] | select(any(.entities[]?; .type == "nodebalancer" and .id == $id))]' <<<"$firewalls"
+}
+
+# Records the pod answering at $1 in the caller's `podnames` array and succeeds
+# once two distinct pods have been observed. Intended to be wrapped in retry.
+observe_distinct_pods() {
+  local output
+  local existing
+
+  output=$(curl -fsS --max-time 10 "$1" | jq -er '.podName') || return 1
+  [[ $output == test-* ]] || return 1
+
+  for existing in "${podnames[@]}"; do
+    [[ $existing != "$output" ]] || return 1
+  done
+
+  podnames+=("$output")
+  ((${#podnames[@]} >= 2))
 }

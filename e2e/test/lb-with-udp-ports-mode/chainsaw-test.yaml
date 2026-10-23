@@ -58,10 +58,8 @@ spec:
               nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
               config_id=$(echo $nbconfig | jq -r '.id')
 
-              mode=$(curl -s \
-                --url $LINODE_URL/v4beta/nodebalancers/$nbid/configs/$config_id/nodes \
-                -H 'accept: application/json' \
-                -H "Authorization: Bearer $LINODE_TOKEN" | jq -r '.data[0].mode')
+              nodes=$(linode_cli nodebalancers nodes-list "$nbid" "$config_id" --json)
+              mode=$(echo "$nodes" | jq -er '.[0].mode')
               if [[ "$mode" != "none" ]]; then
                 fail "Expected NodeBalancer mode none, found $mode"
               fi

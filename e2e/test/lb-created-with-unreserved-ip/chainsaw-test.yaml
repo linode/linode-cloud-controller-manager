@@ -77,6 +77,15 @@ spec:
               name: svc-test
             status:
               (loadBalancer.ingress[0].ip == null): true
+    - name: assert unreserved IP warning event
+      try:
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Event
+              type: Warning
+              reason: SyncLoadBalancerFailed
+              message: "Error syncing load balancer: failed to ensure load balancer: [400] IPv4 address is not reserved"
     - name: get service ip and compare with unreserved ip
       try:
         - script: 
@@ -93,15 +102,6 @@ spec:
                   fail "No un reserved ip found in configmap"
               fi
 
-              wait_for_warning_event() {
-                local events message
-                events=$(kubectl get events -n "$NAMESPACE" --field-selector reason=SyncLoadBalancerFailed --sort-by='.lastTimestamp' -o json)
-                message=$(printf '%s' "$events" | jq -r '.items[0].message // empty')
-                [[ "$message" == "Error syncing load balancer: failed to ensure load balancer: [400] IPv4 address is not reserved" ]]
-              }
-              retry 10 10 wait_for_warning_event >/dev/null
-              echo "Warning event found"
-              
               service_ip=$(kubectl get svc svc-test -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
               if [[ "$service_ip" != "" ]]; then
                   fail "Service ip found for service svc-test: expected empty, got $service_ip"

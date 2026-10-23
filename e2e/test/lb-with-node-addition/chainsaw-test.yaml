@@ -53,35 +53,10 @@ spec:
 
               echo "Nodebalancer ID: $nbid"
 
-              node_count_reached=false
-              for attempt in {1..20}; do
-                  response=$(curl -sf \
-                    -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "Content-Type: application/json" --fail-early --retry 3 \
-                    "$LINODE_URL/v4/nodebalancers/$nbid/configs" || true)
-
-                  nbconfig=$(echo "$response" | jq '.data[]? | select(.port == 80)' || true)
-
-                  if [[ -z $nbconfig ]]; then
-                      printf 'Failed fetching NodeBalancer config for port 80; retrying\n' >&2
-                      if ((attempt < 20)); then
-                          sleep 20
-                      fi
-                      continue
-                  fi
-
-                  port_80_up_nodes=$(echo $nbconfig | jq '(.nodes_status.up)|tonumber >= 2')
-
-                  if [[ $port_80_up_nodes == "true" ]]; then
-                      node_count_reached=true
-                      break
-                  fi
-                  printf 'NodeBalancer does not have two nodes up yet (up=%s)\n' "$port_80_up_nodes" >&2
-                  if ((attempt < 20)); then
-                      sleep 20
-                  fi
-              done
-              [[ "$node_count_reached" == true ]] || fail "NodeBalancer did not have two nodes up after 20 attempts"
+              if ! retry_jq 20 20 'select(any(.[]; .port == 80 and (.nodes_status.up | tonumber) >= 2))' \
+                linode_cli nodebalancers configs-list "$nbid" --json >/dev/null; then
+                  fail "NodeBalancer did not have two nodes up after 20 attempts"
+              fi
             check:
               ($error == null): true
     - name: Add new node and check nodebalancer gets updated
@@ -90,7 +65,7 @@ spec:
             shell: bash
             shellArgs:
               - -c
-            timeout: 10m
+            timeout: 12m
             content: |
               set -euo pipefail
               source ../scripts/lib.sh
@@ -99,36 +74,13 @@ spec:
               required_replicas=$((current_replicas + 1))
               KUBECONFIG=$MGMT_KUBECONFIG kubectl patch machinedeployment ${CLUSTER_NAME} --type='merge' -p "{\"spec\":{\"replicas\":$required_replicas}}"
 
-              sleep 180
-
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
               echo "Nodebalancer ID: $nbid"
 
-              node_count_reached=false
-              for attempt in {1..30}; do
-                  response=$(curl -sf \
-                    -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "Content-Type: application/json" --fail-early --retry 3 \
-                    "$LINODE_URL/v4/nodebalancers/$nbid/configs" || true)
-
-                  nbconfig=$(echo "$response" | jq '.data[]? | select(.port == 80)' || true)
-
-                  if [[ -z $nbconfig ]]; then
-                      printf 'Failed fetching NodeBalancer config for port 80; retrying\n' >&2
-                  else
-                      port_80_up_nodes=$(echo $nbconfig | jq '(.nodes_status.up)|tonumber >= 3')
-
-                      if [[ $port_80_up_nodes == "true" ]]; then
-                          node_count_reached=true
-                          break
-                      fi
-                      printf 'NodeBalancer does not have three nodes up yet (up=%s)\n' "$port_80_up_nodes" >&2
-                  fi
-                  if ((attempt < 30)); then
-                      sleep 20
-                  fi
-              done
-              [[ "$node_count_reached" == true ]] || fail "NodeBalancer did not have three nodes up after 30 attempts"
+              if ! retry_jq 30 20 'select(any(.[]; .port == 80 and (.nodes_status.up | tonumber) >= 3))' \
+                linode_cli nodebalancers configs-list "$nbid" --json >/dev/null; then
+                  fail "NodeBalancer did not have three nodes up after 30 attempts"
+              fi
 
               #KUBECONFIG=$MGMT_KUBECONFIG kubectl patch machinedeployment ${CLUSTER_NAME} --type='merge' -p "{\"spec\":{\"replicas\":$current_replicas}}"
             check:

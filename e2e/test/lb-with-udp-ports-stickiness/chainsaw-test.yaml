@@ -45,41 +45,24 @@ spec:
             shell: bash
             shellArgs:
               - -c
+            timeout: 3m
             content: |
               set -euo pipefail
-              
+              source ../scripts/lib.sh
+
               echo "Starting e2e test"
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
               echo "Nodebalancer ID: $nbid"
 
-              nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
-                    
-              echo "Nodebalancer config found, updating config stickiness"
+              echo "Updating NodeBalancer stickiness"
 
               kubectl annotate --overwrite svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-default-stickiness=source_ip
               
-              echo "Waiting for stickiness to be updated to source_ip..."
-              max_attempts=12
-              for i in $(seq 1 $max_attempts); do
-                echo "Attempt $i/$max_attempts: Checking stickiness..."
-                nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
-                stickiness=$(echo $nbconfig | jq -r '.stickiness')
-                echo "Current stickiness: $stickiness"
-                
-                if [[ "$stickiness" == "source_ip" ]]; then
-                  echo "Stickiness successfully updated to source_ip"
-                  break
-                fi
-                
-                if [[ $i -eq $max_attempts ]]; then
-                  echo "Timeout: Stickiness was not updated to source_ip after $max_attempts attempts"
-                  exit 1
-                fi
-                
-                echo "Waiting 10 seconds before next check..."
-                sleep 10
-              done
+              if ! retry_jq 12 10 'select(.stickiness == "source_ip")' \
+                env LINODE_TOKEN="$LINODE_TOKEN" NBID="$nbid" ../scripts/get-nb-config.sh >/dev/null; then
+                  fail "Stickiness was not updated to source_ip after 12 attempts"
+              fi
             check:
               ($error == null): true

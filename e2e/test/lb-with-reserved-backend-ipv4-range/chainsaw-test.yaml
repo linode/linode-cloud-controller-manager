@@ -214,10 +214,7 @@ spec:
               # No NodeBalancer in the VPC subnet may hold the reserved range.
               vpc_id=$(echo "$vpcconfig" | jq -r '.vpc_id')
               subnet_id=$(echo "$vpcconfig" | jq -r '.subnet_id')
-              subnet=$(curl -s \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                "$LINODE_URL/v4beta/vpcs/$vpc_id/subnets/$subnet_id")
+              subnet=$(linode_cli vpcs subnets-list "$vpc_id" --json | jq -ce --arg subnet "$subnet_id" '[.[] | select((.id | tostring) == $subnet)][0]')
 
               echo "NodeBalancers in subnet $subnet_id: $(echo "$subnet" | jq -c '[.nodebalancers[]? | {id, ipv4_range}]')"
 
@@ -239,6 +236,13 @@ spec:
                 name: svc-test-reserved
               status:
                 (loadBalancer.ingress[0].ip == null): true
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Event
+              type: Warning
+              reason: SyncLoadBalancerFailed
+              "(contains(message, 'overlaps the reserved NodeBalancer backend range'))": true
         - script:
             shell: bash
             shellArgs:
@@ -250,15 +254,6 @@ spec:
             content: |
               set -euo pipefail
               source ../scripts/lib.sh
-
-              wait_for_rejection_event() {
-                local events
-                events=$(kubectl get events -n "$NAMESPACE" --field-selector reason=SyncLoadBalancerFailed \
-                  --sort-by='.lastTimestamp' -o json)
-                jq -e 'any(.items[]?; (.message | contains("overlaps the reserved NodeBalancer backend range")))' \
-                  <<<"$events" >/dev/null
-              }
-              retry 10 10 wait_for_rejection_event
 
               service_ip=$(kubectl get svc svc-test-reserved -n "$NAMESPACE" \
                 -o jsonpath='{.status.loadBalancer.ingress[0].ip}')

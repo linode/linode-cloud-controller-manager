@@ -45,32 +45,16 @@ spec:
             shell: bash
             shellArgs:
               - -c
+            timeout: 3m
             content: |
               set -euo pipefail
-
               source ../scripts/lib.sh
-              matched=false
-              for _ in {1..10}; do
-                  nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+              nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+              if ! retry_jq 10 10 'select(length == 1 and any(.[0].rules.inbound[]?.addresses.ipv4[]?; . == "7.7.7.7/32"))' \
+                linode_firewalls_for_nodebalancer "$nbid" >/dev/null; then
+                fail "Firewall was not attached with the expected 7.7.7.7/32 rule after 10 attempts"
+              fi
 
-                  fw=$(curl -s --request GET \
-                    -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "Content-Type: application/json" --fail-early --retry 3 \
-                    -H "accept: application/json" \
-                    "$LINODE_URL/v4/nodebalancers/${nbid}/firewalls" || true)
-                  
-                  fwCount=$(echo $fw | jq '.data | length')
-                  ips=$(echo $fw | jq '.data[].rules.inbound[].addresses.ipv4[]')
-                  if [[ $fwCount -eq 1 && -n $ips && $ips == *"7.7.7.7/32"* ]]; then
-                      echo "firewall attached and rule has specified ip"
-                      matched=true
-                      break
-                  fi
-                  sleep 10
-              done
-                if [[ "$matched" != true ]]; then
-                    fail "Firewall was not attached with the expected 7.7.7.7/32 rule after 10 attempts"
-                fi
             check:
                 ($error == null): true
     - name: Delete ACL and check that firewall no longer exists
@@ -79,52 +63,25 @@ spec:
             shell: bash
             shellArgs:
               - -c
-            timeout: 5m
+            timeout: 6m
             content: |
               set -euo pipefail
               source ../scripts/lib.sh
-
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+              firewalls=$(linode_firewalls_for_nodebalancer "$nbid")
+              fwid=$(jq -er '.[0].id' <<< "$firewalls")
+              kubectl patch service svc-test -n "$NAMESPACE" --type=json -p='[{"op": "remove", "path": "/metadata/annotations/service.beta.kubernetes.io~1linode-loadbalancer-firewall-acl"}]'
 
-              fw=$(curl -s --request GET \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                -H "accept: application/json" \
-                "$LINODE_URL/v4/nodebalancers/${nbid}/firewalls" || true)
-
-              fwid=$(echo $fw | jq -r '.data[].id')
-
-              # Patch service to remove ACL annotation
-              kubectl patch service svc-test -n $NAMESPACE --type=json -p='[{"op": "remove", "path": "/metadata/annotations/service.beta.kubernetes.io~1linode-loadbalancer-firewall-acl"}]'
-
-              matched=false
-              for _ in {1..30}; do
-                # Check that firewall is no longer attached to nb
-                fw=$(curl -s --request GET \
-                  -H "Authorization: Bearer $LINODE_TOKEN" \
-                  -H "Content-Type: application/json" --fail-early --retry 3 \
-                  -H "accept: application/json" \
-                  "$LINODE_URL/v4/nodebalancers/${nbid}/firewalls" || true)
-
-                fwCount=$(echo $fw | jq -r '.data | length')
-
-                # Check if firewall is deleted
-                fwRespCode=$(curl -s -o /dev/null -w "%{http_code}" \
-                  --request GET \
-                  -H "Authorization: Bearer $LINODE_TOKEN" \
-                  -H "accept: application/json" \
-                  "$LINODE_URL/v4/networking/firewalls/${fwid}" || true)
-
-                if [[ $fwCount -eq 0 && $fwRespCode -eq "404" ]]; then
-                    echo "firewall detatched and deleted"
-                    matched=true
-                    break
-                fi
-                sleep 10
-              done
-                if [[ "$matched" != true ]]; then
+              firewall_detached_and_absent() {
+                local current_firewalls
+                current_firewalls=$(linode_firewalls_for_nodebalancer "$nbid") || return 1
+                jq -e --argjson id "$fwid" 'all(.[]; .id != $id)' <<< "$current_firewalls" >/dev/null || return 1
+                linode_firewall_absent "$fwid"
+              }
+              if ! retry 30 10 firewall_detached_and_absent; then
                 fail "Firewall $fwid remained attached or undeleted after 30 attempts"
-                fi
+              fi
+
             check:
                 ($error == null): true
     - name: Refresh service by adding the ACL again
@@ -141,64 +98,21 @@ spec:
             shell: bash
             shellArgs:
               - -c
+            timeout: 4m
             content: |
               set -euo pipefail
               source ../scripts/lib.sh
+              nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+              firewalls=$(retry_jq 10 2 'select(length > 0)' linode_firewalls_for_nodebalancer "$nbid")
+              fwid=$(jq -er '.[0].id' <<< "$firewalls")
 
-              nbid=0
-              fwid=0
-
-              matched=false
-              for _ in {1..10}; do
-                  nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
-
-                  fw=$(curl -s --request GET \
-                    -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "Content-Type: application/json" --fail-early --retry 3 \
-                    -H "accept: application/json" \
-                    "$LINODE_URL/v4/nodebalancers/${nbid}/firewalls" || true)
-                  
-                  fwid=$(echo $fw | jq -r '.data[].id')
-
-                  if [[ $nbid -ne 0 && $fwid -ne 0 ]]; then
-                      break
-                  fi
-                  sleep 2
-              done
-
-              if [[ $nbid -eq 0 || $fwid -eq 0 ]]; then
-                  echo "nb or fw not found"
-                  exit 1
+              kubectl delete service svc-test -n "$NAMESPACE" --ignore-not-found --wait=true --timeout=60s
+              resources_absent() {
+                linode_nodebalancer_absent "$nbid" && linode_firewall_absent "$fwid"
+              }
+              if ! retry 10 10 resources_absent; then
+                fail "NodeBalancer $nbid and firewall $fwid were not deleted after 10 attempts"
               fi
 
-              for _ in {1..10}; do
-                  # Remove service
-                  kubectl delete service svc-test -n $NAMESPACE --ignore-not-found
-                  sleep 5
-
-                  # Check if nodebalancer is deleted
-                  nbRespCode=$(curl -s -o /dev/null -w "%{http_code}" \
-                    --request GET \
-                    -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "accept: application/json" \
-                    "$LINODE_URL/v4/nodebalancers/${nbid}" || true)
-
-                  # Check if firewall is deleted
-                  fwRespCode=$(curl -s -o /dev/null -w "%{http_code}" \
-                    --request GET \
-                    -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "accept: application/json" \
-                    "$LINODE_URL/v4/networking/firewalls/${fwid}" || true)
-
-                  if [[ $nbRespCode == "404" && $fwRespCode == "404" ]]; then
-                      echo "nb and fw deleted"
-                      matched=true
-                      break
-                  fi
-                  sleep 10
-              done
-                if [[ "$matched" != true ]]; then
-                    fail "NodeBalancer $nbid and firewall $fwid were not deleted after 10 attempts"
-                fi
             check:
                 ($error == null): true

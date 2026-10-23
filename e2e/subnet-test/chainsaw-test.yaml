@@ -26,8 +26,10 @@ spec:
             shell: bash
             shellArgs:
               - -c
+            timeout: 4m
             content: |
               set -euo pipefail
+              source ../test/scripts/lib.sh
 
               if [ -z "$FIRST_CONFIG" ] || [ -z "$SECOND_CONFIG" ] || [ -z "$LINODE_TOKEN" ]; then
                   echo "Error: FIRST_CONFIG, SECOND_CONFIG, and LINODE_TOKEN environment variables must be set"
@@ -50,44 +52,36 @@ spec:
                 .[0].items[] | [.metadata.name, .spec.podCIDR, .spec.providerID, $foreign] | @tsv
               ')
 
-              # Node Ready does not guarantee that CCM has populated interface routes.
-              # Share one deadline across all nodes, within the suite's 5-minute exec timeout.
-              # SECONDS is Bash's built-in elapsed timer; it advances automatically.
-              deadline=$((SECONDS + 180))
-              while true; do
-                observations=()
+              check_route_state() {
+                local observations=() node pod_cidr provider_id foreign_cidrs interfaces state result
                 while IFS=$'\t' read -r node pod_cidr provider_id foreign_cidrs; do
-                  # Stop starting API requests after the deadline, even partway through a node scan.
-                  (( SECONDS < deadline )) || exit 1
-                  state=$(curl --fail --silent --show-error --max-time 15 \
-                    -H "Authorization: Bearer $LINODE_TOKEN" \
-                    "$LINODE_URL/v4/linode/instances/${provider_id#linode://}/configs" \
-                    | jq -c --arg node "$node" --arg cidr "$pod_cidr" \
-                      --argjson foreign "$foreign_cidrs" '
-                      [.data[0].interfaces[] | select(.purpose == "vpc") | .ip_ranges[]?] as $ranges |
-                      {
-                        node: $node,
-                        own_route_present: ($ranges | index($cidr) != null),
-                        foreign_routes: [$ranges[] | select(. as $range | $foreign | index($range) != null)]
-                      }
-                    ')
-                  # Never retry an isolation violation.
-                  if jq -e '.foreign_routes | length > 0' <<< "$state" > /dev/null; then
-                    # Return JSON successfully so Chainsaw's foreign-route assertion reports the failure.
+                  interfaces=$(linode_cli linodes configs-list "${provider_id#linode://}" --json \
+                    | jq -ce '.[0].interfaces') || return 1
+                  state=$(jq -cn --arg node "$node" --arg cidr "$pod_cidr" \
+                    --argjson foreign "$foreign_cidrs" --argjson interfaces "$interfaces" '
+                    [$interfaces[] | select(.purpose == "vpc") | .ip_ranges[]?] as $ranges |
+                    {
+                      node: $node,
+                      own_route_present: ($ranges | index($cidr) != null),
+                      foreign_routes: [$ranges[] | select(. as $range | $foreign | index($range) != null)]
+                    }
+                  ')
+                  if jq -e '.foreign_routes | length > 0' <<< "$state" >/dev/null; then
                     printf '[%s]\n' "$state"
-                    exit 0
+                    return 0
                   fi
                   observations+=("$state")
                 done <<< "$targets"
-                # Combine node observations into the JSON array consumed by Chainsaw below.
+
                 result=$(printf '%s\n' "${observations[@]}" | jq -s '.')
-                if jq -e 'all(.[]; .own_route_present)' <<< "$result" > /dev/null; then
-                  break
+                if jq -e 'all(.[]; .own_route_present)' <<< "$result" >/dev/null; then
+                  printf '%s\n' "$result"
+                  return 0
                 fi
-                sleep 5
-                (( SECONDS < deadline )) || break
-              done
-              printf '%s\n' "$result"
+                return 1
+              }
+
+              retry 36 5 check_route_state
             check:
               ($error == null): true
               (length(json_parse($stdout)[?own_route_present == `false`])): 0

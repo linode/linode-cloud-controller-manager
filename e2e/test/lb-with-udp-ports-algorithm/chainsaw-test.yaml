@@ -45,6 +45,7 @@ spec:
             shell: bash
             shellArgs:
               - -c
+            timeout: 3m
             content: |
               set -euo pipefail
               source ../scripts/lib.sh
@@ -55,26 +56,13 @@ spec:
 
               echo "Nodebalancer ID: $nbid"
 
-              nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
-                    
-              echo "Nodebalancer config found, updating config algorithm"
+              echo "Updating NodeBalancer algorithm"
 
               kubectl annotate --overwrite svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-default-algorithm=ring_hash
 
-              echo "Verifying that algorithm is set to ring hash"
-              matched=false
-              for _ in {1..10}; do
-                nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
-                algorithm=$(echo $nbconfig | jq -r '.algorithm')
-                echo "algorithm is $algorithm"
-                if [[ "$algorithm" == "ring_hash" ]]; then
-                  matched=true
-                  break
-                fi
-                sleep 10
-              done
-              if [[ "$matched" != true ]]; then
-                fail "Expected NodeBalancer algorithm ring_hash after 10 attempts; found $algorithm"
+              if ! retry_jq 10 10 'select(.algorithm == "ring_hash")' \
+                env LINODE_TOKEN="$LINODE_TOKEN" NBID="$nbid" ../scripts/get-nb-config.sh >/dev/null; then
+                  fail "Expected NodeBalancer algorithm ring_hash after 10 attempts"
               fi
             check:
               ($error == null): true

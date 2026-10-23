@@ -39,9 +39,22 @@ spec:
               set -euo pipefail
               kubectl -n "$NAMESPACE" create secret tls tls-secret-1 --cert=../certificates/server.crt --key=../certificates/server.key
               kubectl -n "$NAMESPACE" create secret tls tls-secret-2 --cert=../certificates/server.crt --key=../certificates/server.key
-              sleep 2
             check:
               ($error == null): true
+    - name: Check TLS secrets exist
+      try:
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                name: tls-secret-1
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                name: tls-secret-2
     - name: Check endpoints exist
       try:
       - assert:
@@ -76,15 +89,18 @@ spec:
             shell: bash
             shellArgs:
               - -c
-            timeout: 10m
+            timeout: 22m
             content: |
               set -euo pipefail
               source ../scripts/lib.sh
               IP=$(kubectl get svc svc-test -n "$NAMESPACE" -o json | jq -r .status.loadBalancer.ingress[0].ip)
               echo "loadbalancer ip: $IP"
 
-              connected=false
-              for attempt in {1..20}; do
+              all_ports_reachable() {
+                  local port_80
+                  local port_8080
+                  local port_443
+                  local port_8443
                   port_80=$(curl -fsS --max-time 10 "$IP:80" | grep "test-" || true)
                   port_8080=$(curl -fsS --max-time 10 "$IP:8080" | grep "test-" || true)
                   port_443=$(curl --fail --silent --max-time 10 \
@@ -96,20 +112,11 @@ spec:
                     --cacert ../certificates/ca.crt \
                     https://linode.test:8443 | grep "test-" || true)
 
-                  if [[ -z $port_80 || -z $port_8080 || -z $port_443 || -z $port_8443 ]]; then
-                      echo "pod not reachable on all ports, retrying in 20 seconds..."
-                      echo "port 80: $port_80"
-                      echo "port 8080: $port_8080"
-                      echo "port 443: $port_443"
-                      echo "port 8443: $port_8443"
-                      if ((attempt < 20)); then
-                          sleep 20
-                      fi
-                  else
-                      connected=true
-                      break
-                  fi
-              done
-              [[ "$connected" == true ]] || fail "Pods did not respond on all configured ports"
+                  [[ -n $port_80 && -n $port_8080 && -n $port_443 && -n $port_8443 ]]
+              }
+
+              if ! retry 20 20 all_ports_reachable; then
+                  fail "Pods did not respond on all configured ports"
+              fi
             check:
               ($error == null): true

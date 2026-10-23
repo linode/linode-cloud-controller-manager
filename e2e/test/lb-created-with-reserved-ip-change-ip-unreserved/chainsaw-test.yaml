@@ -29,20 +29,7 @@ spec:
               source ../scripts/lib.sh
               #!/bin/bash
 
-              re='^((25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})$'
-
-              reserved_ip=$(curl -s --request POST \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                -H "accept: application/json" \
-                "${LINODE_URL}/v4beta/networking/reserved/ips" \
-                --data "{\"region\": \"$LINODE_REGION\", \"tags\": [\"$E2E_RESERVED_IP_TAG\"]}" | jq .address)
-
-              reserved_ip=$(echo "$reserved_ip" | tr -d '"')
-              
-              if ! [[ $reserved_ip =~ $re ]]; then
-                  fail "Reserved ip [$reserved_ip] is incorrect, failed to create a reserved ip"
-              fi
+              reserved_ip=$(create_reserved_ip)
               
               create_cm=$(kubectl -n $NAMESPACE create configmap reserved-ip-config --from-literal=ReservedIP=$reserved_ip --from-literal=UnreservedIP="100.10.10.10" -o yaml --dry-run=client | kubectl apply -f -)
               if [[ "$create_cm" != "configmap/reserved-ip-config created" ]]; then
@@ -116,6 +103,7 @@ spec:
             shell: bash
             shellArgs:
               - -c
+            timeout: 3m
             content: |
               set -euo pipefail
               source ../scripts/lib.sh
@@ -142,24 +130,18 @@ spec:
               if [[ "$patch" != "service/svc-test patched" ]]; then
                 fail "Unable to update annotation"
               fi
-
-              warning_found=false
-              for _ in {1..10}; do
-                events=$(kubectl get events -n $NAMESPACE --field-selector reason=NodeBalancerIPChangeIgnored --sort-by='.lastTimestamp' -o json)
-                message=$(echo $events | jq .items[0].message)
-
-                if [[ "$message" =~ ^\"IPv4\ annotation\ changed\ to\ $unreserved_ip,\ but\ NodeBalancer\ \([0-9]+\)\ IP\ cannot\ be\ updated\ after\ creation.\ It\ will\ remain\ $reserved_ip\"$ ]]; then
-                  echo "Warning event found"
-                  warning_found=true
-                  break
-                fi
-                sleep 10
-              done
-              if [[ "$warning_found" != true ]]; then
-                fail "Warning event not found after 10 attempts for annotation change to $unreserved_ip"
-              fi
             check:
               ($error == null): true
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Event
+              type: Warning
+              reason: NodeBalancerIPChangeIgnored
+              involvedObject:
+                kind: Service
+                name: svc-test
+              "(contains(message, $ip.unreserved_ip) && contains(message, $ip.reserved_ip))": true
     - name: get service ip and compare with reserved ip
       try:
         - script: 

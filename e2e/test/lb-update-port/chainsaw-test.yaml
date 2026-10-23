@@ -45,6 +45,7 @@ spec:
             shell: bash
             shellArgs:
               - -c
+            timeout: 8m
             content: |
               set -euo pipefail
               source ../scripts/lib.sh
@@ -52,31 +53,7 @@ spec:
 
               podnames=()
 
-              for attempt in {1..20}; do
-                  if [[ ${#podnames[@]} -ge 2 ]]; then
-                      break
-                  fi
-
-                  output=$(curl -fsS --max-time 10 "$IP:80" | jq -er '.podName') || output=""
-                  if [[ "$output" == test-* ]]; then
-                      unique=true
-                      for existing in "${podnames[@]}"; do
-                          if [[ "$existing" == "$output" ]]; then
-                              unique=false
-                              break
-                          fi
-                      done
-                      if [[ "$unique" == true ]]; then
-                          podnames+=("$output")
-                      fi
-                  fi
-
-                  if ((attempt < 20)); then
-                      sleep 10
-                  fi
-              done
-
-              if [[ ${#podnames[@]} -lt 2 ]]; then
+              if ! retry 20 10 observe_distinct_pods "$IP:80"; then
                   fail "Expected responses from two distinct pods on port 80, observed ${#podnames[@]}"
               fi
             check:
@@ -91,6 +68,7 @@ spec:
             shell: bash
             shellArgs:
               - -c
+            timeout: 12m
             content: |
               set -euo pipefail
               source ../scripts/lib.sh
@@ -99,31 +77,7 @@ spec:
 
               podnames=()
 
-              for attempt in {1..30}; do
-                  if [[ ${#podnames[@]} -ge 2 ]]; then
-                      break
-                  fi
-
-                  output=$(curl -fsS --max-time 10 "$IP:8080" | jq -er '.podName') || output=""
-                  if [[ "$output" == test-* ]]; then
-                      unique=true
-                      for existing in "${podnames[@]}"; do
-                          if [[ "$existing" == "$output" ]]; then
-                              unique=false
-                              break
-                          fi
-                      done
-                      if [[ "$unique" == true ]]; then
-                          podnames+=("$output")
-                      fi
-                  fi
-
-                  if ((attempt < 30)); then
-                      sleep 10
-                  fi
-              done
-
-              if [[ ${#podnames[@]} -lt 2 ]]; then
+              if ! retry 30 10 observe_distinct_pods "$IP:8080"; then
                   fail "Expected responses from two distinct pods on port 8080, observed ${#podnames[@]}"
               fi
             check:
@@ -134,27 +88,14 @@ spec:
             shell: bash
             shellArgs:
               - -c
+            timeout: 3m
             content: |
               set -euo pipefail
               source ../scripts/lib.sh
-              firewall_rule_updated=false
-              for attempt in {1..10}; do
-                  nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
-
-                  fw=$(curl -s --request GET \
-                    -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "Content-Type: application/json" --fail-early --retry 3 \
-                    -H "accept: application/json" \
-                    "$LINODE_URL/v4/nodebalancers/${nbid}/firewalls" || true)
-                  echo "$fw" | jq -r '.data[].rules.inbound[]'
-                  if echo "$fw" | jq -r '.data[].rules.inbound[].ports' | grep 8080 ; then
-                    firewall_rule_updated=true
-                    break
-                  fi
-                  if ((attempt < 10)); then
-                    sleep 10
-                  fi
-              done
-              [[ "$firewall_rule_updated" == true ]] || fail "Firewall rule was not updated with port 8080"
+              nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+              if ! retry_jq 10 10 'select(any(.[]; any(.rules.inbound[]?; (.ports // "" | tostring | contains("8080")))))' \
+                linode_firewalls_for_nodebalancer "$nbid" >/dev/null; then
+                fail "Firewall rule was not updated with port 8080 after 10 attempts"
+              fi
             check:
                 ($error == null): true
