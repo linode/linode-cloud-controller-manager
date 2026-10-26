@@ -15,7 +15,7 @@ release_attempt() {
     return 0
   fi
 
-  if [[ $response =~ Request[[:space:]]failed:[[:space:]]404|HTTP[[:space:]]+404 ]]; then
+  if linode_reserved_ip_absent "$reserved_ip"; then
     printf 'Reserved IP %s is already absent\n' "$reserved_ip"
     return 0
   fi

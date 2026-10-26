@@ -215,6 +215,14 @@ linode_firewall_absent() {
   linode_resource_absent "networking/firewalls/$1"
 }
 
+# Succeeds only when the reserved IP is not in the account's reserved IP list.
+linode_reserved_ip_absent() {
+  local reserved_ips
+
+  reserved_ips=$(linode_cli networking reserved-ips-list --all-rows --json) || return 1
+  jq -e --arg ip "$1" 'all(.[]?; .address != $ip)' <<<"$reserved_ips" >/dev/null
+}
+
 linode_firewalls_for_nodebalancer() {
   local firewalls
 
