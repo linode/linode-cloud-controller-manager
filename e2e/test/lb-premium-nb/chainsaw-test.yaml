@@ -50,6 +50,7 @@ spec:
               source ../scripts/lib.sh
               IP=$(kubectl get svc svc-test -n "$NAMESPACE" -o json | jq -r .status.loadBalancer.ingress[0].ip)
 
+              # Populated by observe_distinct_pods in lib.sh.
               podnames=()
               if ! retry 20 20 observe_distinct_pods "$IP:80"; then
                   fail "Expected responses from two distinct pods, observed ${#podnames[@]}"

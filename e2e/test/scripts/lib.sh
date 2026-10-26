@@ -238,8 +238,9 @@ linode_firewalls_for_nodebalancer() {
     '[.[] | select(any(.entities[]?; .type == "nodebalancer" and .id == $id))]' <<<"$firewalls"
 }
 
-# Records the pod answering at $1 in the caller's `podnames` array and succeeds
-# once two distinct pods have been observed. Intended to be wrapped in retry.
+# Records the pod answering at $1 in the caller's `podnames` array (callers must
+# declare `podnames=()` first; it is mutated here) and succeeds once two
+# distinct pods have been observed. Intended to be wrapped in retry.
 observe_distinct_pods() {
   local output
   local existing

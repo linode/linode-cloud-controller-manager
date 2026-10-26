@@ -112,6 +112,7 @@ spec:
               source ../scripts/lib.sh
               target_ip=$(kubectl get svc svc-test -n "$NAMESPACE" -o json | jq -r '"'"'.status.loadBalancer.ingress[]? | select(.ip != null and (.ip | contains(":") | not)) | .ip'"'"' | head -n1)
               target="http://$target_ip:80"
+              # Populated by observe_distinct_pods in lib.sh.
               podnames=()
               kubectl get pods -n "$NAMESPACE" -l app=lb-ipv6-backends -o wide >&2
 
