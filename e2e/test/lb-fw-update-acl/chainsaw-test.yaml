@@ -76,7 +76,7 @@ spec:
 
               source ../scripts/lib.sh
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
-              if ! retry_jq 10 10 'select(length == 1 and all(.[0].rules.inbound[]?.addresses.ipv4[]?; . != "7.7.7.7/32"))' linode_firewalls_for_nodebalancer "$nbid" >/dev/null; then
+              if ! retry_jq 10 10 'select(length == 1) | .[0] as $firewall | [$firewall.rules.inbound[]?.addresses.ipv4[]?] as $ips | select(($ips | length) > 0 and all($ips[]; . != "7.7.7.7/32"))' linode_firewalls_for_nodebalancer "$nbid" >/dev/null; then
                   fail "Firewall rule did not update away from 7.7.7.7/32 after 10 attempts"
               fi
             check:
