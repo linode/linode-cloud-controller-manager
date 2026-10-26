@@ -130,8 +130,13 @@ spec:
               if [[ "$patch" != "service/svc-test patched" ]]; then
                 fail "Unable to update annotation"
               fi
+
+              echo "{\"reserved_ip\": \"$reserved_ip\", \"unreserved_ip\": \"$unreserved_ip\"}"
             check:
               ($error == null): true
+            outputs:
+              - name: ip
+                value: (json_parse($stdout))
         - assert:
             resource:
               apiVersion: v1

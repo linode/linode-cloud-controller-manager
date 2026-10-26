@@ -133,9 +133,14 @@ spec:
                   fail "Second reserved ip not found in configmap"
               fi
 
-              parallel -j 2 patch_annotation ::: $reserved_ip2 "100.10.10.10"
+              parallel -j 2 patch_annotation ::: $reserved_ip2 "100.10.10.10" >&2
+
+              echo "{\"reserved_ip\": \"$reserved_ip\", \"reserved_ip2\": \"$reserved_ip2\"}"
             check:
               ($error == null): true
+            outputs:
+              - name: ip
+                value: (json_parse($stdout))
         - assert:
             resource:
               apiVersion: v1

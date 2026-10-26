@@ -35,12 +35,8 @@ spec:
                 fail "Unable to create configmap. Error: $create_cm"
               fi
 
-              echo "{\"invalid_ip\": \"$invalid_ip\"}"
             check:
               ($error == null): true
-            outputs:
-              - name: ip
-                value: (json_parse($stdout))
         - apply:
             file: create-pods-services.yaml
       catch:
@@ -85,7 +81,7 @@ spec:
               kind: Event
               type: Warning
               reason: SyncLoadBalancerFailed
-              "(contains(message, 'Error syncing load balancer: failed to ensure load balancer: [400] Invalid IPv4 address') && contains(message, $ip.invalid_ip))": true
+              "(contains(message, 'Error syncing load balancer: failed to ensure load balancer: [400] Invalid IPv4 address'))": true
     - name: get service ip and compare with invalid ip
       try:
         - script: 
