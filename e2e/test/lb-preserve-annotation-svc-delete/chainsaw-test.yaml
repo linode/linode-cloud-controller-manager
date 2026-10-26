@@ -80,13 +80,19 @@ spec:
               # annotation means CCM will not delete it automatically).
               kubectl create configmap nb-cleanup -n $NAMESPACE --from-literal=nbid=$nbid --dry-run=client -o yaml | kubectl apply -f -
 
-              kubectl --timeout=60s -n $NAMESPACE delete deploy test
-              kubectl --timeout=60s -n $NAMESPACE delete svc svc-test
-              if linode_cli nodebalancers view "$nbid" --json >/dev/null; then
-                  echo "nodebalancer exists"
-              else
-                  fail "Expected preserved NodeBalancer $nbid to exist after service deletion"
-              fi
+              kubectl -n $NAMESPACE delete deploy test --wait=true --timeout=60s
+              # --wait blocks until the Service and its finalizer (CCM cleanup) are gone.
+              kubectl -n $NAMESPACE delete svc svc-test --wait=true --timeout=120s
+
+              # Give CCM time to (incorrectly) delete the NodeBalancer, then assert
+              # that it persisted for the whole window.
+              for ((i = 0; i < 6; i++)); do
+                  if ! linode_cli nodebalancers view "$nbid" --json >/dev/null; then
+                      fail "Expected preserved NodeBalancer $nbid to exist after service deletion"
+                  fi
+                  sleep 5
+              done
+              echo "nodebalancer exists"
 
               # cleanup remaining nodebalancer
               if ! linode_cli nodebalancers delete "$nbid" --json >/dev/null; then
