@@ -8,41 +8,19 @@ source "$SCRIPT_DIR/lib.sh"
 
 release_attempt() {
   local reserved_ip=$1
-  local response=''
-  local response_body
-  local http_status
-  local curl_status=0
-  local api_url=${LINODE_URL:-https://api.linode.com}
+  local response
 
-  : "${LINODE_TOKEN:?LINODE_TOKEN must be set}"
-
-  if response=$(curl --silent --show-error --write-out $'\n%{http_code}' --request DELETE \
-    -H "Authorization: Bearer $LINODE_TOKEN" \
-    -H "Content-Type: application/json" \
-    "${api_url%/}/v4beta/networking/reserved/ips/$reserved_ip"); then
-    :
-  else
-    curl_status=$?
+  if response=$(linode_cli networking reserved-ip-delete "$reserved_ip" --json 2>&1); then
+    printf 'Reserved IP %s released\n' "$reserved_ip"
+    return 0
   fi
 
-  http_status=${response##*$'\n'}
-  response_body=${response%$'\n'*}
-  if [[ ! $http_status =~ ^[0-9]{3}$ ]]; then
-    http_status=000
+  if linode_reserved_ip_absent "$reserved_ip"; then
+    printf 'Reserved IP %s is already absent\n' "$reserved_ip"
+    return 0
   fi
 
-  case "$http_status" in
-    2??|404)
-      if ((curl_status != 0)); then
-        return "$curl_status"
-      fi
-      printf 'Reserved IP %s released (HTTP %s)\n' "$reserved_ip" "$http_status"
-      return 0
-      ;;
-  esac
-
-  printf 'Reserved IP %s release failed (HTTP %s): %s\n' \
-    "$reserved_ip" "$http_status" "$response_body" >&2
+  printf 'Reserved IP %s release failed: %s\n' "$reserved_ip" "$response" >&2
   return 1
 }
 
@@ -63,8 +41,9 @@ sweep_reserved_ips() {
   local reserved_ip
 
   : "${E2E_RESERVED_IP_TAG:?E2E_RESERVED_IP_TAG must be set}"
-  response=$(retry 3 5 linode_api GET "/v4beta/networking/reserved/ips")
-  reserved_ips=$(jq -r --arg tag "$E2E_RESERVED_IP_TAG" '.data[]? | select(.tags | index($tag)) | .address' <<<"$response")
+  response=$(retry 3 5 linode_cli networking reserved-ips-list --all-rows --json)
+  reserved_ips=$(jq -r --arg tag "$E2E_RESERVED_IP_TAG" \
+    '.[]? | select((.tags // []) | index($tag)) | .address' <<<"$response")
 
   while IFS= read -r reserved_ip; do
     if [[ -n $reserved_ip ]]; then

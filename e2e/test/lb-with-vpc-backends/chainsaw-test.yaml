@@ -60,21 +60,15 @@ spec:
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
-              nbconfig=$(curl -s \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                "$LINODE_URL/v4/nodebalancers/$nbid/configs")
+              nbconfig=$(linode_cli nodebalancers configs-list "$nbid" --json)
 
-              config_id=$(echo $nbconfig | jq -r '.data[] | select(.port == 80) | .id')
+              config_id=$(echo "$nbconfig" | jq -er '.[] | select(.port == 80) | .id')
 
               # Get nodes from the config
-              nodes=$(curl -s \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                "$LINODE_URL/v4/nodebalancers/$nbid/configs/$config_id/nodes")
+              nodes=$(linode_cli nodebalancers nodes-list "$nbid" "$config_id" --json)
 
               # Extract all addresses and remove ports
-              addresses=$(echo "$nodes" | jq -r '.data[].address' | sed 's/:[0-9]*$//')
+              addresses=$(echo "$nodes" | jq -r '.[].address' | sed 's/:[0-9]*$//')
               if [[ -z "$addresses" ]]; then
                   fail "NodeBalancer config $config_id has no backend addresses"
               fi

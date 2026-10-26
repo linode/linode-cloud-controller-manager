@@ -50,19 +50,13 @@ spec:
 
               nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
 
-              nbconfig=$(curl -s \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                "$LINODE_URL/v4/nodebalancers/$nbid/configs")
+              nbconfig=$(linode_cli nodebalancers configs-list "$nbid" --json)
 
-              config_id=$(echo "$nbconfig" | jq -r '.data[] | select(.port == 80) | .id')
+              config_id=$(echo "$nbconfig" | jq -er '.[] | select(.port == 80) | .id')
 
-              nodes=$(curl -s \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                "$LINODE_URL/v4/nodebalancers/$nbid/configs/$config_id/nodes")
+              nodes=$(linode_cli nodebalancers nodes-list "$nbid" "$config_id" --json)
 
-              addresses=$(echo "$nodes" | jq -r '.data[].address')
+              addresses=$(echo "$nodes" | jq -r '.[].address')
 
               if [[ -z "$addresses" ]]; then
                 fail "NodeBalancer has no backend addresses"
@@ -118,13 +112,18 @@ spec:
               source ../scripts/lib.sh
               target_ip=$(kubectl get svc svc-test -n "$NAMESPACE" -o json | jq -r '"'"'.status.loadBalancer.ingress[]? | select(.ip != null and (.ip | contains(":") | not)) | .ip'"'"' | head -n1)
               target="http://$target_ip:80"
+              # Populated by observe_distinct_pods in lib.sh.
               podnames=()
               kubectl get pods -n "$NAMESPACE" -l app=lb-ipv6-backends -o wide >&2
 
-              for batch in {1..5}; do
+              check_pod_batch() {
+                  local attempt
+                  local response
+                  local podname
+                  local existing
                   for attempt in {1..10}; do
                       if [[ ${#podnames[@]} -ge 2 ]]; then
-                          break
+                          return 0
                       fi
 
                       response=$(curl --fail --silent --max-time 8 "$target") || response=""
@@ -144,16 +143,10 @@ spec:
                       fi
                   done
 
-                  if [[ ${#podnames[@]} -ge 2 ]]; then
-                      break
-                  fi
+                  ((${#podnames[@]} >= 2))
+              }
 
-                  if [[ "$batch" -lt 5 ]]; then
-                      sleep 10
-                  fi
-              done
-
-              if [[ ${#podnames[@]} -lt 2 ]]; then
+              if ! retry 5 10 check_pod_batch; then
                   fail "Expected responses from two distinct pods, observed ${#podnames[@]}"
               fi
               '

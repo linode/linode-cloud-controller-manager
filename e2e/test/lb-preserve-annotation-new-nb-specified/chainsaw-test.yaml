@@ -15,6 +15,7 @@ spec:
           - -c
         content: |
           set -uo pipefail
+          source ../scripts/lib.sh
           echo "Test failed. Fetching CCM logs..."
           kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-preserve-annotation-new-nb-specified" | tail -100 || true
 
@@ -31,18 +32,13 @@ spec:
           fi
           ip=$(kubectl get svc svc-test -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
           if [[ -n "$ip" ]]; then
-            current=$(curl -s \
-              -H "Authorization: Bearer $LINODE_TOKEN" \
-              -H "X-Filter: {\"ipv4\": \"$ip\"}" \
-              "$LINODE_URL/v4/nodebalancers" | jq -r '.data[0].id // empty' || true)
+            current=$(linode_nodebalancer_id_by_ip "$ip" 2>/dev/null || true)
             nbids="$nbids $current"
           fi
           for nbid in $nbids; do
             if [[ "$nbid" =~ ^[0-9]+$ ]]; then
               echo "Deleting NodeBalancer $nbid"
-              curl -s -o /dev/null -X DELETE \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                "$LINODE_URL/v4/nodebalancers/$nbid" || true
+              linode_cli nodebalancers delete "$nbid" --json >/dev/null || echo "WARNING: failed to delete NodeBalancer $nbid; it may have leaked" >&2
             fi
           done
           kubectl delete svc svc-test -n "$NAMESPACE" --ignore-not-found --timeout=60s || true
@@ -74,6 +70,7 @@ spec:
             shell: bash
             shellArgs:
               - -c
+            timeout: 3m
             content: |
               set -euo pipefail
               source ../scripts/lib.sh
@@ -92,23 +89,17 @@ spec:
               LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
 
               # Get VPC config for the old nodebalancer if it exists
-              vpcconfig=$(curl -s \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                "$LINODE_URL/v4beta/nodebalancers/$old_nbid/vpcs")
+              vpcconfig=$(linode_cli nodebalancers vpcs-list "$old_nbid" --json)
 
               echo "Nodebalancer ID: $old_nbid"
               echo "VPC config: $vpcconfig"
 
-              SUBNET_ID=$(echo $vpcconfig | jq -r ".data[] | select(.nodebalancer_id == $old_nbid) | .subnet_id")
+              SUBNET_ID=$(jq -er --argjson id "$old_nbid" '.[] | select(.nodebalancer_id == $id) | .subnet_id' <<< "$vpcconfig" 2>/dev/null || true)
               echo "Subnet ID: $SUBNET_ID"
 
-              data="{\"label\": \"$LABEL\", \"region\": \"$REGION\", \"vpcs\": [{\"subnet_id\": $SUBNET_ID}]}"
-              if [[ -z $SUBNET_ID ]]; then
-                  data="{\"label\": \"$LABEL\", \"region\": \"$REGION\"}"
-              fi
+              data=$(nodebalancer_payload "$LABEL" "$REGION" "$SUBNET_ID")
 
-              nbid=$(retry 3 5 linode_api POST /v4beta/nodebalancers --data "$data" | jq -er '.id')
+              nbid=$(create_nodebalancer "$data")
 
               if ! [[ $nbid =~ $re ]]; then
                   fail "Nodebalancer id [$nbid] is incorrect, failed to create nodebalancer"
@@ -120,53 +111,29 @@ spec:
 
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id=$nbid
 
-              matched=false
-              for _ in {1..10}; do
-                  nbid2=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
-
-                  if [[ "$nbid" == "$nbid2" ]]; then
-                      echo "updated nodebalancer used"
-                      matched=true
-                      break
-                  fi
-                  sleep 5
-              done
-              if [[ "$matched" != true ]]; then
+              check_new_nodebalancer_adopted() {
+                  local current_nbid
+                  current_nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh) || return 1
+                  [[ "$current_nbid" == "$nbid" ]]
+              }
+              if ! retry 10 5 check_new_nodebalancer_adopted; then
                   fail "Service did not adopt new NodeBalancer $nbid after 10 attempts"
               fi
 
               # Check old nodebalancer still exists
-              old_nb_resp=$(curl --write-out "%{http_code}\n" \
-                --silent --output /dev/null \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                "$LINODE_URL/v4/nodebalancers/$old_nbid")
-
-              if [[ $old_nb_resp == "200" ]]; then
-                  echo "old nodebalancer found"
-              else
-                  fail "Expected old NodeBalancer $old_nbid to remain during service update, got HTTP $old_nb_resp"
+              if ! linode_cli nodebalancers view "$old_nbid" --json >/dev/null; then
+                  fail "Expected old NodeBalancer $old_nbid to remain during service update"
               fi
+              echo "old nodebalancer found"
 
               # cleanup old nodebalancer
-              delete_resp=$(curl --write-out "%{http_code}\n" \
-                --silent --output /dev/null \
-                -X DELETE \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                "$LINODE_URL/v4/nodebalancers/$old_nbid")
-
-              if [[ $delete_resp != "200" ]]; then
-                  fail "Failed deleting old NodeBalancer $old_nbid, got HTTP $delete_resp"
+              if ! linode_cli nodebalancers delete "$old_nbid" --json >/dev/null; then
+                  fail "Failed deleting old NodeBalancer $old_nbid"
               fi
 
               # cleanup new nodebalancer
-              delete_resp=$(curl --write-out "%{http_code}\n" \
-                --silent --output /dev/null \
-                -X DELETE \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                "$LINODE_URL/v4/nodebalancers/$nbid")
-
-              if [[ $delete_resp != "200" ]]; then
-                  fail "Failed deleting new NodeBalancer $nbid, got HTTP $delete_resp"
+              if ! linode_cli nodebalancers delete "$nbid" --json >/dev/null; then
+                  fail "Failed deleting new NodeBalancer $nbid"
               fi
             check:
               ($error == null): true

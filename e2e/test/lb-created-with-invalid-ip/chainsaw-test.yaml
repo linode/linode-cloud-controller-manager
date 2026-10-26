@@ -77,34 +77,28 @@ spec:
               name: svc-test
             status:
               (loadBalancer.ingress[0].ip == null): true
+    - name: assert invalid IP warning event
+      try:
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Event
+              type: Warning
+              reason: SyncLoadBalancerFailed
+              "(contains(message, 'Error syncing load balancer: failed to ensure load balancer: [400] Invalid IPv4 address'))": true
     - name: get service ip and compare with invalid ip
       try:
         - script: 
             shell: bash
             shellArgs:
               - -c
+            timeout: 3m
             content: |
               set -euo pipefail
               source ../scripts/lib.sh
               invalid_ip=$(kubectl get configmap invalid-ip-config -o=jsonpath='{.data.InvalidIP}' -n $NAMESPACE)
               if [[ -z "$invalid_ip" ]]; then
                   fail "No invalid ip found in configmap"
-              fi
-
-              warning_found=false
-              for _ in {1..10}; do
-                events=$(kubectl get events -n $NAMESPACE --field-selector reason=SyncLoadBalancerFailed --sort-by='.lastTimestamp' -o json)
-                message=$(echo $events | jq .items[0].message)
-
-                if [[ "$message" == *"Error syncing load balancer: failed to ensure load balancer: [400] Invalid IPv4 address"* ]]; then
-                  echo "Warning event found"
-                  warning_found=true
-                  break
-                fi
-                sleep 10
-              done
-              if [[ "$warning_found" != true ]]; then
-                fail "Warning event not found after 10 attempts: expected invalid IPv4 address event"
               fi
 
               service_ip=$(kubectl get svc svc-test -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].ip}')

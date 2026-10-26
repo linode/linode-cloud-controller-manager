@@ -54,40 +54,10 @@ spec:
 
               echo "Nodebalancer ID: $nbid"
 
-              matched=false
-              for _ in {1..20}; do
-                  nbconfig=$(curl -s \
-                    -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "Content-Type: application/json" --fail-early --retry 3 \
-                    "$LINODE_URL/v4/nodebalancers/$nbid/configs" | jq '.data[] | select(.port == 80)' || true)
-
-                  if [[ -z $nbconfig ]]; then
-                      echo "Failed fetching nodebalancer config for port 80"
-                  fi
-
-                  port_80_check=$(echo $nbconfig | jq '.check == "connection"')
-                  port_80_interval=$(echo $nbconfig | jq '.check_interval == 10')
-                  port_80_timeout=$(echo $nbconfig | jq '.check_timeout == 5')
-                  port_80_attempts=$(echo $nbconfig | jq '.check_attempts == 4')
-                  port_80_protocol=$(echo $nbconfig | jq '.protocol == "tcp"')
-                  port_80_up_nodes=$(echo $nbconfig | jq '(.nodes_status.up)|tonumber >= 2')
-
-                  if [[ $port_80_check == "true" && $port_80_interval == "true" && $port_80_timeout == "true" && $port_80_attempts == "true" && $port_80_protocol == "true" && $port_80_up_nodes == "true" ]]; then
-                      echo "All conditions met"
-                      matched=true
-                      break
-                  fi
-                  echo "Conditions not met, retrying in 20 seconds..."
-                  echo "check: $port_80_check"
-                  echo "interval: $port_80_interval"
-                  echo "timeout: $port_80_timeout"
-                  echo "attempts: $port_80_attempts"
-                  echo "protocol: $port_80_protocol"
-                  echo "up_nodes: $port_80_up_nodes"
-                  sleep 20
-              done
-              if [[ "$matched" != true ]]; then
+              if ! retry_jq 20 20 'select(any(.[]; .port == 80 and .check == "connection" and .check_interval == 10 and .check_timeout == 5 and .check_attempts == 4 and .protocol == "tcp" and (.nodes_status.up | tonumber) >= 2))' \
+                linode_cli nodebalancers configs-list "$nbid" --json >/dev/null; then
                   fail "NodeBalancer config for port 80 did not satisfy the TCP connection health check after 20 attempts"
               fi
+
             check:
               ($error == null): true

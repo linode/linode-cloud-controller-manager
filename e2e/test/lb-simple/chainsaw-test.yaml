@@ -45,38 +45,16 @@ spec:
             shell: bash
             shellArgs:
               - -c
+            timeout: 4m
             content: |
               set -euo pipefail
               source ../scripts/lib.sh
               IP=$(kubectl get svc svc-test -n "$NAMESPACE" -o json | jq -r .status.loadBalancer.ingress[0].ip)
 
+              # Populated by observe_distinct_pods in lib.sh.
               podnames=()
 
-              for attempt in {1..10}; do
-                  if [[ ${#podnames[@]} -ge 2 ]]; then
-                      break
-                  fi
-
-                  output=$(curl -fsS --max-time 10 "$IP:80" | jq -er '.podName') || output=""
-                  if [[ "$output" == test-* ]]; then
-                      unique=true
-                      for existing in "${podnames[@]}"; do
-                          if [[ "$existing" == "$output" ]]; then
-                              unique=false
-                              break
-                          fi
-                      done
-                      if [[ "$unique" == true ]]; then
-                          podnames+=("$output")
-                      fi
-                  fi
-
-                  if ((attempt < 10)); then
-                      sleep 10
-                  fi
-              done
-
-              if [[ ${#podnames[@]} -lt 2 ]]; then
+              if ! retry 10 10 observe_distinct_pods "$IP:80"; then
                   fail "Expected responses from two distinct pods, observed ${#podnames[@]}"
               fi
             check:

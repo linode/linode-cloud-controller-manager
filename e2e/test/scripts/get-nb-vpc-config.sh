@@ -11,8 +11,8 @@ svcname=${1:-svc-test}
 : "${LINODE_TOKEN:?LINODE_TOKEN must be set}"
 
 nbid=$(NAMESPACE="$NAMESPACE" LINODE_TOKEN="$LINODE_TOKEN" "$SCRIPT_DIR/get-nb-id.sh" "$svcname")
-vpcconfig=$(retry 3 2 linode_api GET "/v4beta/nodebalancers/$nbid/vpcs" \
-  | jq -c --argjson nbid "$nbid" '.data[]? | select(.nodebalancer_id == $nbid)')
+
+vpcconfig=$(retry 3 2 linode_nodebalancer_vpc_config "$nbid")
 
 if [[ -z $vpcconfig ]]; then
   fail "No VPC configuration found for NodeBalancer $nbid"

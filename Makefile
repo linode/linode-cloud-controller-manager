@@ -235,7 +235,7 @@ e2e-test:
 	LINODE_TOKEN=$(LINODE_TOKEN) \
 	LINODE_URL=$(LINODE_URL) \
 	E2E_RESERVED_IP_TAG=$(E2E_RESERVED_IP_TAG) \
-	chainsaw test e2e/test --parallel 2 --selector all $(E2E_FLAGS)
+	chainsaw test e2e/test --selector all $(E2E_FLAGS)
 
 .PHONY: e2e-test-ipv6-backends
 e2e-test-ipv6-backends:
