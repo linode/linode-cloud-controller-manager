@@ -178,7 +178,7 @@ linode_firewall_id_by_label() {
 linode_nodebalancer_id_by_ip() {
   local nodebalancers
 
-  nodebalancers=$(linode_cli nodebalancers list --all-rows --json) || return 1
+  nodebalancers=$(linode_cli nodebalancers list --ipv4 "$1" --json) || return 1
   jq -er --arg ip "$1" '[.[] | select(.ipv4 == $ip)][0].id' <<<"$nodebalancers"
 }
 
@@ -189,18 +189,30 @@ linode_nodebalancer_vpc_config() {
   jq -c '.[0] // empty' <<<"$configs"
 }
 
-linode_nodebalancer_absent() {
-  local nodebalancers
+# Prints the HTTP status of a GET against the Linode API path $1.
+linode_api_status() {
+  : "${LINODE_TOKEN:?LINODE_TOKEN must be set}"
 
-  nodebalancers=$(linode_cli nodebalancers list --all-rows --json) || return 1
-  jq -e --argjson id "$1" 'all(.[]; .id != $id)' <<<"$nodebalancers" >/dev/null
+  curl -sS -o /dev/null -w '%{http_code}' --max-time 30 \
+    -H "Authorization: Bearer $LINODE_TOKEN" \
+    "${LINODE_URL:-https://api.linode.com}/${LINODE_CLI_API_VERSION:-v4}/$1"
+}
+
+# Succeeds only on a 404; any other status or request error is a failure so
+# callers wrapping this in retry keep retrying.
+linode_resource_absent() {
+  local status
+
+  status=$(linode_api_status "$1") || return 1
+  [[ $status == 404 ]]
+}
+
+linode_nodebalancer_absent() {
+  linode_resource_absent "nodebalancers/$1"
 }
 
 linode_firewall_absent() {
-  local firewalls
-
-  firewalls=$(linode_cli firewalls list --all-rows --json) || return 1
-  jq -e --argjson id "$1" 'all(.[]; .id != $id)' <<<"$firewalls" >/dev/null
+  linode_resource_absent "networking/firewalls/$1"
 }
 
 linode_firewalls_for_nodebalancer() {
