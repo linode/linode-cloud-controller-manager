@@ -38,7 +38,7 @@ spec:
           fi
           if [[ "$nbid" =~ ^[0-9]+$ ]]; then
             echo "Deleting NodeBalancer $nbid"
-            linode_cli nodebalancers delete "$nbid" --json >/dev/null 2>&1 || true
+            linode_cli nodebalancers delete "$nbid" --json >/dev/null || echo "WARNING: failed to delete NodeBalancer $nbid; it may have leaked" >&2
           fi
           kubectl delete svc svc-test -n "$NAMESPACE" --ignore-not-found --timeout=60s || true
   steps:

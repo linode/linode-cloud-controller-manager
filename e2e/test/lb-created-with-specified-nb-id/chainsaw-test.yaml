@@ -32,7 +32,7 @@ spec:
           for nbid in $nbids; do
             if [[ "$nbid" =~ ^[0-9]+$ ]]; then
               echo "Deleting NodeBalancer $nbid"
-              linode_cli nodebalancers delete "$nbid" --json >/dev/null 2>&1 || true
+              linode_cli nodebalancers delete "$nbid" --json >/dev/null || echo "WARNING: failed to delete NodeBalancer $nbid; it may have leaked" >&2
             fi
           done
   steps:
