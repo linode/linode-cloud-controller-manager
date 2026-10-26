@@ -223,6 +223,13 @@ linode_reserved_ip_absent() {
   jq -e --arg ip "$1" 'all(.[]?; .address != $ip)' <<<"$reserved_ips" >/dev/null
 }
 
+# Builds a NodeBalancer create payload; the VPC subnet is omitted when empty.
+nodebalancer_payload() {
+  jq -cn --arg lbl "$1" --arg region "$2" --arg subnet "${3:-}" \
+    '{label: $lbl, region: $region}
+     + (if $subnet == "" then {} else {vpcs: [{subnet_id: ($subnet | tonumber)}]} end)'
+}
+
 linode_firewalls_for_nodebalancer() {
   local firewalls
 

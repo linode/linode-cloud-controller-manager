@@ -152,10 +152,7 @@ spec:
               SUBNET_ID=$(jq -er --argjson id "$old_nbid" '.[] | select(.nodebalancer_id == $id) | .subnet_id' <<< "$vpcconfig" 2>/dev/null || true)
               echo "Subnet ID: $SUBNET_ID"
 
-              data="{\"label\": \"$LABEL\", \"region\": \"$REGION\", \"vpcs\": [{\"subnet_id\": $SUBNET_ID}]}"
-              if [[ -z $SUBNET_ID ]]; then
-                  data="{\"label\": \"$LABEL\", \"region\": \"$REGION\"}"
-              fi
+              data=$(nodebalancer_payload "$LABEL" "$REGION" "$SUBNET_ID")
 
               nbid=$(create_nodebalancer "$data")
 
