@@ -6,6 +6,8 @@ metadata:
   labels:
     all:
 spec:
+  # Temporarily renames a node, which the route/node controllers react to.
+  concurrent: false
   bindings:
     - name: fwname
       value: (join('-', ['ccm-fwtest', env('CLUSTER_NAME')]))

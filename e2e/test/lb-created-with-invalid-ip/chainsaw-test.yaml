@@ -35,8 +35,12 @@ spec:
                 fail "Unable to create configmap. Error: $create_cm"
               fi
 
+              echo "{\"invalid_ip\": \"$invalid_ip\"}"
             check:
               ($error == null): true
+            outputs:
+              - name: ip
+                value: (json_parse($stdout))
         - apply:
             file: create-pods-services.yaml
       catch:

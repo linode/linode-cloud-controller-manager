@@ -7,6 +7,8 @@ metadata:
     all:
 spec:
   namespace: "lb-with-node-addition"
+  # Scales the cluster's MachineDeployment, which changes the node set other tests see.
+  concurrent: false
   catch:
     - script:
         shell: bash
