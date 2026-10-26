@@ -32,92 +32,55 @@ spec:
               source ../scripts/lib.sh
 
               re='^[0-9]+$'
-              ip_re='^"((25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})"$'
               LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
 
-              nbconf=$(curl -s --request POST \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                -H "accept: application/json" \
-                "${LINODE_URL}/v4beta/nodebalancers" \
-                --data "{\"label\": \"$LABEL\", \"region\": \"$LINODE_REGION\"}")
-              
-              nbid=$(echo "$nbconf" | jq '.id')
+              nb_data=$(jq -cn --arg label "$LABEL" --arg region "$LINODE_REGION" '{label: $label, region: $region}')
+              nbid=$(create_nodebalancer "$nb_data")
               if ! [[ $nbid =~ $re ]]; then
-                  fail "Nodebalancer id [$nbid] is incorrect, failed to create nodebalancer"
-              fi
-    
-              ip=$(echo "$nbconf" | jq '.ipv4')
-              if ! [[ $ip =~ $ip_re ]]; then
-                fail "Nodebalancer ipv4 [$ip] is incorrect, failed to create nodebalancer"
-              fi
-              
-              ip=$(echo "$ip" | tr -d '"')
-              update_ip=$(curl --no-keepalive -s --request PUT \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                -H "accept: application/json" \
-                "${LINODE_URL}/v4beta/networking/ips/$ip" \
-                --data "{\"reserved\": true}")
-
-              if ! echo "$update_ip" | jq -e '.reserved == true' >/dev/null; then
-                  fail "Unable to update the IP: $ip status to reserved"
+                fail "NodeBalancer id [$nbid] is incorrect, failed to create NodeBalancer"
               fi
 
+              ip=$(linode_cli nodebalancers view "$nbid" --json | jq -er '.[0].ipv4')
+              if ! is_ipv4_address "$ip"; then
+                fail "NodeBalancer IPv4 [$ip] is incorrect"
+              fi
+
+              if ! linode_cli networking ip-update "$ip" --reserved true --json \
+                | jq -e '.[0].reserved == true' >/dev/null; then
+                fail "Unable to reserve IP $ip"
+              fi
               reserved_ip=$ip
               create_cm=$(kubectl -n $NAMESPACE create configmap reserved-ip-config --from-literal=ReservedIP=$reserved_ip -o yaml --dry-run=client | kubectl apply -f -)
               if [[ "$create_cm" != "configmap/reserved-ip-config created" ]]; then
                 fail "Unable to create configmap. Error: $create_cm"
               fi
 
-              tagged_ip=$(curl -s --request PUT \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                "${LINODE_URL}/v4beta/networking/reserved/ips/$reserved_ip" \
-                --data "{\"tags\": [\"$E2E_RESERVED_IP_TAG\"]}")
-              if [[ "$(echo "$tagged_ip" | jq -r --arg tag "$E2E_RESERVED_IP_TAG" '.tags | index($tag) != null')" != "true" ]]; then
-                fail "Unable to tag reserved ip: $reserved_ip"
+              tagged_ip=$(linode_cli networking reserved-ip-update "$reserved_ip" --tags "$E2E_RESERVED_IP_TAG" --json)
+              if ! jq -e --arg tag "$E2E_RESERVED_IP_TAG" 'any(.[0].tags[]?; . == $tag)' <<< "$tagged_ip" >/dev/null; then
+                fail "Unable to tag reserved IP $reserved_ip"
               fi
-              
-              del_nb=$(curl -s --no-keepalive --request DELETE \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                -H "accept: application/json" \
-                "${LINODE_URL}/v4beta/nodebalancers/$nbid")
-              if [ "$(echo "$del_nb" | jq 'length')" != 0 ]; then
-                  fail "Error deleting the nodebalancer"
-              fi
+
+              linode_cli nodebalancers delete "$nbid" --json >/dev/null
 
               fw_label="ccm-fwtest-$RANDOM"
-
-              fw_id=$(curl -s --request POST \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                -H "accept: application/json" \
-                "$LINODE_URL/v4/networking/firewalls" \
-                --data "
-              {
-                \"label\": \"$fw_label\",
-                \"rules\": {
-                  \"inbound\": [{
-                    \"action\": \"ACCEPT\",
-                    \"label\": \"inbound-rule123\",
-                    \"description\": \"inbound rule123\",
-                    \"ports\": \"80\",
-                    \"protocol\": \"TCP\",
-                    \"addresses\": {
-                      \"ipv4\": [\"0.0.0.0/0\"]
-                    }
+              fw_data=$(jq -cn --arg label "$fw_label" --arg ports "80" '{
+                label: $label,
+                rules: {
+                  inbound: [{
+                    action: "ACCEPT",
+                    label: "inbound-rule123",
+                    description: "inbound rule123",
+                    ports: $ports,
+                    protocol: "TCP",
+                    addresses: {ipv4: ["0.0.0.0/0"]}
                   }],
-                  \"inbound_policy\": \"ACCEPT\",
-                  \"outbound_policy\": \"ACCEPT\"
+                  inbound_policy: "ACCEPT",
+                  outbound_policy: "ACCEPT"
                 }
-              }
-              " | jq .id)
-              
-              sleep 30
-              if [[ "$fw_id" == "null" || -z "$fw_id" ]]; then
-                fail "failed to create firewall"
+              }')
+              fw_id=$(create_firewall "$fw_data")
+              if [[ ! $fw_id =~ ^[0-9]+$ ]]; then
+                fail "Failed to create firewall: $fw_id"
               fi
 
               echo "{\"reserved_ip\": \"$reserved_ip\",
@@ -153,18 +116,14 @@ spec:
               fi
 
               if [[ -n "$fw_id" ]]; then
-              delete_fw=$(curl -s -X DELETE \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                "$LINODE_URL/v4/networking/firewalls/$fw_id" || true)
+                if linode_cli firewalls delete "$fw_id" --json >/dev/null 2>&1 \
+                  || linode_firewall_absent "$fw_id"; then
+                  echo "Firewall $fw_id deleted successfully"
+                else
+                  cleanup_error="${cleanup_error:+$cleanup_error; }Unable to delete firewall: $fw_id"
+                fi
+              fi
 
-              if [[ "$delete_fw" == "{}" || "$delete_fw" == *'"reason": "Not found"'* ]]; then
-                echo "Firewall $fw_id deleted successfully"
-              else
-                cleanup_error="${cleanup_error:+$cleanup_error; }Unable to delete firewall: $fw_id. Error: $delete_fw"
-              fi
-              fi
-              
               # Release the primary reserved IP if it still exists. On the happy
               # path CCM already released it when svc-test was torn down, so this
               # is a best-effort, idempotent no-op; on failure paths it prevents
@@ -204,6 +163,7 @@ spec:
             shell: bash
             shellArgs:
               - -c
+            timeout: 4m
             content: |
               set -euo pipefail
               source ../scripts/lib.sh
@@ -227,18 +187,12 @@ spec:
 
               #Run a curl command to the service ip
               URL="http://$service_ip:80/"
-              request_succeeded=false
-              for _ in {1..10}; do
-                HTTP_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
-                if [ "$HTTP_RESPONSE" -eq 200 ]; then
-                   echo "Request was successful (HTTP 200)"
-                   request_succeeded=true
-                   break
-                fi
-                sleep 10
-              done
-              if [[ "$request_succeeded" != true ]]; then
-                fail "Request failed with response code ${HTTP_RESPONSE:-<empty>} after 10 attempts"
+              check_service_response() {
+                HTTP_RESPONSE=$(curl -s --max-time 10 -o /dev/null -w "%{http_code}" "$URL" || true)
+                [[ "$HTTP_RESPONSE" == "200" ]]
+              }
+              if ! retry 10 10 check_service_response; then
+                fail "Request did not return HTTP 200 from the service after 10 attempts"
               fi
             check:
               ($error == null): true

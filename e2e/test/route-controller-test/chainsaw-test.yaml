@@ -6,6 +6,8 @@ metadata:
   labels:
     all:
 spec:
+  # Temporarily renames a node, which the route/node controllers react to.
+  concurrent: false
   bindings:
     - name: fwname
       value: (join('-', ['ccm-fwtest', env('CLUSTER_NAME')]))
@@ -52,10 +54,7 @@ spec:
                   echo "  Instance ID: $instance_id"
                   
                   # Get interface details for this config
-                  interfaces=$(curl -s \
-                      -H "Authorization: Bearer $LINODE_TOKEN" \
-                      "$LINODE_URL/v4/linode/instances/$instance_id/configs" \
-                      | jq -r '.data[0].interfaces')
+                  interfaces=$(linode_cli linodes configs-list "$instance_id" --json | jq -ce '.[0].interfaces')
                   
                   # Check if pod CIDR is in the VPC interface IP ranges
                   if echo "$interfaces" | jq -e --arg cidr "$pod_cidr" '.[] | select(.purpose == "vpc") | .ip_ranges[] | select(. == $cidr)' > /dev/null; then
@@ -78,6 +77,7 @@ spec:
             shell: bash
             shellArgs:
               - -c
+            timeout: 4m
             content: |
               set -euo pipefail
               source ../scripts/lib.sh
@@ -93,63 +93,48 @@ spec:
               newNodeName=${node}-test
 
               # Change label of linode
-              resp=$(curl -X PUT --write-out "%{http_code}\n" \
-                  --silent --output /dev/null \
-                  -H "Authorization: Bearer $LINODE_TOKEN" \
-                  -H "Content-Type: application/json" --fail-early --retry 3 \
-                  "$LINODE_URL/v4/linode/instances/$instance_id" \
-                  --data "{\"label\": \"$newNodeName\"}")
-
-              if [[ $resp != "200" ]]; then
-                  fail "Failed updating node label: HTTP $resp"
+              if ! linode_cli linodes update "$instance_id" --label "$newNodeName" --json >/dev/null; then
+                  fail "Failed updating node label to $newNodeName"
               fi
 
-              currentLabel=$(curl -s \
-                  -H "Authorization: Bearer $LINODE_TOKEN" \
-                  "$LINODE_URL/v4/linode/instances/$instance_id" \
-                  | jq -r '.label')
-
+              currentLabel=""
+              check_new_label() {
+                  currentLabel=$(linode_cli linodes view "$instance_id" --json | jq -er '.[0].label') || return 1
+                  [[ "$currentLabel" == "$newNodeName" ]]
+              }
               label_matches=false
-              if [[ "$currentLabel" == "$newNodeName" ]]; then
+              if retry 10 5 check_new_label; then
                   echo "Labels match"
                   label_matches=true
               else
                   echo "Expected Linode label $newNodeName, found $currentLabel"
               fi
 
-              # sleep for a minute for route_controller to reconcile few times
+              # give the route controller time to reconcile after the rename
               sleep 60
 
-              # Get interface details for this config
-              interfaces=$(curl -s \
-                  -H "Authorization: Bearer $LINODE_TOKEN" \
-                  "$LINODE_URL/v4/linode/instances/$instance_id/configs" \
-                  | jq -r '.data[0].interfaces')
-
-              # Check if pod CIDR still exists in the VPC interface IP ranges
-              pod_cidr_found=false
-              if echo "$interfaces" | jq -e --arg cidr "$pod_cidr" '.[] | select(.purpose == "vpc") | .ip_ranges[] | select(. == $cidr)' > /dev/null; then
-                  echo "Pod CIDR found in VPC interface configuration"
-                  pod_cidr_found=true
+              check_pod_cidr_in_vpc() {
+                  local interfaces
+                  interfaces=$(linode_cli linodes configs-list "$instance_id" --json | jq -ce '.[0].interfaces') || return 1
+                  jq -e --arg cidr "$pod_cidr" \
+                    'any(.[]; .purpose == "vpc" and any(.ip_ranges[]?; . == $cidr))' \
+                    <<< "$interfaces" >/dev/null
+              }
+              route_preserved=false
+              if retry 12 5 check_pod_cidr_in_vpc; then
+                  route_preserved=true
               else
-                  echo "Pod CIDR not found in VPC interface configuration"
-                  echo "Current VPC interface configuration:"
-                  echo "$interfaces" | jq '.[] | select(.purpose == "vpc")'
+                  echo "Pod CIDR $pod_cidr was not present in the VPC interface configuration after the label update"
               fi
 
               # revert label to original value
-              revert_resp=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
-                  -H "Authorization: Bearer $LINODE_TOKEN" \
-                  -H "Content-Type: application/json" --fail-early --retry 3 \
-                  "$LINODE_URL/v4/linode/instances/$instance_id" \
-                  --data "{\"label\": \"$node\"}")
-              if [[ "$revert_resp" != "200" ]]; then
-                  fail "Failed restoring Linode label $node: HTTP $revert_resp"
+              if ! linode_cli linodes update "$instance_id" --label "$node" --json >/dev/null; then
+                  fail "Failed restoring Linode label $node"
               fi
               if [[ "$label_matches" != true ]]; then
                   fail "Expected Linode label $newNodeName, found $currentLabel"
               fi
-              if [[ "$pod_cidr_found" != true ]]; then
+              if [[ "$route_preserved" != true ]]; then
                   fail "Pod CIDR $pod_cidr is missing from node $node VPC interface configuration after label update"
               fi
             check:

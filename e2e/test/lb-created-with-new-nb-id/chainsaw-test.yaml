@@ -15,6 +15,7 @@ spec:
           - -c
         content: |
           set -uo pipefail
+          source ../scripts/lib.sh
           echo "Test failed. Fetching CCM logs..."
           kubectl logs -n kube-system daemonsets/ccm-linode | grep "lb-created-with-new-nb-id" | tail -100 || true
 
@@ -31,9 +32,7 @@ spec:
           for nbid in $nbids; do
             if [[ "$nbid" =~ ^[0-9]+$ ]]; then
               echo "Deleting NodeBalancer $nbid"
-              curl -s -o /dev/null -X DELETE \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                "$LINODE_URL/v4/nodebalancers/$nbid" || true
+              linode_cli nodebalancers delete "$nbid" --json >/dev/null || echo "WARNING: failed to delete NodeBalancer $nbid; it may have leaked" >&2
             fi
           done
   steps:
@@ -74,7 +73,7 @@ spec:
               # Get data to use for new nodebalancer
               data=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN LABEL=$LABEL REGION=$REGION ../scripts/get-nb-create-data.sh svc-dummy)
 
-              nbid=$(retry 3 5 linode_api POST /v4beta/nodebalancers --data "$data" | jq -er '.id')
+              nbid=$(create_nodebalancer "$data")
 
               if ! [[ $nbid =~ $re ]]; then
                   echo "Nodebalancer id [$nbid] is incorrect, failed to create nodebalancer"
@@ -133,6 +132,7 @@ spec:
             shell: bash
             shellArgs:
               - -c
+            timeout: 3m
             content: |
               set -euo pipefail
               source ../scripts/lib.sh
@@ -144,23 +144,17 @@ spec:
               LABEL="ccm-$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)"
 
               # Get VPC config if it exists
-              vpcconfig=$(curl -s \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                "$LINODE_URL/v4beta/nodebalancers/$old_nbid/vpcs")
+              vpcconfig=$(linode_cli nodebalancers vpcs-list "$old_nbid" --json)
 
               echo "Old Nodebalancer ID: $old_nbid"
               echo "VPC config: $vpcconfig"
 
-              SUBNET_ID=$(echo $vpcconfig | jq -r ".data[] | select(.nodebalancer_id == $old_nbid) | .subnet_id")
+              SUBNET_ID=$(jq -er --argjson id "$old_nbid" '.[] | select(.nodebalancer_id == $id) | .subnet_id' <<< "$vpcconfig" 2>/dev/null || true)
               echo "Subnet ID: $SUBNET_ID"
 
-              data="{\"label\": \"$LABEL\", \"region\": \"$REGION\", \"vpcs\": [{\"subnet_id\": $SUBNET_ID}]}"
-              if [[ -z $SUBNET_ID ]]; then
-                  data="{\"label\": \"$LABEL\", \"region\": \"$REGION\"}"
-              fi
+              data=$(nodebalancer_payload "$LABEL" "$REGION" "$SUBNET_ID")
 
-              nbid=$(retry 3 5 linode_api POST /v4beta/nodebalancers --data "$data" | jq -er '.id')
+              nbid=$(create_nodebalancer "$data")
 
               if ! [[ $nbid =~ $re ]]; then
                   fail "Nodebalancer id [$nbid] is incorrect, failed to create nodebalancer"
@@ -172,31 +166,19 @@ spec:
 
                   kubectl annotate --overwrite svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-nodebalancer-id=$nbid
 
-                  matched=false
-                  for _ in {1..10}; do
-                      nbid2=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
-
-                      if [[ "$nbid" == "$nbid2" ]]; then
-                          echo "Condition met"
-                          matched=true
-                          break
-                      fi
-                      sleep 5
-                  done
-                  if [[ "$matched" != true ]]; then
+                  check_new_nodebalancer_adopted() {
+                      local current_nbid
+                      current_nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh) || return 1
+                      [[ "$current_nbid" == "$nbid" ]]
+                  }
+                  if ! retry 10 5 check_new_nodebalancer_adopted; then
                       fail "Service did not adopt new NodeBalancer $nbid after 10 attempts"
                   fi
               fi
 
-              old_nb_resp=$(curl --write-out "%{http_code}\n" \
-                --silent --output /dev/null \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                "$LINODE_URL/v4/nodebalancers/$old_nbid")
-
-              if [[ $old_nb_resp == "404" ]]; then
-                  echo "old nodebalancer not found"
-              else
-                  fail "Expected old NodeBalancer $old_nbid to be deleted, got HTTP $old_nb_resp"
+              if ! linode_nodebalancer_absent "$old_nbid"; then
+                  fail "Expected old NodeBalancer $old_nbid to be deleted"
               fi
+              echo "old nodebalancer not found"
             check:
               ($error == null): true

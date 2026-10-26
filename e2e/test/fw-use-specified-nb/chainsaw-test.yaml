@@ -21,6 +21,7 @@ spec:
             value: ($fwname)
         content: |
           set -uo pipefail
+          source ../scripts/lib.sh
           echo "Test failed. Fetching CCM logs..."
           kubectl logs -n kube-system daemonsets/ccm-linode | grep "fw-use-specified-nb" | tail -100 || true
 
@@ -29,16 +30,13 @@ spec:
           # deletes it, the firewall would leak. Look it up by its (deterministic)
           # label and delete it here (best-effort, idempotent).
           echo "Cleaning up firewall (if any)..."
-          fwid=$(curl -s \
-            -H "Authorization: Bearer $LINODE_TOKEN" \
-            -H "Content-Type: application/json" \
-            -H "X-Filter: {\"label\": \"$FWLABEL\"}" \
-            "$LINODE_URL/v4/networking/firewalls" | jq -r '.data[0].id // empty' 2>/dev/null || true)
+          fwid=$(linode_firewall_id_by_label "$FWLABEL" 2>/dev/null || true)
           if [[ "$fwid" =~ ^[0-9]+$ ]]; then
             echo "Deleting firewall $fwid"
-            curl -s -o /dev/null -X DELETE \
-              -H "Authorization: Bearer $LINODE_TOKEN" \
-              "$LINODE_URL/v4/networking/firewalls/$fwid" || true
+            if ! linode_cli firewalls delete "$fwid" --json >/dev/null 2>&1 \
+              && ! linode_firewall_absent "$fwid"; then
+              echo "Unable to delete firewall $fwid during test cleanup" >&2
+            fi
           fi
   steps:
     - name: Create firewall, Create pods and services
@@ -54,36 +52,24 @@ spec:
               set -euo pipefail
               source ../scripts/lib.sh
 
-              create_fw=$(curl -s --write-out "%{http_code}\n" --output /dev/null --request POST \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                -H "accept: application/json" \
-                "$LINODE_URL/v4/networking/firewalls" \
-                --data "
-              {
-                \"label\": \"$FWLABEL\",
-                \"rules\": {
-                  \"inbound\": [{
-                    \"action\": \"ACCEPT\",
-                    \"label\": \"inbound-rule123\",
-                    \"description\": \"inbound rule123\",
-                    \"ports\": \"4321\",
-                    \"protocol\": \"TCP\",
-                    \"addresses\": {
-                      \"ipv4\": [\"0.0.0.0/0\"]
-                    }
+              firewall_data=$(jq -cn --arg label "$FWLABEL" '{
+                label: $label,
+                rules: {
+                  inbound: [{
+                    action: "ACCEPT",
+                    label: "inbound-rule123",
+                    description: "inbound rule123",
+                    ports: "4321",
+                    protocol: "TCP",
+                    addresses: {ipv4: ["0.0.0.0/0"]}
                   }],
-                  \"inbound_policy\": \"ACCEPT\",
-                  \"outbound_policy\": \"ACCEPT\"
+                  inbound_policy: "ACCEPT",
+                  outbound_policy: "ACCEPT"
                 }
-              }
-              "
-              )
-
-              if [[ $create_fw == "200" ]]; then
-                  echo "fw created"
-              else
-                  fail "Failed creating firewall, got HTTP $create_fw"
+              }')
+              fwid=$(create_firewall "$firewall_data")
+              if [[ ! "$fwid" =~ ^[0-9]+$ ]]; then
+                fail "Failed creating firewall: $fwid"
               fi
             check:
               ($error == null): true
@@ -115,16 +101,13 @@ spec:
             env:
               - name: FWLABEL
                 value: ($fwname)
+            timeout: 3m
             content: |
               set -euo pipefail
               source ../scripts/lib.sh
               re='^[0-9]+$'
 
-              fwid=$(curl -s \
-                    -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "Content-Type: application/json" --fail-early --retry 3 \
-                    -H "X-Filter: {\"label\": \"$FWLABEL\"}" \
-                    "$LINODE_URL/v4/networking/firewalls" | jq .data[].id)
+              fwid=$(linode_firewall_id_by_label "$FWLABEL")
 
               if ! [[ $fwid =~ $re ]]; then
                   echo "Firewall id [$fwid] is incorrect, failed to fetch firewall"
@@ -132,34 +115,18 @@ spec:
               fi
 
               kubectl annotate svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-firewall-id=$fwid
-              sleep 5
-
-              matched=false
-              for _ in {1..10}; do
-                  nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
-
-                  fwconfig=$(curl -s \
-                    -H "Authorization: Bearer $LINODE_TOKEN" \
-                    -H "Content-Type: application/json" --fail-early --retry 3 \
-                    "$LINODE_URL/v4/networking/firewalls/$fwid" || true)
-
-                  fw_attached_to_nb=$(echo $fwconfig | jq ".entities[] | select(.id == $nbid) | .id == $nbid")
-
-                  if [[ $fw_attached_to_nb == "true" ]]; then
-                      echo "Conditions met"
-                      matched=true
-                      break
-                  fi
-
-                  sleep 10
-              done
-              if [[ "$matched" != true ]]; then
+              nbid=$(KUBECONFIG=$KUBECONFIG NAMESPACE=$NAMESPACE LINODE_TOKEN=$LINODE_TOKEN ../scripts/get-nb-id.sh)
+              firewall_attached_to_nodebalancer() {
+                  local firewalls
+                  firewalls=$(linode_firewalls_for_nodebalancer "$nbid") || return 1
+                  jq -e --argjson id "$fwid" 'any(.[]; .id == $id)' <<< "$firewalls" >/dev/null
+              }
+              if ! retry 10 10 firewall_attached_to_nodebalancer; then
                   fail "Firewall $fwid was not attached to NodeBalancer $nbid after 10 attempts"
               fi
 
-              curl -s --fail -X DELETE \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "Content-Type: application/json" --fail-early --retry 3 \
-                "$LINODE_URL/v4/networking/firewalls/$fwid"
+              if ! linode_cli firewalls delete "$fwid" --json >/dev/null; then
+                  fail "Failed deleting firewall $fwid"
+              fi
             check:
               ($error == null): true

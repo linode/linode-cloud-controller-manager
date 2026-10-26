@@ -45,6 +45,7 @@ spec:
             shell: bash
             shellArgs:
               - -c
+            timeout: 3m
             content: |
               set -euo pipefail
               source ../scripts/lib.sh
@@ -55,26 +56,13 @@ spec:
 
               echo "Nodebalancer ID: $nbid"
 
-              nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
-                    
-              echo "Nodebalancer config found, updating config udp_check_port"
+              echo "Updating NodeBalancer udp_check_port"
 
               kubectl annotate --overwrite svc svc-test -n $NAMESPACE service.beta.kubernetes.io/linode-loadbalancer-udp-check-port=4500
 
-              echo "Verifying that udp_check_port is set to 4500"
-              matched=false
-              for _ in {1..10}; do
-                nbconfig=$(LINODE_TOKEN=$LINODE_TOKEN NBID=$nbid ../scripts/get-nb-config.sh)
-                udp_check_port=$(echo $nbconfig | jq -r '.udp_check_port')
-                echo "udp_check_port is $udp_check_port"
-                if [[ "$udp_check_port" == "4500" ]]; then
-                  matched=true
-                  break
-                fi
-                sleep 10
-              done
-              if [[ "$matched" != true ]]; then
-                fail "Expected NodeBalancer udp_check_port 4500 after 10 attempts; found $udp_check_port"
+              if ! retry_jq 10 10 'select(.udp_check_port == 4500)' \
+                env LINODE_TOKEN="$LINODE_TOKEN" NBID="$nbid" ../scripts/get-nb-config.sh >/dev/null; then
+                  fail "Expected NodeBalancer udp_check_port 4500 after 10 attempts"
               fi
             check:
               ($error == null): true
