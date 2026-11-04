@@ -6,12 +6,12 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"golang.org/x/exp/slices"
 	"k8s.io/client-go/informers"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
