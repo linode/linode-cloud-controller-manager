@@ -6255,3 +6255,46 @@ func Test_getFrontendVPCCreateOptions(t *testing.T) {
 		})
 	}
 } */
+
+func Test_loadbalancers_GetLoadBalancerTags(t *testing.T) {
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		want        []string
+	}{
+		{
+			name:        "no tags annotation",
+			annotations: map[string]string{},
+			want:        []string{"linodelb"},
+		},
+		{
+			name:        "comma separated tags",
+			annotations: map[string]string{annotations.AnnLinodeLoadBalancerTags: "fake,test,yolo"},
+			want:        []string{"linodelb", "fake", "test", "yolo"},
+		},
+		{
+			name:        "spaces after commas",
+			annotations: map[string]string{annotations.AnnLinodeLoadBalancerTags: "production, web-tier"},
+			want:        []string{"linodelb", "production", "web-tier"},
+		},
+		{
+			name:        "empty entries",
+			annotations: map[string]string{annotations.AnnLinodeLoadBalancerTags: "production,, web-tier,"},
+			want:        []string{"linodelb", "production", "web-tier"},
+		},
+		{
+			name:        "empty annotation",
+			annotations: map[string]string{annotations.AnnLinodeLoadBalancerTags: ""},
+			want:        []string{"linodelb"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			l := &loadbalancers{}
+			svc := &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test", Annotations: tt.annotations}}
+			if got := l.GetLoadBalancerTags(t.Context(), "linodelb", svc); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetLoadBalancerTags() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
