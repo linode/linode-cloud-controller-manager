@@ -731,7 +731,11 @@ func (l *loadbalancers) GetLoadBalancerTags(_ context.Context, clusterName strin
 
 	tagStr, ok := service.GetAnnotations()[annotations.AnnLinodeLoadBalancerTags]
 	if ok {
-		return append(tags, strings.Split(tagStr, ",")...)
+		for _, tag := range strings.Split(tagStr, ",") {
+			if tag = strings.TrimSpace(tag); tag != "" {
+				tags = append(tags, tag)
+			}
+		}
 	}
 
 	return tags
