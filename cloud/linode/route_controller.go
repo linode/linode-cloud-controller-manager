@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,7 +24,47 @@ import (
 	ccmUtils "github.com/linode/linode-cloud-controller-manager/cloud/linode/utils"
 )
 
-var ipv6ConfiguredRoutes []*cloudprovider.Route
+// ipv6RouteStore keeps the IPv6 routes that CreateRoute accepted without configuring anything,
+// so that ListRoutes reports them back to the route controller. The route controller calls
+// CreateRoute and DeleteRoute from concurrent goroutines, so access is guarded by a mutex.
+type ipv6RouteStore struct {
+	mu     sync.Mutex
+	routes []*cloudprovider.Route
+}
+
+var ipv6ConfiguredRoutes = &ipv6RouteStore{}
+
+func sameRoute(a, b *cloudprovider.Route) bool {
+	return a.TargetNode == b.TargetNode && a.DestinationCIDR == b.DestinationCIDR
+}
+
+// add stores route unless a route for the same node and CIDR is already stored.
+func (s *ipv6RouteStore) add(route *cloudprovider.Route) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, r := range s.routes {
+		if sameRoute(r, route) {
+			return
+		}
+	}
+	s.routes = append(s.routes, route)
+}
+
+// remove drops the stored routes for the same node and CIDR as route.
+func (s *ipv6RouteStore) remove(route *cloudprovider.Route) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.routes = slices.DeleteFunc(s.routes, func(r *cloudprovider.Route) bool {
+		return sameRoute(r, route)
+	})
+}
+
+// list returns a copy of the stored routes.
+func (s *ipv6RouteStore) list() []*cloudprovider.Route {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.routes)
+}
 
 type routeCache struct {
 	Mu         sync.RWMutex
@@ -140,7 +181,7 @@ func (r *routes) CreateRoute(ctx context.Context, clusterName, nameHint string, 
 	}
 	if ipAddr.To4() == nil {
 		// "configure" the route so route controller doesn't keep creating it
-		ipv6ConfiguredRoutes = append(ipv6ConfiguredRoutes, route)
+		ipv6ConfiguredRoutes.add(route)
 		return nil
 	}
 
@@ -198,6 +239,16 @@ func (r *routes) CreateRoute(ctx context.Context, clusterName, nameHint string, 
 
 // DeleteRoute removes route's subnet from ip_ranges of target node's VPC interface
 func (r *routes) DeleteRoute(ctx context.Context, clusterName string, route *cloudprovider.Route) error {
+	ipAddr, _, err := net.ParseCIDR(route.DestinationCIDR)
+	if err != nil {
+		return err
+	}
+	if ipAddr.To4() == nil {
+		// IPv6 routes are never configured on the interface, only remembered by CreateRoute
+		ipv6ConfiguredRoutes.remove(route)
+		return nil
+	}
+
 	instance, err := r.getInstanceFromName(ctx, string(route.TargetNode))
 	if err != nil {
 		return err
@@ -326,7 +377,7 @@ func (r *routes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpr
 	}
 
 	// add in "configured" IPv6 routes so cloud-provider is happy
-	configuredRoutes = append(configuredRoutes, ipv6ConfiguredRoutes...)
+	configuredRoutes = append(configuredRoutes, ipv6ConfiguredRoutes.list()...)
 
 	return configuredRoutes, nil
 }
