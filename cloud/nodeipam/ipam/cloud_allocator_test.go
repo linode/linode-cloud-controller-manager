@@ -1454,3 +1454,74 @@ func TestNodeDeletionReleaseCIDR(t *testing.T) {
 		})
 	}
 }
+
+func TestAllocateOrOccupyCIDRReleasesIPv4WhenIPv6Fails(t *testing.T) {
+	oldVPCNames := options.Options.VPCNames
+	options.Options.VPCNames = nil
+	defer func() {
+		options.Options.VPCNames = oldVPCNames
+	}()
+
+	const linodeID = 12345
+	testCases := []struct {
+		description string
+		providerID  string
+		setupClient func(client *mocks.MockClient)
+	}{
+		{
+			description: "node without a ProviderID yet",
+			providerID:  "",
+			setupClient: func(client *mocks.MockClient) {},
+		},
+		{
+			description: "Linode API error while looking up the instance",
+			providerID:  fmt.Sprintf("%s%d", providerIDPrefix, linodeID),
+			setupClient: func(client *mocks.MockClient) {
+				client.EXPECT().GetInstance(gomock.Any(), linodeID).AnyTimes().Return(nil, errors.New("api unavailable"))
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			_, tCtx := ktesting.NewTestContext(t)
+			ctrl := gomock.NewController(t)
+			client := mocks.NewMockClient(ctrl)
+			tc.setupClient(client)
+
+			fakeNodeHandler := &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{{
+					ObjectMeta: metav1.ObjectMeta{Name: "node0"},
+					Spec:       v1.NodeSpec{ProviderID: tc.providerID},
+				}},
+				Clientset: fake.NewClientset(),
+			}
+			_, clusterCIDR, _ := netutils.ParseCIDRSloppy("127.123.234.0/28")
+			allocator, err := NewLinodeCIDRAllocator(tCtx, client, fakeNodeHandler, test.FakeNodeInformer(fakeNodeHandler), CIDRAllocatorParams{
+				ClusterCIDRs:      []*net.IPNet{clusterCIDR},
+				NodeCIDRMaskSizes: []int{30, 112},
+			}, nil)
+			if err != nil {
+				t.Fatalf("failed to create allocator: %v", err)
+			}
+			cloudAllocator, ok := allocator.(*cloudAllocator)
+			if !ok {
+				t.Fatalf("unexpected allocator type %T", allocator)
+			}
+
+			// The /28 holds four /30 blocks. Retry more often than that, as the work queue would.
+			for range 6 {
+				if err := allocator.AllocateOrOccupyCIDR(tCtx, fakeNodeHandler.Existing[0]); err == nil {
+					t.Fatalf("expected AllocateOrOccupyCIDR to fail")
+				}
+			}
+
+			// All four blocks must still be free.
+			for i := range 4 {
+				if _, err := cloudAllocator.cidrSet.AllocateNext(); err != nil {
+					t.Fatalf("IPv4 CIDRs leaked after failed IPv6 allocations, only %d of 4 left: %v", i, err)
+				}
+			}
+		})
+	}
+}
