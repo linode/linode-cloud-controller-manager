@@ -184,6 +184,9 @@ func GetVPCIPv6Addresses(ctx context.Context, linodeClient client.Client, vpcNam
 // It uses the first VPC name from Options.VPCNames to find the VPC ID and then retrieves the subnet ID
 // for the NodeBalancer backend IPv4 subnet name specified in Options.NodeBalancerBackendIPv4SubnetName.
 func GetNodeBalancerBackendIPv4SubnetID(linodeClient client.Client) (int, error) {
+	if len(options.Options.VPCNames) == 0 {
+		return 0, fmt.Errorf("--nodebalancer-backend-ipv4-subnet-name %q requires --vpc-names or --vpc-ids to be set", options.Options.NodeBalancerBackendIPv4SubnetName)
+	}
 	// Get the VPC ID from the name
 	vpcID, err := GetVPCID(context.TODO(), linodeClient, options.Options.VPCNames[0])
 	if err != nil {
