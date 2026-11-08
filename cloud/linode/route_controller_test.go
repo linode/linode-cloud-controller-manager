@@ -1,8 +1,10 @@
 package linode
 
 import (
+	"fmt"
 	"net"
 	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -661,5 +663,94 @@ func TestDeleteRoute(t *testing.T) {
 		client.EXPECT().UpdateInterface(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&interfaceWitVPCAndNoRoute, nil)
 		err = routeController.DeleteRoute(ctx, "dummy", route)
 		assert.NoError(t, err)
+	})
+}
+
+func TestIPv6RouteBookkeeping(t *testing.T) {
+	options.Options.VPCNames = []string{"dummy"}
+	services.VpcIDs["dummy"] = 1
+	options.Options.EnableRouteController = true
+
+	existingRoutes := ipv6ConfiguredRoutes
+	defer func() {
+		ipv6ConfiguredRoutes = existingRoutes
+	}()
+
+	existingK8sCache := registeredK8sNodeCache
+	defer func() {
+		registeredK8sNodeCache = existingK8sCache
+	}()
+	registeredK8sNodeCache = newK8sNodeCache()
+
+	newController := func(t *testing.T) cloudprovider.Routes {
+		t.Helper()
+		ctrl := gomock.NewController(t)
+		client := mocks.NewMockClient(ctrl)
+		client.EXPECT().ListInstances(gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.Instance{}, nil)
+		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.VPCIP{}, nil)
+		client.EXPECT().ListVPCIPv6Addresses(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return([]linodego.VPCIP{}, nil)
+		routeController, err := newRoutes(client, services.NewInstances(client))
+		require.NoError(t, err)
+		return routeController
+	}
+
+	t.Run("concurrent CreateRoute calls keep every IPv6 route", func(t *testing.T) {
+		ipv6ConfiguredRoutes = &ipv6RouteStore{}
+		routeController := newController(t)
+
+		const nodes = 50
+		var wg sync.WaitGroup
+		for i := range nodes {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				route := &cloudprovider.Route{
+					TargetNode:      types.NodeName(fmt.Sprintf("node-%d", i)),
+					DestinationCIDR: fmt.Sprintf("fd00:0:0:%x::/64", i),
+				}
+				assert.NoError(t, routeController.CreateRoute(t.Context(), "dummy", "dummy", route))
+			}(i)
+		}
+		wg.Wait()
+
+		routes, err := routeController.ListRoutes(t.Context(), "dummy")
+		require.NoError(t, err)
+		assert.Len(t, routes, nodes)
+	})
+
+	t.Run("CreateRoute does not store the same IPv6 route twice", func(t *testing.T) {
+		ipv6ConfiguredRoutes = &ipv6RouteStore{}
+		routeController := newController(t)
+		route := &cloudprovider.Route{TargetNode: "node-a", DestinationCIDR: "fd00::/64"}
+
+		require.NoError(t, routeController.CreateRoute(t.Context(), "dummy", "dummy", route))
+		require.NoError(t, routeController.CreateRoute(t.Context(), "dummy", "dummy", route))
+
+		routes, err := routeController.ListRoutes(t.Context(), "dummy")
+		require.NoError(t, err)
+		assert.Len(t, routes, 1)
+	})
+
+	t.Run("DeleteRoute forgets an IPv6 route without looking up the node", func(t *testing.T) {
+		ipv6ConfiguredRoutes = &ipv6RouteStore{}
+		routeController := newController(t)
+		kept := &cloudprovider.Route{TargetNode: "node-a", DestinationCIDR: "fd00:0:0:1::/64"}
+		deleted := &cloudprovider.Route{TargetNode: "node-b", DestinationCIDR: "fd00:0:0:2::/64"}
+
+		require.NoError(t, routeController.CreateRoute(t.Context(), "dummy", "dummy", kept))
+		require.NoError(t, routeController.CreateRoute(t.Context(), "dummy", "dummy", deleted))
+
+		// node-b is gone from the cluster and from Linode, the delete must still succeed
+		require.NoError(t, routeController.DeleteRoute(t.Context(), "dummy", deleted))
+
+		routes, err := routeController.ListRoutes(t.Context(), "dummy")
+		require.NoError(t, err)
+		assert.Equal(t, []*cloudprovider.Route{kept}, routes)
+	})
+
+	t.Run("DeleteRoute returns an error for an invalid CIDR", func(t *testing.T) {
+		routeController := newController(t)
+		err := routeController.DeleteRoute(t.Context(), "dummy", &cloudprovider.Route{TargetNode: "node-a", DestinationCIDR: ":/64"})
+		assert.Error(t, err)
 	})
 }
