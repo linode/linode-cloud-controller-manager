@@ -163,3 +163,11 @@ The E2E manifests use labels to select compatible scenarios:
 | `ipv6-backends` | CAPL-provisioned IPv6 workload cluster |
 
 Some tests require a CAPL management cluster to add nodes or configure routes. They are intentionally excluded from the `lke` selector.
+
+## Chainsaw schema validation
+
+Run the Chainsaw configuration and test-manifest checks without a cluster:
+
+```bash
+mise run chainsaw-lint
+```
