@@ -340,17 +340,26 @@ func (s *nodeController) updateNodeMetadata(ctx context.Context, node *v1.Node, 
 			nodeResult.Spec.ProviderID = ccmUtils.ProviderIDPrefix + strconv.Itoa(linode.ID)
 		}
 
-		// Try to update the expectedPrivateIP if its not set or doesn't match
-		if nodeResult.Annotations[annotations.AnnLinodeNodePrivateIP] != privateIP && privateIP != "" {
-			nodeResult.Annotations[annotations.AnnLinodeNodePrivateIP] = privateIP
-		}
-		if nodeResult.Annotations[annotations.AnnLinodeNodePublicIPv6] != publicIPv6 && publicIPv6 != "" {
-			nodeResult.Annotations[annotations.AnnLinodeNodePublicIPv6] = publicIPv6
-		}
+		// Keep the IP annotations in sync with the linode. An address the
+		// linode no longer has is removed, so load balancers stop using it.
+		setOrDeleteAnnotation(nodeResult, annotations.AnnLinodeNodePrivateIP, privateIP)
+		setOrDeleteAnnotation(nodeResult, annotations.AnnLinodeNodePublicIPv6, publicIPv6)
 		updatedNode, err = s.kubeclient.CoreV1().Nodes().Update(ctx, nodeResult, metav1.UpdateOptions{})
 		return err
 	})
 	return updatedNode, err
+}
+
+// setOrDeleteAnnotation sets the annotation to value, or removes it when value is empty.
+func setOrDeleteAnnotation(node *v1.Node, key, value string) {
+	if value == "" {
+		delete(node.Annotations, key)
+		return
+	}
+	if node.Annotations == nil {
+		node.Annotations = map[string]string{}
+	}
+	node.Annotations[key] = value
 }
 
 func (s *nodeController) handleNode(ctx context.Context, node *v1.Node) error {
