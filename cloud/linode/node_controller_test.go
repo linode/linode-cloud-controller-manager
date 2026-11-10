@@ -267,6 +267,57 @@ func TestNodeController_handleNode(t *testing.T) {
 	assert.NoError(t, err, "expected no error during handleNode")
 }
 
+func TestNodeController_handleNodeRemovesStaleIPAnnotations(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	client := mocks.NewMockClient(ctrl)
+	kubeClient := fake.NewClientset()
+	publicIP := net.ParseIP("172.234.31.123")
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "test-node",
+			Labels: map[string]string{annotations.AnnLinodeHostUUID: "123"},
+			Annotations: map[string]string{
+				annotations.AnnLinodeNodePrivateIP:  "192.168.159.135",
+				annotations.AnnLinodeNodePublicIPv6: "2001:db8::f03c:91ff:fe2b:1a2b/128",
+				"other":                             "kept",
+			},
+		},
+		Spec: v1.NodeSpec{ProviderID: "linode://123"},
+		Status: v1.NodeStatus{
+			Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.0.2"}},
+		},
+	}
+	_, err := kubeClient.CoreV1().Nodes().Create(t.Context(), node, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	nodeCtrl := newNodeController(kubeClient, client, nil, services.NewInstances(client))
+	// The private IPv4 and the IPv6 range were removed from the linode.
+	client.EXPECT().ListInstances(gomock.Any(), &linodego.ListOptions{PageSize: linodeClient.MaxPageSize, Filter: "{}"}).Times(1).Return([]linodego.Instance{
+		{ID: 123, Label: "test-node", IPv4: []net.IP{publicIP}, HostUUID: "123"},
+	}, nil)
+	require.NoError(t, nodeCtrl.handleNode(t.Context(), node))
+
+	updated, err := kubeClient.CoreV1().Nodes().Get(t.Context(), "test-node", metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.NotContains(t, updated.Annotations, annotations.AnnLinodeNodePrivateIP)
+	assert.NotContains(t, updated.Annotations, annotations.AnnLinodeNodePublicIPv6)
+	assert.Equal(t, "kept", updated.Annotations["other"])
+
+	// Backends fall back to the node's InternalIP instead of the removed address.
+	backendIP, err := getNodePrivateIP(updated, 0)
+	require.NoError(t, err)
+	assert.Equal(t, "10.0.0.2", backendIP)
+
+	// A later refresh (served from the instance cache) sees nothing to change.
+	nodeCtrl.seenMetadata["test-node"] = nodeMetadata{seenAt: time.Now().Add(-2 * nodeCtrl.ttl)}
+	before := updated.ResourceVersion
+	require.NoError(t, nodeCtrl.handleNode(t.Context(), updated))
+	again, err := kubeClient.CoreV1().Nodes().Get(t.Context(), "test-node", metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, before, again.ResourceVersion)
+}
+
 func TestNodeController_metadataNeedsRefresh(t *testing.T) {
 	publicIP := net.ParseIP("172.234.31.123")
 	privateIP := net.ParseIP("192.168.159.135")
