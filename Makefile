@@ -80,6 +80,11 @@ vet: fmt
 lint:
 	golangci-lint run -c .golangci.yml
 
+.PHONY: chainsaw-lint
+chainsaw-lint: ## Validate the Chainsaw configuration and every test manifest.
+	chainsaw lint configuration --file .chainsaw.yaml
+	find e2e -type f -name 'chainsaw-test.yaml' -print0 | xargs -0 -n 1 chainsaw lint test --file
+
 .PHONY: lint-fix
 lint-fix:
 	golangci-lint run -c .golangci.yml --fix
