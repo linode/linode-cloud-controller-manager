@@ -92,6 +92,10 @@ run = "make vet"
 description = "Run golangci-lint"
 run = "make lint"
 
+[tasks.chainsaw-lint]
+description = "Validate the Chainsaw configuration and every E2E test manifest."
+run = "make chainsaw-lint"
+
 [tasks.lint-fix]
 description = "Run golangci-lint --fix"
 run = "make lint-fix"

@@ -84,6 +84,9 @@ jobs:
       - name: lint
         run: mise run lint
 
+
+      - name: Chainsaw lint
+        run: mise run chainsaw-lint
       - name: Helm Lint
         run: mise run helm-lint
 
