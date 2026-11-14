@@ -227,6 +227,25 @@ func TestGetSubnetID(t *testing.T) {
 }
 
 func TestGetNodeBalancerBackendIPv4SubnetID(t *testing.T) {
+	t.Run("No VPC configured", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		client := mocks.NewMockClient(ctrl)
+		currVPCNames := options.Options.VPCNames
+		currNodeBalancerBackendIPv4SubnetName := options.Options.NodeBalancerBackendIPv4SubnetName
+		defer func() {
+			options.Options.VPCNames = currVPCNames
+			options.Options.NodeBalancerBackendIPv4SubnetName = currNodeBalancerBackendIPv4SubnetName
+		}()
+		options.Options.VPCNames = nil
+		options.Options.NodeBalancerBackendIPv4SubnetName = "nb-backends"
+		subnetID, err := GetNodeBalancerBackendIPv4SubnetID(client)
+		require.ErrorContains(t, err, "requires --vpc-names or --vpc-ids")
+		if subnetID != 0 {
+			t.Errorf("getNodeBalancerBackendIPv4SubnetID() = %v, want %v", subnetID, 0)
+		}
+	})
+
 	t.Run("VPC not found", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
