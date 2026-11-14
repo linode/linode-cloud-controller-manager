@@ -617,6 +617,11 @@ func (c *cloudAllocator) AllocateOrOccupyCIDR(ctx context.Context, node *v1.Node
 	// Allocate IPv6 CIDR for the node.
 	logger.V(4).Info("Allocating IPv6 CIDR", "node", klog.KObj(node))
 	if allocatedCIDRs[1], err = c.allocateIPv6CIDR(ctx, node); err != nil {
+		// The node is requeued on error and gets a new IPv4 CIDR on the next attempt,
+		// so give this one back to the pool instead of leaking it.
+		if releaseErr := c.cidrSet.Release(podCIDR); releaseErr != nil {
+			logger.Error(releaseErr, "Error releasing allocated CIDR for node", "node", klog.KObj(node), "CIDR", podCIDR)
+		}
 		return fmt.Errorf("failed to assign IPv6 CIDR: %w", err)
 	}
 
