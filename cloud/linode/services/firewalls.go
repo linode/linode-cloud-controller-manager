@@ -459,7 +459,9 @@ func (l *LinodeClient) getNodeBalancerDeviceID(ctx context.Context, firewallID, 
 	}
 
 	for i := range devices {
-		if devices[i].Entity.ID == nbID {
+		// Linodes, Linode interfaces and NodeBalancers have separate ID spaces, so the
+		// entity type must be checked as well as the ID.
+		if devices[i].Entity.Type == linodego.FirewallDeviceNodeBalancer && devices[i].Entity.ID == nbID {
 			return devices[i].ID, true, nil
 		}
 	}
