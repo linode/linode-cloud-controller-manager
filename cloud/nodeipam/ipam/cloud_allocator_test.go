@@ -241,7 +241,7 @@ func setNodeIPAMSubnetOptionsForTest(t *testing.T, vpcNames, subnetNames []strin
 	options.Options.VPCNames = vpcNames
 	options.Options.SubnetNames = subnetNames
 	services.VpcIDs = map[string]int{}
-	services.SubnetIDs = map[string]int{}
+	services.SubnetIDs = map[services.SubnetKey]int{}
 
 	t.Cleanup(func() {
 		options.Options.VPCNames = prevVPCNames

@@ -165,7 +165,7 @@ func TestGetVPCCreateOptionsWithReservedBackendRange(t *testing.T) {
 
 			services.Mu.Lock()
 			services.VpcIDs = map[string]int{"test-vpc": 123}
-			services.SubnetIDs = map[string]int{"test-subnet": 456}
+			services.SubnetIDs = map[services.SubnetKey]int{{VPCID: 123, Name: "test-subnet"}: 456}
 			services.Mu.Unlock()
 
 			linodeClient.EXPECT().
