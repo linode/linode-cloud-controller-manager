@@ -195,7 +195,7 @@ func TestNewCloud(t *testing.T) {
 		options.Options.VPCNames = []string{"vpc-test1", "vpc-test2"}
 		options.Options.NodeBalancerBackendIPv4SubnetName = "t1"
 		services.VpcIDs = map[string]int{"vpc-test1": 1, "vpc-test2": 2, "vpc-test3": 3}
-		services.SubnetIDs = map[string]int{"t1": 1, "t2": 2, "t3": 3}
+		services.SubnetIDs = map[services.SubnetKey]int{{VPCID: 1, Name: "t1"}: 1, {VPCID: 1, Name: "t2"}: 2, {VPCID: 1, Name: "t3"}: 3}
 		defer func() {
 			options.Options.LoadBalancerType = ""
 			options.Options.EnableRouteController = rtEnabled
@@ -203,7 +203,7 @@ func TestNewCloud(t *testing.T) {
 			options.Options.NodeBalancerBackendIPv4SubnetID = 0
 			options.Options.NodeBalancerBackendIPv4SubnetName = ""
 			services.VpcIDs = map[string]int{}
-			services.SubnetIDs = map[string]int{}
+			services.SubnetIDs = map[services.SubnetKey]int{}
 		}()
 		_, err := newCloud()
 		assert.Error(t, err, "expected error if incorrect loadbalancertype is set")

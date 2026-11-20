@@ -26,7 +26,8 @@ func TestListRoutes(t *testing.T) {
 	services.VpcIDs["test"] = 1
 	services.VpcIDs["abc"] = 2
 	options.Options.SubnetNames = []string{"default"}
-	services.SubnetIDs["default"] = 1
+	services.SubnetIDs[services.SubnetKey{VPCID: 1, Name: "default"}] = 1
+	services.SubnetIDs[services.SubnetKey{VPCID: 2, Name: "default"}] = 1
 	options.Options.EnableRouteController = true
 
 	nodeID := 123

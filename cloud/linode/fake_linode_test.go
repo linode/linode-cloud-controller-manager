@@ -47,7 +47,7 @@ func newFake(t *testing.T) *fakeAPI {
 	t.Helper()
 	services.Mu.Lock()
 	services.VpcIDs = make(map[string]int)
-	services.SubnetIDs = make(map[string]int)
+	services.SubnetIDs = make(map[services.SubnetKey]int)
 	services.Mu.Unlock()
 
 	fake := &fakeAPI{

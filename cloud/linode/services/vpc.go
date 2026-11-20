@@ -20,9 +20,16 @@ var (
 	Mu sync.RWMutex
 	// VpcIDs map stores vpc id's for given vpc labels
 	VpcIDs = make(map[string]int, 0)
-	// SubnetIDs map stores subnet id's for given subnet labels
-	SubnetIDs = make(map[string]int, 0)
+	// SubnetIDs map stores subnet id's for given VPC ID and subnet label pairs
+	SubnetIDs = make(map[SubnetKey]int, 0)
 )
+
+// SubnetKey identifies a subnet by its parent VPC and label.
+// Subnet labels are only unique within a VPC.
+type SubnetKey struct {
+	VPCID int
+	Name  string
+}
 
 type vpcLookupError struct {
 	value string
@@ -77,13 +84,14 @@ func GetVPCID(ctx context.Context, linodeClient client.Client, vpcName string) (
 	return 0, vpcLookupError{vpcName}
 }
 
-// GetSubnetID returns the subnet ID of given subnet label
+// GetSubnetID returns the subnet ID of given subnet label within the given VPC
 func GetSubnetID(ctx context.Context, linodeClient client.Client, vpcID int, subnetName string) (int, error) {
 	Mu.Lock()
 	defer Mu.Unlock()
 
-	// Check if map contains the id for the given label
-	if subnetid, ok := SubnetIDs[subnetName]; ok {
+	// Check if map contains the id for the given VPC and label
+	key := SubnetKey{VPCID: vpcID, Name: subnetName}
+	if subnetid, ok := SubnetIDs[key]; ok {
 		return subnetid, nil
 	}
 	// Otherwise, get it from linodego.ListVPCSubnets()
@@ -93,7 +101,7 @@ func GetSubnetID(ctx context.Context, linodeClient client.Client, vpcID int, sub
 	}
 	for i := range subnets {
 		if subnets[i].Label == subnetName {
-			SubnetIDs[subnetName] = subnets[i].ID
+			SubnetIDs[key] = subnets[i].ID
 			return subnets[i].ID, nil
 		}
 	}
@@ -251,7 +259,7 @@ func resolveSubnetNames(linodeClient client.Client, vpcID int) ([]string, error)
 			return nil, fmt.Errorf("failed to get subnet %d for VPC %d: %w", subnetID, vpcID, err)
 		}
 
-		SubnetIDs[subnet.Label] = subnet.ID
+		SubnetIDs[SubnetKey{VPCID: vpcID, Name: subnet.Label}] = subnet.ID
 		subnetNames = append(subnetNames, subnet.Label)
 	}
 

@@ -157,13 +157,13 @@ func TestGetVPCIPAddresses(t *testing.T) {
 		defer func() { options.Options.SubnetNames = sn }()
 		options.Options.SubnetNames = []string{"subnet4"}
 		VpcIDs = map[string]int{"test1": 1}
-		SubnetIDs = map[string]int{"subnet1": 1}
+		SubnetIDs = map[SubnetKey]int{{VPCID: 1, Name: "subnet1"}: 1}
 		client.EXPECT().ListVPCs(gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPC{{ID: 10, Label: "test10"}}, nil)
 		client.EXPECT().ListVPCSubnets(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCSubnet{{ID: 4, Label: "subnet4"}}, nil)
 		client.EXPECT().ListVPCIPAddresses(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCIP{}, nil)
 		_, err := GetVPCIPAddresses(t.Context(), client, "test10")
 		require.NoError(t, err)
-		_, exists := SubnetIDs["subnet4"]
+		_, exists := SubnetIDs[SubnetKey{VPCID: 10, Name: "subnet4"}]
 		assert.True(t, exists, "subnet4 should be present in subnetIDs map")
 	})
 }
@@ -173,14 +173,14 @@ func TestGetSubnetID(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		SubnetIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
+		SubnetIDs = map[SubnetKey]int{{Name: "test1"}: 1, {Name: "test2"}: 2, {Name: "test3"}: 3}
 		got, err := GetSubnetID(t.Context(), client, 0, "test3")
 		if err != nil {
 			t.Errorf("GetSubnetID() error = %v", err)
 			return
 		}
-		if got != SubnetIDs["test3"] {
-			t.Errorf("GetSubnetID() = %v, want %v", got, SubnetIDs["test3"])
+		if got != SubnetIDs[SubnetKey{Name: "test3"}] {
+			t.Errorf("GetSubnetID() = %v, want %v", got, SubnetIDs[SubnetKey{Name: "test3"}])
 		}
 	})
 
@@ -188,14 +188,14 @@ func TestGetSubnetID(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		SubnetIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
+		SubnetIDs = map[SubnetKey]int{{Name: "test1"}: 1, {Name: "test2"}: 2, {Name: "test3"}: 3}
 		client.EXPECT().ListVPCSubnets(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCSubnet{}, errors.New("error"))
 		got, err := GetSubnetID(t.Context(), client, 0, "test4")
 		require.Error(t, err)
 		if got != 0 {
 			t.Errorf("GetSubnetID() = %v, want %v", got, 0)
 		}
-		_, exists := SubnetIDs["test4"]
+		_, exists := SubnetIDs[SubnetKey{Name: "test4"}]
 		assert.False(t, exists, "subnet4 should not be present in subnetIDs")
 	})
 
@@ -203,7 +203,7 @@ func TestGetSubnetID(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		SubnetIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
+		SubnetIDs = map[SubnetKey]int{{Name: "test1"}: 1, {Name: "test2"}: 2, {Name: "test3"}: 3}
 		client.EXPECT().ListVPCSubnets(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCSubnet{}, nil)
 		got, err := GetSubnetID(t.Context(), client, 0, "test4")
 		require.ErrorIs(t, err, subnetLookupError{"test4"})
@@ -216,7 +216,7 @@ func TestGetSubnetID(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		client := mocks.NewMockClient(ctrl)
-		SubnetIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
+		SubnetIDs = map[SubnetKey]int{{Name: "test1"}: 1, {Name: "test2"}: 2, {Name: "test3"}: 3}
 		client.EXPECT().ListVPCSubnets(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCSubnet{{ID: 4, Label: "test4"}}, nil)
 		got, err := GetSubnetID(t.Context(), client, 0, "test4")
 		require.NoError(t, err)
@@ -224,6 +224,34 @@ func TestGetSubnetID(t *testing.T) {
 			t.Errorf("GetSubnetID() = %v, want %v", got, 4)
 		}
 	})
+}
+
+func TestGetSubnetIDSameNameDifferentVPCs(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	client := mocks.NewMockClient(ctrl)
+	prev := SubnetIDs
+	defer func() { SubnetIDs = prev }()
+	SubnetIDs = map[SubnetKey]int{}
+
+	client.EXPECT().ListVPCSubnets(gomock.Any(), 101, gomock.Any()).Times(1).Return([]linodego.VPCSubnet{{ID: 1001, Label: "default"}}, nil)
+	client.EXPECT().ListVPCSubnets(gomock.Any(), 202, gomock.Any()).Times(1).Return([]linodego.VPCSubnet{{ID: 2001, Label: "default"}}, nil)
+
+	got, err := GetSubnetID(t.Context(), client, 101, "default")
+	require.NoError(t, err)
+	assert.Equal(t, 1001, got)
+
+	got, err = GetSubnetID(t.Context(), client, 202, "default")
+	require.NoError(t, err)
+	assert.Equal(t, 2001, got, "subnet cached for another VPC must not be returned")
+
+	// both are now served from the cache
+	got, err = GetSubnetID(t.Context(), client, 101, "default")
+	require.NoError(t, err)
+	assert.Equal(t, 1001, got)
+	got, err = GetSubnetID(t.Context(), client, 202, "default")
+	require.NoError(t, err)
+	assert.Equal(t, 2001, got)
 }
 
 func TestGetNodeBalancerBackendIPv4SubnetID(t *testing.T) {
@@ -241,7 +269,7 @@ func TestGetNodeBalancerBackendIPv4SubnetID(t *testing.T) {
 		}()
 		options.Options.VPCNames = []string{"vpc-test1", "vpc-test2", "vpc-test3"}
 		VpcIDs = map[string]int{"vpc-test2": 2, "vpc-test3": 3}
-		SubnetIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
+		SubnetIDs = map[SubnetKey]int{{Name: "test1"}: 1, {Name: "test2"}: 2, {Name: "test3"}: 3}
 		client.EXPECT().ListVPCs(gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPC{}, errors.New("error"))
 		subnetID, err := GetNodeBalancerBackendIPv4SubnetID(client)
 		require.Error(t, err)
@@ -258,7 +286,7 @@ func TestGetNodeBalancerBackendIPv4SubnetID(t *testing.T) {
 		defer func() { options.Options.VPCNames = currVPCNames }()
 		options.Options.VPCNames = []string{"vpc-test1", "vpc-test2", "vpc-test3"}
 		VpcIDs = map[string]int{"vpc-test1": 1, "vpc-test2": 2, "vpc-test3": 3}
-		SubnetIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
+		SubnetIDs = map[SubnetKey]int{{Name: "test1"}: 1, {Name: "test2"}: 2, {Name: "test3"}: 3}
 		client.EXPECT().ListVPCSubnets(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCSubnet{}, errors.New("error"))
 		subnetID, err := GetNodeBalancerBackendIPv4SubnetID(client)
 		require.Error(t, err)
@@ -280,7 +308,7 @@ func TestGetNodeBalancerBackendIPv4SubnetID(t *testing.T) {
 		options.Options.VPCNames = []string{"vpc-test1", "vpc-test2", "vpc-test3"}
 		options.Options.NodeBalancerBackendIPv4SubnetName = "test4"
 		VpcIDs = map[string]int{"vpc-test1": 1, "vpc-test2": 2, "vpc-test3": 3}
-		SubnetIDs = map[string]int{"test1": 1, "test2": 2, "test3": 3}
+		SubnetIDs = map[SubnetKey]int{{Name: "test1"}: 1, {Name: "test2"}: 2, {Name: "test3"}: 3}
 		client.EXPECT().ListVPCSubnets(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return([]linodego.VPCSubnet{{ID: 4, Label: "test4"}}, nil)
 		subnetID, err := GetNodeBalancerBackendIPv4SubnetID(client)
 		require.NoError(t, err)
@@ -439,7 +467,7 @@ func Test_validateAndSetVPCSubnetFlags(t *testing.T) {
 			options.Options.VPCIDs = currVPCIDs
 			options.Options.SubnetIDs = currSubnetIDs
 			VpcIDs = map[string]int{}
-			SubnetIDs = map[string]int{}
+			SubnetIDs = map[SubnetKey]int{}
 		}()
 		options.Options.VPCIDs = []int{1}
 		options.Options.SubnetIDs = []int{1, 2}
@@ -459,7 +487,7 @@ func Test_validateAndSetVPCSubnetFlags(t *testing.T) {
 			options.Options.VPCIDs = currVPCIDs
 			options.Options.SubnetIDs = currSubnetIDs
 			VpcIDs = map[string]int{}
-			SubnetIDs = map[string]int{}
+			SubnetIDs = map[SubnetKey]int{}
 		}()
 		options.Options.VPCIDs = []int{1}
 		options.Options.SubnetIDs = []int{1, 2}
@@ -480,7 +508,7 @@ func Test_validateAndSetVPCSubnetFlags(t *testing.T) {
 			options.Options.VPCNames = currVPCNames
 			options.Options.SubnetNames = currSubnetNames
 			VpcIDs = map[string]int{}
-			SubnetIDs = map[string]int{}
+			SubnetIDs = map[SubnetKey]int{}
 		}()
 		options.Options.VPCNames = []string{"vpc1"}
 		options.Options.SubnetNames = []string{"subnet1", "subnet2"}
